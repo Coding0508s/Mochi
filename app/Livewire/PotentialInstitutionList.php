@@ -1,0 +1,464 @@
+<?php
+
+namespace App\Livewire;
+
+use App\Models\AccountInformation;
+use App\Models\CoNewTarget;
+use App\Models\CoNewTargetDetail;
+use App\Models\Institution;
+use App\Services\PotentialInstitutionSkCodeService;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Throwable;
+use Livewire\Component;
+use Livewire\WithPagination;
+
+class PotentialInstitutionList extends Component
+{
+    use WithPagination;
+
+    public string $search = '';
+    public string $filterYear = '';
+    public string $filterManager = '';
+    public string $filterType = '';
+    public string $filterRegion = '';
+    public string $summaryFilter = 'all'; // all | new | terminated
+
+    // 신규 등록 모달 상태
+    public bool $showCreateModal = false;
+    public string $newManager = '';
+    public string $newConsultingType = '';
+    public string $newConnected = '';
+    public string $newMeetingDate = '';
+    public string $newMeetingTime = '';
+    public string $newMeetingTimeEnd = '';
+    public string $newType = '';
+    public string $newAccountCode = '';
+    public string $newAccountName = '';
+    public string $newDirector = '';
+    public string $newPhone = '';
+    public string $newAddress = '';
+    public string $newPossibility = '';
+    public string $newDescription = '';
+    public string $newLS = '';
+    public string $newGSK = '';
+    public string $newGSE = '';
+    public string $newApproaching = '';
+    public string $newPresenting = '';
+    public string $newConsultingCount = '';
+    public string $newClosing = '';
+    public string $newDroppedOut = '';
+
+    // 상세 모달 상태
+    public bool $showDetailModal = false;
+    public ?array $selectedTarget = null;
+    public array $detailMeetings = [];
+    public bool $showMeetingDetailModal = false;
+    public ?array $selectedMeeting = null;
+
+    public function updatingSearch(): void { $this->resetPage(); }
+    public function updatingFilterYear(): void { $this->resetPage(); }
+    public function updatingFilterManager(): void { $this->resetPage(); }
+    public function updatingFilterType(): void { $this->resetPage(); }
+    public function updatingFilterRegion(): void { $this->resetPage(); }
+    public function updatingSummaryFilter(): void { $this->resetPage(); }
+
+    public function openCreateModal(): void
+    {
+        $this->resetValidation();
+        $this->resetCreateForm();
+        $this->showCreateModal = true;
+    }
+
+    public function closeCreateModal(): void
+    {
+        $this->showCreateModal = false;
+        $this->resetValidation();
+    }
+
+    public function saveNewTarget(): void
+    {
+        $validated = $this->validate();
+        $meetingDate = Carbon::parse($validated['newMeetingDate']);
+
+        try {
+            DB::transaction(function () use ($validated, $meetingDate): void {
+                $ls = $this->toNonNegativeInt($validated['newLS'] ?? null);
+                $gsK = $this->toNonNegativeInt($validated['newGSK'] ?? null);
+                $gsE = $this->toNonNegativeInt($validated['newGSE'] ?? null);
+
+                $userSk = trim((string) ($validated['newAccountCode'] ?? ''));
+
+                $target = CoNewTarget::query()->create([
+                    'Year' => (int) $meetingDate->format('Y'),
+                    'CreatedDate' => $meetingDate->format('Y-m-d'),
+                    'AccountManager' => $validated['newManager'] ?: null,
+                    'AccountCode' => $userSk !== '' ? $userSk : null,
+                    'AccountName' => $validated['newAccountName'],
+                    'Address' => $validated['newAddress'] ?: null,
+                    'Director' => $validated['newDirector'] ?: null,
+                    'Phone' => $validated['newPhone'] ?: null,
+                    'Connected' => $validated['newConnected'] ?: null,
+                    'Type' => $validated['newType'],
+                    'Gubun' => $validated['newConsultingType'],
+                    'LS' => $ls,
+                    'GS_K' => $gsK,
+                    'GS_E' => $gsE,
+                    'Total' => $ls + $gsK + $gsE,
+                    'Approaching' => $this->toNonNegativeInt($validated['newApproaching'] ?? null),
+                    'Presenting' => $this->toNonNegativeInt($validated['newPresenting'] ?? null),
+                    'Consulting' => $this->toNonNegativeInt($validated['newConsultingCount'] ?? null),
+                    'Closing' => $this->toNonNegativeInt($validated['newClosing'] ?? null),
+                    'DroppedOut' => $this->toNonNegativeInt($validated['newDroppedOut'] ?? null),
+                    'IsContract' => false,
+                    'ContractedDate' => null,
+                    'Possibility' => $validated['newPossibility'] ?: null,
+                ]);
+
+                $skCode = app(PotentialInstitutionSkCodeService::class)
+                    ->resolveForManualRegistration($userSk, (int) $target->ID);
+
+                if ($userSk === '') {
+                    $target->update(['AccountCode' => $skCode]);
+                }
+
+                Institution::query()->create([
+                    'SKcode' => $skCode,
+                    'AccountName' => $validated['newAccountName'],
+                    'Director' => $validated['newDirector'] ?: null,
+                    'Phone' => $validated['newPhone'] ?: null,
+                    'Address' => $validated['newAddress'] ?: null,
+                    'Gubun' => null,
+                ]);
+
+                AccountInformation::query()->updateOrCreate(
+                    ['SK_Code' => $skCode],
+                    [
+                        'Account_Name' => $validated['newAccountName'],
+                        'Address' => $validated['newAddress'] ?: null,
+                        'Customer_Type' => $validated['newType'] ?: null,
+                    ]
+                );
+
+                CoNewTargetDetail::query()->create([
+                    'Year' => (int) $meetingDate->format('Y'),
+                    'AccountName' => $validated['newAccountName'],
+                    'AccountManager' => $validated['newManager'] ?: null,
+                    'MeetingDate' => $meetingDate->format('Y-m-d'),
+                    'MeetingTime' => $validated['newMeetingTime'] ?: null,
+                    'MeetingTime_End' => $validated['newMeetingTimeEnd'] ?: null,
+                    'Description' => $validated['newDescription'] ?: null,
+                    'ConsultingType' => $validated['newConsultingType'],
+                    'Possibility' => $validated['newPossibility'] ?: null,
+                ]);
+            });
+        } catch (Throwable $e) {
+            report($e);
+            $this->addError('createForm', '저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+
+            return;
+        }
+
+        $this->closeCreateModal();
+        $this->resetCreateForm();
+        $this->resetPage();
+        session()->flash('success', '잠재 기관이 등록되었고, 기관 목록에도 반영되었습니다.');
+    }
+
+    protected function rules(): array
+    {
+        return [
+            'newManager' => ['nullable', 'string', 'max:100'],
+            'newConsultingType' => ['required', 'string', 'max:100'],
+            'newConnected' => ['nullable', 'string', 'max:100'],
+            'newMeetingDate' => ['required', 'date'],
+            'newMeetingTime' => ['nullable', 'date_format:H:i'],
+            'newMeetingTimeEnd' => ['nullable', 'date_format:H:i'],
+            'newType' => ['required', 'string', 'max:100'],
+            'newAccountCode' => [
+                'nullable',
+                'string',
+                'max:100',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! is_string($value) || trim($value) === '') {
+                        return;
+                    }
+                    if (Institution::query()->where('SKcode', trim($value))->exists()) {
+                        $fail('이미 기관 목록에 등록된 SK코드입니다. 다른 값을 입력하거나 비워 두면 임시 코드(LEAD-*)가 부여됩니다.');
+                    }
+                },
+            ],
+            'newAccountName' => ['required', 'string', 'max:150'],
+            'newDirector' => ['nullable', 'string', 'max:100'],
+            'newPhone' => ['nullable', 'string', 'max:50'],
+            'newAddress' => ['nullable', 'string', 'max:255'],
+            'newPossibility' => ['nullable', 'string', 'max:20'],
+            'newDescription' => ['nullable', 'string', 'max:2000'],
+            'newLS' => ['nullable', 'integer', 'min:0'],
+            'newGSK' => ['nullable', 'integer', 'min:0'],
+            'newGSE' => ['nullable', 'integer', 'min:0'],
+            'newApproaching' => ['nullable', 'integer', 'min:0'],
+            'newPresenting' => ['nullable', 'integer', 'min:0'],
+            'newConsultingCount' => ['nullable', 'integer', 'min:0'],
+            'newClosing' => ['nullable', 'integer', 'min:0'],
+            'newDroppedOut' => ['nullable', 'integer', 'min:0'],
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return [
+            'newConsultingType.required' => '컨설팅타입을 입력해 주세요.',
+            'newMeetingDate.required' => '미팅일자를 입력해 주세요.',
+            'newMeetingDate.date' => '미팅일자 형식이 올바르지 않습니다.',
+            'newMeetingTime.date_format' => '미팅 시작시간 형식이 올바르지 않습니다.',
+            'newMeetingTimeEnd.date_format' => '미팅 종료시간 형식이 올바르지 않습니다.',
+            'newType.required' => '신규구분을 선택해 주세요.',
+            'newAccountName.required' => '기관명을 입력해 주세요.',
+            'newLS.integer' => 'LittleSEED는 숫자만 입력해 주세요.',
+            'newGSK.integer' => 'GrapeSEED(유)는 숫자만 입력해 주세요.',
+            'newGSE.integer' => 'GrapeSEED(초)는 숫자만 입력해 주세요.',
+            'newApproaching.integer' => '관계형성 횟수는 숫자만 입력해 주세요.',
+            'newPresenting.integer' => '제품소개 횟수는 숫자만 입력해 주세요.',
+            'newConsultingCount.integer' => '상담/조정 횟수는 숫자만 입력해 주세요.',
+            'newClosing.integer' => '도입제안 횟수는 숫자만 입력해 주세요.',
+            'newDroppedOut.integer' => '도입취소 횟수는 숫자만 입력해 주세요.',
+            '*.min' => '숫자는 0 이상이어야 합니다.',
+        ];
+    }
+
+    private function resetCreateForm(): void
+    {
+        $this->newManager = (string) (auth()->user()?->name ?? '');
+        $this->newConsultingType = '';
+        $this->newConnected = '';
+        $this->newMeetingDate = '';
+        $this->newMeetingTime = '';
+        $this->newMeetingTimeEnd = '';
+        $this->newType = '';
+        $this->newAccountCode = '';
+        $this->newAccountName = '';
+        $this->newDirector = '';
+        $this->newPhone = '';
+        $this->newAddress = '';
+        $this->newPossibility = '';
+        $this->newDescription = '';
+        $this->newLS = '';
+        $this->newGSK = '';
+        $this->newGSE = '';
+        $this->newApproaching = '';
+        $this->newPresenting = '';
+        $this->newConsultingCount = '';
+        $this->newClosing = '';
+        $this->newDroppedOut = '';
+    }
+
+    private function toNonNegativeInt(mixed $value): int
+    {
+        $intValue = (int) $value;
+
+        return max(0, $intValue);
+    }
+
+    // 행 클릭 시 상세 모달 오픈
+    public function openDetailModal(int $id): void
+    {
+        $target = CoNewTarget::query()
+            ->findOrFail($id);
+
+        $meetingCount = CoNewTargetDetail::query()
+            ->ofAccount((string) ($target->AccountName ?? ''))
+            ->when(filled($target->AccountManager), function ($q) use ($target) {
+                $q->where('AccountManager', $target->AccountManager);
+            })
+            ->count();
+
+        $this->selectedTarget = [
+            'id' => $target->ID,
+            'year' => $target->Year,
+            'created_date' => $target->CreatedDate?->format('Y-m-d') ?? '-',
+            'account_manager' => $target->AccountManager,
+            'account_code' => $target->AccountCode,
+            'account_name' => $target->AccountName,
+            'address' => $target->Address,
+            'director' => $target->Director,
+            'phone' => $target->Phone,
+            'type' => $target->Type,
+            'gubun' => $target->Gubun,
+            'possibility' => $target->Possibility,
+            'connected' => $target->Connected,
+            'ls' => $target->LS,
+            'gs_k' => $target->GS_K,
+            'gs_e' => $target->GS_E,
+            'total' => $target->Total,
+            'approaching' => $target->Approaching,
+            'presenting' => $target->Presenting,
+            'consulting' => $target->Consulting,
+            'closing' => $target->Closing,
+            'dropped_out' => $target->DroppedOut,
+            'is_contract' => (bool) ($target->IsContract ?? false),
+            'contracted_date' => $target->ContractedDate?->format('Y-m-d') ?? '-',
+            'meeting_count' => $meetingCount,
+        ];
+
+        $this->detailMeetings = CoNewTargetDetail::query()
+            ->ofAccount((string) ($target->AccountName ?? ''))
+            ->when(filled($target->AccountManager), function ($q) use ($target) {
+                $q->where('AccountManager', $target->AccountManager);
+            })
+            ->orderByDesc('MeetingDate')
+            ->orderByDesc('ID')
+            ->limit(100)
+            ->get()
+            ->map(function (CoNewTargetDetail $detail) {
+                return [
+                    'id' => $detail->ID,
+                    'year' => $detail->Year,
+                    'account_name' => $detail->AccountName ?? '-',
+                    'meeting_date' => $detail->MeetingDate?->format('Y-m-d') ?? '-',
+                    'meeting_time' => $detail->MeetingTime ? substr((string) $detail->MeetingTime, 0, 5) : '-',
+                    'meeting_time_end' => $detail->MeetingTime_End ? substr((string) $detail->MeetingTime_End, 0, 5) : '-',
+                    'account_manager' => $detail->AccountManager ?? '-',
+                    'consulting_type' => $detail->ConsultingType ?? '-',
+                    'possibility' => $detail->Possibility ?? '-',
+                    'description' => $detail->Description ?? '-',
+                ];
+            })
+            ->toArray();
+
+        $this->showDetailModal = true;
+    }
+
+    public function closeDetailModal(): void
+    {
+        $this->showDetailModal = false;
+        $this->selectedTarget = null;
+        $this->detailMeetings = [];
+        $this->showMeetingDetailModal = false;
+        $this->selectedMeeting = null;
+    }
+
+    public function openMeetingDetailModal(int $meetingId): void
+    {
+        $meeting = collect($this->detailMeetings)->firstWhere('id', $meetingId);
+
+        if (!$meeting) {
+            return;
+        }
+
+        $this->selectedMeeting = $meeting;
+        $this->showMeetingDetailModal = true;
+    }
+
+    public function closeMeetingDetailModal(): void
+    {
+        $this->showMeetingDetailModal = false;
+        $this->selectedMeeting = null;
+    }
+
+    public function render()
+    {
+        $query = CoNewTarget::query()
+            ->keyword($this->search);
+
+        if (filled($this->filterYear)) {
+            $query->where('Year', (int) $this->filterYear);
+        }
+
+        if (filled($this->filterManager)) {
+            $query->where('AccountManager', $this->filterManager);
+        }
+
+        if (filled($this->filterType)) {
+            $type = trim($this->filterType);
+            $query->where(function ($q) use ($type) {
+                $q->where('Type', 'like', "%{$type}%")
+                    ->orWhere('Gubun', 'like', "%{$type}%");
+            });
+        }
+
+        if (filled($this->filterRegion)) {
+            $normalizedRegion = preg_replace('/\s+/u', '', (string) $this->filterRegion) ?? '';
+            if ($normalizedRegion !== '') {
+                $query->whereRaw("REPLACE(Address, ' ', '') like ?", ["%{$normalizedRegion}%"]);
+            }
+        }
+
+        if ($this->summaryFilter === 'new') {
+            $query->where(function ($q) {
+                $q->where('Type', 'like', '%신규%')
+                    ->orWhere('Gubun', 'like', '%신규%');
+            });
+        } elseif ($this->summaryFilter === 'terminated') {
+            $query->where(function ($q) {
+                $q->where('Type', 'like', '%해지%')
+                    ->orWhere('Gubun', 'like', '%해지%')
+                    ->orWhere('Possibility', 'like', '%해지%');
+            });
+        }
+
+        $totalCount = (clone $query)->count();
+
+        $targets = $query
+            ->orderByDesc('CreatedDate')
+            ->orderByDesc('ID')
+            ->paginate(15);
+
+        $meetingCountByAccount = CoNewTargetDetail::query()
+            ->whereIn('AccountName', $targets->pluck('AccountName')->filter()->unique()->values())
+            ->selectRaw('AccountName, COUNT(*) as cnt')
+            ->groupBy('AccountName')
+            ->pluck('cnt', 'AccountName')
+            ->toArray();
+
+        $yearList = CoNewTarget::query()
+            ->whereNotNull('Year')
+            ->distinct()
+            ->orderByDesc('Year')
+            ->pluck('Year');
+
+        $managerList = CoNewTarget::query()
+            ->whereNotNull('AccountManager')
+            ->where('AccountManager', '!=', '')
+            ->distinct()
+            ->orderBy('AccountManager')
+            ->pluck('AccountManager');
+
+        $typeList = CoNewTarget::query()
+            ->whereNotNull('Type')
+            ->where('Type', '!=', '')
+            ->distinct()
+            ->orderBy('Type')
+            ->pluck('Type');
+
+        $allCount = CoNewTarget::query()->count();
+
+        $newCount = CoNewTarget::query()
+            ->where(function ($q) {
+                $q->where('Type', 'like', '%신규%')
+                    ->orWhere('Gubun', 'like', '%신규%');
+            })
+            ->count();
+
+        $terminatedCount = CoNewTarget::query()
+            ->where(function ($q) {
+                $q->where('Type', 'like', '%해지%')
+                    ->orWhere('Gubun', 'like', '%해지%')
+                    ->orWhere('Possibility', 'like', '%해지%');
+            })
+            ->count();
+
+        return view('livewire.potential-institution-list', [
+            'targets' => $targets,
+            'meetingCountByAccount' => $meetingCountByAccount,
+            'yearList' => $yearList,
+            'managerList' => $managerList,
+            'typeList' => $typeList,
+            'totalCount' => $totalCount,
+            'allCount' => $allCount,
+            'newCount' => $newCount,
+            'terminatedCount' => $terminatedCount,
+        ]);
+    }
+}
+

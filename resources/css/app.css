@@ -1,0 +1,454 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../views/vendor/pagination/*.blade.php';
+@source '../views/vendor/livewire/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+@source '../../app/Livewire/**/*.php';
+
+@theme {
+    --font-sans: 'Noto Sans KR', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+        'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --color-mochi-header: #2b78c5;
+    --color-mochi-table-header: #96a373;
+    --color-mochi-title: #2d7a3e;
+    --color-mochi-excel: #5eb8e8;
+}
+
+@layer components {
+    .mochi-app-bg {
+        background: #f9fafc;
+        color: #1f2937;
+    }
+
+    .mochi-sidebar {
+        width: 187px;
+        min-width: 187px;
+        background: #ffffff;
+        color: #344054;
+        border-right: 1px solid #eaecf0;
+        box-shadow: none;
+    }
+
+    .mochi-topbar {
+        height: 64px;
+        background: #1e4b9c;
+        border-bottom: 1px solid #e6ebf2;
+    }
+
+    .mochi-topbar-inner {
+        height: 100%;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        column-gap: 24px;
+        padding: 0 24px;
+    }
+
+    .mochi-topbar-brand {
+        justify-self: start;
+        font-size: 13px;
+        line-height: 20px;
+        font-weight: 600;
+        color: #ffffff;
+        letter-spacing: -0.01em;
+        white-space: nowrap;
+    }
+
+    .mochi-topbar-nav {
+        justify-self: center;
+        display: flex;
+        align-items: center;
+        gap: 24px;
+    }
+
+    .mochi-topbar-nav a {
+        font-size: 12px;
+        line-height: 18px;
+        color: rgba(255, 255, 255, 0.88);
+        transition: color 0.16s ease;
+    }
+
+    .mochi-topbar-nav a:hover {
+        color: #ffffff;
+    }
+
+    .mochi-topbar-user {
+        justify-self: end;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .mochi-topbar-action {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.14);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+    }
+
+    .mochi-topbar-account {
+        height: 36px;
+        min-width: 168px;
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 12px;
+        color: #ffffff;
+    }
+
+    .mochi-content-wrap {
+        background: #f4f6f9;
+        padding: 18px;
+    }
+
+    .mochi-page {
+        display: grid;
+        gap: 14px;
+    }
+
+    .mochi-summary-card,
+    .mochi-filter-card,
+    .mochi-table-card,
+    .mochi-panel-card {
+        background: #ffffff;
+        border: 1px solid #d9dee7;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(17, 24, 39, 0.04);
+    }
+
+    .mochi-summary-card {
+        padding: 14px 18px;
+    }
+
+    .mochi-filter-card {
+        padding: 12px 16px;
+    }
+
+    .mochi-table-card {
+        overflow: hidden;
+    }
+
+    .mochi-table-head {
+        background: #e8e6d9;
+        border-bottom: 1px solid #cfd6df;
+    }
+
+    .mochi-table-row-hover:hover {
+        background: #eef5ff;
+    }
+
+    .mochi-modal-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        background: rgba(15, 23, 42, 0.46);
+    }
+
+    .mochi-modal-shell {
+        width: 100%;
+        border-radius: 18px;
+        background: #ffffff;
+        border: 1px solid #d9dee7;
+        box-shadow: 0 18px 42px rgba(15, 23, 42, 0.22);
+        overflow: hidden;
+    }
+
+    .mochi-btn-primary {
+        background: #2b78c5;
+        color: #ffffff;
+    }
+
+    .mochi-btn-primary:hover {
+        background: #246ab0;
+    }
+
+    .sidebar-nav {
+        padding: 8px;
+        font-size: 14px;
+    }
+
+    .sidebar-group {
+        margin-bottom: 2px;
+    }
+
+    .sidebar-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        min-height: 36px;
+        padding: 8px;
+        border-radius: 10px;
+        font-size: 14px;
+        line-height: 20px;
+        font-weight: 500;
+        color: #344054;
+        transition: background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+    }
+
+    .sidebar-item-lead {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        flex: 1;
+        text-align: left;
+    }
+
+    .sidebar-icon {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+        color: #2b78c5;
+    }
+
+    .sidebar-icon--sm {
+        width: 16px;
+        height: 16px;
+    }
+
+    .sidebar-chevron {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+        color: #98a2b3;
+    }
+
+    .sidebar-item:hover {
+        background: #f2f4f7;
+    }
+
+    .sidebar-item-default {
+        color: #344054;
+    }
+
+    .sidebar-item-default:hover {
+        color: #344054;
+    }
+
+    .sidebar-item-active {
+        background: #d9e7f7;
+        color: #344054;
+    }
+
+    .sidebar-item-active:hover {
+        background: #d1e1f5;
+    }
+
+    .sidebar-sublist {
+        margin-top: 2px;
+        margin-left: 8px;
+        padding-left: 8px;
+        border-left: 1px solid #eaecf0;
+        display: grid;
+        gap: 2px;
+    }
+
+    .sidebar-subitem {
+        display: block;
+        min-height: 32px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        font-size: 13px;
+        line-height: 20px;
+        font-weight: 500;
+        color: #475467;
+        transition: background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+    }
+
+    .sidebar-subitem.sidebar-subitem-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .sidebar-subitem-row .sidebar-subitem-label {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .sidebar-subitem:hover {
+        background: #f2f4f7;
+        color: #344054;
+    }
+
+    .sidebar-subitem-active {
+        background: #d9e7f7;
+        color: #344054;
+    }
+
+    .sidebar-subitem-active:hover {
+        background: #d1e1f5;
+    }
+
+    .sidebar-divider {
+        border-top: 1px solid #eaecf0;
+        margin: 8px 8px 6px;
+    }
+
+    .sidebar-focusable:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px #c3d7f3;
+    }
+
+    /* Pagination — Laravel + Livewire (vendor pagination views) */
+    .mochi-pagination-summary {
+        font-size: 14px;
+        line-height: 20px;
+        color: #475467;
+    }
+
+    .mochi-pagination-summary .font-medium {
+        font-weight: 600;
+        color: #344054;
+    }
+
+    .mochi-pagination-mobile-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 16px;
+        font-size: 14px;
+        font-weight: 500;
+        line-height: 20px;
+        font-family: inherit;
+        color: #344054;
+        background: #ffffff;
+        border: 1px solid #d9dee7;
+        border-radius: 10px;
+        box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
+        text-decoration: none;
+        transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+    }
+
+    button.mochi-pagination-mobile-btn {
+        cursor: pointer;
+        appearance: none;
+    }
+
+    a.mochi-pagination-mobile-btn:hover {
+        background: #eef5ff;
+        color: #1e4b9c;
+        border-color: #c3d7f3;
+    }
+
+    .mochi-pagination-mobile-btn:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px #c3d7f3;
+    }
+
+    span.mochi-pagination-mobile-btn--disabled {
+        color: #98a2b3;
+        background: #f9fafb;
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+
+    .mochi-pagination-group {
+        display: inline-flex;
+        flex-direction: row;
+        align-items: stretch;
+        border: 1px solid #d9dee7;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #ffffff;
+        box-shadow: 0 1px 3px rgba(17, 24, 39, 0.05);
+    }
+
+    .mochi-pagination-cell {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 36px;
+        min-width: 36px;
+        padding: 0 12px;
+        font-size: 14px;
+        font-weight: 500;
+        line-height: 20px;
+        font-family: inherit;
+        color: #344054;
+        background: #ffffff;
+        border: none;
+        border-right: 1px solid #d9dee7;
+        margin: 0;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background-color 0.16s ease, color 0.16s ease;
+    }
+
+    button.mochi-pagination-cell {
+        appearance: none;
+    }
+
+    .mochi-pagination-group > span:last-child .mochi-pagination-cell {
+        border-right: none;
+    }
+
+    a.mochi-pagination-cell:hover,
+    button.mochi-pagination-cell:hover:not(:disabled) {
+        background: #eef5ff;
+        color: #1e4b9c;
+    }
+
+    .mochi-pagination-cell:focus-visible {
+        outline: none;
+        box-shadow: inset 0 0 0 2px #c3d7f3;
+        position: relative;
+        z-index: 1;
+    }
+
+    .mochi-pagination-cell--current {
+        background: #d9e7f7;
+        color: #1e4b9c;
+        font-weight: 600;
+        cursor: default;
+    }
+
+    .mochi-pagination-cell--current:hover {
+        background: #d9e7f7;
+        color: #1e4b9c;
+    }
+
+    .mochi-pagination-cell--disabled,
+    span.mochi-pagination-cell--disabled {
+        color: #98a2b3;
+        background: #f9fafb;
+        cursor: default;
+    }
+
+    .mochi-pagination-cell--ellipsis {
+        cursor: default;
+        color: #667085;
+        background: #ffffff;
+    }
+
+    .mochi-pagination-cell--ellipsis:hover {
+        background: #ffffff;
+        color: #667085;
+    }
+
+    button.mochi-pagination-cell:disabled {
+        color: #98a2b3;
+        background: #f9fafb;
+        cursor: default;
+    }
+
+    button.mochi-pagination-cell:disabled:hover {
+        background: #f9fafb;
+        color: #98a2b3;
+    }
+}
