@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Department;
 use App\Models\Employee;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -14,25 +15,41 @@ class PeopleEmployeesList extends Component
     use WithPagination;
 
     public string $search = '';
+
     public string $searchType = 'name'; // name | email | department
+
     public string $filterStatus = '';   // '', '1', '0', ...
+
     public string $filterDept = '';
 
     public string $sortField = 'KOREANAME';
+
     public string $sortDirection = 'asc';
 
     public bool $showEditModal = false;
+
     public string $editingEmpNo = '';
+
     public string $editKoreanName = '';
+
     public string $editEnglishName = '';
+
     public string $editJob = '';
+
     public string $editEmail = '';
+
     public string $editPhone = '';
+
     public string $editStatus = '';
+
     public string $editWorkDept = '';
+
     public bool $showCreateTeamModal = false;
+
     public string $newDeptName = '';
+
     public bool $showDeleteTeamModal = false;
+
     public string $deleteDeptNo = '';
 
     protected array $queryString = [
@@ -75,7 +92,7 @@ class PeopleEmployeesList extends Component
     public function openEditModal(string $empNo): void
     {
         $employee = Employee::query()->where('EMPNO', $empNo)->first();
-        if (!$employee) {
+        if (! $employee) {
             return;
         }
 
@@ -112,6 +129,8 @@ class PeopleEmployeesList extends Component
 
     public function saveEmployee(): void
     {
+        Gate::authorize('editEmployeeProfile');
+
         $deptCodes = $this->getDeptOptions()
             ->pluck('WORKDEPT')
             ->map(fn ($deptCode) => (string) $deptCode)
@@ -147,9 +166,15 @@ class PeopleEmployeesList extends Component
         ]);
 
         $employee = Employee::query()->where('EMPNO', $this->editingEmpNo)->first();
-        if (!$employee) {
+        if (! $employee) {
             $this->addError('editKoreanName', '수정 대상 직원을 찾을 수 없습니다.');
+
             return;
+        }
+
+        $previousWorkDept = (string) ($employee->WORKDEPT ?? '');
+        if ($previousWorkDept !== $validated['editWorkDept']) {
+            Gate::authorize('manageEmployeeDepartment');
         }
 
         $employee->KOREANAME = trim($validated['editKoreanName']);
@@ -167,6 +192,8 @@ class PeopleEmployeesList extends Component
 
     public function openCreateTeamModal(): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $this->newDeptName = '';
         $this->resetErrorBag();
         $this->resetValidation();
@@ -183,6 +210,8 @@ class PeopleEmployeesList extends Component
 
     public function createTeam(): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $validated = $this->validate([
             'newDeptName' => ['required', 'string', 'max:25'],
         ], [
@@ -206,6 +235,8 @@ class PeopleEmployeesList extends Component
 
     public function openDeleteTeamModal(): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $this->deleteDeptNo = '';
         $this->resetErrorBag();
         $this->resetValidation();
@@ -222,6 +253,8 @@ class PeopleEmployeesList extends Component
 
     public function deleteTeam(): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $validated = $this->validate([
             'deleteDeptNo' => ['required', 'string', Rule::exists('department', 'DEPTNO')],
         ], [
@@ -237,6 +270,7 @@ class PeopleEmployeesList extends Component
 
         if ($employeeCount > 0) {
             $this->addError('deleteDeptNo', "해당 팀에 소속된 직원 {$employeeCount}명이 있어 삭제할 수 없습니다.");
+
             return;
         }
 
@@ -244,8 +278,9 @@ class PeopleEmployeesList extends Component
             ->where('DEPTNO', $deptNo)
             ->delete();
 
-        if (!$deleted) {
+        if (! $deleted) {
             $this->addError('deleteDeptNo', '삭제 대상 팀을 찾을 수 없습니다.');
+
             return;
         }
 
@@ -329,7 +364,7 @@ class PeopleEmployeesList extends Component
         }
 
         $matched = $deptOptions->firstWhere('WORKDEPT', $this->filterDept);
-        if (!$matched) {
+        if (! $matched) {
             return $this->filterDept;
         }
 
@@ -365,7 +400,6 @@ class PeopleEmployeesList extends Component
 
         $nextNumber = $maxNumber + 1;
 
-        return 'A' . str_pad((string) $nextNumber, 2, '0', STR_PAD_LEFT);
+        return 'A'.str_pad((string) $nextNumber, 2, '0', STR_PAD_LEFT);
     }
 }
-

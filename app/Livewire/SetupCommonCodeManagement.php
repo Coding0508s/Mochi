@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\SetupCommonCode;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -12,24 +13,35 @@ class SetupCommonCodeManagement extends Component
     use WithPagination;
 
     public string $category = 'job_title';
+
     public string $search = '';
 
     public bool $showCreateModal = false;
+
     public bool $showEditModal = false;
+
     public bool $showDeleteModal = false;
 
     public string $newCode = '';
+
     public string $newLabel = '';
+
     public bool $newIsActive = true;
+
     public int $newSortOrder = 0;
 
     public int $editId = 0;
+
     public string $editCode = '';
+
     public string $editLabel = '';
+
     public bool $editIsActive = true;
+
     public int $editSortOrder = 0;
 
     public int $deleteId = 0;
+
     public string $deleteLabel = '';
 
     public array $categoryLabels = [
@@ -50,6 +62,8 @@ class SetupCommonCodeManagement extends Component
 
     public function openCreateModal(): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $this->newCode = '';
         $this->newLabel = '';
         $this->newIsActive = true;
@@ -68,6 +82,8 @@ class SetupCommonCodeManagement extends Component
 
     public function createCode(): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $validated = $this->validate([
             'newCode' => [
                 'required',
@@ -98,8 +114,10 @@ class SetupCommonCodeManagement extends Component
 
     public function openEditModal(int $id): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $item = SetupCommonCode::query()->find($id);
-        if (!$item) {
+        if (! $item) {
             return;
         }
 
@@ -123,6 +141,8 @@ class SetupCommonCodeManagement extends Component
 
     public function updateCode(): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $validated = $this->validate([
             'editCode' => [
                 'required',
@@ -142,8 +162,9 @@ class SetupCommonCodeManagement extends Component
         ]);
 
         $item = SetupCommonCode::query()->find($this->editId);
-        if (!$item) {
+        if (! $item) {
             $this->addError('editCode', '수정할 코드를 찾을 수 없습니다.');
+
             return;
         }
 
@@ -159,8 +180,10 @@ class SetupCommonCodeManagement extends Component
 
     public function openDeleteModal(int $id): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $item = SetupCommonCode::query()->find($id);
-        if (!$item) {
+        if (! $item) {
             return;
         }
 
@@ -182,9 +205,12 @@ class SetupCommonCodeManagement extends Component
 
     public function deleteCode(): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $item = SetupCommonCode::query()->find($this->deleteId);
-        if (!$item) {
+        if (! $item) {
             $this->addError('deleteId', '삭제할 코드를 찾을 수 없습니다.');
+
             return;
         }
 
@@ -218,4 +244,3 @@ class SetupCommonCodeManagement extends Component
         ]);
     }
 }
-

@@ -79,17 +79,19 @@
                 </button>
             @endif
 
-            <button type="button"
-                    wire:click="openCreateTeamModal"
-                    class="py-2 px-3 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 cursor-pointer">
-                팀 추가
-            </button>
+            @can('manageTeamStructure')
+                <button type="button"
+                        wire:click="openCreateTeamModal"
+                        class="py-2 px-3 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 cursor-pointer">
+                    팀 추가
+                </button>
 
-            <button type="button"
-                    wire:click="openDeleteTeamModal"
-                    class="py-2 px-3 text-sm text-white bg-rose-600 rounded-lg hover:bg-rose-700 cursor-pointer">
-                팀 삭제
-            </button>
+                <button type="button"
+                        wire:click="openDeleteTeamModal"
+                        class="py-2 px-3 text-sm text-white bg-rose-600 rounded-lg hover:bg-rose-700 cursor-pointer">
+                    팀 삭제
+                </button>
+            @endcan
         </div>
     </div>
 
@@ -225,15 +227,29 @@
 
                         <div class="md:col-span-2">
                             <label class="block text-xs font-semibold text-gray-500 mb-1">부서(팀)</label>
-                            <select wire:model.defer="editWorkDept"
-                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="">부서 선택</option>
-                                @foreach($deptOptions as $dept)
-                                    <option value="{{ $dept->WORKDEPT }}">
-                                        {{ $dept->dept_name ?: $dept->WORKDEPT }}
-                                    </option>
-                                @endforeach
-                            </select>
+                            @can('manageEmployeeDepartment')
+                                <select wire:model.defer="editWorkDept"
+                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">부서 선택</option>
+                                    @foreach($deptOptions as $dept)
+                                        <option value="{{ $dept->WORKDEPT }}">
+                                            {{ $dept->dept_name ?: $dept->WORKDEPT }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            @else
+                                <select wire:model.defer="editWorkDept"
+                                        disabled
+                                        class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed">
+                                    <option value="">부서 선택</option>
+                                    @foreach($deptOptions as $dept)
+                                        <option value="{{ $dept->WORKDEPT }}">
+                                            {{ $dept->dept_name ?: $dept->WORKDEPT }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="mt-1 text-[11px] text-amber-700">부서 변경은 관리자만 할 수 있습니다.</p>
+                            @endcan
                             @error('editWorkDept') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
                     </div>

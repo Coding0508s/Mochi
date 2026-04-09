@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\SetupRole;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -14,23 +15,35 @@ class SetupRoleManagement extends Component
     public string $search = '';
 
     public bool $showCreateModal = false;
+
     public bool $showEditModal = false;
+
     public bool $showDeleteModal = false;
 
     public int $editId = 0;
+
     public int $deleteId = 0;
+
     public string $deleteRoleName = '';
 
     public string $newRoleKey = '';
+
     public string $newRoleName = '';
+
     public string $newDescription = '';
+
     public string $newIsActive = '1';
+
     public array $newPermissions = [];
 
     public string $editRoleKey = '';
+
     public string $editRoleName = '';
+
     public string $editDescription = '';
+
     public string $editIsActive = '1';
+
     public array $editPermissions = [];
 
     public array $permissionMenus = [
@@ -57,6 +70,8 @@ class SetupRoleManagement extends Component
 
     public function openCreateModal(): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $this->newRoleKey = '';
         $this->newRoleName = '';
         $this->newDescription = '';
@@ -76,6 +91,8 @@ class SetupRoleManagement extends Component
 
     public function createRole(): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $validated = $this->validate([
             'newRoleKey' => ['required', 'string', 'max:40', 'regex:/^[a-z0-9_]+$/', Rule::unique('setup_roles', 'role_key')],
             'newRoleName' => ['required', 'string', 'max:80'],
@@ -104,8 +121,10 @@ class SetupRoleManagement extends Component
 
     public function openEditModal(int $id): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $role = SetupRole::query()->find($id);
-        if (!$role) {
+        if (! $role) {
             return;
         }
 
@@ -130,6 +149,8 @@ class SetupRoleManagement extends Component
 
     public function updateRole(): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $validated = $this->validate([
             'editRoleKey' => [
                 'required',
@@ -150,8 +171,9 @@ class SetupRoleManagement extends Component
         ]);
 
         $role = SetupRole::query()->find($this->editId);
-        if (!$role) {
+        if (! $role) {
             $this->addError('editRoleKey', '수정할 역할을 찾을 수 없습니다.');
+
             return;
         }
 
@@ -168,8 +190,10 @@ class SetupRoleManagement extends Component
 
     public function openDeleteModal(int $id): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $role = SetupRole::query()->find($id);
-        if (!$role) {
+        if (! $role) {
             return;
         }
 
@@ -191,9 +215,12 @@ class SetupRoleManagement extends Component
 
     public function deleteRole(): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $role = SetupRole::query()->find($this->deleteId);
-        if (!$role) {
+        if (! $role) {
             $this->addError('deleteId', '삭제할 역할을 찾을 수 없습니다.');
+
             return;
         }
 
@@ -265,4 +292,3 @@ class SetupRoleManagement extends Component
         return $normalized;
     }
 }
-

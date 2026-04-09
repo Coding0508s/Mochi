@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Department;
 use App\Models\Employee;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -15,16 +16,23 @@ class SetupTeamManagement extends Component
     public string $search = '';
 
     public bool $showCreateModal = false;
+
     public bool $showEditModal = false;
+
     public bool $showDeleteModal = false;
 
     public string $newDeptName = '';
+
     public string $newAdmrDept = '';
+
     public string $newLocation = '';
 
     public string $editDeptNo = '';
+
     public string $editDeptName = '';
+
     public string $editAdmrDept = '';
+
     public string $editLocation = '';
 
     public string $deleteDeptNo = '';
@@ -36,6 +44,8 @@ class SetupTeamManagement extends Component
 
     public function openCreateModal(): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $this->newDeptName = '';
         $this->newAdmrDept = '';
         $this->newLocation = '';
@@ -53,6 +63,8 @@ class SetupTeamManagement extends Component
 
     public function createTeam(): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $parentCodes = $this->parentDeptCodes();
 
         $validated = $this->validate([
@@ -82,8 +94,10 @@ class SetupTeamManagement extends Component
 
     public function openEditModal(string $deptNo): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $team = Department::query()->where('DEPTNO', $deptNo)->first();
-        if (!$team) {
+        if (! $team) {
             return;
         }
 
@@ -109,6 +123,8 @@ class SetupTeamManagement extends Component
 
     public function updateTeam(): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $parentCodes = $this->parentDeptCodes();
 
         $validated = $this->validate([
@@ -123,8 +139,9 @@ class SetupTeamManagement extends Component
         ]);
 
         $team = Department::query()->where('DEPTNO', $this->editDeptNo)->first();
-        if (!$team) {
+        if (! $team) {
             $this->addError('editDeptName', '수정할 팀을 찾을 수 없습니다.');
+
             return;
         }
 
@@ -139,6 +156,8 @@ class SetupTeamManagement extends Component
 
     public function openDeleteModal(string $deptNo): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $this->deleteDeptNo = $deptNo;
         $this->resetErrorBag();
         $this->resetValidation();
@@ -155,6 +174,8 @@ class SetupTeamManagement extends Component
 
     public function deleteTeam(): void
     {
+        Gate::authorize('manageTeamStructure');
+
         $validated = $this->validate([
             'deleteDeptNo' => ['required', 'string', Rule::exists('department', 'DEPTNO')],
         ], [
@@ -167,6 +188,7 @@ class SetupTeamManagement extends Component
 
         if ($employeeCount > 0) {
             $this->addError('deleteDeptNo', "소속 직원 {$employeeCount}명이 있어 삭제할 수 없습니다.");
+
             return;
         }
 
@@ -217,7 +239,7 @@ class SetupTeamManagement extends Component
             ->selectRaw('MAX(CAST(SUBSTRING(DEPTNO, 2) AS UNSIGNED)) as max_number')
             ->value('max_number') ?? 0);
 
-        return 'A' . str_pad((string) ($maxNumber + 1), 2, '0', STR_PAD_LEFT);
+        return 'A'.str_pad((string) ($maxNumber + 1), 2, '0', STR_PAD_LEFT);
     }
 
     private function parentDeptCodes(): array
@@ -228,4 +250,3 @@ class SetupTeamManagement extends Component
             ->all();
     }
 }
-
