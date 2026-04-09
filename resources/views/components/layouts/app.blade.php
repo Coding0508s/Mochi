@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ $title ?? 'GrapeSEED DujjonKu' }}</title>
+    <title>{{ $title ?? 'GrapeSEED MOCHI' }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
@@ -32,7 +32,7 @@
     {{-- 상단 헤더 (전체 너비) --}}
     <header class="mochi-topbar flex-shrink-0">
         <div class="mochi-topbar-inner">
-            <div class="mochi-topbar-brand">GrapeSEED DujjonKu</div>
+            <div class="mochi-topbar-brand">GrapeSEED MOCHI</div>
 
             <nav class="mochi-topbar-nav">
                 @foreach(['OutLook' => '#', 'Portal' => '#', 'eCount' => '#', 'Coaching' => '#'] as $label => $href)

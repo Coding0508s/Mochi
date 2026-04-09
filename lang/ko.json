@@ -1,8 +1,12 @@
 {
-    "Internal access only": "내부 전용 접속",
+    "GrapeSEED MOCHI": "GrapeSEED 모키",
+    "Log in to access Mochi": "로그인하여 Mochi에 접근하세요",
+    "Remember me": "로그인 상태 유지",
+    "Internal access only": "내부 전용",
     "Employee Portal Login": "직원 포털 로그인",
     "Log in to access internal resources": "내부 리소스를 이용하려면 로그인하세요",
     "Corporate email": "회사 이메일",
+    "Password": "비밀번호",
     "Forgot password?": "비밀번호를 잊으셨나요?",
     "Sign In": "로그인",
     "Internal Wiki": "내부 위키",
