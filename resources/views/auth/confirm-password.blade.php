@@ -1,4 +1,5 @@
 <x-guest-layout>
+    <x-auth-card>
     <div class="mb-4 text-sm text-gray-600">
         {{ __('This is a secure area of the application. Please confirm your password before continuing.') }}
     </div>
@@ -24,4 +25,5 @@
             </x-primary-button>
         </div>
     </form>
+    </x-auth-card>
 </x-guest-layout>
