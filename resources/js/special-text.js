@@ -6,7 +6,13 @@
  * 풀 소진 후에는 '_'로 채움.
  *
  * 시작·종료 시 opacity / transform / filter 전환으로 부드럽게 (prefers-reduced-motion 시 생략).
+ * 정착 후: ShiningText 스타일 쉬머를 CSS로 4회 반복 후 멈춤(motion 없음).
  */
+
+const SHINE_CLASS = 'special-text-shine';
+
+/** @type {WeakMap<HTMLElement, (e: AnimationEvent) => void>} */
+const shineEndHandlers = new WeakMap();
 
 const RANDOM_CHARS = 'WELCOME TO NEW';
 
@@ -28,6 +34,29 @@ function resetMotionStyles(el) {
     el.style.transform = '';
     el.style.filter = '';
     el.style.willChange = '';
+    const onEnd = shineEndHandlers.get(el);
+    if (onEnd) {
+        el.removeEventListener('animationend', onEnd);
+        shineEndHandlers.delete(el);
+    }
+    el.classList.remove(SHINE_CLASS);
+}
+
+/**
+ * 그라데이션 쉬머: CSS에서 4사이클 후 animationend → 클래스 제거로 일반 글자색으로 복귀
+ * @param {HTMLElement} el
+ */
+function startShiningText(el) {
+    if (prefersReducedMotion()) {
+        return;
+    }
+    const onShineEnd = () => {
+        el.classList.remove(SHINE_CLASS);
+        shineEndHandlers.delete(el);
+    };
+    shineEndHandlers.set(el, onShineEnd);
+    el.addEventListener('animationend', onShineEnd, { once: true });
+    el.classList.add(SHINE_CLASS);
 }
 
 /**
@@ -80,6 +109,7 @@ function applySmoothSettle(el, finalText) {
         el.style.transition = '';
         el.style.filter = '';
         el.style.opacity = '';
+        startShiningText(el);
     }, 550);
 }
 

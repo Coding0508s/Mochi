@@ -32,38 +32,33 @@
 
         <form method="POST" action="{{ route('login') }}" class="mt-8 space-y-5">
             @csrf
-            {{-- 회사 이메일 --}}
+            {{-- 회사 이메일 (shadcn/motion 스타일 플로팅 라벨 — Blade 포팅) --}}
             <div>
-                <label for="email" class="mb-2 block text-[11px] font-bold uppercase tracking-wide text-slate-800">
-                    {{ __('Corporate email') }}
-                </label>
-                <div class="relative">
-                    <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-mochi-header">
-                        <svg class="size-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true">
+                <label for="email" class="sr-only">{{ __('Corporate email') }}</label>
+                <x-ui.mochi-floating-input
+                    name="email"
+                    id="email"
+                    type="email"
+                    :label="__('Corporate email')"
+                    :value="old('email')"
+                    autocomplete="username"
+                    placeholder="name@grapeseed.com"
+                    required
+                    autofocus
+                >
+                    <x-slot name="icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
                         </svg>
-                    </span>
-                    <input
-                        id="email"
-                        type="email"
-                        name="email"
-                        value="{{ old('email') }}"
-                        required
-                        autofocus
-                        autocomplete="username"
-                        placeholder="name@grapeseed.com"
-                        class="block w-full rounded-xl border border-mochi-header/20 bg-mochi-header/[0.07] py-3 pl-11 pr-4 text-sm text-slate-800 placeholder:text-slate-400 shadow-inner shadow-slate-200/40 outline-none transition focus:border-mochi-excel focus:bg-white focus:ring-2 focus:ring-mochi-header/25"
-                    />
-                </div>
+                    </x-slot>
+                </x-ui.mochi-floating-input>
                 <x-input-error :messages="$errors->get('email')" class="mt-2 text-sm" />
             </div>
 
-            {{-- 비밀번호 + 비밀번호 찾기 --}}
+            {{-- 비밀번호 --}}
             <div>
-                <div class="mb-2 flex items-center justify-between gap-2">
-                    <label for="password" class="text-[11px] font-bold uppercase tracking-wide text-slate-800">
-                        {{ __('Password') }}
-                    </label>
+                <label for="password" class="sr-only">{{ __('Password') }}</label>
+                <div class="mb-1 flex justify-end">
                     @if (Route::has('password.request'))
                         <a
                             href="{{ route('password.request') }}"
@@ -73,22 +68,21 @@
                         </a>
                     @endif
                 </div>
-                <div class="relative">
-                    <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-mochi-header">
-                        <svg class="size-[18px]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true">
+                <x-ui.mochi-floating-input
+                    name="password"
+                    id="password"
+                    type="password"
+                    :label="__('Password')"
+                    autocomplete="current-password"
+                    placeholder="••••••••"
+                    required
+                >
+                    <x-slot name="icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                         </svg>
-                    </span>
-                    <input
-                        id="password"
-                        type="password"
-                        name="password"
-                        required
-                        autocomplete="current-password"
-                        placeholder="••••••••"
-                        class="block w-full rounded-xl border border-mochi-header/20 bg-mochi-header/[0.07] py-3 pl-11 pr-4 text-sm text-slate-800 placeholder:text-slate-400 shadow-inner shadow-slate-200/40 outline-none transition focus:border-mochi-excel focus:bg-white focus:ring-2 focus:ring-mochi-header/25"
-                    />
-                </div>
+                    </x-slot>
+                </x-ui.mochi-floating-input>
                 <x-input-error :messages="$errors->get('password')" class="mt-2 text-sm" />
             </div>
 
@@ -103,7 +97,7 @@
             </div>
 
             <div class="pt-1">
-                <x-ui.liquid-glass-button pill="true" filter-id="login-glass-filter" class="w-full">
+                <x-ui.liquid-glass-button pill="true" filter-id="login-glass-filter" variant="mochi-blue" class="w-full">
                     {{ __('Sign In') }}
                     <svg class="size-4 opacity-90" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />

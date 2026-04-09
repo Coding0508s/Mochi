@@ -35,23 +35,79 @@
             <div class="mochi-topbar-brand">GrapeSEED MOCHI</div>
 
             <nav class="mochi-topbar-nav">
+                {{-- liquid-glass-button과 동일 feDisplacementMap 필터 (호버 시 링크에만 적용) --}}
+                <svg class="pointer-events-none absolute h-px w-px overflow-hidden opacity-0" aria-hidden="true" focusable="false">
+                    <defs>
+                        <filter
+                            id="mochi-topbar-glass-filter"
+                            x="0%"
+                            y="0%"
+                            width="100%"
+                            height="100%"
+                            color-interpolation-filters="sRGB"
+                        >
+                            <feTurbulence type="fractalNoise" baseFrequency="0.05 0.05" numOctaves="1" seed="1" result="turbulence" />
+                            <feGaussianBlur in="turbulence" stdDeviation="2" result="blurredNoise" />
+                            <feDisplacementMap
+                                in="SourceGraphic"
+                                in2="blurredNoise"
+                                scale="70"
+                                xChannelSelector="R"
+                                yChannelSelector="B"
+                                result="displaced"
+                            />
+                            <feGaussianBlur in="displaced" stdDeviation="4" result="finalBlur" />
+                            <feComposite in="finalBlur" in2="finalBlur" operator="over" />
+                        </filter>
+                    </defs>
+                </svg>
                 @foreach(['OutLook' => '#', 'Portal' => '#', 'eCount' => '#', 'Coaching' => '#'] as $label => $href)
-                    <a href="{{ $href }}">{{ $label }}</a>
+                    <a href="{{ $href }}" class="mochi-topbar-glass-link">
+                        <span class="mochi-topbar-glass-link__depth" aria-hidden="true"></span>
+                        <span
+                            class="mochi-topbar-glass-link__blur"
+                            style="backdrop-filter: url('#mochi-topbar-glass-filter'); -webkit-backdrop-filter: url('#mochi-topbar-glass-filter')"
+                            aria-hidden="true"
+                        ></span>
+                        <span class="mochi-topbar-glass-link__label">{{ $label }}</span>
+                    </a>
                 @endforeach
             </nav>
 
             <div class="mochi-topbar-user">
                 <span class="mochi-topbar-action" aria-hidden="true"></span>
-                <div class="mochi-topbar-account">
-                    <span class="w-6 h-6 rounded-full bg-[#d9e0eb] border border-white/50 flex-shrink-0" aria-hidden="true"></span>
-                    <span class="text-[12px] text-white font-medium truncate max-w-[10rem]" title="{{ auth()->user()->name }}">{{ auth()->user()->name }}</span>
-                    <span class="w-px h-4 bg-white/35 flex-shrink-0" aria-hidden="true"></span>
-                    <form method="POST" action="{{ route('logout') }}" class="inline m-0 leading-none">
-                        @csrf
-                        <button type="submit" class="bg-transparent border-0 p-0 m-0 text-[12px] text-white/92 font-medium cursor-pointer hover:text-white hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50 rounded-sm">
-                            로그아웃
-                        </button>
-                    </form>
+                {{-- 프로필 (편집 페이지로 이동) --}}
+                <a href="{{ route('profile.edit') }}" class="mochi-topbar-profile">
+                    <span class="mochi-topbar-profile__depth" aria-hidden="true"></span>
+                    <span
+                        class="mochi-topbar-profile__blur"
+                        style="backdrop-filter: url('#mochi-topbar-glass-filter'); -webkit-backdrop-filter: url('#mochi-topbar-glass-filter')"
+                        aria-hidden="true"
+                    ></span>
+                    <span class="mochi-topbar-profile__content">
+                        <span class="w-6 h-6 rounded-full bg-[#d9e0eb] border border-white/50 flex-shrink-0" aria-hidden="true"></span>
+                        <span class="text-[12px] text-white font-medium truncate max-w-[10rem]" title="{{ auth()->user()->name }}">{{ auth()->user()->name }}</span>
+                    </span>
+                </a>
+                {{-- 로그아웃 (별도 필) --}}
+                <div class="mochi-topbar-logout">
+                    <span class="mochi-topbar-logout__depth" aria-hidden="true"></span>
+                    <span
+                        class="mochi-topbar-logout__blur"
+                        style="backdrop-filter: url('#mochi-topbar-glass-filter'); -webkit-backdrop-filter: url('#mochi-topbar-glass-filter')"
+                        aria-hidden="true"
+                    ></span>
+                    <div class="mochi-topbar-logout__content">
+                        <form method="POST" action="{{ route('logout') }}" class="m-0 inline leading-none">
+                            @csrf
+                            <button
+                                type="submit"
+                                class="m-0 cursor-pointer rounded-sm border-0 bg-transparent p-0 text-[12px] font-medium text-white/92 transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50"
+                            >
+                                로그아웃
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
