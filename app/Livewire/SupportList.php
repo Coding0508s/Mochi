@@ -19,27 +19,39 @@ class SupportList extends Component
     use WithPagination;
 
     // ─── 필터 상태 ────────────────────────────────────────────────
-    public string $filterYear    = '';   // 년도 필터
-    public string $filterTr      = '';   // 담당자 필터
-    public string $filterSkCode  = '';   // 기관 필터
-    public string $search        = '';   // 키워드 검색
+    public string $filterYear = '';   // 년도 필터
+
+    public string $filterTr = '';   // 담당자 필터
+
+    public string $filterSkCode = '';   // 기관 필터
+
+    public string $search = '';   // 키워드 검색
 
     // ─── 보고서 작성 모달 상태 ────────────────────────────────────
-    public bool   $showModal     = false;
-    public ?int   $editingId     = null; // 수정 중인 레코드 ID (null이면 신규)
+    public bool $showModal = false;
+
+    public ?int $editingId = null; // 수정 중인 레코드 ID (null이면 신규)
 
     // 모달 입력 필드
-    public string $formSkCode      = '';
+    public string $formSkCode = '';
+
     public string $formAccountName = '';
+
     public string $formInstitutionKeyword = ''; // 기관명 입력 검색어
-    public string $formCoName      = 'Andrew Hur'; // 로그인 CO명 (추후 Auth 연동)
+
+    public string $formCoName = 'Andrew Hur'; // 로그인 CO명 (추후 Auth 연동)
+
     public string $formSupportDate = '';
+
     public string $formSupportTime = '13:00';
+
     public string $formSupportType = '전화';       // 지원 방법
-    public string $formTarget      = '';            // 참석자
-    public string $formVisitPurpose = '';           // 방문 목적
-    public string $formToAccount   = '';            // 기관과의 소통내용
-    public bool   $formCompleted   = false;         // 완료처리 토글
+
+    public string $formTarget = '';            // 참석자
+
+    public string $formToAccount = '';            // 기관과의 소통내용
+
+    public bool $formCompleted = false;         // 완료처리 토글
 
     // ─── 계약서(CO) 파일 업로드 모달 ─────────────────────────────
     public bool $showContractModal = false;
@@ -65,24 +77,39 @@ class SupportList extends Component
 
     // ─── 유효성 검사 ─────────────────────────────────────────────
     protected array $rules = [
-        'formSkCode'      => 'required',
+        'formSkCode' => 'required',
         'formSupportDate' => 'required|date',
         'formSupportTime' => ['required', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
     ];
 
     protected array $messages = [
-        'formSkCode.required'      => '기관을 선택해 주세요.',
+        'formSkCode.required' => '기관을 선택해 주세요.',
         'formSupportDate.required' => '지원 날짜를 입력해 주세요.',
-        'formSupportDate.date'     => '올바른 날짜 형식이 아닙니다.',
+        'formSupportDate.date' => '올바른 날짜 형식이 아닙니다.',
         'formSupportTime.required' => '지원 시간을 입력해 주세요.',
-        'formSupportTime.regex'    => '지원 시간은 HH:MM 형식으로 입력해 주세요.',
+        'formSupportTime.regex' => '지원 시간은 HH:MM 형식으로 입력해 주세요.',
     ];
 
     // ─── 필터 변경 시 1페이지로 초기화 ───────────────────────────
-    public function updatingFilterYear():   void { $this->resetPage(); }
-    public function updatingFilterTr():     void { $this->resetPage(); }
-    public function updatingFilterSkCode(): void { $this->resetPage(); }
-    public function updatingSearch():       void { $this->resetPage(); }
+    public function updatingFilterYear(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterTr(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterSkCode(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingSearch(): void
+    {
+        $this->resetPage();
+    }
 
     // ─── 계약서 업로드 모달 ───────────────────────────────────────
     public function openContractUploadModal(): void
@@ -216,6 +243,7 @@ class SupportList extends Component
     {
         if (blank($value)) {
             $this->formAccountName = '';
+
             return;
         }
         $inst = Institution::where('SKcode', $value)->first();
@@ -231,6 +259,7 @@ class SupportList extends Component
         if ($keyword === '') {
             $this->formSkCode = '';
             $this->formAccountName = '';
+
             return;
         }
 
@@ -243,6 +272,7 @@ class SupportList extends Component
         if ($inst) {
             $this->formSkCode = (string) $inst->SKcode;
             $this->formAccountName = (string) $inst->AccountName;
+
             return;
         }
 
@@ -258,7 +288,7 @@ class SupportList extends Component
             ->where('SKcode', $skCode)
             ->first();
 
-        if (!$inst) {
+        if (! $inst) {
             return;
         }
 
@@ -279,18 +309,17 @@ class SupportList extends Component
     {
         $record = SupportRecord::findOrFail($id);
 
-        $this->editingId         = $id;
-        $this->formSkCode        = $record->SK_Code        ?? '';
-        $this->formAccountName   = $record->Account_Name   ?? '';
+        $this->editingId = $id;
+        $this->formSkCode = $record->SK_Code ?? '';
+        $this->formAccountName = $record->Account_Name ?? '';
         $this->formInstitutionKeyword = $record->Account_Name ?? '';
-        $this->formCoName        = $record->TR_Name        ?? 'Andrew Hur';
-        $this->formSupportDate   = $record->Support_Date?->format('Y-m-d') ?? '';
-        $this->formSupportTime   = $this->normalizeTimeForInput($record->Meet_Time);
-        $this->formSupportType   = $record->Support_Type   ?? '전화';
-        $this->formTarget        = $record->Target         ?? '';
-        $this->formVisitPurpose  = $record->Issue          ?? '';
-        $this->formToAccount     = $record->TO_Account     ?? '';
-        $this->formCompleted     = !is_null($record->CompletedDate);
+        $this->formCoName = $record->TR_Name ?? 'Andrew Hur';
+        $this->formSupportDate = $record->Support_Date?->format('Y-m-d') ?? '';
+        $this->formSupportTime = $this->normalizeTimeForInput($record->Meet_Time);
+        $this->formSupportType = $record->Support_Type ?? '전화';
+        $this->formTarget = $record->Target ?? '';
+        $this->formToAccount = $record->TO_Account ?? '';
+        $this->formCompleted = ! is_null($record->CompletedDate);
 
         $this->showModal = true;
     }
@@ -304,18 +333,17 @@ class SupportList extends Component
 
     private function resetForm(): void
     {
-        $this->editingId        = null;
-        $this->formSkCode       = '';
-        $this->formAccountName  = '';
+        $this->editingId = null;
+        $this->formSkCode = '';
+        $this->formAccountName = '';
         $this->formInstitutionKeyword = '';
-        $this->formCoName       = 'Andrew Hur';
-        $this->formSupportDate  = '';
-        $this->formSupportTime  = '13:00';
-        $this->formSupportType  = '전화';
-        $this->formTarget       = '';
-        $this->formVisitPurpose = '';
-        $this->formToAccount    = '';
-        $this->formCompleted    = false;
+        $this->formCoName = 'Andrew Hur';
+        $this->formSupportDate = '';
+        $this->formSupportTime = '13:00';
+        $this->formSupportType = '전화';
+        $this->formTarget = '';
+        $this->formToAccount = '';
+        $this->formCompleted = false;
         $this->resetValidation();
     }
 
@@ -330,19 +358,18 @@ class SupportList extends Component
         $this->validate();
 
         $data = [
-            'Year'         => (int) date('Y', strtotime($this->formSupportDate)),
-            'SK_Code'      => $this->formSkCode,
+            'Year' => (int) date('Y', strtotime($this->formSupportDate)),
+            'SK_Code' => $this->formSkCode,
             'Account_Name' => $this->formAccountName,
-            'TR_Name'      => $this->formCoName,
+            'TR_Name' => $this->formCoName,
             'Support_Date' => $this->formSupportDate,
-            'Meet_Time'    => $this->formSupportTime.':00',
+            'Meet_Time' => $this->formSupportTime.':00',
             'Support_Type' => $this->formSupportType,
-            'Target'       => $this->formTarget,
-            'Issue'        => $this->formVisitPurpose,
-            'TO_Account'   => $this->formToAccount,
-            'Status'       => $this->formCompleted ? '완료' : '진행중',
+            'Target' => $this->formTarget,
+            'TO_Account' => $this->formToAccount,
+            'Status' => $this->formCompleted ? '완료' : '진행중',
             'CompletedDate' => $this->formCompleted ? now() : null,
-            'CreatedDate'  => now(),
+            'CreatedDate' => now(),
         ];
 
         SupportRecord::where('ID', $this->editingId)->update($data);
@@ -362,7 +389,7 @@ class SupportList extends Component
     public function render()
     {
         $records = SupportRecord::query()
-            ->ofYear($this->filterYear ? (int)$this->filterYear : null)
+            ->ofYear($this->filterYear ? (int) $this->filterYear : null)
             ->ofTr($this->filterTr)
             ->ofInstitution($this->filterSkCode)
             ->keyword($this->search)
@@ -397,6 +424,7 @@ class SupportList extends Component
                 if ($normalizedKeyword === '') {
                     // 검색어가 없으면 결과 없음(모달이 깔끔해짐)
                     $query->whereRaw('1 = 0');
+
                     return;
                 }
 
@@ -416,9 +444,9 @@ class SupportList extends Component
             : collect();
 
         return view('livewire.support-list', [
-            'records'      => $records,
-            'years'        => $years,
-            'trList'       => $trList,
+            'records' => $records,
+            'years' => $years,
+            'trList' => $trList,
             'institutions' => $institutions,
             'institutionSuggestions' => $institutionSuggestions,
             'contractDocumentRows' => $contractDocumentRows,

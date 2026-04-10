@@ -125,28 +125,24 @@
                     <h3 class="text-sm font-semibold text-gray-700 mb-3">기관 이슈 및 논의 사항</h3>
 
                     <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">방문 목적</label>
-                        <select wire:model="formVisitPurpose"
-                                @disabled(!$institutionSelected)
-                                class="w-full py-1.5 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
-                                       {{ $institutionSelected ? 'border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}">
-                            <option value="">선택하세요</option>
-                            <option>App 사용률 증진</option>
-                            <option>정기 방문</option>
-                            <option>신규 교사 온보딩</option>
-                            <option>계약 갱신</option>
-                            <option>이슈 해결</option>
-                            <option>기타</option>
-                        </select>
-                    </div>
-
-                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">기관과의 소통내용</label>
                         <textarea wire:model="formToAccount"
                                   @disabled(!$institutionSelected)
                                   rows="10"
-                                  placeholder="기관과 나눈 주요 대화 내용을 기록해 주세요"
+                                  placeholder="기관과 나눈 주요 대화 내용을 기록해 주세요 (Enter 시 새 줄에 ▶ 추가)"
+                                  x-on:keydown.enter="mochiSupportEnterTriangle($event)"
                                   class="w-full min-h-[260px] py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y
+                                         {{ $institutionSelected ? 'border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">본사/타 부서 공유 내용</label>
+                        <textarea wire:model="formToDepart"
+                                  @disabled(!$institutionSelected)
+                                  rows="5"
+                                  placeholder="타 부서와 공유할 내용을 기록해 주세요 (Enter 시 새 줄에 ▶ 추가)"
+                                  x-on:keydown.enter="mochiSupportEnterTriangle($event)"
+                                  class="w-full min-h-[120px] py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y
                                          {{ $institutionSelected ? 'border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}"></textarea>
                     </div>
                 </div>

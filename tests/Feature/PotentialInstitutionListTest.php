@@ -353,4 +353,216 @@ class PotentialInstitutionListTest extends TestCase
         ]);
         $this->assertDatabaseMissing('S_AccountName', ['SKcode' => $leadSk]);
     }
+
+    public function test_mark_contract_complete_sets_contract_flags(): void
+    {
+        $name = '계약완료 QA '.uniqid('', true);
+        $row = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountName' => $name,
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'B',
+        ]);
+
+        Livewire::test(PotentialInstitutionList::class)
+            ->call('markContractComplete', (int) $row->ID);
+
+        $row->refresh();
+        $this->assertTrue((bool) $row->IsContract);
+        $this->assertNotNull($row->ContractedDate);
+
+        Livewire::test(PotentialInstitutionList::class)
+            ->call('markContractComplete', (int) $row->ID);
+
+        $row->refresh();
+        $this->assertTrue((bool) $row->IsContract);
+    }
+
+    public function test_filter_introduction_path_limits_list(): void
+    {
+        $a = '필터A '.uniqid('', true);
+        $b = '필터B '.uniqid('', true);
+        CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountName' => $a,
+            'Connected' => '인바운드 콜',
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'A',
+        ]);
+        CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-02',
+            'AccountName' => $b,
+            'Connected' => '기타경로',
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'A',
+        ]);
+
+        Livewire::test(PotentialInstitutionList::class)
+            ->set('filterIntroductionPath', '인바운드 콜')
+            ->assertSee($a)
+            ->assertDontSee($b);
+    }
+
+    public function test_filter_contract_possibility_letter(): void
+    {
+        $onlyA = 'PossA '.uniqid('', true);
+        $onlyB = 'PossB '.uniqid('', true);
+        CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountName' => $onlyA,
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'A',
+        ]);
+        CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-02',
+            'AccountName' => $onlyB,
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'B',
+        ]);
+
+        Livewire::test(PotentialInstitutionList::class)
+            ->set('filterContractPossibility', 'A')
+            ->assertSee($onlyA)
+            ->assertDontSee($onlyB);
+    }
+
+    public function test_detail_modal_commit_sets_contract(): void
+    {
+        $name = '상세계약 QA '.uniqid('', true);
+        $row = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountName' => $name,
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => null,
+        ]);
+
+        $id = (int) $row->ID;
+
+        $component = Livewire::test(PotentialInstitutionList::class)
+            ->call('openDetailModal', $id)
+            ->assertSet('detailModalContract', '0')
+            ->set('detailModalContract', '1')
+            ->call('commitDetailContract');
+
+        $row->refresh();
+        $this->assertTrue((bool) $row->IsContract);
+        $this->assertNotNull($row->ContractedDate);
+
+        $selected = $component->get('selectedTarget');
+        $this->assertTrue($selected['is_contract'] ?? false);
+    }
+
+    public function test_detail_modal_commit_clears_contract(): void
+    {
+        $name = '상세미계약 QA '.uniqid('', true);
+        $row = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountName' => $name,
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => true,
+            'ContractedDate' => '2026-01-15',
+            'Possibility' => null,
+        ]);
+
+        $id = (int) $row->ID;
+
+        Livewire::test(PotentialInstitutionList::class)
+            ->call('openDetailModal', $id)
+            ->assertSet('detailModalContract', '1')
+            ->set('detailModalContract', '0')
+            ->call('commitDetailContract');
+
+        $row->refresh();
+        $this->assertFalse((bool) $row->IsContract);
+        $this->assertNull($row->ContractedDate);
+    }
 }

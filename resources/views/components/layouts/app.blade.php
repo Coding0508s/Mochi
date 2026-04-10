@@ -152,20 +152,20 @@
 
                 <div x-show="openPeople" class="sidebar-sublist">
                     <a href="{{ route('people.index') }}"
-                       class="sidebar-subitem sidebar-focusable
+                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable
                               {{ request()->routeIs('people.*') && $activePeopleTeam === ''
                                   ? 'sidebar-subitem-active'
                                   : '' }}">
-                        전체 Employees
+                        <span class="sidebar-subitem-label">전체 Employees</span>
                     </a>
 
                     @foreach($peopleTeams as $team)
                         <a href="{{ route('people.index', ['team' => $team->DEPTNO]) }}"
-                           class="sidebar-subitem sidebar-focusable
+                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable
                                   {{ request()->routeIs('people.*') && $activePeopleTeam === (string) $team->DEPTNO
                                       ? 'sidebar-subitem-active'
                                       : '' }}">
-                            {{ $team->DEPTNAME ?: $team->DEPTNO }}
+                            <span class="sidebar-subitem-label">{{ $team->DEPTNAME ?: $team->DEPTNO }}</span>
                         </a>
                     @endforeach
                 </div>
@@ -190,24 +190,24 @@
                 <div x-show="openTeams" class="sidebar-sublist">
 
                     {{-- CS Team --}}
-                    <button type="button" class="sidebar-subitem sidebar-focusable flex w-full items-center justify-between gap-1 text-left">
-                        <span>CS Team</span>
+                    <button type="button" class="sidebar-subitem sidebar-focusable flex w-full items-start justify-between gap-1 text-left">
+                        <span class="min-w-0 flex-1 break-words text-left">CS Team</span>
                         <svg class="h-3 w-3 shrink-0 text-[#98a2b3]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
                         </svg>
                     </button>
 
                     {{-- Admin --}}
-                    <button type="button" class="sidebar-subitem sidebar-focusable flex w-full items-center justify-between gap-1 text-left">
-                        <span>Admin</span>
+                    <button type="button" class="sidebar-subitem sidebar-focusable flex w-full items-start justify-between gap-1 text-left">
+                        <span class="min-w-0 flex-1 break-words text-left">Admin</span>
                         <svg class="h-3 w-3 shrink-0 text-[#98a2b3]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
                         </svg>
                     </button>
 
                     {{-- TR Team --}}
-                    <button type="button" class="sidebar-subitem sidebar-focusable flex w-full items-center justify-between gap-1 text-left">
-                        <span>TR Team</span>
+                    <button type="button" class="sidebar-subitem sidebar-focusable flex w-full items-start justify-between gap-1 text-left">
+                        <span class="min-w-0 flex-1 break-words text-left">TR Team</span>
                         <svg class="h-3 w-3 shrink-0 text-[#98a2b3]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
                         </svg>
@@ -256,7 +256,7 @@
                                                  ? 'sidebar-subitem-active'
                                                  : '') }}">
                                     @include('partials.sidebar-menu-icon', ['name' => $menu['icon'], 'small' => true])
-                                    <span class="sidebar-subitem-label truncate">{{ $menu['label'] }}</span>
+                                    <span class="sidebar-subitem-label">{{ $menu['label'] }}</span>
                                 </a>
                             @endforeach
 
@@ -346,28 +346,28 @@
                     <a href="{{ route('setup.index') }}"
                        class="sidebar-subitem sidebar-subitem-row sidebar-focusable
                               {{ request()->routeIs('setup.index') ? 'sidebar-subitem-active' : '' }}">
-                        <span class="sidebar-subitem-label truncate">SetUp 홈</span>
+                        <span class="sidebar-subitem-label">SetUp 홈</span>
                     </a>
                     <a href="{{ route('setup.team') }}"
                        class="sidebar-subitem sidebar-subitem-row sidebar-focusable
                               {{ request()->routeIs('setup.team') ? 'sidebar-subitem-active' : '' }}">
-                        <span class="sidebar-subitem-label truncate">팀 관리</span>
+                        <span class="sidebar-subitem-label">팀 관리</span>
                     </a>
                     <a href="{{ route('setup.common-codes') }}"
                        class="sidebar-subitem sidebar-subitem-row sidebar-focusable
                               {{ request()->routeIs('setup.common-codes') ? 'sidebar-subitem-active' : '' }}">
-                        <span class="sidebar-subitem-label truncate">공통코드</span>
+                        <span class="sidebar-subitem-label">공통코드</span>
                     </a>
                     <a href="{{ route('setup.roles') }}"
                        class="sidebar-subitem sidebar-subitem-row sidebar-focusable
                               {{ request()->routeIs('setup.roles') ? 'sidebar-subitem-active' : '' }}">
-                        <span class="sidebar-subitem-label truncate">역할·권한</span>
+                        <span class="sidebar-subitem-label">역할·권한</span>
                     </a>
                     @can('manageEmployeeDepartment')
                         <a href="{{ route('setup.employees.create') }}"
                            class="sidebar-subitem sidebar-subitem-row sidebar-focusable
                                   {{ request()->routeIs('setup.employees.create') ? 'sidebar-subitem-active' : '' }}">
-                            <span class="sidebar-subitem-label truncate">직원 등록</span>
+                            <span class="sidebar-subitem-label">직원 등록</span>
                         </a>
                     @endcan
                 </div>

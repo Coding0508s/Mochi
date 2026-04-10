@@ -5,7 +5,6 @@ namespace App\Livewire;
 use App\Models\AccountInformation;
 use App\Models\Institution;
 use App\Models\SupportRecord;
-use Illuminate\Http\Request;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -67,42 +66,6 @@ class InstitutionList extends Component
     public string $editTr = '';
 
     public string $editCs = '';
-
-    // ─── 신규 기관 생성 모달 상태 ───────────────────────────────────
-    public bool $showCreateModal = false;
-
-    public string $newSkCode = '';
-
-    public string $newInstitutionName = '';
-
-    public string $newGubun = '';
-
-    public string $newDirector = '';
-
-    public string $newPhone = '';
-
-    public string $newAccountTel = '';
-
-    public string $newAddress = '';
-
-    public string $newCustomerType = '';
-
-    public string $newGsNo = '';
-
-    public string $newCo = '';
-
-    public string $newTr = '';
-
-    public string $newCs = '';
-
-    public string $newPossibility = '';
-
-    public function mount(Request $request): void
-    {
-        if ($request->boolean('openCreate') && config('features.institution_create_enabled')) {
-            $this->openCreateModal();
-        }
-    }
 
     // ─── 검색어가 바뀌면 자동으로 1페이지로 돌아가기 ──────────────
     public function updatingSearch(): void
@@ -394,90 +357,6 @@ class InstitutionList extends Component
 
         session()->flash('success', '담당자 정보가 저장되었습니다.');
         $this->closeManagerModal();
-    }
-
-    // ─── 신규 기관 생성 모달 열기/닫기/저장 ─────────────────────────
-    public function openCreateModal(): void
-    {
-        if (! config('features.institution_create_enabled')) {
-            return;
-        }
-
-        $this->newSkCode = '';
-        $this->newInstitutionName = '';
-        $this->newGubun = '';
-        $this->newDirector = '';
-        $this->newPhone = '';
-        $this->newAccountTel = '';
-        $this->newAddress = '';
-        $this->newCustomerType = '';
-        $this->newGsNo = '';
-        $this->newCo = '';
-        $this->newTr = '';
-        $this->newCs = '';
-        $this->newPossibility = '';
-        $this->resetValidation();
-        $this->showCreateModal = true;
-    }
-
-    public function closeCreateModal(): void
-    {
-        $this->showCreateModal = false;
-    }
-
-    public function saveNewInstitution(): void
-    {
-        if (! config('features.institution_create_enabled')) {
-            return;
-        }
-
-        $this->validate([
-            'newSkCode' => 'required|string|max:255|unique:S_AccountName,SKcode',
-            'newInstitutionName' => 'required|string|max:255',
-            'newGubun' => 'nullable|string|max:255',
-            'newDirector' => 'nullable|string|max:255',
-            'newPhone' => 'nullable|string|max:255',
-            'newAccountTel' => 'nullable|string|max:255',
-            'newAddress' => 'nullable|string|max:255',
-            'newCustomerType' => 'nullable|string|max:255',
-            'newGsNo' => 'nullable|string|max:255',
-            'newCo' => 'nullable|string|max:255',
-            'newTr' => 'nullable|string|max:255',
-            'newCs' => 'nullable|string|max:255',
-            'newPossibility' => 'nullable|string|in:A,B,C,D',
-        ], [
-            'newSkCode.required' => 'SK코드를 입력해 주세요.',
-            'newSkCode.unique' => '이미 사용 중인 SK코드입니다.',
-            'newInstitutionName.required' => '기관명을 입력해 주세요.',
-        ]);
-
-        Institution::query()->create([
-            'SKcode' => trim($this->newSkCode),
-            'AccountName' => trim($this->newInstitutionName),
-            'Director' => trim($this->newDirector) ?: null,
-            'Phone' => trim($this->newPhone) ?: null,
-            'AccountTel' => trim($this->newAccountTel) ?: null,
-            'Address' => trim($this->newAddress) ?: null,
-            'Gubun' => trim($this->newGubun) ?: null,
-            'GSno' => trim($this->newGsNo) ?: null,
-            'Possibility' => filled($this->newPossibility) ? trim($this->newPossibility) : null,
-        ]);
-
-        AccountInformation::query()->updateOrCreate(
-            ['SK_Code' => trim($this->newSkCode)],
-            [
-                'Account_Name' => trim($this->newInstitutionName),
-                'CO' => trim($this->newCo) ?: null,
-                'TR' => trim($this->newTr) ?: null,
-                'CS' => trim($this->newCs) ?: null,
-                'Customer_Type' => trim($this->newCustomerType) ?: null,
-                'Address' => trim($this->newAddress) ?: null,
-            ]
-        );
-
-        session()->flash('success', '신규 기관이 등록되었습니다.');
-        $this->closeCreateModal();
-        $this->resetPage();
     }
 
     // ─── 화면에 표시할 데이터 가져오기 ───────────────────────────────

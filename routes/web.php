@@ -32,6 +32,16 @@ Route::middleware(['auth'])->group(function () {
         return view('pages.institutions.index');
     })->name('institutions.index');
 
+    Route::get('/institutions/create', function () {
+        if (! config('features.institution_create_enabled')) {
+            return redirect()
+                ->route('institutions.index')
+                ->with('warning', '신규 기관 등록이 비활성화되어 있습니다.');
+        }
+
+        return view('pages.institutions.create');
+    })->name('institutions.create');
+
     Route::get('/contacts', function () {
         return view('pages.contacts.index');
     })->name('contacts.index');

@@ -25,9 +25,10 @@ class SupportCreateForm extends Component
 
     public string $formTarget = '';
 
-    public string $formVisitPurpose = '';
-
     public string $formToAccount = '';
+
+    /** 본사/타 부서 공유 (TO_Depart) */
+    public string $formToDepart = '';
 
     public bool $formCompleted = false;
 
@@ -62,6 +63,9 @@ class SupportCreateForm extends Component
 
         $inst = Institution::query()->where('SKcode', $value)->first();
         $this->formAccountName = (string) ($inst?->AccountName ?? '');
+        if (filled($value)) {
+            $this->applyDefaultCommunicationTemplatesIfEmpty();
+        }
     }
 
     public function updatedFormInstitutionKeyword(string $value): void
@@ -83,6 +87,7 @@ class SupportCreateForm extends Component
         if ($inst) {
             $this->formSkCode = (string) $inst->SKcode;
             $this->formAccountName = (string) $inst->AccountName;
+            $this->applyDefaultCommunicationTemplatesIfEmpty();
 
             return;
         }
@@ -102,6 +107,25 @@ class SupportCreateForm extends Component
         $this->formSkCode = (string) $inst->SKcode;
         $this->formAccountName = (string) $inst->AccountName;
         $this->formInstitutionKeyword = (string) $inst->AccountName;
+        $this->applyDefaultCommunicationTemplatesIfEmpty();
+    }
+
+    /**
+     * 기관 선택 직후, 소통 필드가 비어 있을 때만 config 템플릿을 넣습니다.
+     */
+    private function applyDefaultCommunicationTemplatesIfEmpty(): void
+    {
+        if (blank($this->formSkCode)) {
+            return;
+        }
+
+        if ($this->formToAccount === '') {
+            $this->formToAccount = (string) config('support_report_defaults.to_account_template', '');
+        }
+
+        if ($this->formToDepart === '') {
+            $this->formToDepart = (string) config('support_report_defaults.to_depart_template', '');
+        }
     }
 
     public function save(): void
@@ -117,8 +141,9 @@ class SupportCreateForm extends Component
             'Meet_Time' => $this->formSupportTime.':00',
             'Support_Type' => $this->formSupportType,
             'Target' => $this->formTarget,
-            'Issue' => $this->formVisitPurpose,
+            'Issue' => null,
             'TO_Account' => $this->formToAccount,
+            'TO_Depart' => $this->formToDepart,
             'Status' => $this->formCompleted ? '완료' : '진행중',
             'CompletedDate' => $this->formCompleted ? now() : null,
             'CreatedDate' => now(),

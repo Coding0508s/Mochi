@@ -75,10 +75,31 @@
                        class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
 
-            <a href="{{ route('institutions.index', ['openCreate' => 1]) }}"
+            <a href="{{ route('institutions.create') }}"
                class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
                 신규 기관 등록
             </a>
+        </div>
+        <div class="flex flex-wrap items-center gap-3 pt-3 mt-3 border-t border-gray-200/80">
+            <select wire:model.live="filterIntroductionPath"
+                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">전체 소개경로</option>
+                <option value="__empty__">(미입력)</option>
+                @foreach($introductionPathList as $path)
+                    <option value="{{ $path }}">{{ $path }}</option>
+                @endforeach
+            </select>
+
+            <select wire:model.live="filterContractPossibility"
+                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">전체 계약가능성</option>
+                <option value="contract">계약</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+                <option value="none">미지정</option>
+            </select>
         </div>
     </div>
 
@@ -100,6 +121,9 @@
                         <th class="px-3 py-2 text-center text-xs font-semibold">GS(유)</th>
                         <th class="px-3 py-2 text-center text-xs font-semibold">GS(초)</th>
                         <th class="px-3 py-2 text-center text-xs font-semibold">합계</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold">소개경로</th>
+                        <th class="px-3 py-2 text-center text-xs font-semibold">계약가능성</th>
+                        <th class="px-3 py-2 text-center text-xs font-semibold">액션</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -122,10 +146,29 @@
                             <td class="px-3 py-2 text-center text-gray-700">{{ $target->GS_K ?? 0 }}</td>
                             <td class="px-3 py-2 text-center text-gray-700">{{ $target->GS_E ?? 0 }}</td>
                             <td class="px-3 py-2 text-center font-semibold text-gray-800">{{ $target->Total ?? 0 }}</td>
+                            <td class="px-3 py-2 text-gray-700 max-w-[14rem] truncate" title="{{ $target->Connected ?? '' }}">{{ filled($target->Connected) ? $target->Connected : '-' }}</td>
+                            <td class="px-3 py-2 text-center text-gray-700">
+                                @if($target->IsContract)
+                                    <span class="font-medium text-emerald-700">계약</span>
+                                @else
+                                    {{ filled($target->Possibility) ? $target->Possibility : '-' }}
+                                @endif
+                            </td>
+                            <td class="px-3 py-2 text-center">
+                                @if($target->IsContract)
+                                    <span class="text-xs text-gray-500">계약완료됨</span>
+                                @else
+                                    <button type="button"
+                                            wire:click.stop="markContractComplete({{ $target->ID }})"
+                                            class="inline-flex items-center justify-center rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-1">
+                                        계약완료
+                                    </button>
+                                @endif
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="12" class="px-4 py-16 text-center text-gray-400">
+                            <td colspan="15" class="px-4 py-16 text-center text-gray-400">
                                 <p class="font-medium">잠재고객 데이터가 없습니다</p>
                                 <p class="text-sm mt-1">필터 조건을 변경해 보세요.</p>
                             </td>
@@ -400,7 +443,14 @@
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">미팅횟수</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['meeting_count'] ?? 0 }}</td>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">계약여부</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ ($selectedTarget['is_contract'] ?? false) ? '계약' : '미계약' }}</td>
+                                    <td class="px-3 py-2" wire:click.stop>
+                                        <select wire:model="detailModalContract"
+                                                wire:change="commitDetailContract"
+                                                class="w-full max-w-[11rem] py-1.5 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            <option value="0">미계약</option>
+                                            <option value="1">계약</option>
+                                        </select>
+                                    </td>
                                 </tr>
                                 <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">주소</th>

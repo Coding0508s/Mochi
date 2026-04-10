@@ -2,14 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\InstitutionCreateForm;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Schema;
+use Livewire\Livewire;
 use Tests\TestCase;
 
-class InstitutionListTest extends TestCase
+class InstitutionCreateTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -54,24 +56,65 @@ class InstitutionListTest extends TestCase
         });
     }
 
-    public function test_index_renders_and_has_no_inline_register_button(): void
+    public function test_create_page_renders_form(): void
     {
         $user = User::factory()->create();
 
         $this->actingAs($user)
-            ->get(route('institutions.index'))
+            ->get(route('institutions.create'))
             ->assertOk()
-            ->assertSee('기관리스트')
-            ->assertDontSee('신규 기관 등록');
+            ->assertSee('신규 기관 생성');
     }
 
-    public function test_legacy_open_create_query_does_not_show_create_ui(): void
+    public function test_create_page_redirects_when_feature_disabled(): void
     {
+        Config::set('features.institution_create_enabled', false);
+
         $user = User::factory()->create();
 
         $this->actingAs($user)
-            ->get(route('institutions.index', ['openCreate' => 1]))
-            ->assertOk()
-            ->assertDontSee('신규 기관 생성');
+            ->get(route('institutions.create'))
+            ->assertRedirect(route('institutions.index'))
+            ->assertSessionHas('warning');
+    }
+
+    public function test_save_new_institution_stores_possibility(): void
+    {
+        $user = User::factory()->create();
+        $sk = 'SK-TEST-'.uniqid();
+
+        Livewire::actingAs($user)
+            ->test(InstitutionCreateForm::class)
+            ->set('newSkCode', $sk)
+            ->set('newInstitutionName', '테스트 유치원')
+            ->set('newPossibility', 'C')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertRedirect(route('institutions.index'));
+
+        $this->assertDatabaseHas('S_AccountName', [
+            'SKcode' => $sk,
+            'AccountName' => '테스트 유치원',
+            'Possibility' => 'C',
+        ]);
+    }
+
+    public function test_save_new_institution_nullable_possibility(): void
+    {
+        $user = User::factory()->create();
+        $sk = 'SK-TEST-'.uniqid();
+
+        Livewire::actingAs($user)
+            ->test(InstitutionCreateForm::class)
+            ->set('newSkCode', $sk)
+            ->set('newInstitutionName', '무가능성 테스트')
+            ->set('newPossibility', '')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_AccountName', [
+            'SKcode' => $sk,
+            'Possibility' => null,
+        ]);
     }
 }

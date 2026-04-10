@@ -9,59 +9,198 @@ use App\Models\Institution;
 use App\Services\PotentialInstitutionSkCodeService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Throwable;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Throwable;
 
 class PotentialInstitutionList extends Component
 {
     use WithPagination;
 
     public string $search = '';
+
     public string $filterYear = '';
+
     public string $filterManager = '';
+
     public string $filterType = '';
+
     public string $filterRegion = '';
+
+    /** 소개경로(`Connected`). 빈 값=전체, __empty__=미입력 */
+    public string $filterIntroductionPath = '';
+
+    /** 계약가능성: 빈 값=전체, contract=계약완료, A–D, none=미지정 */
+    public string $filterContractPossibility = '';
+
     public string $summaryFilter = 'all'; // all | new | terminated
 
     // 신규 등록 모달 상태
     public bool $showCreateModal = false;
+
     public string $newManager = '';
+
     public string $newConsultingType = '';
+
     public string $newConnected = '';
+
     public string $newMeetingDate = '';
+
     public string $newMeetingTime = '';
+
     public string $newMeetingTimeEnd = '';
+
     public string $newType = '';
+
     public string $newAccountCode = '';
+
     public string $newAccountName = '';
+
     public string $newDirector = '';
+
     public string $newPhone = '';
+
     public string $newAddress = '';
+
     public string $newPossibility = '';
+
     public string $newDescription = '';
+
     public string $newLS = '';
+
     public string $newGSK = '';
+
     public string $newGSE = '';
+
     public string $newApproaching = '';
+
     public string $newPresenting = '';
+
     public string $newConsultingCount = '';
+
     public string $newClosing = '';
+
     public string $newDroppedOut = '';
 
     // 상세 모달 상태
     public bool $showDetailModal = false;
+
     public ?array $selectedTarget = null;
+
     public array $detailMeetings = [];
+
     public bool $showMeetingDetailModal = false;
+
     public ?array $selectedMeeting = null;
 
-    public function updatingSearch(): void { $this->resetPage(); }
-    public function updatingFilterYear(): void { $this->resetPage(); }
-    public function updatingFilterManager(): void { $this->resetPage(); }
-    public function updatingFilterType(): void { $this->resetPage(); }
-    public function updatingFilterRegion(): void { $this->resetPage(); }
-    public function updatingSummaryFilter(): void { $this->resetPage(); }
+    /** 상세 모달 계약여부 편집: '0'=미계약, '1'=계약 */
+    public string $detailModalContract = '0';
+
+    public function updatingSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterYear(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterManager(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterType(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterRegion(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingSummaryFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterIntroductionPath(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterContractPossibility(): void
+    {
+        $this->resetPage();
+    }
+
+    public function markContractComplete(int $id): void
+    {
+        $target = CoNewTarget::query()->findOrFail($id);
+
+        if ($target->IsContract) {
+            return;
+        }
+
+        $this->applyContractState($target, true);
+
+        session()->flash('success', '계약완료 처리되었습니다.');
+    }
+
+    /**
+     * 상세 모달에서 계약여부 select 변경 시 호출 (`wire:change`).
+     */
+    public function commitDetailContract(): void
+    {
+        if ($this->selectedTarget === null) {
+            return;
+        }
+
+        $id = (int) ($this->selectedTarget['id'] ?? 0);
+        if ($id <= 0) {
+            return;
+        }
+
+        $contracted = $this->detailModalContract === '1';
+        $target = CoNewTarget::query()->findOrFail($id);
+
+        if ((bool) $target->IsContract === $contracted) {
+            return;
+        }
+
+        $this->applyContractState($target, $contracted);
+        $this->syncSelectedTargetContractFields($contracted);
+        session()->flash('success', $contracted ? '계약으로 변경되었습니다.' : '미계약으로 변경되었습니다.');
+    }
+
+    private function applyContractState(CoNewTarget $target, bool $contracted): void
+    {
+        if ($contracted) {
+            $target->update([
+                'IsContract' => true,
+                'ContractedDate' => now()->toDateString(),
+            ]);
+        } else {
+            $target->update([
+                'IsContract' => false,
+                'ContractedDate' => null,
+            ]);
+        }
+    }
+
+    private function syncSelectedTargetContractFields(bool $contracted): void
+    {
+        if ($this->selectedTarget === null) {
+            return;
+        }
+
+        $this->selectedTarget['is_contract'] = $contracted;
+        $this->selectedTarget['contracted_date'] = $contracted
+            ? now()->format('Y-m-d')
+            : '-';
+    }
 
     public function openCreateModal(): void
     {
@@ -326,6 +465,8 @@ class PotentialInstitutionList extends Component
             })
             ->toArray();
 
+        $this->detailModalContract = ($target->IsContract ?? false) ? '1' : '0';
+
         $this->showDetailModal = true;
     }
 
@@ -334,6 +475,7 @@ class PotentialInstitutionList extends Component
         $this->showDetailModal = false;
         $this->selectedTarget = null;
         $this->detailMeetings = [];
+        $this->detailModalContract = '0';
         $this->showMeetingDetailModal = false;
         $this->selectedMeeting = null;
     }
@@ -342,7 +484,7 @@ class PotentialInstitutionList extends Component
     {
         $meeting = collect($this->detailMeetings)->firstWhere('id', $meetingId);
 
-        if (!$meeting) {
+        if (! $meeting) {
             return;
         }
 
@@ -382,6 +524,30 @@ class PotentialInstitutionList extends Component
             if ($normalizedRegion !== '') {
                 $query->whereRaw("REPLACE(Address, ' ', '') like ?", ["%{$normalizedRegion}%"]);
             }
+        }
+
+        if (filled($this->filterIntroductionPath)) {
+            if ($this->filterIntroductionPath === '__empty__') {
+                $query->where(function ($q): void {
+                    $q->whereNull('Connected')
+                        ->orWhere('Connected', '');
+                });
+            } else {
+                $query->where('Connected', $this->filterIntroductionPath);
+            }
+        }
+
+        if (filled($this->filterContractPossibility)) {
+            match ($this->filterContractPossibility) {
+                'contract' => $query->where('IsContract', true),
+                'none' => $query->where('IsContract', false)->where(function ($q): void {
+                    $q->whereNull('Possibility')
+                        ->orWhere('Possibility', '');
+                }),
+                'A', 'B', 'C', 'D' => $query->where('IsContract', false)
+                    ->where('Possibility', $this->filterContractPossibility),
+                default => null,
+            };
         }
 
         if ($this->summaryFilter === 'new') {
@@ -431,6 +597,13 @@ class PotentialInstitutionList extends Component
             ->orderBy('Type')
             ->pluck('Type');
 
+        $introductionPathList = CoNewTarget::query()
+            ->whereNotNull('Connected')
+            ->where('Connected', '!=', '')
+            ->distinct()
+            ->orderBy('Connected')
+            ->pluck('Connected');
+
         $allCount = CoNewTarget::query()->count();
 
         $newCount = CoNewTarget::query()
@@ -454,6 +627,7 @@ class PotentialInstitutionList extends Component
             'yearList' => $yearList,
             'managerList' => $managerList,
             'typeList' => $typeList,
+            'introductionPathList' => $introductionPathList,
             'totalCount' => $totalCount,
             'allCount' => $allCount,
             'newCount' => $newCount,
@@ -461,4 +635,3 @@ class PotentialInstitutionList extends Component
         ]);
     }
 }
-

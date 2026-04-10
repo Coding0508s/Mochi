@@ -5,6 +5,12 @@
         </div>
     @endif
 
+    @if(session('warning'))
+        <div class="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+            {{ session('warning') }}
+        </div>
+    @endif
+
     {{-- 상단 요약 영역 (잠재기관 페이지와 동일 톤) --}}
     <div class="mochi-summary-card">
         <div class="flex flex-wrap items-center gap-4 text-sm">
@@ -59,21 +65,6 @@
                        placeholder="기관명, SK코드, 원장명, 주소 검색"
                        class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
-
-            @if(config('features.institution_create_enabled'))
-                <button type="button"
-                        wire:click="openCreateModal"
-                        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
-                    신규 기관 등록
-                </button>
-            @else
-                <button type="button"
-                        disabled
-                        title="현재 신규 기관 등록이 비활성화되어 있습니다. 활성화는 INSTITUTION_CREATE_ENABLED 설정을 참고하세요."
-                        class="px-4 py-2 text-sm font-medium text-gray-500 bg-gray-200 rounded-lg cursor-not-allowed opacity-90">
-                    신규 기관 등록
-                </button>
-            @endif
         </div>
     </div>
 
@@ -368,7 +359,7 @@
                                         <th class="px-3 py-2 text-left">담당자</th>
                                         <th class="px-3 py-2 text-left">지원방법</th>
                                         <th class="px-3 py-2 text-left">참석자</th>
-                                        <th class="px-3 py-2 text-left">이슈/방문목적</th>
+                                        <th class="px-3 py-2 text-left">이슈</th>
                                         <th class="px-3 py-2 text-left">소통내용</th>
                                         <th class="px-3 py-2 text-center">상태</th>
                                     </tr>
@@ -468,7 +459,7 @@
                     </div>
 
                     <div class="col-span-2">
-                        <div class="text-xs text-gray-500 mb-1">이슈/방문목적</div>
+                        <div class="text-xs text-gray-500 mb-1">이슈</div>
                         <div class="font-medium text-gray-900 whitespace-pre-wrap">{{ $selectedSupportRecord['issue'] ?? '-' }}</div>
                     </div>
 
@@ -572,152 +563,6 @@
                                 wire:loading.class="opacity-70 cursor-not-allowed">
                             <span wire:loading.remove wire:target="saveManagers">저장</span>
                             <span wire:loading wire:target="saveManagers">저장 중...</span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    @endif
-
-    {{-- 신규 기관 생성 모달 --}}
-    @if($showCreateModal)
-        <div class="mochi-modal-overlay"
-             wire:click.self="closeCreateModal">
-            <div class="mochi-modal-shell max-w-2xl"
-                 wire:click.stop>
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white">
-                    <h2 class="text-lg font-bold text-gray-900">신규 기관 생성</h2>
-                    <button wire:click="closeCreateModal" class="text-gray-400 hover:text-gray-600 p-1">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <form wire:submit="saveNewInstitution" class="px-6 py-5 space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">기관명 <span class="text-red-500">*</span></label>
-                            <input type="text" wire:model="newInstitutionName"
-                                   class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 {{ $errors->has('newInstitutionName') ? 'border-red-400' : 'border-gray-300' }}"
-                                   placeholder="기관명을 입력하세요" />
-                            @error('newInstitutionName') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">SK코드 <span class="text-red-500">*</span></label>
-                            <input type="text" wire:model="newSkCode"
-                                   class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 {{ $errors->has('newSkCode') ? 'border-red-400' : 'border-gray-300' }}"
-                                   placeholder="예: SK9999" />
-                            @error('newSkCode') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">구분</label>
-                            <select wire:model="newGubun"
-                                    class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="">미지정</option>
-                                @foreach($gubunList as $gubun)
-                                    <option value="{{ $gubun }}">{{ $gubun }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">가능성</label>
-                            <select wire:model="newPossibility"
-                                    class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="">미선택</option>
-                                <option value="A">A</option>
-                                <option value="B">B</option>
-                                <option value="C">C</option>
-                                <option value="D">D</option>
-                            </select>
-                            @error('newPossibility') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">원장명</label>
-                            <input type="text" wire:model="newDirector"
-                                   class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                   placeholder="원장명" />
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Customer Type</label>
-                            <input type="text" wire:model="newCustomerType"
-                                   class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                   placeholder="예: GTS 15 전환" />
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">GS Number</label>
-                            <input type="text" wire:model="newGsNo"
-                                   class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                   placeholder="예: 31" />
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">대표전화</label>
-                            <input type="text" wire:model="newPhone"
-                                   class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                   placeholder="대표 전화번호" />
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">직통 연락처</label>
-                            <input type="text" wire:model="newAccountTel"
-                                   class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                   placeholder="직통 연락처" />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">주소</label>
-                        <input type="text" wire:model="newAddress"
-                               class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                               placeholder="기관 주소" />
-                    </div>
-
-                    <div class="grid grid-cols-3 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">담당 CO</label>
-                            <select wire:model="newCo"
-                                    class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="">미지정</option>
-                                @foreach($coManagerOptions as $manager)
-                                    <option value="{{ $manager }}">{{ $manager }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">담당 TR</label>
-                            <select wire:model="newTr"
-                                    class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="">미지정</option>
-                                @foreach($trManagerOptions as $manager)
-                                    <option value="{{ $manager }}">{{ $manager }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">담당 CS</label>
-                            <select wire:model="newCs"
-                                    class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="">미지정</option>
-                                @foreach($csManagerOptions as $manager)
-                                    <option value="{{ $manager }}">{{ $manager }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="pt-2 flex items-center justify-end gap-3">
-                        <button type="button" wire:click="closeCreateModal"
-                                class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
-                            취소
-                        </button>
-                        <button type="submit"
-                                class="px-5 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                                wire:loading.attr="disabled"
-                                wire:loading.class="opacity-70 cursor-not-allowed">
-                            <span wire:loading.remove wire:target="saveNewInstitution">저장</span>
-                            <span wire:loading wire:target="saveNewInstitution">저장 중...</span>
                         </button>
                     </div>
                 </form>
