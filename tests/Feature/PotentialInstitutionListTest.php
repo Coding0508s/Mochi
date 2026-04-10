@@ -383,12 +383,62 @@ class PotentialInstitutionListTest extends TestCase
         $row->refresh();
         $this->assertTrue((bool) $row->IsContract);
         $this->assertNotNull($row->ContractedDate);
+        $expectedSk = 'LEAD-'.$row->ID;
+        $this->assertSame($expectedSk, trim((string) $row->AccountCode));
+        $this->assertDatabaseHas('S_AccountName', [
+            'SKcode' => $expectedSk,
+            'AccountName' => $name,
+        ]);
+        $this->assertDatabaseHas('S_Account_Information', [
+            'SK_Code' => $expectedSk,
+            'Account_Name' => $name,
+        ]);
 
         Livewire::test(PotentialInstitutionList::class)
             ->call('markContractComplete', (int) $row->ID);
 
         $row->refresh();
         $this->assertTrue((bool) $row->IsContract);
+    }
+
+    public function test_mark_contract_complete_does_not_duplicate_institution_when_sk_already_in_list(): void
+    {
+        $name = '기존SK계약 QA '.uniqid('', true);
+        $existingSk = 'SK-EXIST-'.uniqid('', true);
+        Institution::query()->create([
+            'SKcode' => $existingSk,
+            'AccountName' => $name,
+            'Director' => null,
+            'Phone' => null,
+            'Address' => null,
+            'Gubun' => null,
+        ]);
+
+        $row = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountCode' => $existingSk,
+            'AccountName' => $name,
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'B',
+        ]);
+
+        Livewire::test(PotentialInstitutionList::class)
+            ->call('markContractComplete', (int) $row->ID);
+
+        $this->assertSame(1, Institution::query()->where('SKcode', $existingSk)->count());
     }
 
     public function test_filter_introduction_path_limits_list(): void
@@ -528,6 +578,12 @@ class PotentialInstitutionListTest extends TestCase
 
         $selected = $component->get('selectedTarget');
         $this->assertTrue($selected['is_contract'] ?? false);
+        $expectedSk = 'LEAD-'.$id;
+        $this->assertSame($expectedSk, $selected['account_code'] ?? null);
+        $this->assertDatabaseHas('S_AccountName', [
+            'SKcode' => $expectedSk,
+            'AccountName' => $name,
+        ]);
     }
 
     public function test_detail_modal_commit_clears_contract(): void

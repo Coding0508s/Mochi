@@ -61,8 +61,13 @@
                         </filter>
                     </defs>
                 </svg>
-                @foreach(['OutLook' => '#', 'Portal' => '#', 'eCount' => '#', 'Coaching' => '#'] as $label => $href)
-                    <a href="{{ $href }}" class="mochi-topbar-glass-link">
+                @foreach(['OutLook' => '#', 'Portal' => 'https://account.grapeseed.com/', 'eCount' => 'https://login.ecount.com/Login/KR/', 'Coaching' => '#'] as $label => $href)
+                    <a href="{{ $href }}"
+                       class="mochi-topbar-glass-link"
+                       @if(str_starts_with($href, 'http'))
+                           target="_blank"
+                           rel="noopener noreferrer"
+                       @endif>
                         <span class="mochi-topbar-glass-link__depth" aria-hidden="true"></span>
                         <span
                             class="mochi-topbar-glass-link__blur"

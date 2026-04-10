@@ -171,23 +171,79 @@ class PotentialInstitutionList extends Component
         }
 
         $this->applyContractState($target, $contracted);
+        $target->refresh();
         $this->syncSelectedTargetContractFields($contracted);
+        if ($contracted && $this->selectedTarget !== null && (int) ($this->selectedTarget['id'] ?? 0) === $id) {
+            $this->selectedTarget['account_code'] = $target->AccountCode;
+        }
         session()->flash('success', $contracted ? '계약으로 변경되었습니다.' : '미계약으로 변경되었습니다.');
     }
 
     private function applyContractState(CoNewTarget $target, bool $contracted): void
     {
-        if ($contracted) {
-            $target->update([
-                'IsContract' => true,
-                'ContractedDate' => now()->toDateString(),
-            ]);
-        } else {
-            $target->update([
-                'IsContract' => false,
-                'ContractedDate' => null,
-            ]);
+        DB::transaction(function () use ($target, $contracted): void {
+            if ($contracted) {
+                $target->update([
+                    'IsContract' => true,
+                    'ContractedDate' => now()->toDateString(),
+                ]);
+            } else {
+                $target->update([
+                    'IsContract' => false,
+                    'ContractedDate' => null,
+                ]);
+            }
+
+            if ($contracted) {
+                $target->refresh();
+                $this->syncContractedLeadToInstitutionList($target);
+            }
+        });
+    }
+
+    /**
+     * 계약 확정 시 기관리스트(S_AccountName)에 없으면 등록하고, 담당정보(S_Account_Information)를 맞춥니다.
+     * 신규 잠재기관 등록(saveNewTarget)과 동일한 SK 정책(비어 있으면 LEAD-{ID})을 따릅니다.
+     */
+    private function syncContractedLeadToInstitutionList(CoNewTarget $target): void
+    {
+        $name = trim((string) ($target->AccountName ?? ''));
+        if ($name === '') {
+            return;
         }
+
+        $skService = app(PotentialInstitutionSkCodeService::class);
+        $userSk = trim((string) ($target->AccountCode ?? ''));
+        $sk = $userSk !== ''
+            ? $userSk
+            : $skService->resolveForManualRegistration('', (int) $target->ID);
+
+        if ($userSk === '') {
+            $target->update(['AccountCode' => $sk]);
+        }
+
+        if (Institution::query()->where('SKcode', $sk)->exists()) {
+            return;
+        }
+
+        Institution::query()->create([
+            'SKcode' => $sk,
+            'AccountName' => $name,
+            'Director' => $target->Director ? trim((string) $target->Director) : null,
+            'Phone' => $target->Phone ? trim((string) $target->Phone) : null,
+            'Address' => $target->Address ? trim((string) $target->Address) : null,
+            'Gubun' => $target->Gubun ? trim((string) $target->Gubun) : null,
+            'Possibility' => $target->Possibility ? trim((string) $target->Possibility) : null,
+        ]);
+
+        AccountInformation::query()->updateOrCreate(
+            ['SK_Code' => $sk],
+            [
+                'Account_Name' => $name,
+                'Address' => $target->Address ? trim((string) $target->Address) : null,
+                'Customer_Type' => $target->Type ? trim((string) $target->Type) : null,
+            ]
+        );
     }
 
     private function syncSelectedTargetContractFields(bool $contracted): void
