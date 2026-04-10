@@ -60,10 +60,20 @@
                        class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
 
-            <button wire:click="openCreateModal"
-                    class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
-                신규 기관 등록
-            </button>
+            @if(config('features.institution_create_enabled'))
+                <button type="button"
+                        wire:click="openCreateModal"
+                        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+                    신규 기관 등록
+                </button>
+            @else
+                <button type="button"
+                        disabled
+                        title="현재 신규 기관 등록이 비활성화되어 있습니다. 활성화는 INSTITUTION_CREATE_ENABLED 설정을 참고하세요."
+                        class="px-4 py-2 text-sm font-medium text-gray-500 bg-gray-200 rounded-lg cursor-not-allowed opacity-90">
+                    신규 기관 등록
+                </button>
+            @endif
         </div>
     </div>
 
@@ -610,6 +620,18 @@
                                     <option value="{{ $gubun }}">{{ $gubun }}</option>
                                 @endforeach
                             </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">가능성</label>
+                            <select wire:model="newPossibility"
+                                    class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">미선택</option>
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+                                <option value="D">D</option>
+                            </select>
+                            @error('newPossibility') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">원장명</label>

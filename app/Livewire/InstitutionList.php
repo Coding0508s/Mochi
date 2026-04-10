@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\AccountInformation;
 use App\Models\Institution;
 use App\Models\SupportRecord;
+use Illuminate\Http\Request;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -18,6 +19,7 @@ class InstitutionList extends Component
     // 상단 검색창에 입력된 텍스트. 빈 문자열로 시작합니다.
 
     public string $filterGubun = '';
+
     // 기관 구분 필터 (유치원 / 어린이집 / 전체)
     public string $assignmentFilter = '';
     // 담당자 배정 상태 필터: '' | assigned | unassigned
@@ -30,40 +32,77 @@ class InstitutionList extends Component
 
     // ─── 상세 모달 상태 ───────────────────────────────────────────────
     public bool $showDetailModal = false;
+
     public ?array $selectedInstitution = null;
+
     public array $supportHistory = [];
+
     public bool $showSupportDetailModal = false;
+
     public ?array $selectedSupportRecord = null;
+
     public bool $isEditingDetail = false;
+
     public string $editCustomerType = '';
+
     public string $editGsNo = '';
+
     public string $editDetailCo = '';
+
     public string $editDetailTr = '';
+
     public string $editDetailCs = '';
 
     // ─── 담당자 변경 모달 상태 ───────────────────────────────────────
     public bool $showManagerModal = false;
+
     public ?int $editingInstitutionId = null;
+
     public string $editSkCode = '';
+
     public string $editInstitutionName = '';
+
     public string $editCo = '';
+
     public string $editTr = '';
+
     public string $editCs = '';
 
     // ─── 신규 기관 생성 모달 상태 ───────────────────────────────────
     public bool $showCreateModal = false;
+
     public string $newSkCode = '';
+
     public string $newInstitutionName = '';
+
     public string $newGubun = '';
+
     public string $newDirector = '';
+
     public string $newPhone = '';
+
     public string $newAccountTel = '';
+
     public string $newAddress = '';
+
     public string $newCustomerType = '';
+
     public string $newGsNo = '';
+
     public string $newCo = '';
+
     public string $newTr = '';
+
     public string $newCs = '';
+
+    public string $newPossibility = '';
+
+    public function mount(Request $request): void
+    {
+        if ($request->boolean('openCreate') && config('features.institution_create_enabled')) {
+            $this->openCreateModal();
+        }
+    }
 
     // ─── 검색어가 바뀌면 자동으로 1페이지로 돌아가기 ──────────────
     public function updatingSearch(): void
@@ -140,7 +179,7 @@ class InstitutionList extends Component
             ->where('SK_Code', $institution->SKcode)
             ->where(function ($q) use ($startYear) {
                 $q->where('Year', '>=', $startYear)
-                  ->orWhereYear('Support_Date', '>=', $startYear);
+                    ->orWhereYear('Support_Date', '>=', $startYear);
             })
             ->orderByDesc('Support_Date')
             ->orderByDesc('ID')
@@ -181,7 +220,7 @@ class InstitutionList extends Component
 
     public function startDetailEdit(): void
     {
-        if (!$this->selectedInstitution) {
+        if (! $this->selectedInstitution) {
             return;
         }
 
@@ -196,7 +235,7 @@ class InstitutionList extends Component
 
     public function cancelDetailEdit(): void
     {
-        if (!$this->selectedInstitution) {
+        if (! $this->selectedInstitution) {
             return;
         }
 
@@ -211,7 +250,7 @@ class InstitutionList extends Component
 
     public function saveDetailFields(): void
     {
-        if (!$this->selectedInstitution) {
+        if (! $this->selectedInstitution) {
             return;
         }
 
@@ -360,6 +399,10 @@ class InstitutionList extends Component
     // ─── 신규 기관 생성 모달 열기/닫기/저장 ─────────────────────────
     public function openCreateModal(): void
     {
+        if (! config('features.institution_create_enabled')) {
+            return;
+        }
+
         $this->newSkCode = '';
         $this->newInstitutionName = '';
         $this->newGubun = '';
@@ -372,6 +415,7 @@ class InstitutionList extends Component
         $this->newCo = '';
         $this->newTr = '';
         $this->newCs = '';
+        $this->newPossibility = '';
         $this->resetValidation();
         $this->showCreateModal = true;
     }
@@ -383,6 +427,10 @@ class InstitutionList extends Component
 
     public function saveNewInstitution(): void
     {
+        if (! config('features.institution_create_enabled')) {
+            return;
+        }
+
         $this->validate([
             'newSkCode' => 'required|string|max:255|unique:S_AccountName,SKcode',
             'newInstitutionName' => 'required|string|max:255',
@@ -396,6 +444,7 @@ class InstitutionList extends Component
             'newCo' => 'nullable|string|max:255',
             'newTr' => 'nullable|string|max:255',
             'newCs' => 'nullable|string|max:255',
+            'newPossibility' => 'nullable|string|in:A,B,C,D',
         ], [
             'newSkCode.required' => 'SK코드를 입력해 주세요.',
             'newSkCode.unique' => '이미 사용 중인 SK코드입니다.',
@@ -411,6 +460,7 @@ class InstitutionList extends Component
             'Address' => trim($this->newAddress) ?: null,
             'Gubun' => trim($this->newGubun) ?: null,
             'GSno' => trim($this->newGsNo) ?: null,
+            'Possibility' => filled($this->newPossibility) ? trim($this->newPossibility) : null,
         ]);
 
         AccountInformation::query()->updateOrCreate(
@@ -439,7 +489,7 @@ class InstitutionList extends Component
         $assignedCoCount = Institution::query()
             ->whereHas('accountInfo', function ($q) {
                 $q->whereNotNull('CO')
-                  ->where('CO', '!=', '');
+                    ->where('CO', '!=', '');
             })
             ->count();
 
@@ -468,7 +518,7 @@ class InstitutionList extends Component
             })
             ->orderBy($this->sortField, $this->sortDirection)
             ->paginate(20);
-            // 한 페이지에 20개씩 표시합니다.
+        // 한 페이지에 20개씩 표시합니다.
 
         // 기관 구분 목록 (필터 드롭다운용)
         $gubunList = Institution::query()
@@ -508,7 +558,7 @@ class InstitutionList extends Component
 
         return view('livewire.institution-list', [
             'institutions' => $institutions,
-            'gubunList'    => $gubunList,
+            'gubunList' => $gubunList,
             'allInstitutionCount' => $allInstitutionCount,
             'assignedCoCount' => $assignedCoCount,
             'unassignedCoCount' => $unassignedCoCount,

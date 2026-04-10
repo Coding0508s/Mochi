@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Builder;
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -21,18 +21,19 @@ use Illuminate\Database\Eloquent\Builder;
  *   $institution->supportRecords;    // 이 기관의 모든 지원 내역
  * ═══════════════════════════════════════════════════════════════
  *
- * @property int    $ID
- * @property string $SKcode          기관 SK 코드 (업무상 핵심 식별자)
- * @property string $AccountName     기관명(한글)
- * @property string $EnglishName     기관명(영문)
+ * @property int $ID
+ * @property string $SKcode 기관 SK 코드 (업무상 핵심 식별자)
+ * @property string $AccountName 기관명(한글)
+ * @property string $EnglishName 기관명(영문)
  * @property string $PortalAccountName 포털 표시 기관명
- * @property string $AccountNo       사업자/기관 번호
- * @property string $GSno            GrapeSEED 번호
- * @property string $Director        원장명
- * @property string $Phone           대표 전화번호
- * @property string $AccountTel      직통 연락처
- * @property string $Address         주소
- * @property string $Gubun           구분(유치원/초등 등)
+ * @property string $AccountNo 사업자/기관 번호
+ * @property string $GSno GrapeSEED 번호
+ * @property string $Director 원장명
+ * @property string $Phone 대표 전화번호
+ * @property string $AccountTel 직통 연락처
+ * @property string $Address 주소
+ * @property string $Gubun 구분(유치원/초등 등)
+ * @property string|null $Possibility 영업 가능성(A/B/C/D 등)
  */
 class Institution extends Model
 {
@@ -63,6 +64,7 @@ class Institution extends Model
         'AccountTel',
         'Address',
         'Gubun',
+        'Possibility',
     ];
 
     // ─── 날짜/타입 자동 변환 설정 ────────────────────────────────────
@@ -71,9 +73,9 @@ class Institution extends Model
     protected function casts(): array
     {
         return [
-            'FGC_CreateDate'     => 'datetime',
+            'FGC_CreateDate' => 'datetime',
             'FGC_LastModifyDate' => 'datetime',
-            'FGC_Rowversion'     => 'datetime',
+            'FGC_Rowversion' => 'datetime',
         ];
     }
 
@@ -145,9 +147,9 @@ class Institution extends Model
 
         return $query->where(function (Builder $q) use ($normalizedKeyword) {
             $q->whereRaw("REPLACE(AccountName, ' ', '') like ?", ["%{$normalizedKeyword}%"])
-              ->orWhereRaw("REPLACE(SKcode, ' ', '') like ?", ["%{$normalizedKeyword}%"])
-              ->orWhereRaw("REPLACE(Director, ' ', '') like ?", ["%{$normalizedKeyword}%"])
-              ->orWhereRaw("REPLACE(Address, ' ', '') like ?", ["%{$normalizedKeyword}%"]);
+                ->orWhereRaw("REPLACE(SKcode, ' ', '') like ?", ["%{$normalizedKeyword}%"])
+                ->orWhereRaw("REPLACE(Director, ' ', '') like ?", ["%{$normalizedKeyword}%"])
+                ->orWhereRaw("REPLACE(Address, ' ', '') like ?", ["%{$normalizedKeyword}%"]);
         });
     }
 

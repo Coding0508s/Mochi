@@ -238,9 +238,9 @@
                                     ['label' => '기관리스트',     'href' => '/institutions', 'route' => 'institutions', 'icon' => 'building'],
                                     ['label' => '기관연락처보기', 'href' => '/contacts',     'route' => 'contacts',     'icon' => 'phone'],
                                     ['label' => '기관지원보고서', 'href' => '/supports',     'route' => 'supports',     'icon' => 'document'],
-                                    ['label' => '잠재기관리스트', 'href' => '/potential-institutions', 'route' => 'potential-institutions', 'icon' => 'calendar'],
+                                    ['label' => '잠재기관리스트', 'href' => route('potential-institutions.index'), 'route' => '', 'routeIs' => 'potential-institutions.index', 'icon' => 'calendar'],
                                     ['label' => 'Store판매내역',  'href' => '#',             'route' => '',             'icon' => 'cart'],
-                                    ['label' => '잠재기관보기',   'href' => '#',             'route' => '',             'icon' => 'eye'],
+                                    ['label' => '잠재기관보기',   'href' => route('potential-institutions.view'), 'route' => '', 'routeIs' => 'potential-institutions.view', 'icon' => 'eye'],
                                     ['label' => 'Salesforce파일', 'href' => '/salesforce-files', 'route' => 'salesforce-files', 'icon' => 'server'],
                                     ['label' => '계약물건',       'href' => '#',             'route' => '',             'icon' => 'clipboard'],
                                     ['label' => '평가기관리스트', 'href' => '#',             'route' => '',             'icon' => 'chart'],
@@ -250,9 +250,11 @@
                             @foreach($coMenus as $menu)
                                 <a href="{{ $menu['href'] }}"
                                    class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                                          {{ ($menu['route'] && request()->is($menu['route'].'*'))
+                                          {{ (! empty($menu['routeIs'] ?? null) && request()->routeIs($menu['routeIs']))
                                              ? 'sidebar-subitem-active'
-                                             : '' }}">
+                                             : ((! empty($menu['route'] ?? null) && request()->is($menu['route'].'*'))
+                                                 ? 'sidebar-subitem-active'
+                                                 : '') }}">
                                     @include('partials.sidebar-menu-icon', ['name' => $menu['icon'], 'small' => true])
                                     <span class="sidebar-subitem-label truncate">{{ $menu['label'] }}</span>
                                 </a>

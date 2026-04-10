@@ -3,9 +3,9 @@
 namespace Tests\Feature;
 
 use App\Livewire\PotentialInstitutionList;
+use App\Models\AccountInformation;
 use App\Models\CoNewTarget;
 use App\Models\CoNewTargetDetail;
-use App\Models\AccountInformation;
 use App\Models\Institution;
 use App\Models\User;
 use App\Services\PotentialInstitutionSkCodeService;
@@ -48,6 +48,7 @@ class PotentialInstitutionListTest extends TestCase
             $table->string('AccountTel', 100)->nullable();
             $table->string('Address', 255)->nullable();
             $table->string('Gubun', 100)->nullable();
+            $table->string('Possibility', 20)->nullable();
         });
 
         Schema::create('S_Account_Information', function (Blueprint $table): void {

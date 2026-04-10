@@ -57,6 +57,10 @@ Route::middleware(['auth'])->group(function () {
         return view('pages.potential-institutions.index');
     })->name('potential-institutions.index');
 
+    Route::get('/potential-institutions/view', function () {
+        return view('pages.potential-institutions.view');
+    })->name('potential-institutions.view');
+
     Route::get('/setup', function () {
         return view('pages.setup.index');
     })->name('setup.index');
