@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\ContractDocument;
 use App\Models\Institution;
 use App\Models\SupportRecord;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
@@ -357,22 +358,24 @@ class SupportList extends Component
         $this->formSupportTime = $this->normalizeTimeForInput($this->formSupportTime);
         $this->validate();
 
-        $data = [
-            'Year' => (int) date('Y', strtotime($this->formSupportDate)),
-            'SK_Code' => $this->formSkCode,
-            'Account_Name' => $this->formAccountName,
-            'TR_Name' => $this->formCoName,
-            'Support_Date' => $this->formSupportDate,
-            'Meet_Time' => $this->formSupportTime.':00',
-            'Support_Type' => $this->formSupportType,
-            'Target' => $this->formTarget,
-            'TO_Account' => $this->formToAccount,
-            'Status' => $this->formCompleted ? '완료' : '진행중',
-            'CompletedDate' => $this->formCompleted ? now() : null,
-            'CreatedDate' => now(),
-        ];
+        DB::transaction(function (): void {
+            $data = [
+                'Year' => (int) date('Y', strtotime($this->formSupportDate)),
+                'SK_Code' => $this->formSkCode,
+                'Account_Name' => $this->formAccountName,
+                'TR_Name' => $this->formCoName,
+                'Support_Date' => $this->formSupportDate,
+                'Meet_Time' => $this->formSupportTime.':00',
+                'Support_Type' => $this->formSupportType,
+                'Target' => $this->formTarget,
+                'TO_Account' => $this->formToAccount,
+                'Status' => $this->formCompleted ? '완료' : '진행중',
+                'CompletedDate' => $this->formCompleted ? now() : null,
+                'CreatedDate' => now(),
+            ];
 
-        SupportRecord::where('ID', $this->editingId)->update($data);
+            SupportRecord::where('ID', $this->editingId)->update($data);
+        });
         session()->flash('success', '지원 내역이 수정되었습니다.');
 
         $this->closeModal();

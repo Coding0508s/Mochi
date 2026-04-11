@@ -61,7 +61,7 @@
                         </filter>
                     </defs>
                 </svg>
-                @foreach(['OutLook' => '#', 'Portal' => 'https://account.grapeseed.com/', 'eCount' => 'https://login.ecount.com/Login/KR/', 'Coaching' => '#'] as $label => $href)
+                @foreach(['OutLook' => '#', 'Portal' => 'https://account.grapeseed.com/', 'eCount' => 'https://login.ecount.com/Login/KR/', 'Coaching' => 'https://www.gskcoaching.com/'] as $label => $href)
                     <a href="{{ $href }}"
                        class="mochi-topbar-glass-link"
                        @if(str_starts_with($href, 'http'))
@@ -194,29 +194,31 @@
 
                 <div x-show="openTeams" class="sidebar-sublist">
 
-                    {{-- CS Team --}}
-                    <button type="button" class="sidebar-subitem sidebar-focusable flex w-full items-start justify-between gap-1 text-left">
-                        <span class="min-w-0 flex-1 break-words text-left">CS Team</span>
-                        <svg class="h-3 w-3 shrink-0 text-[#98a2b3]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
-                        </svg>
-                    </button>
+                    @if(! auth()->user()?->isCoTeam())
+                        {{-- CS Team --}}
+                        <button type="button" class="sidebar-subitem sidebar-focusable flex w-full items-start justify-between gap-1 text-left">
+                            <span class="min-w-0 flex-1 break-words text-left">CS Team</span>
+                            <svg class="h-3 w-3 shrink-0 text-[#98a2b3]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+                            </svg>
+                        </button>
 
-                    {{-- Admin --}}
-                    <button type="button" class="sidebar-subitem sidebar-focusable flex w-full items-start justify-between gap-1 text-left">
-                        <span class="min-w-0 flex-1 break-words text-left">Admin</span>
-                        <svg class="h-3 w-3 shrink-0 text-[#98a2b3]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
-                        </svg>
-                    </button>
+                        {{-- Admin --}}
+                        <button type="button" class="sidebar-subitem sidebar-focusable flex w-full items-start justify-between gap-1 text-left">
+                            <span class="min-w-0 flex-1 break-words text-left">Admin</span>
+                            <svg class="h-3 w-3 shrink-0 text-[#98a2b3]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+                            </svg>
+                        </button>
 
-                    {{-- TR Team --}}
-                    <button type="button" class="sidebar-subitem sidebar-focusable flex w-full items-start justify-between gap-1 text-left">
-                        <span class="min-w-0 flex-1 break-words text-left">TR Team</span>
-                        <svg class="h-3 w-3 shrink-0 text-[#98a2b3]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
-                        </svg>
-                    </button>
+                        {{-- TR Team --}}
+                        <button type="button" class="sidebar-subitem sidebar-focusable flex w-full items-start justify-between gap-1 text-left">
+                            <span class="min-w-0 flex-1 break-words text-left">TR Team</span>
+                            <svg class="h-3 w-3 shrink-0 text-[#98a2b3]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+                            </svg>
+                        </button>
+                    @endif
 
                     {{-- CO Team (하위 메뉴 포함) --}}
                     <div>

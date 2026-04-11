@@ -107,7 +107,9 @@
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         @forelse($targets as $index => $target)
-                            <tr wire:key="piv-created-{{ $target->ID }}" class="mochi-table-row-hover transition-colors">
+                            <tr wire:key="piv-created-{{ $target->ID }}"
+                                wire:click="openTargetDetail({{ $target->ID }})"
+                                class="mochi-table-row-hover transition-colors cursor-pointer">
                                 <td class="px-3 py-2 text-gray-500 text-xs">{{ $targets->firstItem() + $index }}</td>
                                 <td class="px-3 py-2 text-gray-700">{{ $target->ID }}</td>
                                 <td class="px-3 py-2 text-gray-700">{{ $target->AccountManager ?? '-' }}</td>
@@ -157,7 +159,9 @@
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         @forelse($meetings as $index => $row)
-                            <tr wire:key="piv-meeting-{{ $row->ID }}" class="mochi-table-row-hover transition-colors">
+                            <tr wire:key="piv-meeting-{{ $row->ID }}"
+                                wire:click="openTargetDetailFromMeeting({{ $row->ID }})"
+                                class="mochi-table-row-hover transition-colors cursor-pointer">
                                 <td class="px-3 py-2 text-gray-500 text-xs">{{ $meetings->firstItem() + $index }}</td>
                                 <td class="px-3 py-2 text-gray-700">{{ $row->ID }}</td>
                                 <td class="px-3 py-2 text-gray-700">{{ $row->MeetingDate?->format('Y-m-d') ?? '-' }}</td>
@@ -195,6 +199,149 @@
                     {{ $meetings->links() }}
                 </div>
             @endif
+        </div>
+    @endif
+
+    @if($showDetailModal && $selectedTarget)
+        <div class="mochi-modal-overlay" wire:click.self="closeDetailModal">
+            <div class="mochi-modal-shell max-w-4xl h-[80vh] max-h-[80vh] flex flex-col" wire:click.stop>
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white">
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900">잠재기관 상세 정보</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">
+                            {{ $selectedTarget['account_name'] }} (ID: {{ $selectedTarget['id'] }})
+                        </p>
+                    </div>
+                    <button wire:click="closeDetailModal" class="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="px-6 py-5 text-sm flex-1 overflow-y-auto space-y-4">
+                    <div class="border border-gray-200 rounded-lg overflow-hidden">
+                        <table class="w-full text-sm">
+                            <tbody class="divide-y divide-gray-100">
+                                <tr>
+                                    <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">코드</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['account_code'] }}</td>
+                                    <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당자</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['account_manager'] }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">등록일</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['created_date'] }}</td>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">계약여부</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['is_contract'] ? '계약' : '미계약' }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">신규구분</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['type'] }}</td>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">컨설팅타입</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['gubun'] }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">원장</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['director'] }}</td>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">연락처</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['phone'] }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">LS / GS(유) / GS(초)</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['ls'] }} / {{ $selectedTarget['gs_k'] }} / {{ $selectedTarget['gs_e'] }}</td>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">합계</th>
+                                    <td class="px-3 py-2 font-semibold text-gray-900">{{ $selectedTarget['total'] }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">주소</th>
+                                    <td colspan="3" class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['address'] }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-sm font-bold text-[#1f4f8f]">미팅/컨설팅 이력</h4>
+                            <span class="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
+                                총 {{ count($detailMeetings) }}건
+                            </span>
+                        </div>
+                        <div class="border border-gray-200 rounded-lg overflow-hidden">
+                            <div class="max-h-44 overflow-y-auto overflow-x-auto">
+                                <table class="w-full text-xs whitespace-nowrap">
+                                    <thead class="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                                        <tr class="text-gray-600">
+                                            <th class="px-3 py-2 text-left">일자</th>
+                                            <th class="px-3 py-2 text-left">시간</th>
+                                            <th class="px-3 py-2 text-left">담당자</th>
+                                            <th class="px-3 py-2 text-left">유형</th>
+                                            <th class="px-3 py-2 text-left">내용</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100">
+                                        @forelse($detailMeetings as $meeting)
+                                            <tr>
+                                                <td class="px-3 py-2">{{ $meeting['meeting_date'] }}</td>
+                                                <td class="px-3 py-2">{{ $meeting['meeting_time'] }} ~ {{ $meeting['meeting_time_end'] }}</td>
+                                                <td class="px-3 py-2">{{ $meeting['account_manager'] }}</td>
+                                                <td class="px-3 py-2">{{ $meeting['consulting_type'] }}</td>
+                                                <td class="px-3 py-2 max-w-72 whitespace-normal break-words">{{ \Illuminate\Support\Str::limit($meeting['description'], 100) }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="5" class="px-3 py-8 text-center text-gray-400">미팅/컨설팅 이력이 없습니다.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-sm font-bold text-[#1f4f8f]">기관지원보고서 이력</h4>
+                            <span class="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
+                                총 {{ count($detailSupportRecords) }}건
+                            </span>
+                        </div>
+                        <div class="border border-gray-200 rounded-lg overflow-hidden">
+                            <div class="max-h-44 overflow-y-auto overflow-x-auto">
+                                <table class="w-full text-xs whitespace-nowrap">
+                                    <thead class="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                                        <tr class="text-gray-600">
+                                            <th class="px-3 py-2 text-left">지원일</th>
+                                            <th class="px-3 py-2 text-left">시간</th>
+                                            <th class="px-3 py-2 text-left">담당자</th>
+                                            <th class="px-3 py-2 text-left">지원방법</th>
+                                            <th class="px-3 py-2 text-left">상태</th>
+                                            <th class="px-3 py-2 text-left">소통내용</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100">
+                                        @forelse($detailSupportRecords as $support)
+                                            <tr>
+                                                <td class="px-3 py-2">{{ $support['support_date'] }}</td>
+                                                <td class="px-3 py-2">{{ $support['meet_time'] }}</td>
+                                                <td class="px-3 py-2">{{ $support['tr_name'] }}</td>
+                                                <td class="px-3 py-2">{{ $support['support_type'] }}</td>
+                                                <td class="px-3 py-2">{{ $support['status'] }}</td>
+                                                <td class="px-3 py-2 max-w-72 whitespace-normal break-words">{{ \Illuminate\Support\Str::limit($support['to_account'], 100) }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="6" class="px-3 py-8 text-center text-gray-400">기관지원보고서 이력이 없습니다.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     @endif
 </div>

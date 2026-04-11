@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\CoNewTarget;
 use App\Models\CoNewTargetDetail;
+use App\Models\SupportRecord;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Component;
@@ -25,6 +26,14 @@ class PotentialInstitutionView extends Component
     public string $dateBasis = 'created';
 
     public string $search = '';
+
+    public bool $showDetailModal = false;
+
+    public ?array $selectedTarget = null;
+
+    public array $detailMeetings = [];
+
+    public array $detailSupportRecords = [];
 
     public function mount(): void
     {
@@ -69,6 +78,120 @@ class PotentialInstitutionView extends Component
     public function updatingSearch(): void
     {
         $this->resetPage();
+    }
+
+    public function openTargetDetail(int $targetId): void
+    {
+        $target = CoNewTarget::query()->findOrFail($targetId);
+        $this->loadDetailData($target);
+    }
+
+    public function openTargetDetailFromMeeting(int $meetingId): void
+    {
+        $meeting = CoNewTargetDetail::query()->findOrFail($meetingId);
+
+        $target = CoNewTarget::query()
+            ->where('AccountName', (string) $meeting->AccountName)
+            ->when(filled($meeting->AccountManager), function (Builder $query) use ($meeting): void {
+                $query->where('AccountManager', $meeting->AccountManager);
+            })
+            ->orderByDesc('ID')
+            ->first();
+
+        if (! $target) {
+            return;
+        }
+
+        $this->loadDetailData($target);
+    }
+
+    public function closeDetailModal(): void
+    {
+        $this->showDetailModal = false;
+        $this->selectedTarget = null;
+        $this->detailMeetings = [];
+        $this->detailSupportRecords = [];
+    }
+
+    private function loadDetailData(CoNewTarget $target): void
+    {
+        $this->selectedTarget = [
+            'id' => $target->ID,
+            'account_name' => $target->AccountName ?? '-',
+            'account_code' => $target->AccountCode ?? '-',
+            'account_manager' => $target->AccountManager ?? '-',
+            'created_date' => $target->CreatedDate?->format('Y-m-d') ?? '-',
+            'type' => $target->Type ?? '-',
+            'gubun' => $target->Gubun ?? '-',
+            'possibility' => $target->Possibility ?? '-',
+            'director' => $target->Director ?? '-',
+            'phone' => $target->Phone ?? '-',
+            'address' => $target->Address ?? '-',
+            'ls' => $target->LS ?? 0,
+            'gs_k' => $target->GS_K ?? 0,
+            'gs_e' => $target->GS_E ?? 0,
+            'total' => $target->Total ?? 0,
+            'is_contract' => (bool) ($target->IsContract ?? false),
+        ];
+
+        $this->detailMeetings = CoNewTargetDetail::query()
+            ->ofAccount((string) ($target->AccountName ?? ''))
+            ->when(filled($target->AccountManager), function (Builder $query) use ($target): void {
+                $query->where('AccountManager', $target->AccountManager);
+            })
+            ->orderByDesc('MeetingDate')
+            ->orderByDesc('ID')
+            ->limit(100)
+            ->get()
+            ->map(function (CoNewTargetDetail $detail): array {
+                return [
+                    'id' => $detail->ID,
+                    'meeting_date' => $detail->MeetingDate?->format('Y-m-d') ?? '-',
+                    'meeting_time' => $detail->MeetingTime ?: '-',
+                    'meeting_time_end' => $detail->MeetingTime_End ?: '-',
+                    'account_manager' => $detail->AccountManager ?? '-',
+                    'consulting_type' => $detail->ConsultingType ?? '-',
+                    'possibility' => $detail->Possibility ?? '-',
+                    'description' => $detail->Description ?? '-',
+                ];
+            })
+            ->toArray();
+
+        $this->detailSupportRecords = SupportRecord::query()
+            ->where('SK_Code', (string) ($target->AccountCode ?? ''))
+            ->orderByDesc('Support_Date')
+            ->orderByDesc('ID')
+            ->limit(50)
+            ->get()
+            ->map(function (SupportRecord $record): array {
+                return [
+                    'id' => $record->ID,
+                    'support_date' => $record->Support_Date?->format('Y-m-d') ?? '-',
+                    'meet_time' => $this->normalizeTime($record->Meet_Time),
+                    'tr_name' => $record->TR_Name ?? '-',
+                    'support_type' => $record->Support_Type ?? '-',
+                    'target' => $record->Target ?? '-',
+                    'to_account' => $record->TO_Account ?? '-',
+                    'status' => $record->Status ?? '-',
+                ];
+            })
+            ->toArray();
+
+        $this->showDetailModal = true;
+    }
+
+    private function normalizeTime(mixed $value): string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('H:i');
+        }
+
+        $stringValue = trim((string) $value);
+        if (preg_match('/([01]\d|2[0-3]):([0-5]\d)/', $stringValue, $matches)) {
+            return $matches[0];
+        }
+
+        return '-';
     }
 
     /**

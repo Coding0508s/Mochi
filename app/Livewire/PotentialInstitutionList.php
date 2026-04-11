@@ -6,6 +6,7 @@ use App\Models\AccountInformation;
 use App\Models\CoNewTarget;
 use App\Models\CoNewTargetDetail;
 use App\Models\Institution;
+use App\Models\SupportRecord;
 use App\Services\PotentialInstitutionSkCodeService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -89,9 +90,15 @@ class PotentialInstitutionList extends Component
 
     public array $detailMeetings = [];
 
+    public array $detailSupportRecords = [];
+
     public bool $showMeetingDetailModal = false;
 
     public ?array $selectedMeeting = null;
+
+    public bool $showSupportDetailModal = false;
+
+    public ?array $selectedSupportRecord = null;
 
     /** 상세 모달 계약여부 편집: '0'=미계약, '1'=계약 */
     public string $detailModalContract = '0';
@@ -521,6 +528,27 @@ class PotentialInstitutionList extends Component
             })
             ->toArray();
 
+        $this->detailSupportRecords = SupportRecord::query()
+            ->where('SK_Code', (string) ($target->AccountCode ?? ''))
+            ->orderByDesc('Support_Date')
+            ->orderByDesc('ID')
+            ->limit(50)
+            ->get()
+            ->map(function (SupportRecord $record): array {
+                return [
+                    'id' => $record->ID,
+                    'support_date' => $record->Support_Date?->format('Y-m-d') ?? '-',
+                    'meet_time' => $this->formatSupportTime($record->Meet_Time),
+                    'tr_name' => $record->TR_Name ?? '-',
+                    'support_type' => $record->Support_Type ?? '-',
+                    'target' => $record->Target ?? '-',
+                    'to_account' => $record->TO_Account ?? '-',
+                    'status' => $record->Status ?? '-',
+                    'completed' => ! is_null($record->CompletedDate),
+                ];
+            })
+            ->toArray();
+
         $this->detailModalContract = ($target->IsContract ?? false) ? '1' : '0';
 
         $this->showDetailModal = true;
@@ -531,9 +559,26 @@ class PotentialInstitutionList extends Component
         $this->showDetailModal = false;
         $this->selectedTarget = null;
         $this->detailMeetings = [];
+        $this->detailSupportRecords = [];
         $this->detailModalContract = '0';
         $this->showMeetingDetailModal = false;
         $this->selectedMeeting = null;
+        $this->showSupportDetailModal = false;
+        $this->selectedSupportRecord = null;
+    }
+
+    private function formatSupportTime(mixed $value): string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('H:i');
+        }
+
+        $stringValue = trim((string) $value);
+        if (preg_match('/([01]\d|2[0-3]):([0-5]\d)/', $stringValue, $matches)) {
+            return $matches[0];
+        }
+
+        return '-';
     }
 
     public function openMeetingDetailModal(int $meetingId): void
@@ -552,6 +597,24 @@ class PotentialInstitutionList extends Component
     {
         $this->showMeetingDetailModal = false;
         $this->selectedMeeting = null;
+    }
+
+    public function openSupportDetailModal(int $supportRecordId): void
+    {
+        $record = collect($this->detailSupportRecords)->firstWhere('id', $supportRecordId);
+
+        if (! $record) {
+            return;
+        }
+
+        $this->selectedSupportRecord = $record;
+        $this->showSupportDetailModal = true;
+    }
+
+    public function closeSupportDetailModal(): void
+    {
+        $this->showSupportDetailModal = false;
+        $this->selectedSupportRecord = null;
     }
 
     public function render()

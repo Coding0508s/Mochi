@@ -506,6 +506,120 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="mt-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-base font-bold text-[#1f4f8f]">기관지원보고서 이력</h3>
+                            <span class="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
+                                총 {{ count($detailSupportRecords) }}건
+                            </span>
+                        </div>
+                        <div class="border border-gray-200 rounded-lg overflow-hidden">
+                            <div class="max-h-56 overflow-y-auto overflow-x-auto">
+                                <table class="w-full text-xs whitespace-nowrap">
+                                    <thead class="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                                        <tr class="text-gray-600">
+                                            <th class="px-3 py-2 text-left">지원일</th>
+                                            <th class="px-3 py-2 text-left">시간</th>
+                                            <th class="px-3 py-2 text-left">담당자</th>
+                                            <th class="px-3 py-2 text-left">지원방법</th>
+                                            <th class="px-3 py-2 text-left">참석자</th>
+                                            <th class="px-3 py-2 text-left">상태</th>
+                                            <th class="px-3 py-2 text-left">기관과의 소통내용</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100">
+                                        @forelse($detailSupportRecords as $supportRecord)
+                                            <tr wire:key="support-row-{{ $supportRecord['id'] }}"
+                                                wire:click="openSupportDetailModal({{ $supportRecord['id'] }})"
+                                                class="hover:bg-blue-50 transition-colors cursor-pointer">
+                                                <td class="px-3 py-2">{{ $supportRecord['support_date'] }}</td>
+                                                <td class="px-3 py-2">{{ $supportRecord['meet_time'] }}</td>
+                                                <td class="px-3 py-2">{{ $supportRecord['tr_name'] }}</td>
+                                                <td class="px-3 py-2">{{ $supportRecord['support_type'] }}</td>
+                                                <td class="px-3 py-2">{{ $supportRecord['target'] }}</td>
+                                                <td class="px-3 py-2">
+                                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold
+                                                        {{ $supportRecord['completed'] ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700' }}">
+                                                        {{ $supportRecord['status'] }}
+                                                    </span>
+                                                </td>
+                                                <td class="px-3 py-2 max-w-80 whitespace-normal break-words">
+                                                    {{ \Illuminate\Support\Str::limit($supportRecord['to_account'], 120) }}
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="7" class="px-3 py-8 text-center text-gray-400">
+                                                    작성된 기관지원보고서가 없습니다.
+                                                </td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- 기관지원보고서 상세 모달 --}}
+    @if($showSupportDetailModal && $selectedSupportRecord)
+        <div class="mochi-modal-overlay z-[60]" wire:click.self="closeSupportDetailModal">
+            <div class="mochi-modal-shell max-w-3xl h-[70vh] max-h-[70vh] flex flex-col" wire:click.stop>
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white">
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900">기관지원보고서 상세</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">
+                            {{ $selectedTarget['account_name'] ?? '-' }} · {{ $selectedSupportRecord['support_date'] ?? '-' }}
+                        </p>
+                    </div>
+                    <button wire:click="closeSupportDetailModal" class="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="px-6 py-5 flex-1 overflow-y-auto">
+                    <div class="border border-gray-200 rounded-lg overflow-hidden mb-4">
+                        <table class="w-full text-sm">
+                            <tbody class="divide-y divide-gray-100">
+                                <tr>
+                                    <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">지원일</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedSupportRecord['support_date'] ?? '-' }}</td>
+                                    <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">시간</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedSupportRecord['meet_time'] ?? '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당자</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedSupportRecord['tr_name'] ?? '-' }}</td>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">지원방법</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedSupportRecord['support_type'] ?? '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">참석자</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedSupportRecord['target'] ?? '-' }}</td>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">상태</th>
+                                    <td class="px-3 py-2">
+                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold
+                                            {{ ($selectedSupportRecord['completed'] ?? false) ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700' }}">
+                                            {{ $selectedSupportRecord['status'] ?? '-' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div>
+                        <h4 class="text-sm font-semibold text-gray-700 mb-2">기관과의 소통내용</h4>
+                        <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 leading-6 whitespace-pre-wrap break-words min-h-[120px]">
+                            {{ $selectedSupportRecord['to_account'] ?? '-' }}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

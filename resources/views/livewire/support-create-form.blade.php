@@ -22,8 +22,12 @@
                 $institutionSelected = filled($formSkCode);
             @endphp
             <div class="px-6 py-4 space-y-4">
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
+
+                {{-- ── 1행: 기관명 · 가능성(잠재기관) · CO명 ──────────── --}}
+                <div class="flex items-start gap-3">
+
+                    {{-- 기관명 --}}
+                    <div class="flex-1 min-w-0">
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             기관명 <span class="text-red-500">*</span>
                         </label>
@@ -37,9 +41,14 @@
                             <div class="mt-2 max-h-44 overflow-auto border border-gray-200 rounded-lg bg-white shadow-sm">
                                 @foreach($institutionSuggestions as $inst)
                                     <button type="button"
-                                            wire:click="selectInstitution('{{ $inst->SKcode }}')"
+                                            wire:click="selectInstitution('{{ $inst->SKcode }}', {{ $inst->is_potential ? 'true' : 'false' }})"
                                             class="w-full px-3 py-1.5 text-left text-sm hover:bg-blue-50 transition-colors">
                                         <span class="font-medium text-gray-900">{{ $inst->AccountName }}</span>
+                                        @if($inst->is_potential)
+                                            <span class="ml-2 inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
+                                                잠재기관
+                                            </span>
+                                        @endif
                                         <span class="ml-2 text-xs text-gray-500">({{ $inst->SKcode }})</span>
                                     </button>
                                 @endforeach
@@ -49,6 +58,11 @@
                         @if(filled($formSkCode))
                             <p class="mt-1 text-xs text-blue-600">
                                 선택된 기관: {{ $formAccountName }} ({{ $formSkCode }})
+                                @if($formIsPotential)
+                                    <span class="ml-1 inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700 align-middle">
+                                        잠재기관
+                                    </span>
+                                @endif
                             </p>
                         @endif
 
@@ -60,7 +74,27 @@
                         @endunless
                     </div>
 
-                    <div>
+                    {{-- 가능성 (잠재기관일 때만) --}}
+                    @if($formIsPotential)
+                    <div class="w-32 shrink-0">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            가능성
+                            <span class="inline-flex items-center rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">잠재</span>
+                        </label>
+                        <select wire:model="formPossibility"
+                                class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">-</option>
+                            <option value="A">A</option>
+                            <option value="B">B</option>
+                            <option value="C">C</option>
+                            <option value="D">D</option>
+                        </select>
+                        <p class="mt-1 text-[10px] text-gray-400 leading-tight">저장 시 잠재기관에도 반영</p>
+                    </div>
+                    @endif
+
+                    {{-- CO명 --}}
+                    <div class="w-44 shrink-0">
                         <label class="block text-sm font-medium text-gray-700 mb-1">CO명</label>
                         <input type="text"
                                wire:model="formCoName"
@@ -68,7 +102,10 @@
                                class="w-full py-1.5 px-3 text-sm border rounded-lg
                                       {{ $institutionSelected ? 'border-gray-300 bg-white text-gray-700' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}"/>
                     </div>
+                </div>
 
+                {{-- ── 2행~: 나머지 필드 2열 그리드 ──────────────────── --}}
+                <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             지원 날짜 <span class="text-red-500">*</span>
