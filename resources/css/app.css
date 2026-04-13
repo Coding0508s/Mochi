@@ -18,7 +18,7 @@
 }
 
 @layer components {
-    /* data-special-text 정착 후 JS가 붙이는 클래스 — 쉬머 4회 후 animationend로 제거 */
+    /* data-special-text 정착 후 JS가 붙이는 클래스 — 쉬머 1회 후 animationend로 제거 */
     @keyframes mochi-special-text-shine {
         from {
             background-position: 125% 50%;
@@ -46,7 +46,7 @@
         background-clip: text;
         color: transparent;
         -webkit-text-fill-color: transparent;
-        animation: mochi-special-text-shine 0.72s ease-in-out 4;
+        animation: mochi-special-text-shine 0.72s ease-in-out 1;
         will-change: background-position;
     }
 
@@ -136,7 +136,7 @@
     }
 
     .mochi-floating-input.is-active .mochi-floating-input__char {
-        transform: translateY(-120%);
+        transform: translateY(-175%);
         color: #64748b;
     }
 
@@ -152,7 +152,7 @@
         .mochi-floating-input__control:not(:placeholder-shown)
         ~ .mochi-floating-input__letters
         .mochi-floating-input__char {
-        transform: translateY(-120%);
+        transform: translateY(-175%);
         color: #64748b;
     }
 
@@ -162,7 +162,7 @@
         }
 
         .mochi-floating-input.is-active .mochi-floating-input__char {
-            transform: translateY(-120%);
+            transform: translateY(-175%);
         }
 
         .mochi-floating-input__control:-webkit-autofill ~ .mochi-floating-input__letters .mochi-floating-input__char,
@@ -173,7 +173,7 @@
             .mochi-floating-input__control:not(:placeholder-shown)
             ~ .mochi-floating-input__letters
             .mochi-floating-input__char {
-            transform: translateY(-120%);
+            transform: translateY(-175%);
         }
     }
 
