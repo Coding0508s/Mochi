@@ -54,6 +54,17 @@ Route::middleware(['auth'])->group(function () {
         return view('pages.supports.create');
     })->name('supports.create');
 
+    Route::get('/store/inventory', function () {
+        return view('pages.store.inventory.index');
+    })->name('store.inventory.index');
+    Route::get('/store/sales', function () {
+        return view('pages.store.sales.index');
+    })->name('store.sales.index');
+    Route::get('/store/inventory/skus', function () {
+        return view('pages.store.inventory.skus.index');
+    })->middleware('can:manageStoreInventory')
+        ->name('store.inventory.skus.index');
+
     Route::get('/salesforce-files', function () {
         return view('pages.salesforce-files.index');
     })->name('salesforce-files.index');
