@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\StoreInventorySku;
 use App\Repositories\GrapeSeed\GnuboardShopItemRepository;
 use App\Repositories\Store\StoreInventorySkuRepository;
+use App\Services\Store\EcountApiClient;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -22,11 +23,7 @@ class StoreInventorySkuManager extends Component
 
     public string $newMemo = '';
 
-    public int $newSortOrder = 0;
-
     public string $bulkProdCodes = '';
-
-    public int $bulkSortOrderStart = 0;
 
     public function mount(): void
     {
@@ -45,7 +42,6 @@ class StoreInventorySkuManager extends Component
         $validated = $this->validate([
             'newProdCd' => ['required', 'string', 'max:40', Rule::unique('store_inventory_skus', 'prod_cd')],
             'newMemo' => ['nullable', 'string', 'max:255'],
-            'newSortOrder' => ['required', 'integer', 'min:0'],
         ], [
             'newProdCd.required' => '품목코드는 필수입니다.',
             'newProdCd.unique' => '이미 등록된 품목코드입니다.',
@@ -54,13 +50,12 @@ class StoreInventorySkuManager extends Component
         app(StoreInventorySkuRepository::class)->create(
             prodCd: $validated['newProdCd'],
             isActive: true,
-            sortOrder: (int) $validated['newSortOrder'],
+            sortOrder: 0,
             memo: $validated['newMemo'] !== '' ? $validated['newMemo'] : null
         );
 
         $this->newProdCd = '';
         $this->newMemo = '';
-        $this->newSortOrder = 0;
         session()->flash('success', '재고 연동 품목이 추가되었습니다.');
         $this->resetPage();
         $this->dispatch('store-inventory-skus-updated');
@@ -72,7 +67,6 @@ class StoreInventorySkuManager extends Component
 
         $validated = $this->validate([
             'bulkProdCodes' => ['required', 'string'],
-            'bulkSortOrderStart' => ['required', 'integer', 'min:0'],
         ], [
             'bulkProdCodes.required' => '일괄 등록할 품목코드를 입력해 주세요.',
         ]);
@@ -93,7 +87,6 @@ class StoreInventorySkuManager extends Component
 
         $inserted = 0;
         $duplicated = 0;
-        $sortOrder = (int) $validated['bulkSortOrderStart'];
 
         foreach ($codes as $code) {
             if (isset($existingSet[$code])) {
@@ -105,10 +98,9 @@ class StoreInventorySkuManager extends Component
             app(StoreInventorySkuRepository::class)->create(
                 prodCd: $code,
                 isActive: true,
-                sortOrder: $sortOrder,
+                sortOrder: 0,
                 memo: null
             );
-            $sortOrder++;
             $inserted++;
         }
 
@@ -133,7 +125,7 @@ class StoreInventorySkuManager extends Component
         $this->dispatch('store-inventory-skus-updated');
     }
 
-    public function updateSortOrder(int $id, int $sortOrder): void
+    public function deleteSku(int $id): void
     {
         Gate::authorize('manageStoreInventory');
 
@@ -142,9 +134,10 @@ class StoreInventorySkuManager extends Component
             return;
         }
 
-        app(StoreInventorySkuRepository::class)->update($sku, [
-            'sort_order' => max(0, $sortOrder),
-        ]);
+        app(StoreInventorySkuRepository::class)->delete($sku);
+
+        session()->flash('success', '이 플랫폼 연동 목록에서 제거했습니다. 이카운트 품목은 삭제되지 않습니다.');
+        $this->resetPage();
         $this->dispatch('store-inventory-skus-updated');
     }
 
@@ -199,14 +192,47 @@ class StoreInventorySkuManager extends Component
             }
         }
 
+        $missingForEcount = [];
+        foreach ($skus as $sku) {
+            $key = $this->normalizedProdCdKey((string) $sku->prod_cd);
+            if ($key === '') {
+                continue;
+            }
+            $gnuboardName = trim((string) ($nameMap[$key] ?? ''));
+            if ($gnuboardName === '' && $this->shouldResolveNamesFromEcount()) {
+                $missingForEcount[] = $key;
+            }
+        }
+
+        $ecountNameMap = [];
+        if ($missingForEcount !== []) {
+            try {
+                $ecountNameMap = app(EcountApiClient::class)->fetchProductDisplayNamesByCodes(array_values(array_unique($missingForEcount)));
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        }
+
         $byId = [];
         foreach ($skus as $sku) {
             $key = $this->normalizedProdCdKey((string) $sku->prod_cd);
             $name = trim((string) ($nameMap[$key] ?? ''));
+            if ($name === '') {
+                $name = trim((string) ($ecountNameMap[$key] ?? ''));
+            }
             $byId[(int) $sku->id] = $name !== '' ? $name : '-';
         }
 
         return $byId;
+    }
+
+    private function shouldResolveNamesFromEcount(): bool
+    {
+        if (! (bool) config('store.ecount.fetch_product_names', true)) {
+            return false;
+        }
+
+        return strtolower((string) config('store.data_source', 'ecount')) === 'ecount';
     }
 
     private function normalizedProdCdKey(string $code): string

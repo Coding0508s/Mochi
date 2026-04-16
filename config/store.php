@@ -40,6 +40,7 @@ return [
     ],
     'ecount' => [
         'base_url' => env('ECOUNT_API_BASE_URL'),
+        'zone_lookup_base_url' => env('ECOUNT_ZONE_LOOKUP_BASE_URL', 'https://oapi.ecount.com'),
         'zone' => env('ECOUNT_ZONE'),
         'session_id' => env('ECOUNT_SESSION_ID'),
         'inventory_endpoint' => env('ECOUNT_API_INVENTORY_ENDPOINT', '/OAPI/V2/InventoryBalance/GetListInventoryBalanceStatus'),

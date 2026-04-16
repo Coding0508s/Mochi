@@ -360,6 +360,40 @@ final class EcountApiClient
     }
 
     /**
+     * 품목 기본 조회(PROD_DES)로 표시용 품목명 맵. 키는 대문자·trim 기준으로 통일합니다.
+     *
+     * @param  array<int, string>  $productCodes
+     * @return array<string, string> normalized_prod_cd => trimmed PROD_DES
+     */
+    public function fetchProductDisplayNamesByCodes(array $productCodes): array
+    {
+        if (! (bool) config('store.ecount.fetch_product_names', true)) {
+            return [];
+        }
+
+        $codes = array_values(array_unique(array_filter(array_map(
+            static fn (string $c): string => strtoupper(trim($c)),
+            $productCodes
+        ), static fn (string $c): bool => $c !== '')));
+        if ($codes === []) {
+            return [];
+        }
+
+        $raw = $this->fetchBasicProductNames($codes);
+        $out = [];
+        foreach ($raw as $code => $name) {
+            $k = strtoupper(trim((string) $code));
+            $k = preg_replace('/^[\p{Zs}]+|[\p{Zs}]+$/u', '', $k) ?? $k;
+            if ($k === '') {
+                continue;
+            }
+            $out[$k] = trim((string) $name);
+        }
+
+        return $out;
+    }
+
+    /**
      * @param  array<int, string>  $productCodes
      * @return array<string, array{qty:int, at:string, type:string, reason:string, ref:string, ts:int}>
      */
@@ -775,6 +809,87 @@ final class EcountApiClient
     }
 
     /**
+     * ECOUNT_SESSION_ID가 비어 있을 때 캐시 또는 OAPILogin으로 세션을 준비합니다.
+     * $forceRefresh가 true이면 캐시된 세션·ZONE을 비우고 다시 발급합니다.
+     */
+    public function obtainOapiSession(bool $forceRefresh = false): string
+    {
+        return $this->tryOapiSession($forceRefresh)['session_id'];
+    }
+
+    /**
+     * obtainOapiSession과 동작은 같고, 실패 시 터미널에 표시할 수 있는 사유 문자열을 돌려줍니다.
+     *
+     * @return array{ok: bool, session_id: string, detail: string}
+     */
+    public function tryOapiSession(bool $forceRefresh = false): array
+    {
+        if ($forceRefresh) {
+            Cache::forget($this->cachePrefix().':session_id');
+            Cache::forget($this->cachePrefix().':zone');
+        }
+
+        $configured = trim((string) config('store.ecount.session_id', ''));
+        if ($configured !== '') {
+            return [
+                'ok' => true,
+                'session_id' => $configured,
+                'detail' => 'ECOUNT_SESSION_ID가 설정되어 있어 env 값을 사용합니다.',
+            ];
+        }
+
+        if (! $forceRefresh) {
+            $cached = trim((string) Cache::get($this->cachePrefix().':session_id', ''));
+            if ($cached !== '') {
+                return [
+                    'ok' => true,
+                    'session_id' => $cached,
+                    'detail' => '캐시된 세션을 사용합니다.',
+                ];
+            }
+        }
+
+        if (! (bool) config('store.ecount.auto_login_when_empty_session', true)) {
+            return [
+                'ok' => false,
+                'session_id' => '',
+                'detail' => 'ECOUNT_AUTO_LOGIN_WHEN_EMPTY_SESSION=false 입니다.',
+            ];
+        }
+
+        $comCode = trim((string) config('store.ecount.com_code', ''));
+        $userId = trim((string) config('store.ecount.user_id', ''));
+        $apiCertKey = trim((string) config('store.ecount.api_cert_key', ''));
+        if ($comCode === '' || $userId === '' || $apiCertKey === '') {
+            return [
+                'ok' => false,
+                'session_id' => '',
+                'detail' => 'ECOUNT_COM_CODE, ECOUNT_USER_ID, ECOUNT_API_CERT_KEY를 모두 설정하세요.',
+            ];
+        }
+
+        try {
+            $result = $this->refreshSessionIdResult();
+            if ($result['session_id'] !== '') {
+                return ['ok' => true, 'session_id' => $result['session_id'], 'detail' => 'OAPILogin으로 세션을 발급·캐시했습니다.'];
+            }
+
+            $err = $result['error'] ?? '알 수 없는 오류';
+            report(new RuntimeException('Ecount OAPILogin 실패(detail): '.$err));
+
+            return ['ok' => false, 'session_id' => '', 'detail' => $err];
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return [
+                'ok' => false,
+                'session_id' => '',
+                'detail' => '예외: '.$exception->getMessage(),
+            ];
+        }
+    }
+
+    /**
      * 이카운트 다건 품목코드 구분자(오픈 API에서 PROD_CD 연결에 사용, U+222C).
      */
     private function ecountProdCdJoiner(): string
@@ -827,6 +942,37 @@ final class EcountApiClient
         return [
             'ok' => false,
             'message' => $message !== '' ? $message : 'Ecount API 응답이 실패 상태입니다.',
+        ];
+    }
+
+    /**
+     * OAPILogin 본문 Data.Code 판별. 상위 Status는 200이어도 Data.Code=20 등으로 로그인 거부가 올 수 있음.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{ok: bool, message: string}
+     */
+    private function parseOapiLoginDataBusinessStatus(array $payload): array
+    {
+        $data = $payload['Data'] ?? $payload['data'] ?? null;
+        if (! is_array($data)) {
+            return ['ok' => true, 'message' => ''];
+        }
+
+        if (! array_key_exists('Code', $data) && ! array_key_exists('code', $data)) {
+            return ['ok' => true, 'message' => ''];
+        }
+
+        $codeStr = trim((string) ($data['Code'] ?? $data['code'] ?? ''));
+        if ($codeStr === '' || $codeStr === '0000' || $codeStr === '00' || $codeStr === '0') {
+            return ['ok' => true, 'message' => ''];
+        }
+
+        $rawMsg = (string) ($data['Message'] ?? $data['message'] ?? '');
+        $msg = trim(html_entity_decode(strip_tags(str_replace(['<br />', '<br/>', '<br>'], ' ', $rawMsg))));
+
+        return [
+            'ok' => false,
+            'message' => $msg !== '' ? $msg : 'Data.Code='.$codeStr,
         ];
     }
 
@@ -918,6 +1064,28 @@ final class EcountApiClient
     }
 
     /**
+     * OAPILogin 응답에서 ZONE 추출. 이카운트는 로그인 성공 시 Data에 정확한 ZONE을 줄 수 있음.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function extractZoneFromOapiLoginPayload(array $payload, string $fallbackZone): string
+    {
+        $data = $payload['Data'] ?? $payload['data'] ?? null;
+        if (! is_array($data)) {
+            return trim($fallbackZone);
+        }
+
+        foreach (['ZONE', 'Zone', 'zone'] as $key) {
+            $value = trim((string) ($data[$key] ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return trim($fallbackZone);
+    }
+
+    /**
      * @param  array<string, mixed>  $body
      * @return array<string, mixed>
      */
@@ -1002,53 +1170,100 @@ final class EcountApiClient
 
     private function refreshSessionId(): string
     {
+        $result = $this->refreshSessionIdResult();
+        if (($result['error'] ?? null) !== null && $result['session_id'] === '') {
+            report(new RuntimeException($result['error']));
+        }
+
+        return $result['session_id'];
+    }
+
+    /**
+     * @return array{session_id: string, error: ?string}
+     */
+    private function refreshSessionIdResult(): array
+    {
         $comCode = trim((string) config('store.ecount.com_code', ''));
         $userId = trim((string) config('store.ecount.user_id', ''));
         $apiCertKey = trim((string) config('store.ecount.api_cert_key', ''));
         if ($comCode === '' || $userId === '' || $apiCertKey === '') {
-            return '';
+            return ['session_id' => '', 'error' => 'COM_CODE / USER_ID / API_CERT_KEY 중 비어 있는 값이 있습니다.'];
         }
 
         $zone = trim((string) config('store.ecount.zone', ''));
         if ($zone === '') {
-            $zone = $this->fetchZone($comCode);
+            $zone = trim((string) Cache::get($this->cachePrefix().':zone', ''));
+        }
+        if ($zone === '') {
+            $zoneResult = $this->fetchZoneResult($comCode);
+            if (($zoneResult['error'] ?? null) !== null) {
+                return ['session_id' => '', 'error' => $zoneResult['error']];
+            }
+            $zone = $zoneResult['zone'];
             if ($zone === '') {
-                return '';
+                return ['session_id' => '', 'error' => 'ZONE을 확정하지 못했습니다.'];
             }
         }
 
         $endpoint = (string) config('store.ecount.login_endpoint', '/OAPI/V2/OAPILogin');
-        $baseUrl = $this->resolveBaseUrl();
+        $baseUrl = $this->resolveBaseUrl($zone);
         $timeout = (int) config('store.timeout', 10);
-        if ($baseUrl === '') {
-            return '';
+        if ($baseUrl === '' || str_contains($baseUrl, '{ZONE}') || str_contains($baseUrl, '{zone}')) {
+            return [
+                'session_id' => '',
+                'error' => 'ECOUNT_API_BASE_URL에 {ZONE}이 남아 있습니다. ECOUNT_ZONE을 넣거나 Zone 조회가 성공했는지 확인하세요.',
+            ];
         }
 
-        $response = Http::baseUrl($baseUrl)
-            ->timeout($timeout)
-            ->acceptJson()
-            ->contentType('application/json')
-            ->post($endpoint, [
-                'COM_CODE' => $comCode,
-                'USER_ID' => $userId,
-                'API_CERT_KEY' => $apiCertKey,
-                'LAN_TYPE' => (string) config('store.ecount.lan_type', 'ko-KR'),
-                'ZONE' => $zone,
-            ]);
+        try {
+            $response = Http::baseUrl($baseUrl)
+                ->timeout($timeout)
+                ->acceptJson()
+                ->contentType('application/json')
+                ->post($endpoint, [
+                    'COM_CODE' => $comCode,
+                    'USER_ID' => $userId,
+                    'API_CERT_KEY' => $apiCertKey,
+                    'LAN_TYPE' => (string) config('store.ecount.lan_type', 'ko-KR'),
+                    'ZONE' => $zone,
+                ]);
 
-        $payload = $response->throw()->json();
+            if (! $response->successful()) {
+                $snippet = mb_substr($response->body(), 0, 400);
+
+                return [
+                    'session_id' => '',
+                    'error' => 'OAPILogin HTTP '.$response->status().': '.$snippet,
+                ];
+            }
+
+            $payload = $response->json();
+        } catch (RequestException $exception) {
+            $body = $exception->response !== null ? mb_substr($exception->response->body(), 0, 400) : '';
+
+            return [
+                'session_id' => '',
+                'error' => 'OAPILogin 연결 실패: '.$exception->getMessage().($body !== '' ? ' — '.$body : ''),
+            ];
+        } catch (Throwable $exception) {
+            return ['session_id' => '', 'error' => 'OAPILogin 요청 오류: '.$exception->getMessage()];
+        }
+
         if (! is_array($payload)) {
-            return '';
+            return ['session_id' => '', 'error' => 'OAPILogin 응답이 JSON 객체가 아닙니다.'];
         }
-
-        // [DEBUG] OAPILogin 전체 응답 구조 로깅 — SESSION_ID 파싱 성공 후 제거 예정
-        \Log::debug('[EcountApiClient] OAPILogin raw payload', ['payload' => $payload]);
 
         $parsed = $this->parseEcountApiStatus($payload);
         if (! $parsed['ok']) {
-            report(new RuntimeException('Ecount OAPILogin 실패: '.$parsed['message']));
+            return ['session_id' => '', 'error' => 'OAPILogin API 오류: '.($parsed['message'] !== '' ? $parsed['message'] : 'Status 실패')];
+        }
 
-            return '';
+        $biz = $this->parseOapiLoginDataBusinessStatus($payload);
+        if (! $biz['ok']) {
+            return [
+                'session_id' => '',
+                'error' => 'OAPILogin 인증 실패: '.$biz['message'].' — ECOUNT_COM_CODE·ECOUNT_USER_ID·ECOUNT_API_CERT_KEY를 이카운트 관리자 > OpenAPI에서 발급·확인한 값과 동일하게 넣으세요(일반 웹 로그인 비밀번호가 아닙니다).',
+            ];
         }
 
         $sessionId = $this->extractSessionIdFromOapiLoginPayload($payload);
@@ -1057,47 +1272,87 @@ final class EcountApiClient
             $dataCode = is_array($data) ? ($data['Code'] ?? $data['code'] ?? '') : '';
             $dataMsg = is_array($data) ? ($data['Message'] ?? $data['message'] ?? '') : '';
             $loginType = is_array($data) ? ($data['LoginType'] ?? '') : '';
-            report(new RuntimeException(
-                'Ecount OAPILogin: SESSION_ID를 응답에서 찾지 못했습니다. '.
-                "Data.Code={$dataCode}, LoginType={$loginType}, Data.Message={$dataMsg}. ".
-                '이카운트 포털에서 OAPI 전용 인증키를 발급받아 ECOUNT_API_CERT_KEY에 설정하세요.'
-            ));
-        } else {
-            \Log::debug('[EcountApiClient] OAPILogin SESSION_ID 추출 성공', ['session_id_prefix' => substr($sessionId, 0, 8).'...']);
-            Cache::put($this->cachePrefix().':session_id', $sessionId, now()->addMinutes(30));
+
+            return [
+                'session_id' => '',
+                'error' => '응답에 SESSION_ID 없음. Data.Code='.$dataCode.', LoginType='.$loginType.', Message='.$dataMsg.' (OAPI 전용 인증키·COM_CODE 확인)',
+            ];
         }
 
-        return $sessionId;
+        $actualZone = $this->extractZoneFromOapiLoginPayload($payload, $zone);
+        $this->putSessionAuthCache($sessionId, $actualZone);
+
+        \Log::info('[EcountApiClient] 세션 갱신 성공', [
+            'zone' => $actualZone,
+            'session_id_prefix' => substr($sessionId, 0, 8).'...',
+        ]);
+
+        return ['session_id' => $sessionId, 'error' => null];
     }
 
-    private function fetchZone(string $comCode): string
+    private function putSessionAuthCache(string $sessionId, string $zone): void
+    {
+        $ttl = now()->addMinutes(60);
+        Cache::put($this->cachePrefix().':session_id', $sessionId, $ttl);
+        Cache::put($this->cachePrefix().':zone', trim($zone), $ttl);
+    }
+
+    /**
+     * @return array{zone: string, error: ?string}
+     */
+    private function fetchZoneResult(string $comCode): array
     {
         $endpoint = (string) config('store.ecount.zone_endpoint', '/OAPI/V2/Zone');
-        $baseUrl = $this->resolveBaseUrl();
+        $baseUrl = $this->resolveBaseUrlForZoneLookup();
         $timeout = (int) config('store.timeout', 10);
         if ($baseUrl === '') {
-            return '';
+            return ['zone' => '', 'error' => 'ECOUNT_API_BASE_URL이 비어 있어 Zone API를 호출할 수 없습니다.'];
         }
 
-        $response = Http::baseUrl($baseUrl)
-            ->timeout($timeout)
-            ->acceptJson()
-            ->contentType('application/json')
-            ->post($endpoint, ['COM_CODE' => $comCode]);
+        try {
+            $response = Http::baseUrl($baseUrl)
+                ->timeout($timeout)
+                ->acceptJson()
+                ->contentType('application/json')
+                ->post($endpoint, ['COM_CODE' => $comCode]);
 
-        $payload = $response->throw()->json();
+            if (! $response->successful()) {
+                $snippet = mb_substr($response->body(), 0, 400);
+
+                return ['zone' => '', 'error' => 'Zone API HTTP '.$response->status().': '.$snippet];
+            }
+
+            $payload = $response->json();
+        } catch (RequestException $exception) {
+            $body = $exception->response !== null ? mb_substr($exception->response->body(), 0, 400) : '';
+
+            return [
+                'zone' => '',
+                'error' => 'Zone API 연결 실패: '.$exception->getMessage().($body !== '' ? ' — '.$body : ''),
+            ];
+        } catch (Throwable $exception) {
+            return ['zone' => '', 'error' => 'Zone API 요청 오류: '.$exception->getMessage()];
+        }
+
         if (! is_array($payload)) {
-            return '';
+            return ['zone' => '', 'error' => 'Zone API 응답이 JSON이 아닙니다.'];
         }
 
         $parsed = $this->parseEcountApiStatus($payload);
         if (! $parsed['ok']) {
-            report(new RuntimeException('Ecount Zone 조회 실패: '.$parsed['message']));
-
-            return '';
+            return ['zone' => '', 'error' => 'Zone API: '.($parsed['message'] !== '' ? $parsed['message'] : 'Status 실패')];
         }
 
-        return trim((string) ($payload['Data']['ZONE'] ?? ''));
+        $data = $payload['Data'] ?? $payload['data'] ?? null;
+        $zone = '';
+        if (is_array($data)) {
+            $zone = trim((string) ($data['ZONE'] ?? $data['Zone'] ?? $data['zone'] ?? ''));
+        }
+        if ($zone === '') {
+            return ['zone' => '', 'error' => 'Zone API는 성공했으나 Data에 ZONE 값이 없습니다. COM_CODE를 확인하세요.'];
+        }
+
+        return ['zone' => $zone, 'error' => null];
     }
 
     private function cacheTtlSeconds(): int
@@ -1110,7 +1365,10 @@ final class EcountApiClient
         return trim((string) config('store.ecount.cache_prefix', 'store_inventory'));
     }
 
-    private function resolveBaseUrl(): string
+    /**
+     * @param  string|null  $zoneOverride  Zone API·로그인 직전에 확정한 ZONE. {ZONE} 치환에 최우선.
+     */
+    private function resolveBaseUrl(?string $zoneOverride = null): string
     {
         $baseUrl = trim((string) config('store.ecount.base_url', ''));
         if ($baseUrl === '') {
@@ -1125,7 +1383,13 @@ final class EcountApiClient
             }
         }
 
-        $zone = trim((string) config('store.ecount.zone', ''));
+        $zone = trim((string) ($zoneOverride ?? ''));
+        if ($zone === '') {
+            $zone = trim((string) config('store.ecount.zone', ''));
+        }
+        if ($zone === '') {
+            $zone = trim((string) Cache::get($this->cachePrefix().':zone', ''));
+        }
         if ($zone === '') {
             return $baseUrl;
         }
@@ -1139,6 +1403,23 @@ final class EcountApiClient
         }
 
         return $baseUrl;
+    }
+
+    /**
+     * ZONE을 아직 모를 때 Zone API 호출용 베이스 URL. {ZONE} 플레이스홀더만 있는 호스트로는 DNS가 없으므로
+     * 이카운트 공통 호스트(ECOUNT_ZONE_LOOKUP_BASE_URL)를 사용합니다.
+     */
+    private function resolveBaseUrlForZoneLookup(): string
+    {
+        $base = $this->resolveBaseUrl();
+        if (str_contains($base, '{ZONE}') || str_contains($base, '{zone}')) {
+            return rtrim(
+                trim((string) config('store.ecount.zone_lookup_base_url', 'https://oapi.ecount.com')),
+                '/'
+            );
+        }
+
+        return $base;
     }
 
     /**

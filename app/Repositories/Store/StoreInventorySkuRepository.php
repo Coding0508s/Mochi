@@ -15,7 +15,7 @@ class StoreInventorySkuRepository
     {
         return StoreInventorySku::query()
             ->active()
-            ->orderBy('sort_order')
+            ->orderBy('prod_cd')
             ->orderBy('id')
             ->pluck('prod_cd')
             ->map(fn (mixed $code): string => strtoupper(trim((string) $code)))
@@ -31,7 +31,7 @@ class StoreInventorySkuRepository
                 $keyword = strtoupper(trim($search));
                 $query->whereRaw('UPPER(prod_cd) like ?', ["%{$keyword}%"]);
             })
-            ->orderBy('sort_order')
+            ->orderBy('prod_cd')
             ->orderBy('id')
             ->paginate($perPage);
     }
@@ -72,5 +72,13 @@ class StoreInventorySkuRepository
             ->whereIn('id', $ids)
             ->get()
             ->keyBy('id');
+    }
+
+    /**
+     * 플랫폼 DB의 연동 행만 삭제합니다. 이카운트 ERP는 호출하지 않습니다.
+     */
+    public function delete(StoreInventorySku $sku): void
+    {
+        $sku->delete();
     }
 }

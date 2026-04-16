@@ -24,6 +24,7 @@
             <li>스토어 재고 화면에는 여기서 <strong class="text-gray-800">활성</strong> 처리된 품목코드만 반영됩니다.</li>
             <li>품목코드는 이카운트의 <strong class="text-gray-800">PROD_CD</strong> 기준으로 입력합니다. (예: <code class="rounded bg-gray-100 px-1">00P228</code>)</li>
             <li>새 품목이 많을 때는 아래 <strong class="text-gray-800">일괄 등록</strong> 영역에 줄바꿈/쉼표로 붙여넣으면 됩니다.</li>
+            <li>목록은 <strong class="text-gray-800">품목코드(PROD_CD) 문자 순</strong>으로 정렬됩니다.</li>
         </ul>
     </div>
 
@@ -35,11 +36,6 @@
                    wire:model.defer="newProdCd"
                    placeholder="품목코드 (예: 00P228)"
                    class="min-w-[10rem] max-w-xs flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <input type="number"
-                   min="0"
-                   wire:model.defer="newSortOrder"
-                   placeholder="정렬순서"
-                   class="w-24 shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             <input type="text"
                    wire:model.defer="newMemo"
                    placeholder="메모"
@@ -59,23 +55,16 @@
         <p class="mb-3 text-xs text-gray-500">
             품목코드를 쉼표 또는 줄바꿈으로 구분해 입력하세요. 예: <code class="rounded bg-gray-100 px-1">00P228,00P227</code> 또는 줄바꿈 목록
         </p>
-        <div class="grid gap-3 md:grid-cols-4">
+        <div class="flex flex-wrap items-end gap-3">
             <textarea wire:model.defer="bulkProdCodes"
-                      rows="1"
+                      rows="2"
                       placeholder="00P228,00P227,00P211"
-                      class="rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 md:col-span-3"></textarea>
-            <div class="space-y-2">
-                <input type="number"
-                       min="0"
-                       wire:model.defer="bulkSortOrderStart"
-                       placeholder="시작 정렬순서"
-                       class="w-50 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <button type="button"
-                        wire:click="bulkAddSkus"
-                        class="w-24 rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700">
-                    일괄 등록
-                </button>
-            </div>
+                      class="min-w-[16rem] flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            <button type="button"
+                    wire:click="bulkAddSkus"
+                    class="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-white hover:bg-blue-700">
+                일괄 등록
+            </button>
         </div>
         @error('bulkProdCodes')<p class="mt-2 text-xs text-red-600">{{ $message }}</p>@enderror
     </div>
@@ -110,13 +99,12 @@
             </div>
 
             <div class="overflow-x-auto">
-                <table class="w-full min-w-[880px] text-sm">
+                <table class="w-full min-w-[760px] text-sm">
                     <thead class="mochi-table-head">
                         <tr class="text-gray-700">
-                            <th class="px-3 py-2 text-left text-xs font-semibold">품목코드</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold">품목코드 <span class="font-normal text-gray-500">(정렬 기준)</span></th>
                             <th class="px-3 py-2 text-left text-xs font-semibold">품목명</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold">메모</th>
-                            <th class="px-3 py-2 text-right text-xs font-semibold">정렬</th>
                             <th class="px-3 py-2 text-center text-xs font-semibold">상태</th>
                             <th class="px-3 py-2 text-center text-xs font-semibold">관리</th>
                         </tr>
@@ -132,13 +120,6 @@
                                            wire:change="updateMemo({{ $sku->id }}, $event.target.value)"
                                            class="w-full rounded-lg border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 </td>
-                                <td class="px-3 py-2 text-right">
-                                    <input type="number"
-                                           min="0"
-                                           value="{{ $sku->sort_order }}"
-                                           wire:change="updateSortOrder({{ $sku->id }}, parseInt($event.target.value || 0))"
-                                           class="w-20 rounded-lg border border-gray-300 px-2 py-1 text-right text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                </td>
                                 <td class="px-3 py-2 text-center">
                                     @if($sku->is_active)
                                         <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">활성</span>
@@ -147,16 +128,24 @@
                                     @endif
                                 </td>
                                 <td class="px-3 py-2 text-center">
-                                    <button type="button"
-                                            wire:click="toggleActive({{ $sku->id }})"
-                                            class="rounded-lg border border-gray-300 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50">
-                                        {{ $sku->is_active ? '비활성화' : '활성화' }}
-                                    </button>
+                                    <div class="flex flex-col items-center justify-center gap-1.5 sm:flex-row sm:flex-wrap sm:justify-center">
+                                        <button type="button"
+                                                wire:click="toggleActive({{ $sku->id }})"
+                                                class="rounded-lg border border-gray-300 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50">
+                                            {{ $sku->is_active ? '비활성화' : '활성화' }}
+                                        </button>
+                                        <button type="button"
+                                                wire:click="deleteSku({{ $sku->id }})"
+                                                wire:confirm="이 플랫폼 연동만 제거합니다. 이카운트 품목·재고 데이터는 삭제되지 않습니다. 계속할까요?"
+                                                class="rounded-lg border border-red-200 bg-white px-2 py-1 text-[11px] text-red-700 hover:bg-red-50">
+                                            삭제
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="px-4 py-16 text-center text-gray-400">
+                                <td colspan="5" class="px-4 py-16 text-center text-gray-400">
                                     <p class="font-medium">등록된 품목이 없습니다.</p>
                                     <p class="mt-1 text-sm">위에서 품목을 추가하거나 일괄 등록해 보세요.</p>
                                 </td>
