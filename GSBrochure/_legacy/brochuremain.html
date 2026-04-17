@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brochure Main Page</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: '맑은 고딕', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            color: #440b86;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        p {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            max-width: 600px;
+        }
+
+        button {
+            padding: 15px 30px;
+            margin: 10px;
+            border: none;
+            border-radius: 5px;
+            background-color: #440b86;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0ca22c;
+        }
+
+        /* 반응형 디자인 */
+        @media (max-width: 768px) {
+            body {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            p {
+                font-size: 14px;
+            }
+
+            button {
+                width: 100%;
+                max-width: 300px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 20px;
+            }
+
+            button {
+                font-size: 14px;
+                padding: 12px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>GrapeSEED Brochure Main Page</h1>
+    <p>필요한 브로셔를 신청하세요. 신청하신 브로셔는 최대 3일 이내에 발송됩니다.</p>
+    <button>브로셔 신청</button>
+    <button>브로셔 송장조회</button>
+</body>
+</html>

@@ -35,4 +35,19 @@ return [
         ],
     ],
 
+    'gs_brochure_teams' => [
+        'webhook_url' => env('GS_BROCHURE_TEAMS_WEBHOOK_URL'),
+        // 비우면 APP_URL 기준 관리자 대시보드 운송장 섹션으로 연결
+        'logistics_url' => env('GS_BROCHURE_TEAMS_LOGISTICS_URL'),
+    ],
+
+    'gs_brochure_solapi' => [
+        'key' => env('GS_BROCHURE_SOLAPI_KEY'),
+        'secret' => env('GS_BROCHURE_SOLAPI_SECRET'),
+        'from' => env('GS_BROCHURE_SOLAPI_FROM'),
+        'kakao_pf_id' => env('GS_BROCHURE_SOLAPI_KAKAO_PF_ID'),
+        'kakao_otp_template_id' => env('GS_BROCHURE_SOLAPI_KAKAO_OTP_TEMPLATE_ID'),
+        'kakao_otp_variable' => env('GS_BROCHURE_SOLAPI_KAKAO_OTP_VARIABLE', '#{인증번호}'),
+    ],
+
 ];

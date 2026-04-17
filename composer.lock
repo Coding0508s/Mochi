@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d46695fcde0f4376377e098dfaa09214",
+    "content-hash": "09639946c0560e14f6b24e0e58ff654a",
     "packages": [
         {
             "name": "brick/math",
@@ -2611,6 +2611,84 @@
             "time": "2026-02-16T23:10:27+00:00"
         },
         {
+            "name": "nyholm/psr7",
+            "version": "1.8.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Nyholm/psr7.git",
+                "reference": "a71f2b11690f4b24d099d6b16690a90ae14fc6f3"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Nyholm/psr7/zipball/a71f2b11690f4b24d099d6b16690a90ae14fc6f3",
+                "reference": "a71f2b11690f4b24d099d6b16690a90ae14fc6f3",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=7.2",
+                "psr/http-factory": "^1.0",
+                "psr/http-message": "^1.1 || ^2.0"
+            },
+            "provide": {
+                "php-http/message-factory-implementation": "1.0",
+                "psr/http-factory-implementation": "1.0",
+                "psr/http-message-implementation": "1.0"
+            },
+            "require-dev": {
+                "http-interop/http-factory-tests": "^0.9",
+                "php-http/message-factory": "^1.0",
+                "php-http/psr7-integration-tests": "^1.0",
+                "phpunit/phpunit": "^7.5 || ^8.5 || ^9.4",
+                "symfony/error-handler": "^4.4"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "1.8-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Nyholm\\Psr7\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Tobias Nyholm",
+                    "email": "tobias.nyholm@gmail.com"
+                },
+                {
+                    "name": "Martijn van der Ven",
+                    "email": "martijn@vanderven.se"
+                }
+            ],
+            "description": "A fast PHP7 implementation of PSR-7",
+            "homepage": "https://tnyholm.se",
+            "keywords": [
+                "psr-17",
+                "psr-7"
+            ],
+            "support": {
+                "issues": "https://github.com/Nyholm/psr7/issues",
+                "source": "https://github.com/Nyholm/psr7/tree/1.8.2"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/Zegnat",
+                    "type": "github"
+                },
+                {
+                    "url": "https://github.com/nyholm",
+                    "type": "github"
+                }
+            ],
+            "time": "2024-09-09T07:06:30+00:00"
+        },
+        {
             "name": "phpoption/phpoption",
             "version": "1.9.5",
             "source": {
@@ -3373,6 +3451,70 @@
                 "source": "https://github.com/ramsey/uuid/tree/4.9.2"
             },
             "time": "2025-12-14T04:43:48+00:00"
+        },
+        {
+            "name": "solapi/sdk",
+            "version": "5.1.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/solapi/solapi-php.git",
+                "reference": "8126a0c2f916f70812817083e4773ed13d382490"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/solapi/solapi-php/zipball/8126a0c2f916f70812817083e4773ed13d382490",
+                "reference": "8126a0c2f916f70812817083e4773ed13d382490",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "nyholm/psr7": "^1.5",
+                "php": ">=7.1",
+                "psr/http-client": "^1.0",
+                "psr/http-message": "^1.0 || ^2.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^9.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Nurigo\\Solapi\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Nurigo CX Team",
+                    "email": "contact@nurigo.net"
+                },
+                {
+                    "name": "Subin Lee",
+                    "email": "chandar.sblee@gmail.com",
+                    "homepage": "https://subux.dev"
+                }
+            ],
+            "description": "SOLAPI SDK for PHP",
+            "homepage": "https://solapi.com",
+            "keywords": [
+                "kakao alimtalk",
+                "kakao brand message",
+                "korea fax",
+                "korea lms",
+                "korea mms",
+                "korea sms",
+                "korea voice message",
+                "sdk",
+                "solapi"
+            ],
+            "support": {
+                "issues": "https://github.com/solapi/solapi-php/issues",
+                "source": "https://github.com/solapi/solapi-php/tree/v5.1.2"
+            },
+            "time": "2026-02-24T23:36:16+00:00"
         },
         {
             "name": "symfony/clock",

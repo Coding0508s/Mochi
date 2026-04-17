@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 페이지</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📄</text></svg>">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.5.0/dist/xlsx.full.min.js"></script>
+    <script>
+        // xlsx-js-style이 로드되지 않은 경우 동적 스크립트 로딩
+        if (typeof XLSX === 'undefined') {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+            script.async = true;
+            document.head.appendChild(script);
+        }
+    </script>
+    <script src="js/api.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: '맑은 고딕', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #440b86;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .nav-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #440b86;
+            text-decoration: none;
+            font-weight: bold;
+            transition: color 0.3s;
+        }
+
+        .nav-link:hover {
+            color: #0ca22c;
+        }
+
+        .section {
+            margin-bottom: 40px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+
+        .section h2 {
+            margin-top: 0;
+            color: #440b86;
+            border-bottom: 2px solid #440b86;
+            padding-bottom: 10px;
+        }
+
+        .btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+
+        .btn-primary {
+            background-color: #440b86;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #0ca22c;
+        }
+
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #218838;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+
+        .btn-small {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: white;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #440b86;
+            color: white;
+            font-weight: bold;
+        }
+
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        .stock-low {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .stock-ok {
+            color: #28a745;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        .form-row .form-group.narrow {
+            max-width: 150px;
+        }
+
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .alert-success {
+            color: #155724;
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+
+        .alert-danger {
+            color: #721c24;
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #440b86;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            border: 2px solid #440b86;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #440b86;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        /* 반응형 디자인 */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .header-actions {
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+
+            .section {
+                padding: 15px;
+            }
+
+            .section h2 {
+                font-size: 20px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+
+            .stat-number {
+                font-size: 24px;
+            }
+
+            table {
+                display: block;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            table thead,
+            table tbody {
+                display: block;
+            }
+
+            table tr {
+                display: flex;
+                flex-direction: column;
+                border: 1px solid #ddd;
+                margin-bottom: 10px;
+                padding: 10px;
+                border-radius: 5px;
+                background-color: white;
+            }
+
+            table thead tr {
+                display: none;
+            }
+
+            table td {
+                display: flex;
+                justify-content: space-between;
+                padding: 8px;
+                border: none;
+                border-bottom: 1px solid #eee;
+            }
+
+            table td:last-child {
+                border-bottom: none;
+            }
+
+            table td:before {
+                content: attr(data-label);
+                font-weight: bold;
+                color: #440b86;
+                margin-right: 10px;
+            }
+
+            .btn {
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+
+            .btn-small {
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+
+            .modal-content {
+                width: 95%;
+                margin: 5% auto;
+                padding: 20px;
+            }
+
+            #stockTable {
+                font-size: 14px;
+            }
+
+            #stockTable th,
+            #stockTable td {
+                padding: 8px;
+                font-size: 12px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            .section h2 {
+                font-size: 18px;
+            }
+
+            .stat-number {
+                font-size: 20px;
+            }
+
+            .btn {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+
+            .header-actions {
+                width: 100%;
+            }
+
+            .header-actions > div,
+            .header-actions button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-actions">
+            <div>
+                <a href="requestbrochure.html" class="nav-link">← 신청 페이지로 돌아가기</a>
+            </div>
+            <button class="btn btn-secondary" onclick="logout()">로그아웃</button>
+        </div>
+        
+        <h1>관리자 페이지</h1>
+        <div id="alert" class="alert"></div>
+
+        <!-- 재고 현황 대시보드 -->
+        <div class="section">
+            <h2>재고 현황</h2>
+            <div class="stats-grid" id="statsGrid">
+                <!-- 통계 카드들이 여기에 동적으로 추가됩니다 -->
+            </div>
+            
+            <!-- 품목별 재고 현황 -->
+            <div style="margin-top: 30px;">
+                <h3 style="margin-bottom: 15px;">품목별 재고 현황</h3>
+                <table id="stockTable" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background-color: #440b86; color: white;">
+                            <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">브로셔명</th>
+                            <th style="padding: 12px; text-align: center; border: 1px solid #ddd;">재고 수량</th>
+                            <th style="padding: 12px; text-align: center; border: 1px solid #ddd;">상태</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stockTableBody">
+                        <!-- 품목별 재고가 여기에 동적으로 추가됩니다 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 브로셔 관리 -->
+        <div class="section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="margin: 0;">브로셔 관리</h2>
+                <button class="btn btn-primary" onclick="downloadStockHistory()">입출고 내역 다운로드</button>
+            </div>
+            <button class="btn btn-success" onclick="openBrochureModal()">+ 브로셔 추가</button>
+            <table id="brochureTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>브로셔명</th>
+                        <th>현재 재고</th>
+                        <th>마지막 입고 수량</th>
+                        <th>입고</th>
+                        <th>작업</th>
+                    </tr>
+                </thead>
+                <tbody id="brochureTableBody">
+                    <!-- 브로셔 목록이 여기에 동적으로 추가됩니다 -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 담당자 관리 -->
+        <div class="section">
+            <h2>담당자 관리</h2>
+            <button class="btn btn-success" onclick="openContactModal()">+ 담당자 추가</button>
+            <table id="contactTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>담당자명</th>
+                        <th>작업</th>
+                    </tr>
+                </thead>
+                <tbody id="contactTableBody">
+                    <!-- 담당자 목록이 여기에 동적으로 추가됩니다 -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 관리자 계정 관리 -->
+        <div class="section">
+            <h2>관리자 계정 관리</h2>
+            
+            <!-- 계정 목록 -->
+            <div style="margin-bottom: 20px;">
+                <h3>계정 목록</h3>
+                <table id="adminUsersTable" style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                    <thead>
+                        <tr style="background-color: #440b86; color: white;">
+                            <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">ID</th>
+                            <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">사용자명</th>
+                            <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">생성일</th>
+                            <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">작업</th>
+                        </tr>
+                    </thead>
+                    <tbody id="adminUsersTableBody">
+                        <!-- 계정 목록이 여기에 표시됩니다 -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- 계정 추가 -->
+            <div style="margin-bottom: 20px; padding: 15px; background-color: white; border-radius: 5px; border: 1px solid #ddd;">
+                <h3>새 계정 추가</h3>
+                <form id="addAdminForm" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 200px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">사용자명</label>
+                        <input type="text" id="newUsername" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    <div style="flex: 1; min-width: 200px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">비밀번호</label>
+                        <input type="password" id="newPassword" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    <div style="display: flex; align-items: flex-end;">
+                        <button type="submit" class="btn btn-primary">계정 추가</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 브로셔 추가/수정 모달 -->
+    <div id="brochureModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="brochureModalTitle">브로셔 추가</h3>
+                <span class="close" onclick="closeBrochureModal()">&times;</span>
+            </div>
+            <form id="brochureForm">
+                <input type="hidden" id="brochureId" value="">
+                <div class="form-group">
+                    <label for="brochureName">브로셔명</label>
+                    <input type="text" id="brochureName" required>
+                </div>
+                <div class="form-group" id="stockGroup" style="display: none;">
+                    <label for="brochureStock">초기 재고</label>
+                    <input type="number" id="brochureStock" min="0" value="0">
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeBrochureModal()">취소</button>
+                    <button type="submit" class="btn btn-primary">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 담당자 추가/수정 모달 -->
+    <div id="contactModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="contactModalTitle">담당자 추가</h3>
+                <span class="close" onclick="closeContactModal()">&times;</span>
+            </div>
+            <form id="contactForm">
+                <input type="hidden" id="contactId" value="">
+                <div class="form-group">
+                    <label for="contactName">담당자명</label>
+                    <input type="text" id="contactName" required>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeContactModal()">취소</button>
+                    <button type="submit" class="btn btn-primary">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 비밀번호 변경 모달 -->
+    <div id="passwordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>비밀번호 변경</h3>
+                <span class="close" onclick="closePasswordModal()">&times;</span>
+            </div>
+            <form id="changePasswordForm">
+                <input type="hidden" id="changePasswordUserId">
+                <div class="form-group">
+                    <label for="currentPassword">현재 비밀번호</label>
+                    <input type="password" id="currentPassword" required>
+                </div>
+                <div class="form-group">
+                    <label for="newPasswordInput">새 비밀번호</label>
+                    <input type="password" id="newPasswordInput" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">새 비밀번호 확인</label>
+                    <input type="password" id="confirmPassword" required>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="closePasswordModal()">취소</button>
+                    <button type="submit" class="btn btn-primary">변경</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 입고 처리 모달 -->
+    <div id="stockModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>입고 처리</h3>
+                <span class="close" onclick="closeStockModal()">&times;</span>
+            </div>
+            <form id="stockForm">
+                <input type="hidden" id="stockBrochureId" value="">
+                <div class="form-group">
+                    <label id="stockBrochureName">브로셔명</label>
+                </div>
+                <div class="form-group">
+                    <label for="stockDate">입고 날짜</label>
+                    <input type="date" id="stockDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="stockQuantity">입고 수량</label>
+                    <input type="number" id="stockQuantity" min="1" required>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeStockModal()">취소</button>
+                    <button type="submit" class="btn btn-primary">입고 처리</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 재고 수정 모달 -->
+    <div id="stockEditModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>재고 수정</h3>
+                <span class="close" onclick="closeStockEditModal()">&times;</span>
+            </div>
+            <form id="stockEditForm">
+                <input type="hidden" id="stockEditBrochureId" value="">
+                <div class="form-group">
+                    <label id="stockEditBrochureName">브로셔명</label>
+                </div>
+                <div class="form-group">
+                    <label for="stockEditQuantity">재고 수량</label>
+                    <input type="number" id="stockEditQuantity" min="0" required>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeStockEditModal()">취소</button>
+                    <button type="submit" class="btn btn-primary">수정</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // 로그인 체크
+        function checkLogin() {
+            const isLoggedIn = sessionStorage.getItem('admin_logged_in');
+            if (!isLoggedIn || isLoggedIn !== 'true') {
+                window.location.href = 'admin-login.html';
+                return false;
+            }
+            return true;
+        }
+
+        // 초기 데이터 설정 (더 이상 필요 없음 - 백엔드에서 처리)
+        async function initializeData() {
+            // 백엔드에서 데이터를 가져오므로 초기화 불필요
+        }
+
+        // 알림 표시
+        function showAlert(message, type = 'success') {
+            const alertDiv = document.getElementById('alert');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+            alertDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                alertDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        // 브로셔 목록 로드 및 표시
+        async function loadBrochures() {
+            try {
+                const brochures = await BrochureAPI.getAll();
+                const tbody = document.getElementById('brochureTableBody');
+                tbody.innerHTML = '';
+
+                brochures.forEach(brochure => {
+                    const row = document.createElement('tr');
+                    const stockClass = (brochure.stock || 0) < 10 ? 'stock-low' : 'stock-ok';
+                    const lastStockQuantity = brochure.last_stock_quantity || 0;
+                    const lastStockDate = brochure.last_stock_date || '-';
+                    row.innerHTML = `
+                        <td data-label="ID">${brochure.id}</td>
+                        <td data-label="브로셔명">${brochure.name}</td>
+                        <td data-label="현재 재고" class="${stockClass}">${brochure.stock || 0}권</td>
+                        <td data-label="마지막 입고">${lastStockQuantity > 0 ? `${lastStockQuantity}권 (${lastStockDate})` : '-'}</td>
+                        <td data-label="입고">
+                            <button class="btn btn-success btn-small" onclick="openStockModal('${brochure.id}')">입고</button>
+                        </td>
+                        <td data-label="작업">
+                            <button class="btn btn-primary btn-small" onclick="editBrochure('${brochure.id}')">수정</button>
+                            <button class="btn btn-secondary btn-small" onclick="openStockEditModal('${brochure.id}')">재고 수정</button>
+                            <button class="btn btn-danger btn-small" onclick="deleteBrochure('${brochure.id}')">삭제</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+
+                updateStats(brochures);
+            } catch (error) {
+                console.error('브로셔 로드 오류:', error);
+                showAlert('브로셔 목록을 불러오는 중 오류가 발생했습니다.', 'danger');
+            }
+        }
+
+        // 담당자 목록 로드 및 표시
+        async function loadContacts() {
+            try {
+                const contacts = await ContactAPI.getAll();
+                const tbody = document.getElementById('contactTableBody');
+                tbody.innerHTML = '';
+
+                contacts.forEach(contact => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td data-label="ID">${contact.id}</td>
+                        <td data-label="담당자명">${contact.name}</td>
+                        <td data-label="작업">
+                            <button class="btn btn-primary btn-small" onclick="editContact('${contact.id}')">수정</button>
+                            <button class="btn btn-danger btn-small" onclick="deleteContact('${contact.id}')">삭제</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('담당자 로드 오류:', error);
+                showAlert('담당자 목록을 불러오는 중 오류가 발생했습니다.', 'danger');
+            }
+        }
+
+        // 통계 업데이트
+        function updateStats(brochures = []) {
+            const totalStock = brochures.reduce((sum, b) => sum + (b.stock || 0), 0);
+            // 재고 부족 기준: 400권 이하
+            const lowStockCount = brochures.filter(b => (b.stock || 0) <= 400).length;
+            const totalBrochures = brochures.length;
+
+            const statsGrid = document.getElementById('statsGrid');
+            if (!statsGrid) {
+                console.error('statsGrid element not found');
+                return;
+            }
+
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">${totalBrochures}</div>
+                    <div class="stat-label">총 브로셔 종류</div>
+                </div>
+                <!-- <div class="stat-card">
+                    <div class="stat-number">${totalStock}</div>
+                    <div class="stat-label">총 재고 수량</div>
+                </div> -->
+                <div class="stat-card">
+                    <div class="stat-number" style="color: ${lowStockCount > 0 ? '#dc3545' : '#28a745'}">${lowStockCount}</div>
+                    <div class="stat-label">재고 부족 항목</div>
+                </div>
+            `;
+
+            // 품목별 재고 현황 업데이트
+            updateStockTable();
+        }
+
+        // 품목별 재고 현황 테이블 업데이트
+        async function updateStockTable() {
+            try {
+                const brochures = await BrochureAPI.getAll();
+                const tbody = document.getElementById('stockTableBody');
+                tbody.innerHTML = '';
+
+            if (brochures.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="3" style="padding: 20px; text-align: center; color: #666;">
+                            등록된 브로셔가 없습니다.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            // 재고 수량 기준으로 정렬 (높은 순)
+            const sortedBrochures = [...brochures].sort((a, b) => (b.stock || 0) - (a.stock || 0));
+
+            sortedBrochures.forEach(brochure => {
+                const stock = brochure.stock || 0;
+                const stockClass = stock <= 400 ? 'stock-low' : 'stock-ok';
+                // 재고 상태: 400 이하=재고 부족, 400~800=보통, 800 이상=충분
+                const statusText = stock <= 400 ? '재고 부족' : stock < 800 ? '보통' : '충분';
+                const statusColor = stock <= 400 ? '#dc3545' : stock < 800 ? '#ffc107' : '#28a745';
+                
+                const row = document.createElement('tr');
+                row.style.borderBottom = '1px solid #ddd';
+                row.innerHTML = `
+                    <td data-label="브로셔명" style="padding: 12px; border: 1px solid #ddd;">${brochure.name}</td>
+                    <td data-label="재고 수량" style="padding: 12px; text-align: center; border: 1px solid #ddd; font-weight: bold; color: ${stock < 200 ? '#dc3545' : '#333'}">${stock}권</td>
+                    <td data-label="상태" style="padding: 12px; text-align: center; border: 1px solid #ddd;">
+                        <span style="color: ${statusColor}; font-weight: bold;">${statusText}</span>
+                    </td>
+                `;
+                    tbody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('재고 현황 업데이트 오류:', error);
+            }
+        }
+
+        // 브로셔 모달 열기
+        async function openBrochureModal(id = null) {
+            const modal = document.getElementById('brochureModal');
+            const form = document.getElementById('brochureForm');
+            const title = document.getElementById('brochureModalTitle');
+            const stockGroup = document.getElementById('stockGroup');
+
+            if (id) {
+                // 수정 모드
+                try {
+                    const brochures = await BrochureAPI.getAll();
+                    const brochure = brochures.find(b => b.id == id);
+                    if (brochure) {
+                        document.getElementById('brochureId').value = brochure.id;
+                        document.getElementById('brochureName').value = brochure.name;
+                        title.textContent = '브로셔 수정';
+                        stockGroup.style.display = 'none';
+                    }
+                } catch (error) {
+                    showAlert('브로셔 정보를 불러오는 중 오류가 발생했습니다.', 'danger');
+                    return;
+                }
+            } else {
+                // 추가 모드
+                form.reset();
+                document.getElementById('brochureId').value = '';
+                title.textContent = '브로셔 추가';
+                stockGroup.style.display = 'block';
+            }
+            modal.style.display = 'block';
+        }
+
+        // 브로셔 모달 닫기
+        function closeBrochureModal() {
+            document.getElementById('brochureModal').style.display = 'none';
+            document.getElementById('brochureForm').reset();
+        }
+
+        // 브로셔 저장
+        document.getElementById('brochureForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const id = document.getElementById('brochureId').value;
+            const name = document.getElementById('brochureName').value;
+            const initialStock = parseInt(document.getElementById('brochureStock').value) || 0;
+
+            try {
+                if (id) {
+                    // 수정
+                    await BrochureAPI.update(id, { name, stock: initialStock });
+                    showAlert('브로셔가 수정되었습니다.');
+                } else {
+                    // 추가
+                    await BrochureAPI.create({ name, stock: initialStock });
+                    showAlert('브로셔가 추가되었습니다.');
+                }
+                
+                await loadBrochures();
+                closeBrochureModal();
+            } catch (error) {
+                showAlert('브로셔 저장 중 오류가 발생했습니다: ' + error.message, 'danger');
+            }
+        });
+
+        // 브로셔 수정
+        async function editBrochure(id) {
+            try {
+                const brochures = await BrochureAPI.getAll();
+                const brochure = brochures.find(b => b.id == id);
+                if (brochure) {
+                    openBrochureModal(id);
+                }
+            } catch (error) {
+                showAlert('브로셔 정보를 불러오는 중 오류가 발생했습니다.', 'danger');
+            }
+        }
+
+        // 브로셔 삭제
+        async function deleteBrochure(id) {
+            if (!confirm('정말 삭제하시겠습니까?')) return;
+
+            try {
+                await BrochureAPI.delete(id);
+                await loadBrochures();
+                showAlert('브로셔가 삭제되었습니다.');
+            } catch (error) {
+                showAlert('브로셔 삭제 중 오류가 발생했습니다: ' + error.message, 'danger');
+            }
+        }
+
+        // 입고 처리 모달 열기
+        async function openStockModal(id) {
+            try {
+                const brochures = await BrochureAPI.getAll();
+                const brochure = brochures.find(b => b.id == id);
+                
+                if (brochure) {
+                    const modal = document.getElementById('stockModal');
+                    document.getElementById('stockBrochureId').value = id;
+                    document.getElementById('stockBrochureName').textContent = `브로셔명: ${brochure.name}`;
+                    document.getElementById('stockDate').value = new Date().toISOString().split('T')[0];
+                    document.getElementById('stockQuantity').value = 1;
+                    modal.style.display = 'block';
+                }
+            } catch (error) {
+                showAlert('브로셔 정보를 불러오는 중 오류가 발생했습니다.', 'danger');
+            }
+        }
+
+        // 입고 처리 모달 닫기
+        function closeStockModal() {
+            document.getElementById('stockModal').style.display = 'none';
+            document.getElementById('stockForm').reset();
+        }
+
+        // 입고 처리
+        document.getElementById('stockForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const id = document.getElementById('stockBrochureId').value;
+            const quantity = parseInt(document.getElementById('stockQuantity').value) || 0;
+            const date = document.getElementById('stockDate').value;
+
+            if (quantity <= 0) {
+                showAlert('입고 수량을 입력해주세요.', 'danger');
+                return;
+            }
+
+            if (!date) {
+                showAlert('입고 날짜를 선택해주세요.', 'danger');
+                return;
+            }
+
+            try {
+                // 현재 재고 조회
+                const brochures = await BrochureAPI.getAll();
+                const brochure = brochures.find(b => b.id == id);
+                
+                if (!brochure) {
+                    showAlert('브로셔를 찾을 수 없습니다.', 'danger');
+                    return;
+                }
+                
+                const beforeStock = brochure.stock || 0;
+                
+                // 재고 업데이트
+                await BrochureAPI.updateStock(id, quantity, date);
+                
+                // 입고 내역 저장
+                await StockHistoryAPI.create({
+                    type: '입고',
+                    date: date,
+                    brochure_id: id,
+                    brochure_name: brochure.name,
+                    quantity: quantity,
+                    contact_name: '관리자',
+                    before_stock: beforeStock,
+                    after_stock: beforeStock + quantity
+                });
+                
+                await loadBrochures();
+                showAlert(`${quantity}권이 입고되었습니다. (입고일: ${date})`);
+                closeStockModal();
+            } catch (error) {
+                showAlert('입고 처리 중 오류가 발생했습니다: ' + error.message, 'danger');
+            }
+        });
+
+        // 재고 수정 모달 열기
+        async function openStockEditModal(id) {
+            try {
+                const brochures = await BrochureAPI.getAll();
+                const brochure = brochures.find(b => b.id == id);
+                
+                if (brochure) {
+                    const modal = document.getElementById('stockEditModal');
+                    document.getElementById('stockEditBrochureId').value = id;
+                    document.getElementById('stockEditBrochureName').textContent = `브로셔명: ${brochure.name}`;
+                    document.getElementById('stockEditQuantity').value = brochure.stock || 0;
+                    modal.style.display = 'block';
+                }
+            } catch (error) {
+                showAlert('브로셔 정보를 불러오는 중 오류가 발생했습니다.', 'danger');
+            }
+        }
+
+        // 재고 수정 모달 닫기
+        function closeStockEditModal() {
+            document.getElementById('stockEditModal').style.display = 'none';
+            document.getElementById('stockEditForm').reset();
+        }
+
+        // 재고 수정
+        document.getElementById('stockEditForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const id = document.getElementById('stockEditBrochureId').value;
+            const newQuantity = parseInt(document.getElementById('stockEditQuantity').value) || 0;
+
+            if (newQuantity < 0) {
+                showAlert('재고 수량은 0 이상이어야 합니다.', 'danger');
+                return;
+            }
+
+            try {
+                // 현재 브로셔 정보 가져오기
+                const brochures = await BrochureAPI.getAll();
+                const brochure = brochures.find(b => b.id == id);
+                
+                if (!brochure) {
+                    showAlert('브로셔를 찾을 수 없습니다.', 'danger');
+                    return;
+                }
+
+                // 현재 재고와 새 재고의 차이 계산
+                const quantityDifference = newQuantity - brochure.stock;
+                
+                // 재고 차이를 사용하여 업데이트 (입고/출고 방식)
+                await BrochureAPI.updateStock(id, quantityDifference, new Date().toISOString().split('T')[0]);
+                await loadBrochures();
+                showAlert('재고가 수정되었습니다.');
+                closeStockEditModal();
+            } catch (error) {
+                showAlert('재고 수정 중 오류가 발생했습니다: ' + error.message, 'danger');
+            }
+        });
+
+        // 담당자 모달 열기
+        async function openContactModal(id = null) {
+            const modal = document.getElementById('contactModal');
+            const form = document.getElementById('contactForm');
+            const title = document.getElementById('contactModalTitle');
+
+            if (id) {
+                // 수정 모드
+                try {
+                    const contacts = await ContactAPI.getAll();
+                    const contact = contacts.find(c => c.id == id);
+                    if (contact) {
+                        document.getElementById('contactId').value = contact.id;
+                        document.getElementById('contactName').value = contact.name;
+                        title.textContent = '담당자 수정';
+                    }
+                } catch (error) {
+                    showAlert('담당자 정보를 불러오는 중 오류가 발생했습니다.', 'danger');
+                    return;
+                }
+            } else {
+                // 추가 모드
+                form.reset();
+                document.getElementById('contactId').value = '';
+                title.textContent = '담당자 추가';
+            }
+            modal.style.display = 'block';
+        }
+
+        // 담당자 모달 닫기
+        function closeContactModal() {
+            document.getElementById('contactModal').style.display = 'none';
+            document.getElementById('contactForm').reset();
+        }
+
+        // 담당자 저장
+        document.getElementById('contactForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const id = document.getElementById('contactId').value;
+            const name = document.getElementById('contactName').value;
+
+            try {
+                if (id) {
+                    // 수정
+                    await ContactAPI.update(id, { name });
+                    showAlert('담당자가 수정되었습니다.');
+                } else {
+                    // 추가
+                    await ContactAPI.create({ name });
+                    showAlert('담당자가 추가되었습니다.');
+                }
+                
+                await loadContacts();
+                closeContactModal();
+            } catch (error) {
+                showAlert('담당자 저장 중 오류가 발생했습니다: ' + error.message, 'danger');
+            }
+        });
+
+        // 담당자 수정
+        function editContact(id) {
+            openContactModal(id);
+        }
+
+        // 담당자 삭제
+        async function deleteContact(id) {
+            if (!confirm('정말 삭제하시겠습니까?')) return;
+
+            try {
+                await ContactAPI.delete(id);
+                await loadContacts();
+                showAlert('담당자가 삭제되었습니다.');
+            } catch (error) {
+                showAlert('담당자 삭제 중 오류가 발생했습니다: ' + error.message, 'danger');
+            }
+        }
+
+        // 입출고 내역 저장 함수
+        async function recordStockTransaction(transaction) {
+            try {
+                await StockHistoryAPI.create({
+                    type: transaction.type,
+                    date: transaction.date,
+                    brochure_id: transaction.brochureId,
+                    brochure_name: transaction.brochureName,
+                    quantity: transaction.quantity,
+                    contact_name: transaction.contactName || '',
+                    schoolname: transaction.schoolname || '',
+                    before_stock: transaction.beforeStock,
+                    after_stock: transaction.afterStock
+                });
+            } catch (error) {
+                console.error('입출고 내역 저장 오류:', error);
+            }
+        }
+
+        // 입출고 내역 엑셀 다운로드
+        async function downloadStockHistory() {
+            try {
+                const history = await StockHistoryAPI.getAll();
+                
+                if (history.length === 0) {
+                    showAlert('다운로드할 입출고 내역이 없습니다.', 'danger');
+                    return;
+                }
+
+            // 엑셀 데이터 생성
+            const excelData = [];
+            
+            // 헤더 행
+            excelData.push([
+                '구분',
+                '날짜',
+                '브로셔명',
+                '수량',
+                '담당자',
+                '기관명',
+                '이전 재고',
+                '이후 재고',
+                '처리 시간'
+            ]);
+
+                // 데이터 행
+                history.forEach(item => {
+                    excelData.push([
+                        item.type || '',
+                        item.date || '',
+                        item.brochure_name || '',
+                        item.quantity || 0,
+                        item.contact_name || '',
+                        item.schoolname || '',
+                        item.before_stock || 0,
+                        item.after_stock || 0,
+                        item.created_at ? new Date(item.created_at).toLocaleString('ko-KR') : ''
+                    ]);
+                });
+
+            // 워크북 생성
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+
+            // 헤더 스타일 적용
+            if (XLSX.utils.sheet_add_aoa) {
+                const headerRange = XLSX.utils.decode_range(ws['!ref']);
+                for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
+                    const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+                    if (!ws[cellAddress]) continue;
+                    
+                    ws[cellAddress].s = {
+                        font: { bold: true },
+                        fill: { fgColor: { rgb: "D3D3D3" } },
+                        alignment: { horizontal: "center", vertical: "center" }
+                    };
+                }
+            }
+
+            // 열 너비 설정
+            ws['!cols'] = [
+                { wch: 10 }, // 구분
+                { wch: 12 }, // 날짜
+                { wch: 30 }, // 브로셔명
+                { wch: 10 }, // 수량
+                { wch: 15 }, // 담당자
+                { wch: 20 }, // 기관명
+                { wch: 12 }, // 이전 재고
+                { wch: 12 }, // 이후 재고
+                { wch: 20 }  // 처리 시간
+            ];
+
+            XLSX.utils.book_append_sheet(wb, ws, '입출고 내역');
+
+            // 파일명 생성 (현재 날짜 포함)
+            const today = new Date();
+            const dateStr = today.getFullYear() + 
+                          String(today.getMonth() + 1).padStart(2, '0') + 
+                          String(today.getDate()).padStart(2, '0');
+            const fileName = `입출고내역_${dateStr}.xlsx`;
+
+                // 다운로드
+                XLSX.writeFile(wb, fileName);
+                showAlert('입출고 내역이 다운로드되었습니다.', 'success');
+            } catch (error) {
+                showAlert('입출고 내역 다운로드 중 오류가 발생했습니다: ' + error.message, 'danger');
+            }
+        }
+
+        // 로그아웃
+        function logout() {
+            sessionStorage.removeItem('admin_logged_in');
+            sessionStorage.removeItem('admin_username');
+            window.location.href = 'admin-login.html';
+        }
+
+        // 모달 외부 클릭 시 닫기
+        window.onclick = function(event) {
+            const brochureModal = document.getElementById('brochureModal');
+            const contactModal = document.getElementById('contactModal');
+            const stockModal = document.getElementById('stockModal');
+            const stockEditModal = document.getElementById('stockEditModal');
+            const passwordModal = document.getElementById('passwordModal');
+            
+            if (event.target === brochureModal) {
+                closeBrochureModal();
+            }
+            if (event.target === contactModal) {
+                closeContactModal();
+            }
+            if (event.target === stockModal) {
+                closeStockModal();
+            }
+            if (event.target === stockEditModal) {
+                closeStockEditModal();
+            }
+            if (event.target === passwordModal) {
+                closePasswordModal();
+            }
+        }
+
+        // 관리자 계정 목록 로드
+        async function loadAdminUsers() {
+            try {
+                const users = await AdminAPI.getAllUsers();
+                const tbody = document.getElementById('adminUsersTableBody');
+                tbody.innerHTML = '';
+                
+                users.forEach(user => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td style="padding: 10px; border: 1px solid #ddd;">${user.id}</td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">${user.username}</td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">${new Date(user.created_at).toLocaleDateString('ko-KR')}</td>
+                        <td style="padding: 10px; border: 1px solid #ddd;">
+                            <button class="btn btn-primary" onclick="openPasswordModal(${user.id})" style="margin-right: 5px;">비밀번호 변경</button>
+                            <button class="btn btn-danger" onclick="deleteAdminUser(${user.id})" ${users.length <= 1 ? 'disabled' : ''}>삭제</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('관리자 계정 로드 오류:', error);
+                showAlert('관리자 계정을 불러오는 중 오류가 발생했습니다.', 'danger');
+            }
+        }
+
+        // 계정 추가
+        document.getElementById('addAdminForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const username = document.getElementById('newUsername').value;
+            const password = document.getElementById('newPassword').value;
+            
+            try {
+                const result = await AdminAPI.createUser(username, password);
+                if (result.success) {
+                    showAlert('계정이 추가되었습니다.', 'success');
+                    document.getElementById('addAdminForm').reset();
+                    await loadAdminUsers();
+                } else {
+                    showAlert(result.error || '계정 추가 중 오류가 발생했습니다.', 'danger');
+                }
+            } catch (error) {
+                showAlert('계정 추가 중 오류가 발생했습니다: ' + error.message, 'danger');
+            }
+        });
+
+        // 비밀번호 변경 모달 열기
+        function openPasswordModal(userId) {
+            document.getElementById('changePasswordUserId').value = userId;
+            document.getElementById('passwordModal').style.display = 'block';
+        }
+
+        // 비밀번호 변경 모달 닫기
+        function closePasswordModal() {
+            document.getElementById('passwordModal').style.display = 'none';
+            document.getElementById('changePasswordForm').reset();
+        }
+
+        // 비밀번호 변경
+        document.getElementById('changePasswordForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const userId = document.getElementById('changePasswordUserId').value;
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPasswordInput').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            if (newPassword !== confirmPassword) {
+                showAlert('새 비밀번호가 일치하지 않습니다.', 'danger');
+                return;
+            }
+            
+            try {
+                const result = await AdminAPI.changePassword(userId, currentPassword, newPassword);
+                if (result.success) {
+                    showAlert('비밀번호가 변경되었습니다.', 'success');
+                    closePasswordModal();
+                } else {
+                    showAlert(result.error || '비밀번호 변경 중 오류가 발생했습니다.', 'danger');
+                }
+            } catch (error) {
+                showAlert('비밀번호 변경 중 오류가 발생했습니다: ' + error.message, 'danger');
+            }
+        });
+
+        // 관리자 계정 삭제
+        async function deleteAdminUser(userId) {
+            if (!confirm('정말 이 계정을 삭제하시겠습니까?')) {
+                return;
+            }
+            
+            try {
+                const result = await AdminAPI.deleteUser(userId);
+                if (result.success) {
+                    showAlert('계정이 삭제되었습니다.', 'success');
+                    await loadAdminUsers();
+                } else {
+                    showAlert(result.error || '계정 삭제 중 오류가 발생했습니다.', 'danger');
+                }
+            } catch (error) {
+                showAlert('계정 삭제 중 오류가 발생했습니다: ' + error.message, 'danger');
+            }
+        }
+
+
+        // 페이지 로드 시
+        window.addEventListener('DOMContentLoaded', async function() {
+            if (!checkLogin()) return;
+            
+            await initializeData();
+            await loadBrochures();
+            await loadContacts();
+            await loadAdminUsers();
+        });
+    </script>
+</body>
+</html>
+

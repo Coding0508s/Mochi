@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Brochure</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: '맑은 고딕', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #440b86;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .form-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+
+        .form-section h3 {
+            margin-top: 0;
+            color: #440b86;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group.expand {
+            flex: 1;
+        }
+
+        .form-group.narrow {
+            max-width: 300px;
+            width: 300px;
+            flex-shrink: 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .row-container {
+            border: 2px solid #440b86;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: white;
+            position: relative;
+        }
+
+        .row-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .row-number {
+            font-weight: bold;
+            color: #440b86;
+            font-size: 16px;
+        }
+
+        .schoolname-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #440b86;
+        }
+
+        .schoolname-input::placeholder {
+            color: #999;
+            font-weight: normal;
+        }
+
+        .row-fields {
+            display: flex;
+            gap: 15px;
+            align-items: flex-start;
+        }
+
+        .row-fields.full-width {
+            flex-direction: column;
+        }
+
+        .row-fields.full-width .form-group {
+            width: 100%;
+        }
+
+        .btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+
+        .btn-primary {
+            background-color: #440b86;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #0ca22c;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #218838;
+        }
+
+        .btn-small {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .btn-add-row {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .invoice-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: flex-end;
+            margin-bottom: 10px;
+        }
+
+        .invoice-group {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .invoice-group input {
+            width: 150px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .invoice-group .btn {
+            flex-shrink: 0;
+        }
+
+        .invoice-add-btn {
+            margin-top: 0;
+        }
+
+        .brochure-container {
+            margin-bottom: 15px;
+            width: 100%;
+        }
+
+        .brochure-item {
+            margin-bottom: 15px;
+            width: 100%;
+        }
+
+        .brochure-item-header {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            margin-bottom: 5px;
+        }
+
+        .brochure-item-header .form-group {
+            margin-bottom: 0;
+        }
+
+        .brochure-item-header .form-group.expand {
+            flex: 1;
+        }
+
+        .brochure-item-header .form-group.narrow {
+            max-width: 300px;
+            flex-shrink: 0;
+            width: 300px;
+        }
+
+        .brochure-item-fields {
+            display: flex;
+            gap: 15px;
+            align-items: flex-start;
+        }
+
+        .brochure-item-fields .form-group {
+            margin-bottom: 15px;
+        }
+
+        .brochure-item-fields .form-group.expand {
+            flex: 1;
+        }
+
+        .brochure-item-fields .form-group.narrow {
+            max-width: 300px;
+            flex-shrink: 0;
+            width: 300px;
+        }
+
+        .brochure-add-btn {
+            margin-top: 0;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .alert-success {
+            color: #155724;
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+
+        .alert-danger {
+            color: #721c24;
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+
+        .nav-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #440b86;
+            text-decoration: none;
+            font-weight: bold;
+            transition: color 0.3s;
+        }
+
+        .nav-link:hover {
+            color: #0ca22c;
+        }
+
+        /* 반응형 디자인 */
+        @media screen and (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .subtitle {
+                font-size: 14px;
+            }
+
+            .row-header {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .row-fields {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .form-group.narrow {
+                max-width: 100%;
+                width: 100%;
+            }
+
+            .form-group.expand {
+                width: 100%;
+            }
+
+            .brochure-item-header {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .brochure-item-header .form-group.narrow {
+                max-width: 100%;
+                width: 100%;
+            }
+
+            .brochure-item-fields {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .brochure-item-fields .form-group.narrow {
+                max-width: 100%;
+                width: 100%;
+            }
+
+            .invoice-group {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .invoice-group input {
+                width: 100%;
+            }
+
+            .btn {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+
+            .btn-add-row {
+                width: 100%;
+            }
+
+            .row-container {
+                padding: 10px;
+            }
+        }
+
+        @media screen and (max-width: 480px) {
+            .container {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            .form-section {
+                padding: 15px;
+            }
+
+            .row-container {
+                padding: 8px;
+            }
+
+            input, select {
+                font-size: 16px; /* iOS 줌 방지 */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="requestbrochure-list.html" class="nav-link">📋 신청 내역 조회</a>
+        <a href="requestbrochure logistics.html" class="nav-link">📋 운송장 번호 입력</a>
+        <a href="admin-login.html" class="nav-link">⚙️ 관리자 페이지</a>
+        <h1>GrapeSEED Brochure Request</h1>
+        <p class="subtitle">필요한 브로셔를 신청하세요. 신청하신 브로셔는 최대 3일 이내에 발송됩니다.</p>
+        
+        <div id="alert" class="alert"></div>
+
+        <form id="brochureForm">
+            <!-- 브로셔 신청 행들 -->
+            <div class="form-section">
+                <h3>브로셔 신청</h3>
+                <div class="option-container">
+                    <div class="option-item" style="margin-bottom: 10px;">
+                        <label for="option-1">담당자 이름</label>
+                        <select id="option-1" name="option-1">
+                            <!-- 담당자 옵션이 동적으로 로드됩니다 -->
+                        </select>
+                    </div>
+                </div>
+                <div id="rowsContainer">
+                    <!-- 행들이 여기에 동적으로 추가됩니다 -->
+                </div>
+                <button type="button" class="btn btn-success btn-add-row" onclick="addRow()">+ 다른 기관 추가</button>
+            </div>
+
+            <!-- 각 건마다 개별 저장 버튼이 있으므로 전체 저장 버튼은 제거 -->
+        </form>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        let rowCount = 0;
+
+        // 브로셔 옵션 목록 로드 (API에서)
+        async function loadBrochureOptions() {
+            try {
+                const brochures = await BrochureAPI.getAll();
+                return brochures.map(b => ({
+                    value: b.id,
+                    text: b.name
+                }));
+            } catch (error) {
+                console.error('브로셔 옵션 로드 오류:', error);
+                return [];
+            }
+        }
+
+        // 담당자 옵션 목록 로드 (API에서)
+        async function loadContactOptions() {
+            try {
+                const contacts = await ContactAPI.getAll();
+                return contacts.map(c => ({
+                    value: c.id,
+                    text: c.name
+                }));
+            } catch (error) {
+                console.error('담당자 옵션 로드 오류:', error);
+                return [];
+            }
+        }
+
+        // 브로셔 재고 차감 함수
+        async function deductBrochureStock(brochures, contactName, schoolname, date) {
+            try {
+                const brochureMaster = await BrochureAPI.getAll();
+                const insufficientStock = [];
+                const stockChanges = []; // 재고 변경 내역 저장
+
+                // 재고 확인
+                for (const brochure of brochures) {
+                    const masterItem = brochureMaster.find(b => b.id == brochure.brochure);
+                    if (masterItem) {
+                        const currentStock = masterItem.stock || 0;
+                        const requestedQuantity = brochure.quantity || 0;
+                        
+                        if (currentStock < requestedQuantity) {
+                            insufficientStock.push({
+                                name: brochure.brochureName,
+                                requested: requestedQuantity,
+                                available: currentStock
+                            });
+                        } else {
+                            // 재고 변경 내역 저장
+                            stockChanges.push({
+                                brochureId: brochure.brochure,
+                                brochureName: brochure.brochureName,
+                                quantity: requestedQuantity,
+                                beforeStock: currentStock,
+                                afterStock: currentStock - requestedQuantity
+                            });
+                        }
+                    }
+                }
+
+                // 재고 부족이 있으면 false 반환
+                if (insufficientStock.length > 0) {
+                    return {
+                        success: false,
+                        insufficient: insufficientStock
+                    };
+                }
+
+                // 재고 차감 및 출고 내역 저장
+                for (const change of stockChanges) {
+                    // 재고 차감 (음수로 전달)
+                    await BrochureAPI.updateStock(change.brochureId, -change.quantity, date || new Date().toISOString().split('T')[0]);
+                    
+                    // 출고 내역 저장
+                    await StockHistoryAPI.create({
+                        type: '출고',
+                        date: date || new Date().toISOString().split('T')[0],
+                        brochure_id: change.brochureId,
+                        brochure_name: change.brochureName,
+                        quantity: change.quantity,
+                        contact_name: contactName || '',
+                        schoolname: schoolname || '',
+                        before_stock: change.beforeStock,
+                        after_stock: change.afterStock
+                    });
+                }
+
+                return { success: true };
+            } catch (error) {
+                console.error('재고 차감 오류:', error);
+                return {
+                    success: false,
+                    error: error.message
+                };
+            }
+        }
+
+        // 행 추가 함수
+        async function addRow() {
+            rowCount++;
+            const rowsContainer = document.getElementById('rowsContainer');
+            
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'row-container';
+            rowDiv.id = `row-${rowCount}`;
+            
+            // 브로셔 선택 옵션 생성 (API에서 로드)
+            const brochureOptions = await loadBrochureOptions();
+            let brochureOptionsHtml = '<option value="">선택하세요</option>';
+            brochureOptions.forEach(option => {
+                brochureOptionsHtml += `<option value="${option.value}">${option.text}</option>`;
+            });
+
+            rowDiv.innerHTML = `
+                <div class="row-header">
+                    <div class="form-group">
+                        <label for="date-${rowCount}">날짜</label>
+                        <input type="date" id="date-${rowCount}" name="date-${rowCount}" required>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="schoolname-${rowCount}">기관명</label>
+                        <input type="text" id="schoolname-${rowCount}" name="schoolname-${rowCount}" class="schoolname-input" placeholder="기관명을 입력하세요" required>
+                    </div>
+                </div>
+                <div class="row-fields">
+                    <div class="form-group expand">
+                        <label for="address-${rowCount}">주소</label>
+                        <input type="text" id="address-${rowCount}" name="address-${rowCount}" required>
+                    </div>
+                    <div class="form-group narrow">
+                        <label for="phone-${rowCount}">전화번호</label>
+                        <input type="tel" id="phone-${rowCount}" name="phone-${rowCount}" placeholder="010-0000-0000" oninput="formatPhoneNumber(this)" maxlength="13" required>
+                    </div>
+                </div>
+
+                <div class="row-fields full-width">
+                    <div class="form-group">
+                        <div class="brochure-container" id="brochure-container-${rowCount}">
+                            <!-- 브로셔 항목들이 여기에 동적으로 추가됩니다 -->
+                        </div>
+                        <button type="button" class="btn btn-success btn-small brochure-add-btn" onclick="addBrochureItem(${rowCount})">+ 브로셔 추가</button>
+                    </div>
+                </div>
+                
+                <div class="row-fields full-width">
+                    <div class="form-group">
+                        <label>송장번호(화성 물류창고 입력)</label>
+                        <div class="invoice-container" id="invoice-container-${rowCount}">
+                            <!-- 송장번호 필드들이 여기에 동적으로 추가됩니다 -->
+                        </div>
+                        <!-- 송장번호는 logistics 페이지에서만 추가 가능 -->
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
+                    <button type="button" class="btn btn-danger" onclick="removeRow(${rowCount})" style="padding: 10px 20px; font-size: 14px;">삭제</button>
+                    <button type="button" class="btn btn-primary" onclick="saveSingleRequest(${rowCount})" style="padding: 10px 20px; font-size: 14px;">저장</button>
+                </div>
+            `;
+            
+            rowsContainer.appendChild(rowDiv);
+            // 기본 브로셔 항목 하나 추가
+            addBrochureItem(rowCount, true).catch(err => console.error('브로셔 항목 추가 오류:', err));
+            // 송장번호 필드는 비활성화 (logistics 페이지에서만 추가 가능)
+            addInvoiceField(rowCount, []);
+            updateRowNumbers();
+        }
+
+        // 행 삭제 함수
+        function removeRow(rowId) {
+            const row = document.getElementById(`row-${rowId}`);
+            if (row) {
+                row.remove();
+                updateRowNumbers();
+            }
+        }
+
+        // 행 번호 업데이트 함수 (더 이상 필요 없지만 호환성을 위해 유지)
+        function updateRowNumbers() {
+            // 기관명 입력 필드로 변경되어 더 이상 번호 업데이트 불필요
+        }
+
+        // 브로셔 항목 추가 함수
+        async function addBrochureItem(rowId, isDefault = false) {
+            const container = document.getElementById(`brochure-container-${rowId}`);
+            if (!container) return;
+
+            const brochureCount = container.querySelectorAll('.brochure-item').length;
+            const itemId = `brochure-${rowId}-${brochureCount + 1}`;
+            
+            try {
+                // 브로셔 선택 옵션 생성 (API에서 로드)
+                const brochureOptions = await loadBrochureOptions();
+                let brochureOptionsHtml = '<option value="">선택하세요</option>';
+                brochureOptions.forEach(option => {
+                    brochureOptionsHtml += `<option value="${option.value}">${option.text}</option>`;
+                });
+
+                const brochureItem = document.createElement('div');
+                brochureItem.className = 'brochure-item';
+                brochureItem.id = `brochure-item-${itemId}`;
+                
+                brochureItem.innerHTML = `
+                    <div class="brochure-item-fields">
+                        <div class="form-group expand">
+                            <label for="${itemId}">브로셔</label>
+                            <select id="${itemId}" name="${itemId}" required>
+                                ${brochureOptionsHtml}
+                            </select>
+                        </div>
+                        <div class="form-group narrow">
+                            <label for="quantity-${itemId}">수량</label>
+                            <input type="number" id="quantity-${itemId}" name="quantity-${itemId}" min="1" placeholder="수량을 입력하세요" required>
+                        </div>
+                        ${!isDefault ? `<button type="button" class="btn btn-danger btn-small" onclick="removeBrochureItem('${itemId}')" style="align-self: flex-end; margin-bottom: 0;">삭제</button>` : ''}
+                    </div>
+                `;
+                
+                container.appendChild(brochureItem);
+            } catch (error) {
+                console.error('브로셔 항목 추가 오류:', error);
+                showAlert('브로셔 옵션을 불러오는 중 오류가 발생했습니다.', 'danger');
+            }
+        }
+
+        // 브로셔 항목 삭제 함수
+        function removeBrochureItem(itemId) {
+            const item = document.getElementById(`brochure-item-${itemId}`);
+            if (item) {
+                item.remove();
+            }
+        }
+
+        // 브로셔 항목들 수집 함수
+        function collectBrochureItems(rowId) {
+            const container = document.getElementById(`brochure-container-${rowId}`);
+            if (!container) return [];
+
+            const items = [];
+            const brochureItems = container.querySelectorAll('.brochure-item');
+            
+            brochureItems.forEach(item => {
+                const select = item.querySelector('select');
+                const input = item.querySelector('input[type="number"]');
+                
+                if (select && input && select.value && input.value) {
+                    items.push({
+                        brochure: select.value,
+                        brochureName: select.options[select.selectedIndex].text,
+                        quantity: parseInt(input.value)
+                    });
+                }
+            });
+            
+            return items;
+        }
+
+        // 전화번호 자동 포맷팅 함수
+        function formatPhoneNumber(input) {
+            // 숫자만 추출
+            let value = input.value.replace(/[^\d]/g, '');
+            
+            // 전화번호 포맷팅 (000-0000-0000)
+            if (value.length <= 3) {
+                input.value = value;
+            } else if (value.length <= 7) {
+                input.value = value.slice(0, 3) + '-' + value.slice(3);
+            } else if (value.length <= 11) {
+                input.value = value.slice(0, 3) + '-' + value.slice(3, 7) + '-' + value.slice(7);
+            } else {
+                // 11자리 초과 시 11자리까지만
+                input.value = value.slice(0, 3) + '-' + value.slice(3, 7) + '-' + value.slice(7, 11);
+            }
+        }
+
+        // 송장번호 필드 추가 함수 (읽기 전용으로 표시)
+        function addInvoiceField(rowId, invoices = []) {
+            const container = document.getElementById(`invoice-container-${rowId}`);
+            if (!container) return;
+
+            // 기존 내용 제거
+            container.innerHTML = '';
+
+            if (invoices && invoices.length > 0) {
+                invoices.forEach((invoice, index) => {
+                    const invoiceGroup = document.createElement('div');
+                    invoiceGroup.className = 'invoice-group';
+                    
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = invoice;
+                    input.disabled = true;
+                    input.style.backgroundColor = '#f5f5f5';
+                    input.style.cursor = 'not-allowed';
+                    
+                    invoiceGroup.appendChild(input);
+                    container.appendChild(invoiceGroup);
+                });
+            } else {
+                // 송장번호가 없을 때 표시
+                const emptyMsg = document.createElement('div');
+                emptyMsg.textContent = '송장번호가 아직 등록되지 않았습니다.';
+                emptyMsg.style.color = '#999';
+                emptyMsg.style.fontStyle = 'italic';
+                emptyMsg.style.padding = '8px';
+                container.appendChild(emptyMsg);
+            }
+        }
+
+        // 저장된 신청 데이터에서 송장번호 로드
+        function loadInvoiceNumbers(rowId) {
+            // 해당 행의 데이터와 일치하는 신청 찾기
+            const date = document.getElementById(`date-${rowId}`)?.value;
+            const schoolname = document.getElementById(`schoolname-${rowId}`)?.value;
+            const address = document.getElementById(`address-${rowId}`)?.value;
+            const phone = document.getElementById(`phone-${rowId}`)?.value;
+
+            if (!date || !schoolname || !address || !phone) {
+                return;
+            }
+
+            // 로컬 스토리지에서 모든 신청 내역 가져오기
+            const allRequests = JSON.parse(localStorage.getItem('brochure_requests') || '[]');
+            
+            // 일치하는 신청 찾기 (날짜, 기관명, 주소, 전화번호로 매칭)
+            for (let requestGroup of allRequests) {
+                for (let request of requestGroup.requests || []) {
+                    if (request.date === date &&
+                        request.schoolname === schoolname &&
+                        request.address === address &&
+                        request.phone === phone) {
+                        // 송장번호 표시
+                        if (request.invoices && request.invoices.length > 0) {
+                            addInvoiceField(rowId, request.invoices);
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 송장번호 필드들 수집 함수
+        function collectInvoiceFields(rowId) {
+            const container = document.getElementById(`invoice-container-${rowId}`);
+            if (!container) return [];
+
+            const invoices = [];
+            const invoiceInputs = container.querySelectorAll('input[type="text"]');
+            invoiceInputs.forEach(input => {
+                if (input.value.trim()) {
+                    invoices.push(input.value.trim());
+                }
+            });
+            return invoices;
+        }
+
+        // 알림 표시 함수
+        function showAlert(message, type = 'success') {
+            const alertDiv = document.getElementById('alert');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+            alertDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                alertDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        // 개별 건 저장 함수
+        async function saveSingleRequest(rowId) {
+            // 상단의 담당자 선택 값 가져오기
+            const contactSelect = document.getElementById('option-1');
+            const contact = contactSelect.value;
+            const contactName = contactSelect.options[contactSelect.selectedIndex]?.text || '';
+            
+            if (!contact) {
+                showAlert('담당자를 선택해주세요.', 'danger');
+                return;
+            }
+
+            // 해당 행의 데이터 수집
+            const date = document.getElementById(`date-${rowId}`)?.value;
+            const schoolname = document.getElementById(`schoolname-${rowId}`)?.value;
+            const address = document.getElementById(`address-${rowId}`)?.value;
+            const phone = document.getElementById(`phone-${rowId}`)?.value;
+            const brochures = collectBrochureItems(rowId);
+            const invoices = collectInvoiceFields(rowId);
+                
+            // 필수 필드 검증
+            if (!date || !schoolname || !address || !phone || brochures.length === 0) {
+                showAlert('모든 필수 항목을 입력해주세요.', 'danger');
+                return;
+            }
+
+            try {
+                // 재고 확인 및 차감
+                const stockResult = await deductBrochureStock(brochures, contactName, schoolname, date);
+                if (!stockResult.success) {
+                    if (stockResult.insufficient) {
+                        let message = '재고가 부족합니다:\n';
+                        stockResult.insufficient.forEach(item => {
+                            message += `- ${item.name}: 요청 ${item.requested}권, 보유 ${item.available}권\n`;
+                        });
+                        alert(message);
+                    } else {
+                        showAlert('재고 확인 중 오류가 발생했습니다: ' + (stockResult.error || '알 수 없는 오류'), 'danger');
+                    }
+                    return;
+                }
+
+                // 데이터 저장 (API 사용)
+                const requestData = {
+                    date: date,
+                    schoolname: schoolname,
+                    address: address,
+                    phone: phone,
+                    contact_id: contact,
+                    contact_name: contactName,
+                    brochures: brochures.map(b => ({
+                        brochure: b.brochure,
+                        brochureName: b.brochureName,
+                        quantity: b.quantity
+                    })),
+                    invoices: invoices.filter(inv => inv && inv.trim())
+                };
+
+                await RequestAPI.create(requestData);
+
+                showAlert('브로셔 신청이 완료되었습니다!', 'success');
+                
+                // 해당 행 제거
+                const row = document.getElementById(`row-${rowId}`);
+                if (row) {
+                    row.remove();
+                }
+            } catch (error) {
+                showAlert('신청 저장 중 오류가 발생했습니다: ' + error.message, 'danger');
+            }
+        }
+
+        // 폼 제출 처리 - 더 이상 사용하지 않지만 호환성을 위해 유지
+        document.getElementById('brochureForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            showAlert('각 건마다 개별 저장 버튼을 사용해주세요.', 'danger');
+        });
+
+        // 담당자 옵션 로드 및 표시
+        async function loadContactOptionsToSelect() {
+            const contactSelect = document.getElementById('option-1');
+            if (!contactSelect) return;
+
+            try {
+                const contacts = await loadContactOptions();
+                contactSelect.innerHTML = '<option value="">선택하세요</option>';
+                contacts.forEach(contact => {
+                    const option = document.createElement('option');
+                    option.value = contact.value;
+                    option.textContent = contact.text;
+                    contactSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('담당자 옵션 로드 오류:', error);
+            }
+        }
+
+        // 페이지 로드 시 기본 행 하나 추가 및 옵션 로드
+        window.addEventListener('DOMContentLoaded', async function() {
+            await loadContactOptionsToSelect();
+            await addRow();
+        });
+    </script>
+</body>
+</html>

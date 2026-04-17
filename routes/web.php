@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ContractDocumentFileController;
 use App\Http\Controllers\ProfileController;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -16,6 +17,32 @@ Route::get('/', function () {
         ? redirect()->route('institutions.index')
         : redirect()->route('login');
 });
+
+/*
+| GS Brochure — 공개 신청 (플랫폼 계정 없이 접근)
+| 레거시 URL requestbrochure-v2 등도 동일 폼으로 연결
+*/
+Route::get('/co/gs-brochure', function () {
+    return auth()->user()?->is_admin
+        ? redirect()->route('co.gs-brochure.admin.dashboard')
+        : redirect()->route('co.gs-brochure.request');
+})->name('co.gs-brochure');
+Route::get('/co/gs-brochure/request', function () {
+    return view('request.form-v2');
+})->name('co.gs-brochure.request');
+Route::get('/co/gs-brochure/request/success', function () {
+    return view('request.success');
+})->name('co.gs-brochure.request.success');
+
+Route::get('/requestbrochure-v2', function () {
+    return redirect()->route('co.gs-brochure.request');
+})->name('gs-brochure.legacy.request');
+Route::get('/requestbrochure', function () {
+    return redirect()->route('co.gs-brochure.request');
+})->name('gs-brochure.legacy.request.v1');
+Route::get('/requestbrochure-success', function () {
+    return redirect()->route('co.gs-brochure.request.success');
+})->name('gs-brochure.legacy.request.success');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -53,6 +80,49 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/supports/create', function () {
         return view('pages.supports.create');
     })->name('supports.create');
+
+    Route::get('/co/gs-brochure/main', function () {
+        return view('pages.co.gs-brochure-main');
+    })->name('co.gs-brochure.main');
+    Route::get('/co/gs-brochure/requests', function () {
+        return view('request.list');
+    })->name('co.gs-brochure.requests');
+    Route::get('/co/gs-brochure/admin/login', function () {
+        if (! Gate::allows('manageGsBrochureAdmin')) {
+            return redirect()->route('co.gs-brochure.request');
+        }
+
+        return redirect()->route('co.gs-brochure.admin.dashboard');
+    })->name('co.gs-brochure.admin.login');
+    Route::get('/co/gs-brochure/admin/dashboard', function () {
+        if (! Gate::allows('manageGsBrochureAdmin')) {
+            return redirect()->route('co.gs-brochure.request');
+        }
+
+        return view('admin.dashboard');
+    })->name('co.gs-brochure.admin.dashboard');
+
+    // GS 레거시 Blade 호환 URL (목록·관리자 등 — 로그인 필요)
+    Route::get('/requestbrochure-list', function () {
+        return redirect()->route('co.gs-brochure.requests');
+    })->name('gs-brochure.legacy.request.list');
+    Route::get('/requestbrochure-list-v2', function () {
+        return redirect()->route('co.gs-brochure.requests');
+    })->name('gs-brochure.legacy.request.list-v2');
+    Route::get('/admin/login', function () {
+        if (! Gate::allows('manageGsBrochureAdmin')) {
+            return redirect()->route('co.gs-brochure.request');
+        }
+
+        return redirect()->route('co.gs-brochure.admin.dashboard');
+    })->name('gs-brochure.legacy.admin.login');
+    Route::get('/admin/dashboard', function () {
+        if (! Gate::allows('manageGsBrochureAdmin')) {
+            return redirect()->route('co.gs-brochure.request');
+        }
+
+        return redirect()->route('co.gs-brochure.admin.dashboard');
+    })->name('gs-brochure.legacy.admin.dashboard');
 
     Route::get('/store/inventory', function () {
         return view('pages.store.inventory.index');

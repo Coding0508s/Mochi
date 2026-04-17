@@ -15,7 +15,8 @@
         || request()->is('supports*')
         || request()->is('potential-institutions*')
         || request()->is('salesforce-files*')
-        || request()->is('store/*');
+        || request()->is('store/*')
+        || request()->is('co/*');
 @endphp
 
 {{-- Alpine.js: 사이드바 아코디언(열고 닫기) 에 사용 --}}
@@ -247,6 +248,7 @@
                                     ['label' => '기관지원보고서', 'href' => '/supports',     'route' => 'supports',     'icon' => 'document'],
                                     ['label' => '잠재기관리스트', 'href' => route('potential-institutions.index'), 'route' => '', 'routeIs' => 'potential-institutions.index', 'icon' => 'calendar'],
                                     ['label' => '잠재기관보기',   'href' => route('potential-institutions.view'), 'route' => '', 'routeIs' => 'potential-institutions.view', 'icon' => 'eye'],
+                                    ['label' => 'GS Brochure', 'href' => route('co.gs-brochure'), 'route' => '', 'routeIs' => 'co.gs-brochure*', 'icon' => 'document', 'blank' => true],
                                     ['label' => 'Store 재고',  'href' => route('store.inventory.index'), 'route' => '', 'routeIs' => 'store.inventory.index', 'icon' => 'cart'],
                                     ['label' => 'Store판매내역',  'href' => route('store.sales.index'), 'route' => '', 'routeIs' => 'store.sales.index', 'icon' => 'cart'],
                                     ['label' => 'Salesforce파일', 'href' => '/salesforce-files', 'route' => 'salesforce-files', 'icon' => 'server'],
@@ -257,6 +259,9 @@
 
                             @foreach($coMenus as $menu)
                                 <a href="{{ $menu['href'] }}"
+                                   @if(! empty($menu['blank'] ?? false))
+                                       target="_blank" rel="noopener noreferrer"
+                                   @endif
                                    class="sidebar-subitem sidebar-subitem-row sidebar-focusable
                                           {{ (! empty($menu['routeIs'] ?? null) && request()->routeIs($menu['routeIs']))
                                              ? 'sidebar-subitem-active'

@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>신청 내역 조회</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: '맑은 고딕', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #440b86;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .search-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+
+        .search-row {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .search-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .search-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .search-group input,
+        .search-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+
+        .btn-primary {
+            background-color: #440b86;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #0ca22c;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+
+        .request-card {
+            border: 2px solid #440b86;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background-color: white;
+        }
+
+        .request-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #440b86;
+        }
+
+        .request-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #440b86;
+        }
+
+        .request-date {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .request-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .info-value {
+            color: #333;
+            font-size: 14px;
+        }
+
+        .brochure-list {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+        }
+
+        .brochure-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+        }
+
+        .brochure-name {
+            flex: 1;
+            font-weight: bold;
+        }
+
+        .brochure-quantity {
+            color: #440b86;
+            font-weight: bold;
+            margin-right: 20px;
+        }
+
+        .invoice-list {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+        }
+
+        .invoice-item {
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 5px 5px 5px 0;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .no-invoice {
+            color: #999;
+            font-style: italic;
+            font-size: 12px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status-badge.completed {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .status-badge.pending {
+            background-color: #ffc107;
+            color: #333;
+        }
+
+        .card-actions {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+
+        .info-value input,
+        .info-value select {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .brochure-item-edit {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .brochure-item-edit input,
+        .brochure-item-edit select {
+            flex: 1;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .brochure-item-edit input[type="number"] {
+            max-width: 100px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+
+        .stat-item {
+            flex: 1;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #440b86;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .nav-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #440b86;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .nav-link:hover {
+            color: #0ca22c;
+        }
+
+        .pagination-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 30px 0;
+            gap: 10px;
+        }
+
+        .pagination {
+            display: flex;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            gap: 5px;
+        }
+
+        .pagination li {
+            display: inline-block;
+        }
+
+        .pagination a {
+            display: block;
+            padding: 8px 12px;
+            text-decoration: none;
+            color: #440b86;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .pagination a:hover {
+            background-color: #440b86;
+            color: white;
+        }
+
+        .pagination .active a {
+            background-color: #440b86;
+            color: white;
+        }
+
+        .pagination .disabled a {
+            color: #ccc;
+            pointer-events: none;
+            cursor: not-allowed;
+        }
+
+        .pagination-info {
+            color: #666;
+            font-size: 14px;
+            margin: 0 15px;
+        }
+
+        /* 반응형 디자인 */
+        @media screen and (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .request-info {
+                grid-template-columns: 1fr;
+            }
+
+            .request-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .search-row {
+                flex-direction: column;
+            }
+
+            .search-group {
+                min-width: 100%;
+            }
+
+            .request-card {
+                padding: 15px;
+            }
+
+            .card-actions {
+                flex-direction: column;
+            }
+
+            .card-actions .btn {
+                width: 100%;
+            }
+
+            .pagination-container {
+                flex-wrap: wrap;
+            }
+
+            .btn {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+        }
+
+        @media screen and (max-width: 480px) {
+            .container {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            .request-card {
+                padding: 10px;
+            }
+
+            input, select {
+                font-size: 16px; /* iOS 줌 방지 */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="requestbrochure.html" class="nav-link">← 신청 페이지로 돌아가기</a>
+        <h1>신청 내역 조회</h1>
+        <p class="subtitle">신청 완료된 브로셔 정보를 확인할 수 있습니다.</p>
+
+        <div class="search-section">
+            <div class="search-row">
+                <div class="search-group">
+                    <label>날짜 검색</label>
+                    <input type="date" id="searchDate" onchange="filterRequests()">
+                </div>
+                <div class="search-group">
+                    <label>기관명 검색</label>
+                    <input type="text" id="searchSchool" placeholder="기관명을 입력하세요" onkeyup="filterRequests()">
+                </div>
+                <div class="search-group">
+                    <label>배송 상태</label>
+                    <select id="searchStatus" onchange="filterRequests()">
+                        <option value="">전체</option>
+                        <option value="pending">배송 대기중</option>
+                        <option value="completed">배송완료</option>
+                    </select>
+                </div>
+                <div class="search-group">
+                    <button class="btn btn-primary" onclick="filterRequests()">검색</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats" id="stats">
+            <div class="stat-item">
+                <div class="stat-number" id="totalRequests">0</div>
+                <div class="stat-label">총 신청 건수</div>
+            </div>
+            <!-- <div class="stat-item">
+                <div class="stat-number" id="totalBrochures">0</div>
+                <div class="stat-label">총 브로셔 수량</div>
+            </div> -->
+            <div class="stat-item">
+                <div class="stat-number" id="withInvoice">0</div>
+                <div class="stat-label">운송장 등록 완료</div>
+            </div>
+        </div>
+
+        <div id="requestsContainer">
+            <!-- 신청 내역이 여기에 표시됩니다 -->
+        </div>
+
+        <div class="pagination-container">
+            <div class="pagination-info" id="paginationInfo"></div>
+            <ul class="pagination" id="pagination">
+                <!-- 페이지네이션 버튼이 여기에 동적으로 추가됩니다 -->
+            </ul>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        let allRequests = [];
+        let filteredRequests = [];
+        let currentPage = 1;
+        const itemsPerPage = 10;
+
+        // 브로셔 옵션 목록 로드 (API에서)
+        async function loadBrochureOptions() {
+            try {
+                const brochures = await BrochureAPI.getAll();
+                return brochures.map(b => ({
+                    value: b.id,
+                    text: b.name
+                }));
+            } catch (error) {
+                console.error('브로셔 옵션 로드 오류:', error);
+                return [];
+            }
+        }
+
+        // 담당자 옵션 목록 로드 (API에서)
+        async function loadContactOptions() {
+            try {
+                const contacts = await ContactAPI.getAll();
+                return contacts.map(c => ({
+                    value: c.id,
+                    text: c.name
+                }));
+            } catch (error) {
+                console.error('담당자 옵션 로드 오류:', error);
+                return [];
+            }
+        }
+
+        // 저장된 신청 내역 로드
+        async function loadRequests() {
+            try {
+                const requests = await RequestAPI.getAll();
+                // API 응답을 기존 형식으로 변환
+                allRequests = requests.map(req => ({
+                    id: req.id, // API에서 받은 ID 저장
+                    requests: [{
+                        id: req.id, // 요청 ID도 저장
+                        date: req.date,
+                        schoolname: req.schoolname,
+                        address: req.address,
+                        phone: req.phone,
+                        contact: req.contact_id,
+                        contactName: req.contact_name,
+                        // API에서 받은 items를 기존 형식으로 변환 (brochure_name -> brochureName)
+                        brochures: (req.items || []).map(item => ({
+                            brochure: item.brochure_id,
+                            brochureName: item.brochure_name,
+                            quantity: item.quantity
+                        })),
+                        invoices: req.invoices || []
+                    }],
+                    submittedAt: req.submitted_at
+                }));
+                filteredRequests = [...allRequests];
+                currentPage = 1;
+                displayRequests();
+                updateStats();
+            } catch (error) {
+                console.error('신청 내역 로드 오류:', error);
+                showAlert('신청 내역을 불러오는 중 오류가 발생했습니다.', 'danger');
+            }
+        }
+
+        // 모든 신청을 평면 배열로 변환
+        function flattenRequests() {
+            const flatList = [];
+            filteredRequests.forEach((requestGroup, groupIndex) => {
+                if (requestGroup.requests && requestGroup.requests.length > 0) {
+                    requestGroup.requests.forEach((request, requestIndex) => {
+                        flatList.push({
+                            request: request,
+                            groupIndex: groupIndex,
+                            requestIndex: requestIndex
+                        });
+                    });
+                }
+            });
+            return flatList;
+        }
+
+        // 신청 내역 표시
+        function displayRequests() {
+            const container = document.getElementById('requestsContainer');
+            container.innerHTML = '';
+
+            const flatList = flattenRequests();
+            const totalItems = flatList.length;
+
+            if (totalItems === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📋</div>
+                        <p>신청 내역이 없습니다.</p>
+                    </div>
+                `;
+                document.getElementById('pagination').innerHTML = '';
+                document.getElementById('paginationInfo').textContent = '';
+                return;
+            }
+
+            // 페이지네이션 계산
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const pageItems = flatList.slice(startIndex, endIndex);
+
+            // 현재 페이지의 항목만 표시
+            pageItems.forEach(item => {
+                const requestCard = createRequestCard(item.request, item.groupIndex, item.requestIndex);
+                container.appendChild(requestCard);
+            });
+
+            // 페이지네이션 UI 업데이트
+            updatePagination(totalPages, totalItems);
+        }
+
+        // 페이지네이션 UI 업데이트
+        function updatePagination(totalPages, totalItems) {
+            const pagination = document.getElementById('pagination');
+            const paginationInfo = document.getElementById('paginationInfo');
+            
+            pagination.innerHTML = '';
+            
+            if (totalPages <= 1) {
+                paginationInfo.textContent = `총 ${totalItems}개`;
+                return;
+            }
+
+            // 이전 버튼
+            const prevLi = document.createElement('li');
+            prevLi.className = currentPage === 1 ? 'disabled' : '';
+            prevLi.innerHTML = `<a onclick="goToPage(${currentPage - 1})">이전</a>`;
+            pagination.appendChild(prevLi);
+
+            // 페이지 번호들
+            const startPage = Math.max(1, currentPage - 2);
+            const endPage = Math.min(totalPages, currentPage + 2);
+
+            if (startPage > 1) {
+                const firstLi = document.createElement('li');
+                firstLi.innerHTML = `<a onclick="goToPage(1)">1</a>`;
+                pagination.appendChild(firstLi);
+                if (startPage > 2) {
+                    const dotsLi = document.createElement('li');
+                    dotsLi.className = 'disabled';
+                    dotsLi.innerHTML = '<a>...</a>';
+                    pagination.appendChild(dotsLi);
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                const li = document.createElement('li');
+                li.className = i === currentPage ? 'active' : '';
+                li.innerHTML = `<a onclick="goToPage(${i})">${i}</a>`;
+                pagination.appendChild(li);
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    const dotsLi = document.createElement('li');
+                    dotsLi.className = 'disabled';
+                    dotsLi.innerHTML = '<a>...</a>';
+                    pagination.appendChild(dotsLi);
+                }
+                const lastLi = document.createElement('li');
+                lastLi.innerHTML = `<a onclick="goToPage(${totalPages})">${totalPages}</a>`;
+                pagination.appendChild(lastLi);
+            }
+
+            // 다음 버튼
+            const nextLi = document.createElement('li');
+            nextLi.className = currentPage === totalPages ? 'disabled' : '';
+            nextLi.innerHTML = `<a onclick="goToPage(${currentPage + 1})">다음</a>`;
+            pagination.appendChild(nextLi);
+
+            // 페이지 정보
+            const startItem = startIndex + 1;
+            const endItem = Math.min(endIndex, totalItems);
+            paginationInfo.textContent = `총 ${totalItems}개 중 ${startItem}-${endItem}개 표시`;
+        }
+
+        // 페이지 이동
+        function goToPage(page) {
+            const flatList = flattenRequests();
+            const totalPages = Math.ceil(flatList.length / itemsPerPage);
+            if (page < 1 || page > totalPages) return;
+            currentPage = page;
+            displayRequests();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // 신청 카드 생성
+        function createRequestCard(request, groupIndex, requestIndex) {
+            const card = document.createElement('div');
+            card.className = 'request-card';
+
+            // 브로셔 목록 생성
+            let brochureListHtml = '';
+            if (request.brochures && request.brochures.length > 0) {
+                request.brochures.forEach(brochure => {
+                    brochureListHtml += `
+                        <div class="brochure-item">
+                            <span class="brochure-name">${brochure.brochureName}</span>
+                            <span class="brochure-quantity">${brochure.quantity}권</span>
+                        </div>
+                    `;
+                });
+            }
+
+            // 송장번호 목록 생성
+            let invoiceListHtml = '';
+            const hasInvoices = request.invoices && request.invoices.length > 0 && 
+                               request.invoices.some(inv => inv && inv.trim() !== '');
+            
+            if (hasInvoices) {
+                request.invoices.forEach(invoice => {
+                    if (invoice && invoice.trim() !== '') {
+                        invoiceListHtml += `<span class="invoice-item">${invoice}</span>`;
+                    }
+                });
+            } else {
+                invoiceListHtml = '<span class="no-invoice">배송 대기중</span>';
+            }
+
+            // 배송 상태 배지
+            const statusBadge = hasInvoices 
+                ? '<span class="status-badge completed">배송완료</span>'
+                : '<span class="status-badge pending">배송 대기중</span>';
+
+            const cardId = `card-${groupIndex}-${requestIndex}`;
+            const isEditable = !hasInvoices;
+            
+            card.id = cardId;
+            card.dataset.groupIndex = groupIndex;
+            card.dataset.requestIndex = requestIndex;
+            
+            // 수정 버튼 (배송 완료가 아닌 경우만)
+            const editButton = isEditable 
+                ? `<div class="card-actions">
+                    <button class="btn btn-primary" onclick="editRequest('${cardId}')">수정</button>
+                   </div>`
+                : '';
+
+            card.innerHTML = `
+                <div class="request-header">
+                    <div>
+                        <div class="request-title">${request.schoolname}</div>
+                        <div class="request-date">신청일: ${formatDate(request.date)}</div>
+                    </div>
+                    ${statusBadge}
+                </div>
+                <div class="request-info">
+                    <div class="info-item">
+                        <div class="info-label">기관명</div>
+                        <div class="info-value" data-field="schoolname">${request.schoolname}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">주소</div>
+                        <div class="info-value" data-field="address">${request.address}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">전화번호</div>
+                        <div class="info-value" data-field="phone">${request.phone}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">담당자</div>
+                        <div class="info-value" data-field="contactName">${request.contactName || request.contact || '-'}</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">신청일</div>
+                        <div class="info-value" data-field="date">${formatDate(request.date)}</div>
+                    </div>
+                </div>
+                <div class="brochure-list" data-brochures="${encodeURIComponent(JSON.stringify(request.brochures || []))}">
+                    <div class="info-label" style="margin-bottom: 10px;">신청 브로셔</div>
+                    <div class="brochure-items-container">${brochureListHtml}</div>
+                </div>
+                <div class="invoice-list">
+                    <div class="info-label" style="margin-bottom: 10px;">운송장 번호</div>
+                    ${invoiceListHtml}
+                </div>
+                ${editButton}
+            `;
+
+            return card;
+        }
+
+        // 수정 모드로 전환
+        async function editRequest(cardId) {
+            const card = document.getElementById(cardId);
+            if (!card) return;
+
+            const groupIndex = parseInt(card.dataset.groupIndex);
+            const requestIndex = parseInt(card.dataset.requestIndex);
+            const request = filteredRequests[groupIndex]?.requests[requestIndex];
+            if (!request) return;
+
+            try {
+                // 필드들을 편집 가능하게 변경
+                const infoValues = card.querySelectorAll('.info-value');
+                for (const item of infoValues) {
+                    const field = item.dataset.field;
+                    const currentValue = item.textContent.trim();
+                    
+                    if (field === 'date') {
+                        // 날짜는 input[type="date"]로
+                        const dateValue = request.date || '';
+                        item.innerHTML = `<input type="date" value="${dateValue}" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">`;
+                    } else if (field === 'contactName') {
+                        // 담당자는 select로 (API에서 로드)
+                        const contactOptions = await loadContactOptions();
+                        let optionsHtml = '<option value="">선택하세요</option>';
+                        contactOptions.forEach(opt => {
+                            const selected = opt.value == request.contact ? 'selected' : '';
+                            optionsHtml += `<option value="${opt.value}" ${selected}>${opt.text}</option>`;
+                        });
+                        item.innerHTML = `<select style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">${optionsHtml}</select>`;
+                    } else {
+                        // 나머지는 text input으로
+                        item.innerHTML = `<input type="text" value="${currentValue}" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">`;
+                    }
+                }
+
+                // 브로셔 목록을 편집 가능하게 변경
+                const brochureContainer = card.querySelector('.brochure-items-container');
+                if (brochureContainer && request.brochures) {
+                    const brochureOptions = await loadBrochureOptions();
+                    let brochureEditHtml = '';
+                    request.brochures.forEach((brochure, index) => {
+                        let optionsHtml = '<option value="">선택하세요</option>';
+                        brochureOptions.forEach(opt => {
+                            const selected = opt.value == brochure.brochure ? 'selected' : '';
+                            optionsHtml += `<option value="${opt.value}" ${selected}>${opt.text}</option>`;
+                        });
+                        brochureEditHtml += `
+                            <div class="brochure-item-edit" data-index="${index}">
+                                <select data-field="brochure" style="flex: 1; padding: 5px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">${optionsHtml}</select>
+                                <input type="number" data-field="quantity" value="${brochure.quantity}" min="1" style="max-width: 100px; padding: 5px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                                <button type="button" class="btn btn-danger btn-small" onclick="removeBrochureItem(this)">삭제</button>
+                            </div>
+                        `;
+                    });
+                    brochureEditHtml += `<button type="button" class="btn btn-success btn-small" onclick="addBrochureItemEdit('${cardId}')" style="margin-top: 10px;">+ 브로셔 추가</button>`;
+                    brochureContainer.innerHTML = brochureEditHtml;
+                }
+            } catch (error) {
+                console.error('수정 모드 전환 오류:', error);
+                showAlert('수정 모드로 전환하는 중 오류가 발생했습니다.', 'danger');
+            }
+
+            // 수정/취소 버튼으로 변경
+            const actionsDiv = card.querySelector('.card-actions');
+            if (actionsDiv) {
+                actionsDiv.innerHTML = `
+                    <button class="btn btn-primary" onclick="saveRequest('${cardId}')">저장</button>
+                    <button class="btn btn-secondary" onclick="cancelEdit('${cardId}')">취소</button>
+                `;
+            }
+        }
+
+        // 브로셔 항목 추가 (수정 모드)
+        async function addBrochureItemEdit(cardId) {
+            const card = document.getElementById(cardId);
+            const container = card.querySelector('.brochure-items-container');
+            if (!container) return;
+
+            try {
+                const brochureOptions = await loadBrochureOptions();
+                let optionsHtml = '<option value="">선택하세요</option>';
+                brochureOptions.forEach(opt => {
+                    optionsHtml += `<option value="${opt.value}">${opt.text}</option>`;
+                });
+
+                const newItem = document.createElement('div');
+                newItem.className = 'brochure-item-edit';
+                newItem.innerHTML = `
+                    <select data-field="brochure" style="flex: 1; padding: 5px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">${optionsHtml}</select>
+                    <input type="number" data-field="quantity" value="1" min="1" style="max-width: 100px; padding: 5px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                    <button type="button" class="btn btn-danger btn-small" onclick="removeBrochureItem(this)">삭제</button>
+                `;
+                container.insertBefore(newItem, container.lastElementChild);
+            } catch (error) {
+                console.error('브로셔 옵션 로드 오류:', error);
+            }
+        }
+
+        // 브로셔 항목 삭제
+        function removeBrochureItem(button) {
+            button.closest('.brochure-item-edit').remove();
+        }
+
+        // 수정 저장
+        async function saveRequest(cardId) {
+            const card = document.getElementById(cardId);
+            if (!card) return;
+
+            const groupIndex = parseInt(card.dataset.groupIndex);
+            const requestIndex = parseInt(card.dataset.requestIndex);
+            
+            // 필드 값 수집
+            const schoolname = card.querySelector('[data-field="schoolname"] input')?.value || '';
+            const address = card.querySelector('[data-field="address"] input')?.value || '';
+            const phone = card.querySelector('[data-field="phone"] input')?.value || '';
+            const date = card.querySelector('[data-field="date"] input')?.value || '';
+                    const contactSelect = card.querySelector('[data-field="contactName"] select');
+                    const contact = contactSelect?.value || '';
+                    const contactName = contactSelect?.options[contactSelect.selectedIndex]?.text || '';
+
+            // 브로셔 항목 수집
+            const brochures = [];
+            const brochureItems = card.querySelectorAll('.brochure-item-edit');
+            brochureItems.forEach(item => {
+                const brochureSelect = item.querySelector('[data-field="brochure"]');
+                const quantityInput = item.querySelector('[data-field="quantity"]');
+                if (brochureSelect && brochureSelect.value && quantityInput && quantityInput.value) {
+                    brochures.push({
+                        brochure: brochureSelect.value,
+                        brochureName: brochureSelect.options[brochureSelect.selectedIndex].text,
+                        quantity: parseInt(quantityInput.value)
+                    });
+                }
+            });
+
+            if (!schoolname || !address || !phone || !date || brochures.length === 0) {
+                alert('모든 필수 항목을 입력해주세요.');
+                return;
+            }
+
+            // API를 통해 업데이트
+            try {
+                // 현재 요청의 ID 찾기
+                const flatList = flattenRequests();
+                const currentItem = flatList.find(item => 
+                    item.groupIndex === groupIndex && item.requestIndex === requestIndex
+                );
+                
+                if (!currentItem) {
+                    alert('신청 내역을 찾을 수 없습니다.');
+                    return;
+                }
+                
+                // API에서 요청 ID 가져오기
+                const requestId = allRequests[groupIndex]?.id || allRequests[groupIndex]?.requests?.[requestIndex]?.id;
+                
+                if (!requestId) {
+                    alert('요청 ID를 찾을 수 없습니다.');
+                    return;
+                }
+                
+                await RequestAPI.update(requestId, {
+                    date: date,
+                    schoolname: schoolname,
+                    address: address,
+                    phone: phone,
+                    contact_id: contact,
+                    contact_name: contactName,
+                    brochures: brochures.map(b => ({
+                        brochure: b.brochure,
+                        brochureName: b.brochureName,
+                        quantity: b.quantity
+                    }))
+                });
+                
+                await loadRequests();
+                showAlert('신청 내역이 수정되었습니다.', 'success');
+            } catch (error) {
+                console.error('수정 오류:', error);
+                alert('수정 중 오류가 발생했습니다: ' + error.message);
+            }
+        }
+
+        // 수정 취소
+        function cancelEdit(cardId) {
+            loadRequests();
+        }
+
+        // 날짜 포맷팅
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+
+        // 필터링
+        function filterRequests() {
+            const schoolSearch = document.getElementById('searchSchool').value.toLowerCase();
+            const dateSearch = document.getElementById('searchDate').value;
+            const statusSearch = document.getElementById('searchStatus').value;
+
+            filteredRequests = allRequests.map(requestGroup => {
+                const filtered = requestGroup.requests.filter(request => {
+                    const matchSchool = !schoolSearch || request.schoolname.toLowerCase().includes(schoolSearch);
+                    const matchDate = !dateSearch || request.date === dateSearch;
+                    
+                    // 배송 상태 필터링
+                    const hasInvoices = request.invoices && request.invoices.length > 0 && 
+                                       request.invoices.some(inv => inv && inv.trim() !== '');
+                    let matchStatus = true;
+                    if (statusSearch === 'completed') {
+                        matchStatus = hasInvoices;
+                    } else if (statusSearch === 'pending') {
+                        matchStatus = !hasInvoices;
+                    }
+
+                    return matchSchool && matchDate && matchStatus;
+                });
+
+                return {
+                    ...requestGroup,
+                    requests: filtered
+                };
+            }).filter(group => group.requests.length > 0);
+
+            currentPage = 1;
+            displayRequests();
+            updateStats();
+        }
+
+        // 필터 초기화
+        function clearFilters() {
+            document.getElementById('searchSchool').value = '';
+            document.getElementById('searchDate').value = '';
+            document.getElementById('searchStatus').value = '';
+            filteredRequests = [...allRequests];
+            currentPage = 1;
+            displayRequests();
+            updateStats();
+        }
+
+        // 통계 업데이트
+        function updateStats() {
+            let totalRequests = 0;
+            let totalBrochures = 0;
+            let withInvoice = 0;
+
+            filteredRequests.forEach(requestGroup => {
+                if (requestGroup.requests) {
+                    requestGroup.requests.forEach(request => {
+                        totalRequests++;
+                        if (request.brochures) {
+                            request.brochures.forEach(b => {
+                                totalBrochures += parseInt(b.quantity) || 0;
+                            });
+                        }
+                        if (request.invoices && request.invoices.length > 0) {
+                            withInvoice++;
+                        }
+                    });
+                }
+            });
+
+            // 요소가 존재하는지 확인한 후에만 업데이트
+            const totalRequestsEl = document.getElementById('totalRequests');
+            const totalBrochuresEl = document.getElementById('totalBrochures');
+            const withInvoiceEl = document.getElementById('withInvoice');
+
+            if (totalRequestsEl) {
+                totalRequestsEl.textContent = totalRequests;
+            }
+            if (totalBrochuresEl) {
+                totalBrochuresEl.textContent = totalBrochures;
+            }
+            if (withInvoiceEl) {
+                withInvoiceEl.textContent = withInvoice;
+            }
+        }
+
+        // 알림 표시 함수
+        function showAlert(message, type = 'success') {
+            // 간단한 alert로 대체 (또는 커스텀 알림 UI 구현 가능)
+            if (type === 'danger' || type === 'error') {
+                alert('오류: ' + message);
+            } else {
+                alert(message);
+            }
+        }
+
+        // 페이지 로드 시 데이터 불러오기
+        window.addEventListener('DOMContentLoaded', function() {
+            loadRequests();
+        });
+    </script>
+</body>
+</html>
+
