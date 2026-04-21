@@ -9,8 +9,9 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Schema;
 
-#[Fillable(['name', 'email', 'password', 'is_admin', 'team'])]
+#[Fillable(['name', 'email', 'password', 'is_admin', 'team', 'is_gs_brochure_admin'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -20,6 +21,34 @@ class User extends Authenticatable
     public function isCoTeam(): bool
     {
         return $this->team === 'CO';
+    }
+
+    public function isCountryManager(): bool
+    {
+        $email = mb_strtolower(trim((string) $this->email));
+        if ($email === '' || ! Schema::hasTable('employee')) {
+            return false;
+        }
+
+        $job = Employee::query()
+            ->whereRaw('LOWER(TRIM(COALESCE(EMAIL, \'\'))) = ?', [$email])
+            ->value('JOB');
+
+        if (! is_string($job) || trim($job) === '') {
+            return false;
+        }
+
+        $normalizedJob = mb_strtolower(trim($job));
+
+        return in_array($normalizedJob, [
+            'country manager',
+            'countrymanager',
+        ], true);
+    }
+
+    public function hasFullAccess(): bool
+    {
+        return (bool) $this->is_admin || $this->isCountryManager();
     }
 
     /**
@@ -33,6 +62,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
+            'is_gs_brochure_admin' => 'boolean',
         ];
     }
 }

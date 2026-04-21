@@ -23,7 +23,7 @@ Route::get('/', function () {
 | 레거시 URL requestbrochure-v2 등도 동일 폼으로 연결
 */
 Route::get('/co/gs-brochure', function () {
-    return auth()->user()?->is_admin
+    return auth()->user()?->can('manageGsBrochureAdmin')
         ? redirect()->route('co.gs-brochure.admin.dashboard')
         : redirect()->route('co.gs-brochure.request');
 })->name('co.gs-brochure');

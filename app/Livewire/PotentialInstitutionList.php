@@ -10,6 +10,7 @@ use App\Models\SupportRecord;
 use App\Services\PotentialInstitutionSkCodeService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Throwable;
@@ -52,8 +53,6 @@ class PotentialInstitutionList extends Component
     public string $newMeetingTimeEnd = '';
 
     public string $newType = '';
-
-    public string $newAccountCode = '';
 
     public string $newAccountName = '';
 
@@ -204,6 +203,9 @@ class PotentialInstitutionList extends Component
             if ($contracted) {
                 $target->refresh();
                 $this->syncContractedLeadToInstitutionList($target);
+            } else {
+                $target->refresh();
+                $this->removeUncontractedLeadFromInstitutionList($target);
             }
         });
     }
@@ -224,6 +226,8 @@ class PotentialInstitutionList extends Component
         $sk = $userSk !== ''
             ? $userSk
             : $skService->resolveForManualRegistration('', (int) $target->ID);
+
+        $this->clearInstitutionHiddenFlag($sk);
 
         if ($userSk === '') {
             $target->update(['AccountCode' => $sk]);
@@ -251,6 +255,42 @@ class PotentialInstitutionList extends Component
                 'Customer_Type' => $target->Type ? trim((string) $target->Type) : null,
             ]
         );
+    }
+
+    /**
+     * 미계약 전환 시 기관리스트에서 숨김 처리합니다.
+     */
+    private function removeUncontractedLeadFromInstitutionList(CoNewTarget $target): void
+    {
+        $sk = trim((string) ($target->AccountCode ?? ''));
+        if ($sk === '') {
+            return;
+        }
+
+        if (! Schema::hasTable('institution_visibility_overrides')) {
+            return;
+        }
+
+        DB::table('institution_visibility_overrides')->updateOrInsert(
+            ['sk_code' => $sk],
+            [
+                'hidden_reason' => 'uncontracted',
+                'hidden_at' => now(),
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+    }
+
+    private function clearInstitutionHiddenFlag(string $sk): void
+    {
+        if ($sk === '' || ! Schema::hasTable('institution_visibility_overrides')) {
+            return;
+        }
+
+        DB::table('institution_visibility_overrides')
+            ->where('sk_code', $sk)
+            ->delete();
     }
 
     private function syncSelectedTargetContractFields(bool $contracted): void
@@ -289,13 +329,12 @@ class PotentialInstitutionList extends Component
                 $gsK = $this->toNonNegativeInt($validated['newGSK'] ?? null);
                 $gsE = $this->toNonNegativeInt($validated['newGSE'] ?? null);
 
-                $userSk = trim((string) ($validated['newAccountCode'] ?? ''));
-
                 $target = CoNewTarget::query()->create([
                     'Year' => (int) $meetingDate->format('Y'),
                     'CreatedDate' => $meetingDate->format('Y-m-d'),
                     'AccountManager' => $validated['newManager'] ?: null,
-                    'AccountCode' => $userSk !== '' ? $userSk : null,
+                    // 신규(미계약) 등록 단계에서는 SK를 발급/반영하지 않습니다.
+                    'AccountCode' => null,
                     'AccountName' => $validated['newAccountName'],
                     'Address' => $validated['newAddress'] ?: null,
                     'Director' => $validated['newDirector'] ?: null,
@@ -316,31 +355,6 @@ class PotentialInstitutionList extends Component
                     'ContractedDate' => null,
                     'Possibility' => $validated['newPossibility'] ?: null,
                 ]);
-
-                $skCode = app(PotentialInstitutionSkCodeService::class)
-                    ->resolveForManualRegistration($userSk, (int) $target->ID);
-
-                if ($userSk === '') {
-                    $target->update(['AccountCode' => $skCode]);
-                }
-
-                Institution::query()->create([
-                    'SKcode' => $skCode,
-                    'AccountName' => $validated['newAccountName'],
-                    'Director' => $validated['newDirector'] ?: null,
-                    'Phone' => $validated['newPhone'] ?: null,
-                    'Address' => $validated['newAddress'] ?: null,
-                    'Gubun' => null,
-                ]);
-
-                AccountInformation::query()->updateOrCreate(
-                    ['SK_Code' => $skCode],
-                    [
-                        'Account_Name' => $validated['newAccountName'],
-                        'Address' => $validated['newAddress'] ?: null,
-                        'Customer_Type' => $validated['newType'] ?: null,
-                    ]
-                );
 
                 CoNewTargetDetail::query()->create([
                     'Year' => (int) $meetingDate->format('Y'),
@@ -364,7 +378,7 @@ class PotentialInstitutionList extends Component
         $this->closeCreateModal();
         $this->resetCreateForm();
         $this->resetPage();
-        session()->flash('success', '잠재 기관이 등록되었고, 기관 목록에도 반영되었습니다.');
+        session()->flash('success', '잠재 기관이 등록되었습니다. 계약 처리 시 SK코드가 발급됩니다.');
     }
 
     protected function rules(): array
@@ -377,19 +391,6 @@ class PotentialInstitutionList extends Component
             'newMeetingTime' => ['nullable', 'date_format:H:i'],
             'newMeetingTimeEnd' => ['nullable', 'date_format:H:i'],
             'newType' => ['required', 'string', 'max:100'],
-            'newAccountCode' => [
-                'nullable',
-                'string',
-                'max:100',
-                function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (! is_string($value) || trim($value) === '') {
-                        return;
-                    }
-                    if (Institution::query()->where('SKcode', trim($value))->exists()) {
-                        $fail('이미 기관 목록에 등록된 SK코드입니다. 다른 값을 입력하거나 비워 두면 임시 코드(LEAD-*)가 부여됩니다.');
-                    }
-                },
-            ],
             'newAccountName' => ['required', 'string', 'max:150'],
             'newDirector' => ['nullable', 'string', 'max:100'],
             'newPhone' => ['nullable', 'string', 'max:50'],
@@ -438,7 +439,6 @@ class PotentialInstitutionList extends Component
         $this->newMeetingTime = '';
         $this->newMeetingTimeEnd = '';
         $this->newType = '';
-        $this->newAccountCode = '';
         $this->newAccountName = '';
         $this->newDirector = '';
         $this->newPhone = '';

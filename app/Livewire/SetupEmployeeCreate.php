@@ -35,9 +35,18 @@ class SetupEmployeeCreate extends Component
 
     public bool $issueLoginAccount = false;
 
+    public bool $isGsBrochureAdmin = false;
+
     public function mount(): void
     {
         Gate::authorize('manageEmployeeDepartment');
+    }
+
+    public function updatedIssueLoginAccount($value): void
+    {
+        if (! (bool) $value) {
+            $this->isGsBrochureAdmin = false;
+        }
     }
 
     public function save(): void
@@ -74,6 +83,7 @@ class SetupEmployeeCreate extends Component
             'workDept' => ['required', 'string', Rule::in($deptCodes)],
             'hireDate' => ['nullable', 'date'],
             'issueLoginAccount' => ['boolean'],
+            'isGsBrochureAdmin' => ['boolean'],
         ], [
             'empNo.required' => '사번은 필수입니다.',
             'empNo.unique' => '이미 등록된 사번입니다.',
@@ -114,6 +124,7 @@ class SetupEmployeeCreate extends Component
                 'email' => $email,
                 'password' => Str::random(48),
                 'is_admin' => false,
+                'is_gs_brochure_admin' => (bool) ($validated['isGsBrochureAdmin'] ?? false),
                 'email_verified_at' => null,
             ]);
 

@@ -4,12 +4,14 @@ namespace Tests\Feature;
 
 use App\Livewire\StoreInventoryList;
 use App\Models\StoreGnuboardStockChangeLog;
+use App\Models\StoreInventorySku;
 use App\Models\User;
 use App\Repositories\GrapeSeed\GnuboardShopItemRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Mockery;
 use Tests\TestCase;
@@ -223,6 +225,46 @@ class StoreInventoryPageTest extends TestCase
             ->assertSet('items.0.notify_quantity', 77)
             ->assertSet('items.0.actual_stock_quantity', 33)
             ->assertSee('알림수량');
+    }
+
+    public function test_inventory_page_converts_legacy_absolute_image_url_to_public_url(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('store-skus/legacy-item.png', 'legacy-image');
+
+        StoreInventorySku::query()->create([
+            'prod_cd' => 'P-IMG',
+            'is_active' => true,
+            'sort_order' => 0,
+            'memo' => null,
+            'image_url' => 'http://localhost/storage/store-skus/legacy-item.png',
+        ]);
+
+        Http::fake([
+            'https://oapi.ecount.com/OAPI/V2/InventoryBalance/GetListInventoryBalanceStatus*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-IMG', 'BAL_QTY' => '12'],
+                    ],
+                ],
+            ], 200),
+            'https://oapi.ecount.com/OAPI/V2/InventoryBasic/GetBasicProductsList*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-IMG', 'PROD_DES' => '이미지 레거시 상품'],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(StoreInventoryList::class)
+            ->assertSet('items.0.product_code', 'P-IMG')
+            ->assertSet('items.0.image_url', Storage::disk('public')->url('store-skus/legacy-item.png'));
     }
 
     public function test_open_actual_stock_modal_sets_item_and_latest_audit_info(): void

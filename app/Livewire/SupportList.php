@@ -142,7 +142,39 @@ class SupportList extends Component
 
     public function selectContractDocument(int $id): void
     {
-        $this->contractSelectedId = $id;
+        $doc = ContractDocument::query()->find($id);
+        if ($doc === null) {
+            return;
+        }
+
+        $this->contractSelectedId = (int) $doc->id;
+        $this->contractSkCode = (string) ($doc->sk_code ?? '');
+        $this->contractAccountName = (string) ($doc->account_name ?? '');
+        $this->contractChangedAccountName = (string) ($doc->changed_account_name ?? '');
+        $this->contractBusinessNumber = (string) ($doc->business_number ?? '');
+        $this->contractDocumentDate = $doc->document_date?->format('Y-m-d') ?? '';
+        $this->contractDocumentTime = $this->normalizeTimeForInput($doc->document_time);
+        $this->contractConsultant = (string) ($doc->consultant ?? '');
+        $this->contractUpload = null;
+        $this->resetValidation('contractUpload');
+    }
+
+    public function clearSelectedContractDocument(): void
+    {
+        $this->contractSelectedId = null;
+        $this->contractUpload = null;
+        $this->resetValidation('contractUpload');
+    }
+
+    public function saveContractDocument(): void
+    {
+        if ($this->contractSelectedId === null) {
+            $this->uploadContractDocument();
+
+            return;
+        }
+
+        $this->updateSelectedContractDocument();
     }
 
     public function uploadContractDocument(): void
@@ -174,7 +206,12 @@ class SupportList extends Component
             return;
         }
 
-        $safeOriginal = preg_replace('/[^\p{L}\p{N}._\-\s]/u', '_', $file->getClientOriginalName()) ?? 'contract';
+        // TemporaryUploadedFile은 storeAs 이후 임시 파일 메타 접근이 실패할 수 있어 사전 캡처합니다.
+        $originalFilename = $file->getClientOriginalName();
+        $detectedMimeType = $file->getMimeType();
+        $detectedSize = $file->getSize();
+
+        $safeOriginal = preg_replace('/[^\p{L}\p{N}._\-\s]/u', '_', $originalFilename) ?? 'contract';
         $storedName = Str::uuid()->toString().'_'.$safeOriginal;
         $directory = 'contract-documents/'.$this->contractSkCode;
 
@@ -196,17 +233,108 @@ class SupportList extends Component
                 ? substr($this->contractDocumentTime, 0, 5).':00'
                 : $this->contractDocumentTime,
             'consultant' => $this->contractConsultant ?: null,
-            'original_filename' => $file->getClientOriginalName(),
+            'original_filename' => $originalFilename,
             'stored_disk' => 'local',
             'stored_path' => $path,
-            'mime_type' => $file->getMimeType(),
-            'size_bytes' => $file->getSize(),
+            'mime_type' => $detectedMimeType,
+            'size_bytes' => $detectedSize,
             'uploaded_by' => auth()->user()?->name,
         ]);
 
         $this->contractUpload = null;
         $this->contractSelectedId = null;
         session()->flash('success', '계약서 파일이 업로드되었습니다.');
+    }
+
+    public function updateSelectedContractDocument(): void
+    {
+        if ($this->contractSelectedId === null) {
+            return;
+        }
+
+        $this->validate([
+            'contractSkCode' => ['required', 'string', 'max:100'],
+            'contractDocumentDate' => ['required', 'date'],
+            'contractDocumentTime' => ['required', 'string', 'max:8'],
+            'contractChangedAccountName' => ['nullable', 'string', 'max:255'],
+            'contractBusinessNumber' => ['nullable', 'string', 'max:100'],
+            'contractConsultant' => ['nullable', 'string', 'max:150'],
+            'contractUpload' => [
+                'nullable',
+                'file',
+                'max:20480',
+                'mimes:pdf,jpg,jpeg,png,gif,webp,doc,docx,xls,xlsx',
+            ],
+        ], [
+            'contractSkCode.required' => '기관을 선택해 주세요.',
+            'contractDocumentDate.required' => '날짜를 선택해 주세요.',
+            'contractDocumentTime.required' => '시간을 입력해 주세요.',
+            'contractUpload.max' => '파일 크기는 20MB 이하여야 합니다.',
+            'contractUpload.mimes' => '허용 형식: PDF, 이미지, Word, Excel',
+        ]);
+
+        $doc = ContractDocument::query()->findOrFail($this->contractSelectedId);
+        $replacementFile = $this->contractUpload;
+
+        $newStoredPath = null;
+        $newOriginalFilename = (string) ($doc->original_filename ?? '');
+        $newMimeType = (string) ($doc->mime_type ?? '');
+        $newSizeBytes = (int) ($doc->size_bytes ?? 0);
+
+        if ($replacementFile instanceof TemporaryUploadedFile) {
+            // TemporaryUploadedFile은 storeAs 이후 임시 파일 메타 접근이 실패할 수 있어 사전 캡처합니다.
+            $newOriginalFilename = $replacementFile->getClientOriginalName();
+            $newMimeType = (string) $replacementFile->getMimeType();
+            $newSizeBytes = (int) $replacementFile->getSize();
+
+            $safeOriginal = preg_replace('/[^\p{L}\p{N}._\-\s]/u', '_', $newOriginalFilename) ?? 'contract';
+            $storedName = Str::uuid()->toString().'_'.$safeOriginal;
+            $directory = 'contract-documents/'.$this->contractSkCode;
+            $newStoredPath = $replacementFile->storeAs($directory, $storedName, 'local');
+
+            if ($newStoredPath === false) {
+                $this->addError('contractUpload', '파일 저장에 실패했습니다.');
+
+                return;
+            }
+        }
+
+        $oldDisk = (string) ($doc->stored_disk ?: 'local');
+        $oldStoredPath = (string) ($doc->stored_path ?? '');
+
+        try {
+            $doc->update([
+                'sk_code' => $this->contractSkCode,
+                'account_name' => $this->contractAccountName !== '' ? $this->contractAccountName : '-',
+                'changed_account_name' => $this->contractChangedAccountName !== '' ? $this->contractChangedAccountName : null,
+                'business_number' => $this->contractBusinessNumber !== '' ? $this->contractBusinessNumber : null,
+                'document_date' => $this->contractDocumentDate,
+                'document_time' => strlen($this->contractDocumentTime) >= 5
+                    ? substr($this->contractDocumentTime, 0, 5).':00'
+                    : $this->contractDocumentTime,
+                'consultant' => $this->contractConsultant !== '' ? $this->contractConsultant : null,
+                'original_filename' => $newOriginalFilename,
+                'stored_disk' => 'local',
+                'stored_path' => $newStoredPath !== null ? $newStoredPath : $oldStoredPath,
+                'mime_type' => $newMimeType !== '' ? $newMimeType : null,
+                'size_bytes' => $newSizeBytes > 0 ? $newSizeBytes : null,
+            ]);
+        } catch (\Throwable $e) {
+            if (is_string($newStoredPath) && $newStoredPath !== '' && Storage::disk('local')->exists($newStoredPath)) {
+                Storage::disk('local')->delete($newStoredPath);
+            }
+
+            throw $e;
+        }
+
+        if (is_string($newStoredPath) && $newStoredPath !== '' && $oldStoredPath !== '' && $oldStoredPath !== $newStoredPath) {
+            if (Storage::disk($oldDisk)->exists($oldStoredPath)) {
+                Storage::disk($oldDisk)->delete($oldStoredPath);
+            }
+        }
+
+        $this->selectContractDocument((int) $doc->id);
+        session()->flash('success', '선택한 계약서 파일이 수정되었습니다.');
     }
 
     public function deleteSelectedContractDocument(): void
@@ -221,7 +349,7 @@ class SupportList extends Component
             Storage::disk($disk)->delete($doc->stored_path);
         }
         $doc->delete();
-        $this->contractSelectedId = null;
+        $this->clearSelectedContractDocument();
         session()->flash('success', '선택한 계약서 파일을 삭제했습니다.');
     }
 

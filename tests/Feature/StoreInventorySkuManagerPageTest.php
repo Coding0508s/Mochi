@@ -6,8 +6,10 @@ use App\Livewire\StoreInventorySkuManager;
 use App\Models\StoreInventorySku;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -22,7 +24,7 @@ class StoreInventorySkuManagerPageTest extends TestCase
         $this->actingAs($admin)
             ->get(route('store.inventory.skus.index'))
             ->assertOk()
-            ->assertSee('스토어 재고 연동 품목')
+            ->assertSee('스토어 품목 수정 (이미지 수정 및 품목 활성 비활성)')
             ->assertSee('품목명');
     }
 
@@ -122,5 +124,54 @@ class StoreInventorySkuManagerPageTest extends TestCase
             ->assertHasNoErrors();
 
         $this->assertDatabaseMissing('store_inventory_skus', ['id' => $row->id]);
+    }
+
+    public function test_admin_can_upload_sku_image_and_store_relative_path(): void
+    {
+        Storage::fake('public');
+
+        $sku = StoreInventorySku::query()->create([
+            'prod_cd' => 'IMG001',
+            'is_active' => true,
+            'sort_order' => 0,
+            'memo' => null,
+        ]);
+
+        $admin = User::factory()->create(['is_admin' => true]);
+        $this->actingAs($admin);
+
+        Livewire::test(StoreInventorySkuManager::class)
+            ->set("rowImageFiles.{$sku->id}", UploadedFile::fake()->image('sku.png'))
+            ->assertHasNoErrors();
+
+        $sku->refresh();
+        $this->assertNotNull($sku->image_url);
+        $this->assertStringStartsWith('store-skus/', (string) $sku->image_url);
+        Storage::disk('public')->assertExists((string) $sku->image_url);
+    }
+
+    public function test_remove_row_image_deletes_file_for_legacy_absolute_url_data(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('store-skus/legacy.png', 'legacy-content');
+
+        $sku = StoreInventorySku::query()->create([
+            'prod_cd' => 'LEG001',
+            'is_active' => true,
+            'sort_order' => 0,
+            'memo' => null,
+            'image_url' => 'http://localhost/storage/store-skus/legacy.png',
+        ]);
+
+        $admin = User::factory()->create(['is_admin' => true]);
+        $this->actingAs($admin);
+
+        Livewire::test(StoreInventorySkuManager::class)
+            ->call('removeRowImage', $sku->id)
+            ->assertHasNoErrors();
+
+        $sku->refresh();
+        $this->assertNull($sku->image_url);
+        Storage::disk('public')->assertMissing('store-skus/legacy.png');
     }
 }

@@ -19,7 +19,8 @@
 
         <form wire:submit="save">
             @php
-                $institutionSelected = filled($formSkCode);
+                $institutionSelected = filled($formSkCode) || filled($formPotentialTargetId);
+                $sfUploadEnabled = $institutionSelected && filled($formSkCode);
             @endphp
             <div class="px-6 py-4 space-y-4">
 
@@ -41,7 +42,7 @@
                             <div class="mt-2 max-h-44 overflow-auto border border-gray-200 rounded-lg bg-white shadow-sm">
                                 @foreach($institutionSuggestions as $inst)
                                     <button type="button"
-                                            wire:click="selectInstitution('{{ $inst->SKcode }}', {{ $inst->is_potential ? 'true' : 'false' }})"
+                                            wire:click="selectInstitution('{{ $inst->SKcode }}', {{ $inst->is_potential ? 'true' : 'false' }}, {{ $inst->potential_target_id ?? 'null' }})"
                                             class="w-full px-3 py-1.5 text-left text-sm hover:bg-blue-50 transition-colors">
                                         <span class="font-medium text-gray-900">{{ $inst->AccountName }}</span>
                                         @if($inst->is_potential)
@@ -63,6 +64,13 @@
                                         잠재기관
                                     </span>
                                 @endif
+                            </p>
+                        @elseif($formIsPotential && filled($formPotentialTargetId))
+                            <p class="mt-1 text-xs text-blue-600">
+                                선택된 기관: {{ $formAccountName }} (SK 미발급)
+                                <span class="ml-1 inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700 align-middle">
+                                    잠재기관
+                                </span>
                             </p>
                         @endif
 
@@ -182,6 +190,53 @@
                                   class="w-full min-h-[120px] py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y
                                          {{ $institutionSelected ? 'border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}"></textarea>
                     </div>
+                </div>
+
+                <div class="border-t border-gray-100 pt-3">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-2">SF 파일 업로드 (선택)</h3>
+                    <p class="mb-3 text-xs text-gray-500">
+                        저장 시 보고서와 함께 계약문서/`SF_Files` 메타데이터가 동시에 등록됩니다.
+                    </p>
+
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <input type="file"
+                               id="sf-upload-input"
+                               wire:model="sfUpload"
+                               @disabled(!$sfUploadEnabled)
+                               class="hidden"
+                               accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,application/pdf,image/*" />
+
+                        <label for="sf-upload-input"
+                               class="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors
+                                      {{ $sfUploadEnabled
+                                          ? 'cursor-pointer bg-blue-600 hover:bg-blue-700'
+                                          : 'cursor-not-allowed bg-gray-400' }}">
+                            파일 선택
+                        </label>
+
+                        <button type="button"
+                                wire:click="clearSfUpload"
+                                @disabled(!$sfUploadEnabled || !$sfUpload)
+                                class="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 transition-colors
+                                       hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">
+                            선택 해제
+                        </button>
+
+                        <span wire:loading wire:target="sfUpload" class="text-xs text-blue-600">파일 처리 중…</span>
+                    </div>
+
+                    <div class="mt-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                        @if($sfUpload)
+                            선택된 파일: <span class="font-medium text-gray-800 break-all">{{ $sfUpload->getClientOriginalName() }}</span>
+                        @elseif($institutionSelected && !$sfUploadEnabled)
+                            SK코드 발급 전(미계약 잠재기관)에는 파일 업로드 없이 보고서만 저장됩니다.
+                        @else
+                            파일을 선택하면 이름이 여기에 표시됩니다.
+                        @endif
+                    </div>
+                    @error('sfUpload')
+                        <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                    @enderror
                 </div>
             </div>
 

@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Builder;
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -28,22 +28,24 @@ use Illuminate\Database\Eloquent\Builder;
  *   $record->institution->AccountName
  * ═══════════════════════════════════════════════════════════════
  *
- * @property int    $ID
- * @property int    $Year         연도
- * @property string $SK_Code      기관 코드
+ * @property int $ID
+ * @property int $Year 연도
+ * @property string $SK_Code 기관 코드
  * @property string $Account_Name 기관명
- * @property string $TR_Name      담당 TR 이름
+ * @property string $TR_Name 담당 TR 이름
  * @property string $Support_Date 지원 날짜
  * @property string $Support_Type 지원 방식
- * @property string $Issue        이슈 내용
- * @property string $TO_Account   기관 소통 내용
- * @property string $Status       처리 상태
+ * @property string $Issue 이슈 내용
+ * @property string $TO_Account 기관 소통 내용
+ * @property string $Status 처리 상태
  */
 class SupportRecord extends Model
 {
     // ─── 테이블 설정 ──────────────────────────────────────────────────
     protected $table = 'S_SupportInfo_Account';
+
     protected $primaryKey = 'ID';
+
     public $timestamps = false;
     // Laravel 기본 timestamps(created_at/updated_at) 대신
     // FGC_CreateDate 와 CreatedDate 를 직접 관리합니다.
@@ -52,6 +54,7 @@ class SupportRecord extends Model
     protected $fillable = [
         'Year',
         'SK_Code',
+        'potential_target_id',
         'Account_Name',
         'TR_Name',
         'Support_Date',
@@ -72,18 +75,18 @@ class SupportRecord extends Model
     protected function casts(): array
     {
         return [
-            'Support_Date'       => 'datetime',
+            'Support_Date' => 'datetime',
             // 꺼내올 때 자동으로 날짜 객체가 됩니다.
             // 예: $record->Support_Date->format('Y년 m월 d일')
 
-            'Meet_Time'          => 'datetime',
+            'Meet_Time' => 'datetime',
             // 시간 필드도 마찬가지입니다.
 
-            'CreatedDate'        => 'datetime',
-            'CompletedDate'      => 'datetime',
-            'FGC_CreateDate'     => 'datetime',
+            'CreatedDate' => 'datetime',
+            'CompletedDate' => 'datetime',
+            'FGC_CreateDate' => 'datetime',
             'FGC_LastModifyDate' => 'datetime',
-            'FGC_Rowversion'     => 'datetime',
+            'FGC_Rowversion' => 'datetime',
         ];
     }
 
@@ -101,6 +104,14 @@ class SupportRecord extends Model
     public function institution(): BelongsTo
     {
         return $this->belongsTo(Institution::class, 'SK_Code', 'SKcode');
+    }
+
+    /**
+     * 잠재기관(미계약) 보고서 연결
+     */
+    public function potentialTarget(): BelongsTo
+    {
+        return $this->belongsTo(CoNewTarget::class, 'potential_target_id', 'ID');
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -194,9 +205,9 @@ class SupportRecord extends Model
 
         return $query->where(function (Builder $q) use ($normalizedKeyword) {
             $q->whereRaw("REPLACE(Account_Name, ' ', '') like ?", ["%{$normalizedKeyword}%"])
-              ->orWhereRaw("REPLACE(Issue, ' ', '') like ?", ["%{$normalizedKeyword}%"])
-              ->orWhereRaw("REPLACE(TO_Account, ' ', '') like ?", ["%{$normalizedKeyword}%"])
-              ->orWhereRaw("REPLACE(SK_Code, ' ', '') like ?", ["%{$normalizedKeyword}%"]);
+                ->orWhereRaw("REPLACE(Issue, ' ', '') like ?", ["%{$normalizedKeyword}%"])
+                ->orWhereRaw("REPLACE(TO_Account, ' ', '') like ?", ["%{$normalizedKeyword}%"])
+                ->orWhereRaw("REPLACE(SK_Code, ' ', '') like ?", ["%{$normalizedKeyword}%"]);
         });
     }
 

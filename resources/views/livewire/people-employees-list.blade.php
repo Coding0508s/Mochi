@@ -225,6 +225,29 @@
                             @error('editStatus') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
 
+                        @can('manageEmployeeDepartment')
+                            <div class="md:col-span-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
+                                <label class="flex items-start gap-2 cursor-pointer select-none">
+                                    <input type="checkbox"
+                                           wire:model.defer="editGsBrochureAdmin"
+                                           @disabled(! $hasLinkedLoginAccount)
+                                           class="mt-0.5 rounded border-gray-300 text-[#2b78c5] focus:ring-[#2b78c5] disabled:cursor-not-allowed disabled:opacity-60"/>
+                                    <span class="text-sm text-gray-700 leading-snug">
+                                        GS Brochure 관리 권한
+                                        @if($hasLinkedLoginAccount)
+                                            <span class="mt-0.5 block text-[11px] font-normal text-gray-500">
+                                                체크 시 해당 로그인 계정은 GS Brochure 관리자 화면 접근이 가능합니다.
+                                            </span>
+                                        @else
+                                            <span class="mt-0.5 block text-[11px] font-normal text-amber-700">
+                                                연결된 로그인 계정이 없어 권한을 변경할 수 없습니다.
+                                            </span>
+                                        @endif
+                                    </span>
+                                </label>
+                            </div>
+                        @endcan
+
                         <div class="md:col-span-2">
                             <label class="block text-xs font-semibold text-gray-500 mb-1">부서(팀)</label>
                             @can('manageEmployeeDepartment')

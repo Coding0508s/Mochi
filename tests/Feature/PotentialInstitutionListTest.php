@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\PotentialInstitutionSkCodeService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -32,6 +33,7 @@ class PotentialInstitutionListTest extends TestCase
     {
         Schema::dropIfExists('S_CO_NewTarget_Detail');
         Schema::dropIfExists('S_CO_NewTarget');
+        Schema::dropIfExists('S_SupportInfo_Account');
         Schema::dropIfExists('S_Account_Information');
         Schema::dropIfExists('S_AccountName');
 
@@ -61,6 +63,24 @@ class PotentialInstitutionListTest extends TestCase
             $table->string('Customer_Type', 255)->nullable();
             $table->string('Affiliate', 255)->nullable();
             $table->string('Address', 255)->nullable();
+        });
+
+        Schema::create('S_SupportInfo_Account', function (Blueprint $table): void {
+            $table->increments('ID');
+            $table->integer('Year')->nullable();
+            $table->string('SK_Code', 100)->nullable();
+            $table->string('Account_Name', 255)->nullable();
+            $table->string('TR_Name', 255)->nullable();
+            $table->date('Support_Date')->nullable();
+            $table->string('Meet_Time', 50)->nullable();
+            $table->string('Support_Type', 100)->nullable();
+            $table->string('Target', 255)->nullable();
+            $table->text('Issue')->nullable();
+            $table->text('TO_Account')->nullable();
+            $table->text('TO_Depart')->nullable();
+            $table->string('Status', 50)->nullable();
+            $table->timestamp('CompletedDate')->nullable();
+            $table->timestamp('CreatedDate')->nullable();
         });
 
         Schema::create('S_CO_NewTarget', function (Blueprint $table): void {
@@ -127,14 +147,13 @@ class PotentialInstitutionListTest extends TestCase
             ]);
     }
 
-    public function test_save_new_target_allows_empty_sk_code(): void
+    public function test_save_new_target_does_not_issue_sk_before_contract(): void
     {
         $accountName = 'SK코드 생략 QA '.uniqid('', true);
 
         Livewire::test(PotentialInstitutionList::class)
             ->call('openCreateModal')
             ->set('newAccountName', $accountName)
-            ->set('newAccountCode', '')
             ->set('newType', '신규(25년)')
             ->set('newConsultingType', '신규기관방문')
             ->set('newMeetingDate', '2026-04-06')
@@ -144,15 +163,11 @@ class PotentialInstitutionListTest extends TestCase
 
         $target = CoNewTarget::query()->where('AccountName', $accountName)->first();
         $this->assertNotNull($target);
-        $this->assertNotNull($target->AccountCode);
-        $this->assertStringStartsWith('LEAD-', (string) $target->AccountCode);
-
-        $this->assertDatabaseHas('S_AccountName', [
-            'SKcode' => $target->AccountCode,
+        $this->assertNull($target->AccountCode);
+        $this->assertDatabaseMissing('S_AccountName', [
             'AccountName' => $accountName,
         ]);
-        $this->assertDatabaseHas('S_Account_Information', [
-            'SK_Code' => $target->AccountCode,
+        $this->assertDatabaseMissing('S_Account_Information', [
             'Account_Name' => $accountName,
         ]);
     }
@@ -160,12 +175,9 @@ class PotentialInstitutionListTest extends TestCase
     public function test_save_new_target_persists_target_and_first_meeting_detail(): void
     {
         $accountName = 'QA 테스트 기관 '.uniqid('', true);
-        $accountCode = 'SK-QA-'.uniqid();
-
         Livewire::test(PotentialInstitutionList::class)
             ->call('openCreateModal')
             ->set('newAccountName', $accountName)
-            ->set('newAccountCode', $accountCode)
             ->set('newType', '신규(25년)')
             ->set('newConsultingType', '신규기관방문')
             ->set('newMeetingDate', '2026-04-06')
@@ -182,7 +194,7 @@ class PotentialInstitutionListTest extends TestCase
 
         $this->assertDatabaseHas('S_CO_NewTarget', [
             'AccountName' => $accountName,
-            'AccountCode' => $accountCode,
+            'AccountCode' => null,
             'Type' => '신규(25년)',
             'Gubun' => '신규기관방문',
             'LS' => 2,
@@ -201,21 +213,19 @@ class PotentialInstitutionListTest extends TestCase
         $this->assertNotNull($detail);
         $this->assertStringContainsString('첫 미팅', (string) $detail->Description);
 
-        $this->assertDatabaseHas('S_AccountName', [
-            'SKcode' => $accountCode,
+        $this->assertDatabaseMissing('S_AccountName', [
             'AccountName' => $accountName,
         ]);
-        $this->assertDatabaseHas('S_Account_Information', [
-            'SK_Code' => $accountCode,
-            'Customer_Type' => '신규(25년)',
+        $this->assertDatabaseMissing('S_Account_Information', [
+            'Account_Name' => $accountName,
         ]);
     }
 
-    public function test_save_rejects_duplicate_sk_already_in_institution_list(): void
+    public function test_save_new_target_works_even_if_same_name_exists_in_institution_list(): void
     {
         Institution::query()->create([
             'SKcode' => 'SK-DUP-TEST',
-            'AccountName' => '기존 기관',
+            'AccountName' => '신규 이름',
             'Director' => null,
             'Phone' => null,
             'Address' => null,
@@ -225,12 +235,11 @@ class PotentialInstitutionListTest extends TestCase
         Livewire::test(PotentialInstitutionList::class)
             ->call('openCreateModal')
             ->set('newAccountName', '신규 이름')
-            ->set('newAccountCode', 'SK-DUP-TEST')
             ->set('newType', '신규(25년)')
             ->set('newConsultingType', '신규기관방문')
             ->set('newMeetingDate', '2026-04-06')
             ->call('saveNewTarget')
-            ->assertHasErrors(['newAccountCode']);
+            ->assertHasNoErrors();
     }
 
     public function test_open_detail_modal_shows_created_meeting_history(): void
@@ -589,9 +598,11 @@ class PotentialInstitutionListTest extends TestCase
     public function test_detail_modal_commit_clears_contract(): void
     {
         $name = '상세미계약 QA '.uniqid('', true);
+        $sk = 'SK-UNCONTRACT-'.uniqid('', true);
         $row = CoNewTarget::query()->create([
             'Year' => 2026,
             'CreatedDate' => '2026-04-01',
+            'AccountCode' => $sk,
             'AccountName' => $name,
             'Type' => '신규(25년)',
             'Gubun' => '신규기관방문',
@@ -609,6 +620,19 @@ class PotentialInstitutionListTest extends TestCase
             'Possibility' => null,
         ]);
 
+        Institution::query()->create([
+            'SKcode' => $sk,
+            'AccountName' => $name,
+            'Director' => null,
+            'Phone' => null,
+            'Address' => null,
+            'Gubun' => null,
+        ]);
+        AccountInformation::query()->create([
+            'SK_Code' => $sk,
+            'Account_Name' => $name,
+        ]);
+
         $id = (int) $row->ID;
 
         Livewire::test(PotentialInstitutionList::class)
@@ -620,5 +644,76 @@ class PotentialInstitutionListTest extends TestCase
         $row->refresh();
         $this->assertFalse((bool) $row->IsContract);
         $this->assertNull($row->ContractedDate);
+        $this->assertDatabaseHas('S_AccountName', [
+            'SKcode' => $sk,
+        ]);
+        $this->assertDatabaseHas('S_Account_Information', [
+            'SK_Code' => $sk,
+        ]);
+        $this->assertDatabaseHas('institution_visibility_overrides', [
+            'sk_code' => $sk,
+            'hidden_reason' => 'uncontracted',
+        ]);
+    }
+
+    public function test_detail_modal_commit_sets_contract_clears_hidden_override(): void
+    {
+        $name = '재계약숨김해제 QA '.uniqid('', true);
+        $sk = 'SK-RECONTRACT-'.uniqid('', true);
+        $row = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountCode' => $sk,
+            'AccountName' => $name,
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => null,
+        ]);
+
+        Institution::query()->create([
+            'SKcode' => $sk,
+            'AccountName' => $name,
+            'Director' => null,
+            'Phone' => null,
+            'Address' => null,
+            'Gubun' => null,
+        ]);
+        AccountInformation::query()->create([
+            'SK_Code' => $sk,
+            'Account_Name' => $name,
+        ]);
+        DB::table('institution_visibility_overrides')->insert([
+            'sk_code' => $sk,
+            'hidden_reason' => 'uncontracted',
+            'hidden_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Livewire::test(PotentialInstitutionList::class)
+            ->call('openDetailModal', (int) $row->ID)
+            ->set('detailModalContract', '1')
+            ->call('commitDetailContract');
+
+        $row->refresh();
+        $this->assertTrue((bool) $row->IsContract);
+        $this->assertDatabaseMissing('institution_visibility_overrides', [
+            'sk_code' => $sk,
+        ]);
+        $this->assertDatabaseHas('S_AccountName', [
+            'SKcode' => $sk,
+            'AccountName' => $name,
+        ]);
     }
 }

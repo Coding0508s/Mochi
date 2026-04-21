@@ -27,12 +27,12 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::define('editEmployeeProfile', fn (?User $user): bool => $user !== null);
 
-        Gate::define('manageEmployeeDepartment', fn (?User $user): bool => (bool) ($user?->is_admin));
+        Gate::define('manageEmployeeDepartment', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
 
-        Gate::define('manageTeamStructure', fn (?User $user): bool => (bool) ($user?->is_admin));
+        Gate::define('manageTeamStructure', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
 
-        Gate::define('manageStoreInventory', fn (?User $user): bool => (bool) ($user?->is_admin));
+        Gate::define('manageStoreInventory', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
 
-        Gate::define('manageGsBrochureAdmin', fn (?User $user): bool => (bool) ($user?->is_admin));
+        Gate::define('manageGsBrochureAdmin', fn (?User $user): bool => (bool) ($user?->hasFullAccess() || $user?->is_gs_brochure_admin));
     }
 }

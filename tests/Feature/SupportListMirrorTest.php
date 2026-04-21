@@ -4,12 +4,15 @@ namespace Tests\Feature;
 
 use App\Livewire\SupportList;
 use App\Models\CoNewTarget;
+use App\Models\ContractDocument;
 use App\Models\Institution;
 use App\Models\SupportRecord;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -189,5 +192,97 @@ class SupportListMirrorTest extends TestCase
             'MeetingDate' => '2026-04-12 00:00:00',
         ]);
     }
-}
 
+    public function test_selected_contract_document_can_be_updated_with_file_replacement(): void
+    {
+        Storage::fake('local');
+
+        Institution::query()->create([
+            'SKcode' => 'SK-FILE-1',
+            'AccountName' => '파일수정 기관',
+        ]);
+
+        $oldPath = 'contract-documents/SK-FILE-1/old-contract.pdf';
+        Storage::disk('local')->put($oldPath, 'old-file');
+
+        $doc = ContractDocument::query()->create([
+            'sk_code' => 'SK-FILE-1',
+            'account_name' => '파일수정 기관',
+            'changed_account_name' => null,
+            'business_number' => null,
+            'document_date' => '2026-04-21',
+            'document_time' => '10:20:00',
+            'consultant' => '기존 담당',
+            'original_filename' => 'old-contract.pdf',
+            'stored_disk' => 'local',
+            'stored_path' => $oldPath,
+            'mime_type' => 'application/pdf',
+            'size_bytes' => 100,
+            'uploaded_by' => 'tester',
+        ]);
+
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(SupportList::class)
+            ->call('openContractUploadModal')
+            ->call('selectContractDocument', (int) $doc->id)
+            ->set('contractChangedAccountName', '변경 기관명')
+            ->set('contractBusinessNumber', '123-45-67890')
+            ->set('contractConsultant', '수정 담당')
+            ->set('contractUpload', UploadedFile::fake()->create('updated-contract.pdf', 120, 'application/pdf'))
+            ->call('saveContractDocument')
+            ->assertHasNoErrors();
+
+        $doc->refresh();
+
+        $this->assertSame('변경 기관명', $doc->changed_account_name);
+        $this->assertSame('123-45-67890', $doc->business_number);
+        $this->assertSame('수정 담당', $doc->consultant);
+        $this->assertSame('updated-contract.pdf', $doc->original_filename);
+        $this->assertNotSame($oldPath, $doc->stored_path);
+        $this->assertFalse(Storage::disk('local')->exists($oldPath));
+        $this->assertTrue(Storage::disk('local')->exists((string) $doc->stored_path));
+    }
+
+    public function test_selected_contract_document_can_be_deleted_with_stored_file(): void
+    {
+        Storage::fake('local');
+
+        Institution::query()->create([
+            'SKcode' => 'SK-FILE-2',
+            'AccountName' => '파일삭제 기관',
+        ]);
+
+        $storedPath = 'contract-documents/SK-FILE-2/delete-target.pdf';
+        Storage::disk('local')->put($storedPath, 'delete-me');
+
+        $doc = ContractDocument::query()->create([
+            'sk_code' => 'SK-FILE-2',
+            'account_name' => '파일삭제 기관',
+            'changed_account_name' => null,
+            'business_number' => null,
+            'document_date' => '2026-04-21',
+            'document_time' => '09:00:00',
+            'consultant' => '삭제 담당',
+            'original_filename' => 'delete-target.pdf',
+            'stored_disk' => 'local',
+            'stored_path' => $storedPath,
+            'mime_type' => 'application/pdf',
+            'size_bytes' => 100,
+            'uploaded_by' => 'tester',
+        ]);
+
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(SupportList::class)
+            ->call('openContractUploadModal')
+            ->call('selectContractDocument', (int) $doc->id)
+            ->call('deleteSelectedContractDocument')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseMissing('contract_documents', ['id' => (int) $doc->id]);
+        $this->assertFalse(Storage::disk('local')->exists($storedPath));
+    }
+}

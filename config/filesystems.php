@@ -47,6 +47,17 @@ return [
             'report' => false,
         ],
 
+        /*
+        | Legacy / import: some contract_documents rows use stored_disk = storage_app
+        | (root = storage/app, not app/private where the current "local" disk points).
+        */
+        'storage_app' => [
+            'driver' => 'local',
+            'root' => storage_path('app'),
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

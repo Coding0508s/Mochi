@@ -12,11 +12,11 @@
 
     {{-- ───── 상단: 필터 + 버튼 영역 ───── --}}
     <div class="mochi-filter-card">
-        <div class="flex flex-wrap items-center gap-3">
+        <div class="flex flex-wrap items-center gap-3 lg:flex-nowrap">
 
             {{-- 년도 선택 --}}
             <select wire:model.live="filterYear"
-                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">전체 년도</option>
                 @foreach($years as $year)
                     <option value="{{ $year }}">{{ $year }}년</option>
@@ -25,7 +25,7 @@
 
             {{-- 담당자 필터 --}}
             <select wire:model.live="filterTr"
-                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">전체 담당</option>
                 @foreach($trList as $tr)
                     <option value="{{ $tr }}">{{ $tr }}</option>
@@ -34,7 +34,7 @@
 
             {{-- 기관 필터 --}}
             <select wire:model.live="filterSkCode"
-                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">전체 기관</option>
                 @foreach($institutions as $inst)
                     <option value="{{ $inst->SKcode }}">[{{ $inst->SKcode }}] {{ $inst->AccountName }}</option>
@@ -42,7 +42,7 @@
             </select>
 
             {{-- 키워드 검색 --}}
-            <div class="relative flex-1 min-w-48">
+            <div class="relative min-w-0 flex-1">
                 <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
@@ -54,11 +54,11 @@
             </div>
 
             {{-- 건수 --}}
-            <span class="text-sm text-gray-500">
+            <span class="shrink-0 whitespace-nowrap text-sm text-gray-500">
                 총 <span class="font-semibold text-blue-600">{{ $records->total() }}</span>건
             </span>
 
-            <div class="ml-auto flex flex-wrap items-center gap-2">
+            <div class="ml-auto flex shrink-0 items-center gap-2 whitespace-nowrap">
                 <a href="/supports/create"
                    class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700
                           text-white text-sm font-medium rounded-lg transition-colors">
@@ -468,8 +468,14 @@
                     </button>
                 </div>
 
-                <form wire:submit="uploadContractDocument" class="flex flex-col flex-1 min-h-0">
+                <form wire:submit="saveContractDocument" class="flex flex-col flex-1 min-h-0">
                     <div class="px-6 py-4 space-y-5 overflow-y-auto flex-1">
+                        @if($contractSelectedId)
+                            <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                                선택한 파일(ID: {{ $contractSelectedId }}) 수정 모드입니다. 파일을 새로 선택하면 실제 파일이 교체됩니다.
+                            </div>
+                        @endif
+
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">기관명 <span class="text-red-500">*</span></label>
@@ -535,6 +541,7 @@
                                                     <th class="px-2 py-2 text-left font-medium">SKcode</th>
                                                     <th class="px-2 py-2 text-left font-medium">기관명</th>
                                                     <th class="px-2 py-2 text-left font-medium">사업자번호</th>
+                                                    <th class="px-2 py-2 text-left font-medium">파일명</th>
                                                 </tr>
                                             </thead>
                                             <tbody class="divide-y divide-gray-100">
@@ -553,10 +560,11 @@
                                                         <td class="px-2 py-2 text-gray-700 font-mono text-[11px]">{{ $doc->sk_code }}</td>
                                                         <td class="px-2 py-2 text-gray-700 max-w-[140px] truncate" title="{{ $doc->account_name }}">{{ $doc->account_name }}</td>
                                                         <td class="px-2 py-2 text-gray-600">{{ $doc->business_number ?? '-' }}</td>
+                                                        <td class="px-2 py-2 text-gray-700 max-w-[200px] truncate" title="{{ $doc->original_filename }}">{{ $doc->original_filename ?? '-' }}</td>
                                                     </tr>
                                                 @empty
                                                     <tr>
-                                                        <td colspan="6" class="px-4 py-8 text-center text-gray-400">
+                                                        <td colspan="7" class="px-4 py-8 text-center text-gray-400">
                                                             @if(filled($contractSkCode))
                                                                 등록된 계약서 파일이 없습니다. 우측에서 파일을 선택한 뒤 하단「업로드」를 누르세요.
                                                             @else
@@ -583,6 +591,11 @@
 
                                     <div class="flex flex-col gap-2">
                                         @if($contractSelectedId)
+                                            <button type="button"
+                                                    wire:click="clearSelectedContractDocument"
+                                                    class="px-3 py-2 text-sm text-center border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50">
+                                                신규 등록 모드
+                                            </button>
                                             <a href="{{ route('contract-documents.preview', ['contractDocument' => $contractSelectedId]) }}"
                                                target="_blank" rel="noopener"
                                                class="px-3 py-2 text-sm text-center border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700">
@@ -607,6 +620,8 @@
                                     <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center text-xs text-gray-500 min-h-[100px] flex items-center justify-center">
                                         @if($contractUpload)
                                             <span class="text-gray-800 break-all">{{ $contractUpload->getClientOriginalName() }}</span>
+                                        @elseif($contractSelectedId)
+                                            <span class="text-gray-700 break-all">현재 파일 유지 (교체하려면 새 파일을 선택하세요)</span>
                                         @else
                                             파일을 선택하면 이름이 여기에 표시됩니다.
                                         @endif
@@ -624,9 +639,9 @@
                         <button type="submit"
                                 class="px-6 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer"
                                 wire:loading.attr="disabled"
-                                wire:target="uploadContractDocument,contractUpload">
-                            <span wire:loading.remove wire:target="uploadContractDocument">업로드</span>
-                            <span wire:loading wire:target="uploadContractDocument">업로드 중…</span>
+                                wire:target="saveContractDocument,contractUpload">
+                            <span wire:loading.remove wire:target="saveContractDocument">{{ $contractSelectedId ? '수정 저장' : '업로드' }}</span>
+                            <span wire:loading wire:target="saveContractDocument">{{ $contractSelectedId ? '수정 중…' : '업로드 중…' }}</span>
                         </button>
                     </div>
                 </form>
@@ -636,7 +651,7 @@
 
     {{-- 로딩 인디케이터: target 없이 두면 wire:model.live(필터·검색)마다 매번 뜸 --}}
     <div wire:loading.delay
-         wire:target="save,uploadContractDocument,toggleComplete,deleteSelectedContractDocument,gotoPage,nextPage,previousPage"
+         wire:target="save,saveContractDocument,toggleComplete,deleteSelectedContractDocument,gotoPage,nextPage,previousPage"
          class="fixed bottom-6 right-6 z-50">
         <div class="bg-white rounded-xl px-4 py-3 shadow-lg border border-gray-200 flex items-center gap-2 text-sm text-gray-700">
             <svg class="animate-spin w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24">

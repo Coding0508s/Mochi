@@ -3,11 +3,15 @@
 namespace Tests\Feature;
 
 use App\Livewire\SupportCreateForm;
+use App\Models\CoNewTarget;
 use App\Models\Institution;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -19,6 +23,7 @@ class SupportCreateFormTest extends TestCase
     {
         parent::setUp();
         $this->createSupportTables();
+        $this->createSfAccountTable();
     }
 
     private function createSupportTables(): void
@@ -38,6 +43,7 @@ class SupportCreateFormTest extends TestCase
             $table->increments('ID');
             $table->integer('Year')->nullable();
             $table->string('SK_Code', 100)->nullable();
+            $table->unsignedInteger('potential_target_id')->nullable();
             $table->string('Account_Name', 255)->nullable();
             $table->string('TR_Name', 255)->nullable();
             $table->string('Support_Date', 50)->nullable();
@@ -90,6 +96,19 @@ class SupportCreateFormTest extends TestCase
             $table->text('Description')->nullable();
             $table->string('ConsultingType', 100)->nullable();
             $table->string('Possibility', 20)->nullable();
+        });
+    }
+
+    private function createSfAccountTable(): void
+    {
+        Schema::dropIfExists('SF_Account');
+        Schema::create('SF_Account', function (Blueprint $table): void {
+            $table->increments('ID');
+            $table->string('account_ID', 100)->nullable();
+            $table->string('Name', 255)->nullable();
+            $table->string('GSKR_Billing_Address__c', 255)->nullable();
+            $table->string('GSKR_Contract__c', 255)->nullable();
+            $table->string('GSKR_Gts_Type__c', 255)->nullable();
         });
     }
 
@@ -162,7 +181,7 @@ class SupportCreateFormTest extends TestCase
             'AccountName' => '잠재 기관',
         ]);
 
-        \App\Models\CoNewTarget::query()->create([
+        CoNewTarget::query()->create([
             'AccountCode' => 'SK-POT-1',
             'AccountName' => '잠재 기관',
             'AccountManager' => 'CO 담당자',
@@ -200,7 +219,7 @@ class SupportCreateFormTest extends TestCase
             'AccountName' => '계약 완료 기관',
         ]);
 
-        \App\Models\CoNewTarget::query()->create([
+        CoNewTarget::query()->create([
             'AccountCode' => 'SK-CONTRACT-1',
             'AccountName' => '계약 완료 기관',
             'AccountManager' => 'CO 담당자',
@@ -221,5 +240,149 @@ class SupportCreateFormTest extends TestCase
             'AccountName' => '계약 완료 기관',
             'MeetingDate' => '2026-04-11',
         ]);
+    }
+
+    public function test_save_for_uncontracted_potential_without_sk_records_potential_target_id(): void
+    {
+        $potential = CoNewTarget::query()->create([
+            'AccountCode' => null,
+            'AccountName' => '무SK 잠재 기관',
+            'AccountManager' => '잠재 담당자',
+            'IsContract' => false,
+            'Possibility' => 'C',
+        ]);
+
+        $user = User::factory()->create(['name' => '테스터']);
+
+        Livewire::actingAs($user)
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', '', true, (int) $potential->ID)
+            ->set('formSupportDate', '2026-04-21')
+            ->set('formSupportTime', '15:10')
+            ->set('formSupportType', '대면')
+            ->set('formToAccount', '무SK 잠재기관 소통')
+            ->set('formToDepart', '내부 공유')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_SupportInfo_Account', [
+            'potential_target_id' => (int) $potential->ID,
+            'SK_Code' => null,
+            'Account_Name' => '무SK 잠재 기관',
+            'Support_Type' => '대면',
+        ]);
+
+        $this->assertDatabaseHas('S_CO_NewTarget_Detail', [
+            'AccountName' => '무SK 잠재 기관',
+            'AccountManager' => '잠재 담당자',
+            'MeetingDate' => '2026-04-21 00:00:00',
+            'MeetingTime' => '15:10',
+            'ConsultingType' => '대면',
+            'Possibility' => 'C',
+        ]);
+    }
+
+    public function test_save_rejects_sf_upload_for_uncontracted_potential_without_sk(): void
+    {
+        $potential = CoNewTarget::query()->create([
+            'AccountCode' => null,
+            'AccountName' => '무SK 파일제한 기관',
+            'AccountManager' => '잠재 담당자',
+            'IsContract' => false,
+            'Possibility' => 'B',
+        ]);
+
+        Storage::fake('local');
+        $user = User::factory()->create(['name' => '테스터']);
+        $upload = UploadedFile::fake()->create('무sk-업로드.pdf', 100, 'application/pdf');
+
+        Livewire::actingAs($user)
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', '', true, (int) $potential->ID)
+            ->set('formSupportDate', '2026-04-22')
+            ->set('formSupportTime', '11:20')
+            ->set('sfUpload', $upload)
+            ->call('save')
+            ->assertHasErrors(['sfUpload']);
+
+        $this->assertDatabaseCount('contract_documents', 0);
+        $this->assertDatabaseCount('SF_Files', 0);
+    }
+
+    public function test_save_with_sf_upload_creates_contract_document_and_sf_file_with_account_prefix(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-SF-1',
+            'AccountName' => 'SF 업로드 기관',
+        ]);
+
+        DB::table('SF_Account')->insert([
+            'account_ID' => '0015i00000oOSBqAAO',
+            'Name' => 'SF 업로드 기관',
+            'GSKR_Billing_Address__c' => '강남구',
+            'GSKR_Contract__c' => 'a0C5i00000AW7q5EAD',
+            'GSKR_Gts_Type__c' => 'Terminated (GTS)',
+        ]);
+
+        Storage::fake('local');
+        $user = User::factory()->create(['name' => '업로더']);
+        $upload = UploadedFile::fake()->create('지원자료.pdf', 120, 'application/pdf');
+
+        Livewire::actingAs($user)
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-SF-1')
+            ->set('formSupportDate', '2026-04-11')
+            ->set('formSupportTime', '10:10')
+            ->set('sfUpload', $upload)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_SupportInfo_Account', [
+            'SK_Code' => 'SK-SF-1',
+            'Account_Name' => 'SF 업로드 기관',
+        ]);
+
+        $document = DB::table('contract_documents')
+            ->where('sk_code', 'SK-SF-1')
+            ->orderByDesc('id')
+            ->first();
+        $this->assertNotNull($document);
+        $this->assertSame('지원자료.pdf', $document->original_filename);
+        Storage::disk('local')->assertExists((string) $document->stored_path);
+
+        $sfFile = DB::table('SF_Files')
+            ->where('fileName', 'like', '%지원자료.pdf')
+            ->orderByDesc('ID')
+            ->first();
+        $this->assertNotNull($sfFile);
+        $this->assertStringStartsWith('0015i00000oOSBqAAO_', (string) $sfFile->fileName);
+    }
+
+    public function test_save_with_sf_upload_falls_back_to_original_filename_when_account_not_found(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-SF-2',
+            'AccountName' => '매칭없음 기관',
+        ]);
+
+        Storage::fake('local');
+        $user = User::factory()->create(['name' => '업로더2']);
+        $upload = UploadedFile::fake()->create('원본파일.pdf', 90, 'application/pdf');
+
+        Livewire::actingAs($user)
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-SF-2')
+            ->set('formSupportDate', '2026-04-12')
+            ->set('formSupportTime', '11:30')
+            ->set('sfUpload', $upload)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $sfFile = DB::table('SF_Files')
+            ->where('fileName', '원본파일.pdf')
+            ->orderByDesc('ID')
+            ->first();
+
+        $this->assertNotNull($sfFile);
     }
 }

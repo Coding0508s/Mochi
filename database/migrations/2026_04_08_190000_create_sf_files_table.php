@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * 레거시 Salesforce 파일 메타 테이블.
- * SalesforceFile 모델·SalesforceFileList Livewire와 컬럼명을 맞춥니다.
+ * SalesforceFile 모델과 컬럼명을 맞춥니다.
  */
 return new class extends Migration
 {

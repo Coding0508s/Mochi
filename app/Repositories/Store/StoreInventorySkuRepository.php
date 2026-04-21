@@ -9,6 +9,36 @@ use Illuminate\Support\Collection;
 class StoreInventorySkuRepository
 {
     /**
+     * @param  array<int, string>  $productCodes
+     * @return array<string, string> normalized_prod_cd => image_path
+     */
+    public function getImagePathMapByProductCodes(array $productCodes): array
+    {
+        $codes = array_values(array_unique(array_filter(array_map(
+            static fn (string $code): string => strtoupper(trim($code)),
+            $productCodes
+        ), static fn (string $code): bool => $code !== '')));
+
+        if ($codes === []) {
+            return [];
+        }
+
+        return StoreInventorySku::query()
+            ->whereIn('prod_cd', $codes)
+            ->get(['prod_cd', 'image_url'])
+            ->reduce(function (array $carry, StoreInventorySku $sku): array {
+                $path = StoreInventorySku::normalizeImagePath((string) ($sku->image_url ?? ''));
+                if ($path === '') {
+                    return $carry;
+                }
+
+                $carry[strtoupper(trim((string) $sku->prod_cd))] = $path;
+
+                return $carry;
+            }, []);
+    }
+
+    /**
      * @return array<int, string>
      */
     public function getActiveProductCodes(): array

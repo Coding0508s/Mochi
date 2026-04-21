@@ -229,13 +229,6 @@
                                     </datalist>
                                     @error('newConsultingType') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                 </div>
-
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">SK코드</label>
-                                    <input type="text" wire:model="newAccountCode" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="API 연동 시 자동 반영 예정 (선택 입력)" />
-                                    <p class="mt-1 text-xs text-gray-500">최종 SK는 외부 API에서 받을 예정입니다. 비워 두면 기관 연동용 임시 코드(LEAD-번호)가 부여되며, API 수신 후 서버에서 정식 코드로 바꿀 수 있습니다.</p>
-                                    @error('newAccountCode') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                                </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">소개경로</label>
                                     <input type="text" wire:model="newConnected" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="예: 지인 소개" />
@@ -298,6 +291,12 @@
                                 <label class="block text-sm font-medium text-gray-700 mb-1">주소</label>
                                 <input type="text" wire:model="newAddress" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="기관 주소" />
                                 @error('newAddress') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <p class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                                    신규 등록 단계에서는 SK코드를 발급하지 않습니다. 계약 처리 시 SK코드가 자동 발급되어 기관리스트에 반영됩니다.
+                                </p>
                             </div>
                         </section>
 

@@ -1,5 +1,5 @@
-<x-layouts.app title="Salesforce 계약서 파일">
+<x-layouts.app title="Salesforce 파일">
 
-    <livewire:salesforce-file-list />
+    <livewire:salesforce-file-manager />
 
 </x-layouts.app>

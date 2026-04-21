@@ -25,6 +25,11 @@
                            {{ $assignmentFilter === 'assigned' ? 'font-semibold text-green-700' : '' }} cursor-pointer">
                 담당자 배정 <span class="font-semibold text-green-600">{{ $assignedCoCount }}</span>
             </button>
+            <button wire:click="$set('assignmentFilter', 'my_assigned')"
+                    class="text-gray-600 hover:text-blue-700 transition-colors
+                           {{ $assignmentFilter === 'my_assigned' ? 'font-semibold text-blue-700' : '' }} cursor-pointer">
+                내 담당 기관 <span class="font-semibold text-blue-600">{{ $myAssignedCoCount }}</span>
+            </button>
             <button wire:click="$set('assignmentFilter', 'unassigned')"
                     class="text-gray-600 hover:text-blue-700 transition-colors
                            {{ $assignmentFilter === 'unassigned' ? 'font-semibold text-red-700' : '' }} cursor-pointer">
@@ -47,8 +52,8 @@
                 @endforeach
             </select>
 
-            @if($search || $filterGubun)
-                <button wire:click="$set('search', ''); $set('filterGubun', '')"
+            @if($search || $filterGubun || $assignmentFilter)
+                <button wire:click="$set('search', ''); $set('filterGubun', ''); $set('assignmentFilter', '')"
                         class="py-2 px-3 text-sm text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50">
                     초기화
                 </button>

@@ -78,6 +78,19 @@
                         </span>
                     </span>
                 </label>
+
+                @if($issueLoginAccount)
+                    <label class="mt-3 flex items-start gap-2 cursor-pointer select-none">
+                        <input type="checkbox" wire:model.defer="isGsBrochureAdmin"
+                               class="mt-0.5 rounded border-gray-300 text-[#2b78c5] focus:ring-[#2b78c5]"/>
+                        <span class="text-sm text-gray-700 leading-snug">
+                            GS Brochure 관리 권한 부여
+                            <span class="block text-[11px] text-gray-500 font-normal mt-0.5">
+                                체크하면 해당 계정은 GS Brochure 관리자 화면에 접근할 수 있습니다.
+                            </span>
+                        </span>
+                    </label>
+                @endif
             </div>
 
             <div>

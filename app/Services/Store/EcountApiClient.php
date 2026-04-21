@@ -2,7 +2,9 @@
 
 namespace App\Services\Store;
 
+use App\Models\StoreInventorySku;
 use App\Repositories\GrapeSeed\GnuboardShopItemRepository;
+use App\Repositories\Store\StoreInventorySkuRepository;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Client\RequestException;
@@ -16,6 +18,7 @@ final class EcountApiClient
 {
     public function __construct(
         private readonly GnuboardShopItemRepository $gnuboardShopItemRepository,
+        private readonly StoreInventorySkuRepository $storeInventorySkuRepository,
         private readonly StoreProductCodeResolver $storeProductCodeResolver,
     ) {}
 
@@ -214,13 +217,19 @@ final class EcountApiClient
             $actualStockQtyMap = $this->gnuboardShopItemRepository->getStockQuantityMapByProductCodes($productCodes);
         }
 
+        $imagePathMap = [];
+        if ($productCodes !== []) {
+            $imagePathMap = $this->storeInventorySkuRepository->getImagePathMapByProductCodes($productCodes);
+        }
+
         $deductMap = [];
         if ($productCodes !== []) {
             $deductMap = $this->fetchRecentDeductLogs($productCodes);
         }
 
-        return array_map(function (array $row) use ($nameMap, $notifyQtyMap, $actualStockQtyMap, $deductMap): array {
+        return array_map(function (array $row) use ($nameMap, $notifyQtyMap, $actualStockQtyMap, $imagePathMap, $deductMap): array {
             $productCode = (string) $this->pick($row, ['PROD_CD', 'prod_cd', 'product_code', 'productCode', 'item_code'], '');
+            $normalizedCode = strtoupper(trim($productCode));
             $warehouseStock = $this->toInt($this->pick($row, ['BAL_QTY', 'bal_qty', 'warehouse_stock', 'stock_qty'], 0));
             $pendingOrder = 0;
             $availableStock = max(0, $warehouseStock - $pendingOrder);
@@ -241,7 +250,7 @@ final class EcountApiClient
             return [
                 'product_code' => $productCode !== '' ? $productCode : '-',
                 'product_name' => $productName,
-                'image_url' => '',
+                'image_url' => StoreInventorySku::toPublicImageUrl((string) ($imagePathMap[$normalizedCode] ?? '')),
                 'warehouse_stock' => $warehouseStock,
                 'actual_stock_quantity' => max(0, $actualStockQty),
                 'pending_order' => $pendingOrder,

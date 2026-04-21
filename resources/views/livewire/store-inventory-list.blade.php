@@ -89,7 +89,7 @@
                             <td class="px-3 py-2 font-mono text-xs text-gray-700">{{ $item['product_code'] }}</td>
                             <td class="px-3 py-2">
                                 <div class="flex items-center gap-2">
-                                    <div class="h-8 w-8 shrink-0 overflow-hidden rounded border border-gray-100 bg-gray-50">
+                                    <div class="h-12 w-12 shrink-0 overflow-hidden rounded border border-gray-100 bg-gray-50">
                                         @if($item['image_url'] !== '')
                                             <img src="{{ $item['image_url'] }}" alt="" class="h-full w-full object-cover">
                                         @endif
@@ -243,7 +243,7 @@
             <div class="mochi-modal-shell max-w-2xl">
                 <div class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-6 py-4">
                     <div>
-                        <h3 class="text-lg font-semibold text-gray-800">실제수량 수정 (그누보드)</h3>
+                        <h3 class="text-lg font-semibold text-gray-800">실제수량 수정 (스토어 사이트 재고)</h3>
                         <p class="mt-1 text-xs text-gray-500">이카운트 창고재고는 기준값으로 유지됩니다.</p>
                     </div>
                     <button type="button"

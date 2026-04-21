@@ -8,13 +8,17 @@ use App\Repositories\Store\StoreInventorySkuRepository;
 use App\Services\Store\EcountApiClient;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 use Throwable;
 
 class StoreInventorySkuManager extends Component
 {
+    use WithFileUploads;
     use WithPagination;
 
     public string $search = '';
@@ -23,7 +27,14 @@ class StoreInventorySkuManager extends Component
 
     public string $newMemo = '';
 
+    public ?TemporaryUploadedFile $newImageFile = null;
+
     public string $bulkProdCodes = '';
+
+    /**
+     * @var array<int, TemporaryUploadedFile|null>
+     */
+    public array $rowImageFiles = [];
 
     public function mount(): void
     {
@@ -35,6 +46,19 @@ class StoreInventorySkuManager extends Component
         $this->resetPage();
     }
 
+    public function updatedRowImageFiles(mixed $value, string $key): void
+    {
+        if (! ctype_digit($key)) {
+            return;
+        }
+
+        if (! $value instanceof TemporaryUploadedFile) {
+            return;
+        }
+
+        $this->saveRowImage((int) $key);
+    }
+
     public function addSku(): void
     {
         Gate::authorize('manageStoreInventory');
@@ -42,20 +66,31 @@ class StoreInventorySkuManager extends Component
         $validated = $this->validate([
             'newProdCd' => ['required', 'string', 'max:40', Rule::unique('store_inventory_skus', 'prod_cd')],
             'newMemo' => ['nullable', 'string', 'max:255'],
+            'newImageFile' => ['nullable', 'image', 'max:2048'],
         ], [
             'newProdCd.required' => '품목코드는 필수입니다.',
             'newProdCd.unique' => '이미 등록된 품목코드입니다.',
+            'newImageFile.image' => '이미지 파일만 업로드할 수 있습니다.',
+            'newImageFile.max' => '이미지 파일은 2MB 이하만 업로드할 수 있습니다.',
         ]);
 
-        app(StoreInventorySkuRepository::class)->create(
+        $repository = app(StoreInventorySkuRepository::class);
+
+        $sku = $repository->create(
             prodCd: $validated['newProdCd'],
             isActive: true,
             sortOrder: 0,
             memo: $validated['newMemo'] !== '' ? $validated['newMemo'] : null
         );
 
+        if ($this->newImageFile instanceof TemporaryUploadedFile) {
+            $imagePath = $this->storeImageForSku($this->newImageFile, (string) $sku->prod_cd);
+            $repository->update($sku, ['image_url' => $imagePath]);
+        }
+
         $this->newProdCd = '';
         $this->newMemo = '';
+        $this->newImageFile = null;
         session()->flash('success', '재고 연동 품목이 추가되었습니다.');
         $this->resetPage();
         $this->dispatch('store-inventory-skus-updated');
@@ -156,6 +191,68 @@ class StoreInventorySkuManager extends Component
         $this->dispatch('store-inventory-skus-updated');
     }
 
+    public function saveRowImage(int $id): void
+    {
+        Gate::authorize('manageStoreInventory');
+
+        $this->validate([
+            "rowImageFiles.{$id}" => ['required', 'image', 'max:2048'],
+        ], [
+            "rowImageFiles.{$id}.required" => '업로드할 이미지를 선택해 주세요.',
+            "rowImageFiles.{$id}.image" => '이미지 파일만 업로드할 수 있습니다.',
+            "rowImageFiles.{$id}.max" => '이미지 파일은 2MB 이하만 업로드할 수 있습니다.',
+        ]);
+
+        $sku = StoreInventorySku::query()->find($id);
+        if (! $sku) {
+            return;
+        }
+
+        $file = $this->rowImageFiles[$id] ?? null;
+        if (! $file instanceof TemporaryUploadedFile) {
+            return;
+        }
+
+        $existingImagePath = StoreInventorySku::normalizeImagePath((string) ($sku->image_url ?? ''));
+        if ($existingImagePath !== '') {
+            $this->deleteStoredImageByPath($existingImagePath);
+        }
+
+        $imagePath = $this->storeImageForSku($file, (string) $sku->prod_cd);
+        app(StoreInventorySkuRepository::class)->update($sku, [
+            'image_url' => $imagePath,
+        ]);
+
+        unset($this->rowImageFiles[$id]);
+        session()->flash('success', '품목 이미지가 저장되었습니다.');
+        $this->dispatch('store-inventory-skus-updated');
+    }
+
+    public function removeRowImage(int $id): void
+    {
+        Gate::authorize('manageStoreInventory');
+
+        $sku = StoreInventorySku::query()->find($id);
+        if (! $sku) {
+            return;
+        }
+
+        $existingImagePath = StoreInventorySku::normalizeImagePath((string) ($sku->image_url ?? ''));
+        if ($existingImagePath === '') {
+            return;
+        }
+
+        $this->deleteStoredImageByPath($existingImagePath);
+
+        app(StoreInventorySkuRepository::class)->update($sku, [
+            'image_url' => null,
+        ]);
+
+        unset($this->rowImageFiles[$id]);
+        session()->flash('success', '품목 이미지가 삭제되었습니다.');
+        $this->dispatch('store-inventory-skus-updated');
+    }
+
     public function render()
     {
         $skus = app(StoreInventorySkuRepository::class)->paginate($this->search, 20);
@@ -241,6 +338,30 @@ class StoreInventorySkuManager extends Component
         $code = preg_replace('/^[\p{Zs}]+|[\p{Zs}]+$/u', '', $code) ?? '';
 
         return $code;
+    }
+
+    private function storeImageForSku(TemporaryUploadedFile $imageFile, string $prodCd): string
+    {
+        $normalizedCode = $this->normalizedProdCdKey($prodCd);
+        $extension = strtolower((string) $imageFile->getClientOriginalExtension());
+        $extension = $extension !== '' ? $extension : 'jpg';
+        $filename = sprintf('%s_%s.%s', $normalizedCode !== '' ? $normalizedCode : 'sku', now()->format('YmdHisv'), $extension);
+        $path = (string) $imageFile->storeAs('store-skus', $filename, 'public');
+
+        return $path;
+    }
+
+    private function deleteStoredImageByPath(string $imagePath): void
+    {
+        $path = StoreInventorySku::normalizeImagePath($imagePath);
+        if ($path === '') {
+            return;
+        }
+
+        $disk = Storage::disk('public');
+        if ($disk->exists($path)) {
+            $disk->delete($path);
+        }
     }
 
     /**

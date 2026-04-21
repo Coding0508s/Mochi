@@ -18,8 +18,8 @@
             <h2 class="text-base font-semibold text-[#2b78c5]">Store 판매내역</h2>
             <span class="text-gray-300">|</span>
             @if($salesSource === 'gnuboard')
-                <span class="text-gray-600">그누보드 주문 기준 최근 판매 내역 <span class="font-semibold text-blue-600">최대 5건</span></span>
-                <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-800">그누보드 DB 조회 전용</span>
+                <span class="text-gray-600">스토어 사이트 주문 기준 최근 판매 내역 <span class="font-semibold text-blue-600">최대 5건</span></span>
+                <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-800">스토어 사이트 DB 조회</span>
             @else
                 <span class="text-gray-600">등록 상품별 최근 출고 내역 <span class="font-semibold text-blue-600">최대 5건</span></span>
                 <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-800">이카운트 API 조회 전용</span>

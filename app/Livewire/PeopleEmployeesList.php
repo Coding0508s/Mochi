@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -51,6 +52,12 @@ class PeopleEmployeesList extends Component
     public bool $showDeleteTeamModal = false;
 
     public string $deleteDeptNo = '';
+
+    public ?int $linkedUserId = null;
+
+    public bool $hasLinkedLoginAccount = false;
+
+    public bool $editGsBrochureAdmin = false;
 
     protected array $queryString = [
         'filterDept' => ['as' => 'team', 'except' => ''],
@@ -105,6 +112,17 @@ class PeopleEmployeesList extends Component
         $this->editStatus = $employee->STATUS === null ? '' : (string) $employee->STATUS;
         $this->editWorkDept = (string) ($employee->WORKDEPT ?? '');
 
+        $normalizedEmail = mb_strtolower(trim((string) ($employee->EMAIL ?? '')));
+        $linkedUser = $normalizedEmail === ''
+            ? null
+            : User::query()
+                ->whereRaw('LOWER(TRIM(COALESCE(email, \'\'))) = ?', [$normalizedEmail])
+                ->first(['id', 'is_gs_brochure_admin']);
+
+        $this->linkedUserId = $linkedUser?->id;
+        $this->hasLinkedLoginAccount = $linkedUser !== null;
+        $this->editGsBrochureAdmin = (bool) ($linkedUser?->is_gs_brochure_admin ?? false);
+
         $this->resetErrorBag();
         $this->resetValidation();
         $this->showEditModal = true;
@@ -122,6 +140,9 @@ class PeopleEmployeesList extends Component
         $this->editPhone = '';
         $this->editStatus = '';
         $this->editWorkDept = '';
+        $this->linkedUserId = null;
+        $this->hasLinkedLoginAccount = false;
+        $this->editGsBrochureAdmin = false;
 
         $this->resetErrorBag();
         $this->resetValidation();
@@ -185,6 +206,14 @@ class PeopleEmployeesList extends Component
         $employee->WORKDEPT = $validated['editWorkDept'];
         $employee->STATUS = $validated['editStatus'] === '' ? null : (int) $validated['editStatus'];
         $employee->save();
+
+        if (Gate::allows('manageEmployeeDepartment') && $this->linkedUserId) {
+            User::query()
+                ->whereKey($this->linkedUserId)
+                ->update([
+                    'is_gs_brochure_admin' => $this->editGsBrochureAdmin,
+                ]);
+        }
 
         $this->closeEditModal();
         session()->flash('success', '직원 정보가 저장되었습니다.');

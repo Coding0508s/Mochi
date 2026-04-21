@@ -251,7 +251,7 @@
                                     ['label' => 'GS Brochure', 'href' => route('co.gs-brochure'), 'route' => '', 'routeIs' => 'co.gs-brochure*', 'icon' => 'document', 'blank' => true],
                                     ['label' => 'Store 재고',  'href' => route('store.inventory.index'), 'route' => '', 'routeIs' => 'store.inventory.index', 'icon' => 'cart'],
                                     ['label' => 'Store판매내역',  'href' => route('store.sales.index'), 'route' => '', 'routeIs' => 'store.sales.index', 'icon' => 'cart'],
-                                    ['label' => 'Salesforce파일', 'href' => '/salesforce-files', 'route' => 'salesforce-files', 'icon' => 'server'],
+                                    ['label' => 'Salesforce파일', 'href' => route('salesforce-files.index'), 'route' => '', 'routeIs' => 'salesforce-files.index', 'icon' => 'server'],
                                     ['label' => '계약물건',       'href' => '#',             'route' => '',             'icon' => 'clipboard'],
                                     ['label' => '평가기관리스트', 'href' => '#',             'route' => '',             'icon' => 'chart'],
                                 ];
