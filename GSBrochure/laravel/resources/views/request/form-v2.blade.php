@@ -27,6 +27,24 @@
         </div>
     </div>
 
+    <!-- 카카오 주소 검색 모달 -->
+    <div id="addressSearchModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-modal="true" role="dialog">
+        <div class="fixed inset-0 bg-black/50 transition-opacity" onclick="closeAddressSearchModal()"></div>
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-3xl w-full border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <h3 class="text-base font-semibold text-gray-900 dark:text-white">주소 검색</h3>
+                    <button type="button" id="addressSearchCloseBtn" class="inline-flex items-center justify-center w-8 h-8 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-300" aria-label="주소 검색 닫기">
+                        <span class="material-icons text-xl">close</span>
+                    </button>
+                </div>
+                <div class="p-4 bg-gray-50 dark:bg-gray-900/30">
+                    <div id="addressSearchPostcodeContainer" class="w-full h-[520px] rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-white"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <form class="max-w-5xl mx-auto space-y-8" id="brochureFormV2" method="post" action="#">
         @csrf
         <!-- 1. 배송 정보 (신청·배송 통합) -->
@@ -180,15 +198,35 @@
             showAlertV2('주소 검색 서비스를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.', 'danger');
             return;
         }
+        var modal = document.getElementById('addressSearchModal');
+        var container = document.getElementById('addressSearchPostcodeContainer');
+        if (!modal || !container) return;
+
+        modal.classList.remove('hidden');
+        container.innerHTML = '';
+
         new daum.Postcode({
             oncomplete: function(data) {
                 var addr = data.userSelectedType === 'R' ? data.roadAddress : data.jibunAddress;
-                if (data.buildingName) addr += ' ' + data.buildingName;
+                var extra = '';
+                if (data.userSelectedType === 'R') {
+                    if (data.bname && /[동|로|가]$/g.test(data.bname)) extra += data.bname;
+                    if (data.buildingName && data.apartment === 'Y') extra += (extra ? ', ' + data.buildingName : data.buildingName);
+                    if (extra) addr += ' (' + extra + ')';
+                }
                 var el = document.getElementById('address');
                 if (el) el.value = addr;
+                window.addressConfirmed = false;
+                closeAddressSearchModal();
             }
-        }).open();
+        }).embed(container);
     }
+
+    function closeAddressSearchModal() {
+        var modal = document.getElementById('addressSearchModal');
+        if (modal) modal.classList.add('hidden');
+    }
+    window.closeAddressSearchModal = closeAddressSearchModal;
 
     var selectedBrochure = null;
 
@@ -380,60 +418,6 @@
         else input.value = value.slice(0, 3) + '-' + value.slice(3, 7) + '-' + value.slice(7, 11);
     }
 
-    var MIN_STOCK_FOR_REQUEST = 100;
-    async function deductBrochureStockV2(brochures, contactName, schoolname, date) {
-        try {
-            var brochureMaster = await BrochureAPI.getAll();
-            var insufficientStock = [];
-            var stockChanges = [];
-            for (var i = 0; i < brochures.length; i++) {
-                var brochure = brochures[i];
-                var masterItem = brochureMaster.find(function(b) { return b.id == brochure.brochure; });
-                if (masterItem) {
-                    var currentStock = masterItem.stock_warehouse ?? 0;
-                    var requestedQuantity = brochure.quantity || 0;
-                    if (currentStock < MIN_STOCK_FOR_REQUEST) {
-                        insufficientStock.push({ name: brochure.brochureName, requested: requestedQuantity, available: currentStock, reason: 'min' });
-                    } else if (currentStock < requestedQuantity) {
-                        insufficientStock.push({ name: brochure.brochureName, requested: requestedQuantity, available: currentStock, reason: 'qty' });
-                    } else {
-                        stockChanges.push({
-                            brochureId: brochure.brochure,
-                            brochureName: brochure.brochureName,
-                            quantity: requestedQuantity,
-                            beforeStock: currentStock,
-                            afterStock: currentStock - requestedQuantity
-                        });
-                    }
-                }
-            }
-            if (insufficientStock.length > 0) {
-                return { success: false, insufficient: insufficientStock };
-            }
-            var dateStr = date || new Date().toISOString().split('T')[0];
-            for (var j = 0; j < stockChanges.length; j++) {
-                var change = stockChanges[j];
-                await BrochureAPI.updateWarehouseStock(change.brochureId, -change.quantity, dateStr);
-                await StockHistoryAPI.create({
-                    type: '출고',
-                    location: 'warehouse',
-                    date: dateStr,
-                    brochure_id: change.brochureId,
-                    brochure_name: change.brochureName,
-                    quantity: change.quantity,
-                    contact_name: contactName || '',
-                    schoolname: schoolname || '',
-                    before_stock: change.beforeStock,
-                    after_stock: change.afterStock
-                });
-            }
-            return { success: true };
-        } catch (error) {
-            console.error('재고 차감 오류:', error);
-            return { success: false, error: error.message };
-        }
-    }
-
     function initOrgNameAutocomplete() {
         var input = document.getElementById('org-name');
         var dropdown = document.getElementById('org-name-dropdown');
@@ -517,6 +501,8 @@
         if (dateEl) dateEl.value = new Date().toISOString().split('T')[0];
         var addressSearchBtn = document.getElementById('addressSearchBtn');
         if (addressSearchBtn) addressSearchBtn.addEventListener('click', openPostcodeForAddress);
+        var addressSearchCloseBtn = document.getElementById('addressSearchCloseBtn');
+        if (addressSearchCloseBtn) addressSearchCloseBtn.addEventListener('click', closeAddressSearchModal);
         loadBrochureDropdown();
         initOrgNameAutocomplete();
 
@@ -618,6 +604,10 @@
                 }
             });
         }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeAddressSearchModal();
+        });
     });
 
     var phoneEl = document.getElementById('phone');
@@ -685,23 +675,6 @@
             return;
         }
         try {
-            var stockResult = await deductBrochureStockV2(brochures, '', schoolname, date);
-            if (!stockResult.success) {
-                if (stockResult.insufficient && stockResult.insufficient.length) {
-                    var msg = '신청할 수 없습니다:\n';
-                    stockResult.insufficient.forEach(function(item) {
-                        if (item.reason === 'min') {
-                            msg += '- ' + item.name + ': 현재 재고 ' + item.available + '권 (100권 이상일 때만 신청 가능)\n';
-                        } else {
-                            msg += '- ' + item.name + ': 요청 ' + item.requested + '권, 보유 ' + item.available + '권\n';
-                        }
-                    });
-                    alert(msg);
-                } else {
-                    showAlertV2('재고 확인 중 오류가 발생했습니다: ' + (stockResult.error || '알 수 없는 오류'), 'danger');
-                }
-                return;
-            }
             var requestData = {
                 date: date,
                 schoolname: schoolname.trim(),

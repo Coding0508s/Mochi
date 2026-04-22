@@ -80,8 +80,12 @@
 <body class="bg-background-light dark:bg-background-dark text-gray-900 dark:text-gray-100 font-sans transition-colors duration-200">
     @php
         $path = request()->path();
-        $navRequest = ($path === 'requestbrochure' || $path === 'requestbrochure-v2' || $path === 'co/gs-brochure/request');
-        $navList = ($path === 'requestbrochure-list' || $path === 'requestbrochure-list-v2' || $path === 'co/gs-brochure/requests');
+        $isRequestRoute = request()->routeIs('co.gs-brochure.request');
+        $isStaffListView = $isRequestRoute && request()->query('view') === 'list';
+        $isAdminDashboardRoute = request()->routeIs('co.gs-brochure.admin.dashboard') || request()->routeIs('gs-brochure.legacy.admin.dashboard');
+        $navRequest = ($path === 'requestbrochure' || $path === 'requestbrochure-v2' || ($isRequestRoute && ! $isStaffListView));
+        $navListPublic = ($path === 'requestbrochure-list' || $path === 'requestbrochure-list-v2');
+        $sidebarUserName = auth()->user()?->preferredDisplayName() ?? 'User';
     @endphp
     <div class="flex min-h-screen">
         <aside class="w-64 bg-surface-light dark:bg-surface-dark border-r border-border-light dark:border-border-dark hidden md:flex flex-col fixed h-full z-10">
@@ -93,22 +97,47 @@
                     <span class="material-icons text-xl">description</span>
                     브로셔 신청
                 </a>
-                <a class="shell-sidebar-link {{ $navList ? 'shell-sidebar-link--active' : '' }}" href="{{ route('co.gs-brochure.requests') }}">
+                @guest
+                <a class="shell-sidebar-link {{ $navListPublic ? 'shell-sidebar-link--active' : '' }}" href="{{ route('gs-brochure.legacy.request.list-v2') }}">
                     <span class="material-icons text-xl">history</span>
                     신청 내역 조회
                 </a>
+                @endguest
+                @auth
+                <a class="shell-sidebar-link {{ $isStaffListView ? 'shell-sidebar-link--active' : '' }}" href="{{ route('co.gs-brochure.request', ['view' => 'list']) }}">
+                    <span class="material-icons text-xl">assignment</span>
+                    전체 신청 내역
+                </a>
+                @endauth
+                @can('manageGsBrochureAdmin')
+                <a class="shell-sidebar-link {{ $isAdminDashboardRoute ? 'shell-sidebar-link--active' : '' }}" href="{{ route('co.gs-brochure.admin.dashboard') }}">
+                    <span class="material-icons text-xl">dashboard</span>
+                    대시보드로 가기
+                </a>
+                @endcan
             </nav>
-        <!--     <a class="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors mt-auto" href="{{ url('/') }}">
-                <span class="material-icons text-xl">home</span>
-                메인으로 돌아가기
-            </a> -->
+            @auth
+            <div class="mt-auto px-4 pb-3">
+                <a href="{{ url('/') }}"
+                   class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-gray-600 dark:text-gray-400 bg-transparent hover:bg-primary/10 dark:hover:bg-primary/20 text-sm font-medium transition-colors">
+                    <span class="material-icons text-base">logout</span>
+                    Mocchi로 돌아가기
+                </a>
+            </div>
+            <!-- <button type="button"
+                    onclick="if (window.history.length > 1) { window.history.back(); } else { window.location.href='{{ route('co.gs-brochure.request') }}'; }"
+                    class="mt-2 flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                <span class="material-icons text-xl">arrow_back</span>
+                뒤로가기
+            </button> -->
+            @endauth
             <div class="p-4 border-t border-border-light dark:border-border-dark">
                 <div class="flex items-center gap-3 px-4 py-2">
                     <div class="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
                         <span class="material-icons text-gray-500 dark:text-gray-400 text-sm">person</span>
                     </div>
                     <div>
-                        <p class="text-sm font-medium text-gray-900 dark:text-white">User</p>
+                        <p class="text-sm font-medium text-gray-900 dark:text-white">{{ $sidebarUserName }}</p>
                         <p class="text-xs text-gray-500 dark:text-gray-400">@yield('sidebar-footer-label', 'GrapeSEED Brochure')</p>
                     </div>
                 </div>

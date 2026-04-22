@@ -176,13 +176,13 @@
     @if($showDetailModal && $selectedInstitution)
         <div class="mochi-modal-overlay"
              wire:click.self="closeDetailModal">
-            <div class="mochi-modal-shell max-w-3xl"
+            <div class="mochi-modal-shell flex w-full max-w-2xl max-h-[90vh] flex-col overflow-hidden"
                  wire:click.stop>
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white">
+                <div class="flex shrink-0 items-center justify-between border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white px-4 py-3 sm:px-5">
                     <div class="flex items-start gap-3">
                         <span class="mt-0.5 inline-block w-1.5 h-8 rounded-full bg-blue-600"></span>
                         <div>
-                            <h2 class="text-xl font-extrabold tracking-tight text-gray-900">기관 상세 정보</h2>
+                            <h2 class="text-lg font-bold tracking-tight text-gray-900">기관 상세 정보</h2>
                             <p class="text-sm text-gray-600 mt-0.5">
                                 {{ $selectedInstitution['name'] ?? '-' }}
                                 <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
@@ -198,7 +198,8 @@
                     </button>
                 </div>
 
-                <div class="px-6 py-5 grid grid-cols-2 gap-4 text-sm">
+                <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 text-sm sm:px-5">
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4">
                     <div class="col-span-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
                         <div class="text-xs text-gray-500 mb-1">요약</div>
                         <div class="flex flex-wrap items-center gap-3">
@@ -401,9 +402,10 @@
                         </div>
                         <p class="mt-1 text-[11px] text-gray-400">이력 행을 클릭하면 상세 내용을 볼 수 있습니다.</p>
                     </div>
+                    </div>
                 </div>
 
-                <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 text-right">
+                <div class="shrink-0 border-t border-gray-200 bg-gray-50 px-4 py-3 text-right sm:px-5">
                     @if($isEditingDetail)
                         <button wire:click="cancelDetailEdit"
                                 class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer mr-2">

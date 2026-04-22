@@ -18,7 +18,7 @@
                 <span class="material-icons text-xl">add_circle_outline</span>
                 추가 신청
             </a>
-            <a href="{{ route('co.gs-brochure.requests') }}" class="inline-flex items-center justify-center gap-2 px-6 py-3 border-2 border-primary text-primary hover:bg-primary/10 dark:hover:bg-primary/20 font-medium rounded-lg transition-colors">
+            <a href="{{ route('gs-brochure.legacy.request.list-v2') }}" class="inline-flex items-center justify-center gap-2 px-6 py-3 border-2 border-primary text-primary hover:bg-primary/10 dark:hover:bg-primary/20 font-medium rounded-lg transition-colors">
                 <span class="material-icons text-xl">list_alt</span>
                 신청 내역 조회
             </a>

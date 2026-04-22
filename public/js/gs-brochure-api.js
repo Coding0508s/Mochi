@@ -2,6 +2,22 @@ const API_BASE_URL = typeof window !== 'undefined' && window.API_BASE_URL
     ? window.API_BASE_URL
     : (typeof window !== 'undefined' ? (window.location.origin + '/api/gs-brochure') : '/api/gs-brochure');
 
+function formatMaxUploadSize(bytes) {
+    if (!Number.isFinite(bytes) || bytes <= 0) return '30MB';
+    const mb = bytes / (1024 * 1024);
+    if (mb >= 1) return `${mb.toFixed(mb < 10 ? 1 : 0)}MB`;
+    const kb = bytes / 1024;
+    return `${Math.max(1, Math.round(kb))}KB`;
+}
+
+function getEffectiveMaxUploadBytes() {
+    const appMaxBytes = 30 * 1024 * 1024;
+    const runtimeMax = typeof window !== 'undefined'
+        ? Number(window.GS_BROCHURE_UPLOAD_MAX_BYTES || 0)
+        : 0;
+    return runtimeMax > 0 ? Math.min(appMaxBytes, runtimeMax) : appMaxBytes;
+}
+
 async function apiCall(endpoint, method = 'GET', data = null, fetchOpts = {}) {
     const isFormData = data instanceof FormData;
     const options = { ...fetchOpts, method, headers: { Accept: 'application/json', ...(fetchOpts.headers || {}) } };
@@ -29,6 +45,9 @@ async function apiCall(endpoint, method = 'GET', data = null, fetchOpts = {}) {
             // ignore parse fallback
         }
         if (response.status === 401) errorMessage = '인증 실패: 아이디 또는 비밀번호가 올바르지 않습니다.';
+        if (response.status === 422 && /The image failed to upload\./i.test(errorMessage)) {
+            errorMessage = `이미지 업로드에 실패했습니다. 파일 크기가 서버 업로드 제한(${formatMaxUploadSize(getEffectiveMaxUploadBytes())})을 초과했거나 업로드가 중단되었을 수 있습니다.`;
+        }
         throw new Error(errorMessage);
     }
 
@@ -44,6 +63,29 @@ window.BrochureAPI = {
     updateWarehouseStock: (id, quantity, date, memo) => apiCall(`/brochures/${id}/stock-warehouse`, 'PUT', { quantity, date, memo: memo || '' }),
     transferToHq: (id, quantity, date, memo) => apiCall(`/brochures/${id}/transfer-to-hq`, 'PUT', { quantity, date, memo: memo || '' }),
     uploadImage: (id, file) => {
+        if (!file) {
+            throw new Error('이미지 파일을 선택해 주세요.');
+        }
+        const maxBytes = getEffectiveMaxUploadBytes();
+        if ((file.size || 0) > maxBytes) {
+            throw new Error(`이미지 용량은 ${formatMaxUploadSize(maxBytes)} 이하로 올려 주세요.`);
+        }
+        const allowedMimeTypes = new Set([
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'image/webp',
+            'image/bmp',
+            'image/avif',
+        ]);
+        const allowedExtensions = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif']);
+        const filename = String(file.name || '').toLowerCase();
+        const extension = filename.includes('.') ? filename.split('.').pop() : '';
+        const mimeOk = file.type ? allowedMimeTypes.has(String(file.type).toLowerCase()) : false;
+        const extensionOk = !!extension && allowedExtensions.has(extension);
+        if (!mimeOk && !extensionOk) {
+            throw new Error('jpg, jpeg, png, gif, webp, bmp, avif 형식의 이미지만 업로드할 수 있습니다. (heic/heif는 지원하지 않습니다.)');
+        }
         const formData = new FormData();
         formData.append('image', file);
         return apiCall(`/brochures/${id}/image`, 'POST', formData);

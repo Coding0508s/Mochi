@@ -87,6 +87,7 @@
         $navLogistics = ($path === 'requestbrochure-logistics');
         $navAdmin = (str_starts_with($path, 'admin'));
         $navMain = ($path === '' || $path === '/');
+        $sidebarUserName = auth()->user()?->preferredDisplayName() ?? 'User';
     @endphp
     <div class="flex min-h-screen">
         <aside class="w-64 bg-surface-light dark:bg-surface-dark border-r border-border-light dark:border-border-dark hidden md:flex flex-col fixed h-full z-10">
@@ -118,17 +119,20 @@
                 @endif
 
             </nav>
-           <!--  <a class="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors mt-auto" href="{{ url('/') }}">
-                <span class="material-icons text-xl">home</span>
-                메인으로 돌아가기
-            </a> -->
+            <div class="mt-auto px-4 pb-3">
+                <a href="{{ url('/') }}"
+                   class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-gray-600 dark:text-gray-400 bg-transparent hover:bg-primary/10 dark:hover:bg-primary/20 text-sm font-medium transition-colors">
+                    <span class="material-icons text-base">logout</span>
+                    Mocchi로 돌아가기
+                </a>
+            </div>
             <div class="p-4 border-t border-border-light dark:border-border-dark">
                 <div class="flex items-center gap-3 px-4 py-2">
                     <div class="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
                         <span class="material-icons text-gray-500 dark:text-gray-400 text-sm">person</span>
                     </div>
                     <div>
-                        <p class="text-sm font-medium text-gray-900 dark:text-white">User</p>
+                        <p class="text-sm font-medium text-gray-900 dark:text-white">{{ $sidebarUserName }}</p>
                         <p class="text-xs text-gray-500 dark:text-gray-400">@yield('sidebar-footer-label', 'GrapeSEED Brochure')</p>
                     </div>
                 </div>

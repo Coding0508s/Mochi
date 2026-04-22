@@ -60,6 +60,7 @@
         $navList = ($path === 'requestbrochure-list');
         $navAdmin = (str_starts_with($path, 'admin'));
         $navMain = ($path === '' || $path === '/');
+        $sidebarUserName = auth()->user()?->preferredDisplayName() ?? 'User';
     @endphp
     <div class="flex min-h-screen">
        <!--  <aside class="w-64 bg-surface-light dark:bg-surface-dark border-r border-border-light dark:border-border-dark hidden md:flex flex-col fixed h-full z-10">
@@ -88,7 +89,7 @@
                         <span class="material-icons text-gray-500 dark:text-gray-400 text-sm">person</span>
                     </div>
                     <div>
-                        <p class="text-sm font-medium text-gray-900 dark:text-white">User</p>
+                        <p class="text-sm font-medium text-gray-900 dark:text-white">{{ $sidebarUserName }}</p>
                         <p class="text-xs text-gray-500 dark:text-gray-400">@yield('sidebar-footer-label', 'GrapeSEED Brochure')</p>
                     </div>
                 </div>

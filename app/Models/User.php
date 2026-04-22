@@ -51,6 +51,31 @@ class User extends Authenticatable
         return (bool) $this->is_admin || $this->isCountryManager();
     }
 
+    public function preferredDisplayName(): string
+    {
+        $email = mb_strtolower(trim((string) $this->email));
+        if ($email !== '' && Schema::hasTable('employee')) {
+            $englishName = Employee::query()
+                ->whereRaw('LOWER(TRIM(COALESCE(EMAIL, \'\'))) = ?', [$email])
+                ->value('ENGLISHNAME');
+
+            if (is_string($englishName) && trim($englishName) !== '') {
+                return trim($englishName);
+            }
+        }
+
+        $name = trim((string) $this->name);
+        if ($name !== '') {
+            return $name;
+        }
+
+        if ($email !== '') {
+            return trim((string) $this->email);
+        }
+
+        return 'User';
+    }
+
     /**
      * Get the attributes that should be cast.
      *

@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class BrochureController extends Controller
 {
@@ -36,9 +37,10 @@ class BrochureController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $conn = (string) config('gs_brochure.connection');
         $table = (new Brochure)->getTable();
         $request->validate([
-            'name' => "required|string|unique:{$table},name",
+            'name' => ['required', 'string', Rule::unique("{$conn}.{$table}", 'name')],
             'image_url' => 'sometimes|nullable|string|max:2048',
             'stock' => 'sometimes|integer',
             'stock_warehouse' => 'sometimes|integer',
@@ -115,8 +117,14 @@ class BrochureController extends Controller
 
     public function uploadImage(Request $request, string $id): JsonResponse
     {
+        // max 단위는 KB. 브로셔 표지용으로 30MB까지 허용합니다.
         $request->validate([
-            'image' => 'required|file|mimes:jpeg,jpg,png,gif,webp|max:2048',
+            'image' => ['required', 'file', 'mimes:jpg,jpeg,png,gif,webp,bmp,avif', 'max:30720'],
+        ], [
+            'image.required' => '이미지 파일을 선택해 주세요.',
+            'image.mimes' => 'jpg, jpeg, png, gif, webp, bmp, avif 형식의 이미지만 업로드할 수 있습니다. (heic/heif는 지원하지 않습니다.)',
+            'image.max' => '이미지 용량은 30MB 이하로 올려 주세요.',
+            'image.uploaded' => '이미지 업로드에 실패했습니다. 서버 업로드 제한(php.ini upload_max_filesize/post_max_size)보다 큰 파일일 수 있습니다.',
         ]);
 
         $brochure = Brochure::findOrFail($id);
@@ -126,7 +134,7 @@ class BrochureController extends Controller
         }
 
         $ext = $file->getClientOriginalExtension() ?: $file->guessExtension();
-        if (! in_array(strtolower((string) $ext), ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+        if (! in_array(strtolower((string) $ext), ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'bmp'], true)) {
             $ext = 'jpg';
         }
 

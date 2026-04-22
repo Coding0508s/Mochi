@@ -1,4 +1,4 @@
-@extends('layouts.shell')
+@extends('layouts.shell-public')
 
 @section('title', '신청 내역 조회')
 
@@ -73,6 +73,7 @@
 @push('scripts')
 <script src="{{ asset('js/gs-brochure-api.js') }}"></script>
 <script>
+        const CAN_EDIT_STAFF_REQUESTS = @json(auth()->check());
         let allRequests = [];
         let filteredRequests = [];
         let currentPage = 1;
@@ -274,7 +275,7 @@
                 : '<span class="status-badge pending inline-block py-1.5 px-4 rounded-full text-xs font-semibold bg-amber-400 text-gray-900">배송 대기중</span>';
 
             const cardId = `card-${groupIndex}-${requestIndex}`;
-            const isEditable = !hasInvoices;
+            const isEditable = CAN_EDIT_STAFF_REQUESTS && !hasInvoices;
             card.id = cardId;
             card.dataset.groupIndex = groupIndex;
             card.dataset.requestIndex = requestIndex;

@@ -3,14 +3,17 @@
 namespace App\GsBrochure\Http\Controllers\Api;
 
 use App\GsBrochure\Models\BrochureRequest;
+use App\GsBrochure\Models\Brochure;
 use App\GsBrochure\Models\Institution;
 use App\GsBrochure\Models\Invoice;
 use App\GsBrochure\Models\RequestItem;
+use App\GsBrochure\Models\StockHistory;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 
 class RequestController extends Controller
 {
@@ -63,7 +66,7 @@ class RequestController extends Controller
             'contact_id' => 'nullable|integer',
             'contact_name' => 'nullable|string',
             'brochures' => 'required|array',
-            'brochures.*.brochure' => 'required',
+            'brochures.*.brochure' => 'required|integer|min:1',
             'brochures.*.brochureName' => 'required|string',
             'brochures.*.quantity' => [
                 'required',
@@ -91,24 +94,128 @@ class RequestController extends Controller
             $institution->update(['address' => $requestAddress]);
         }
 
+        $requestDate = trim((string) $data['date']) !== '' ? trim((string) $data['date']) : now()->format('Y-m-d');
+        $inputContactName = trim((string) ($data['contact_name'] ?? ''));
+        $requesterName = trim((string) ($request->user()?->name ?? ''));
+        if ($requesterName === '') {
+            $requesterName = trim((string) ($request->user()?->email ?? ''));
+        }
+        $contactName = $requesterName !== '' ? $requesterName : $inputContactName;
+        $requestedBrochures = collect($data['brochures'])
+            ->map(function (array $item): array {
+                return [
+                    'brochure_id' => (int) ($item['brochure'] ?? 0),
+                    'quantity' => (int) ($item['quantity'] ?? 0),
+                ];
+            })
+            ->values();
+        $requestedByBrochure = $requestedBrochures
+            ->groupBy('brochure_id')
+            ->map(fn ($items) => (int) $items->sum('quantity'));
+        $brochureIds = $requestedByBrochure->keys()->filter(fn ($id) => (int) $id > 0)->values();
+
+        if ($brochureIds->isEmpty()) {
+            throw ValidationException::withMessages([
+                'brochures' => ['유효한 브로셔를 선택해 주세요.'],
+            ]);
+        }
+
         $invoices = $data['invoices'] ?? [];
         DB::beginTransaction();
         try {
+            $brochureMap = Brochure::query()
+                ->whereIn('id', $brochureIds->all())
+                ->lockForUpdate()
+                ->get()
+                ->keyBy(fn (Brochure $brochure) => (string) $brochure->id);
+
+            if ($brochureMap->count() !== $brochureIds->count()) {
+                throw ValidationException::withMessages([
+                    'brochures' => ['유효하지 않은 브로셔가 포함되어 있습니다.'],
+                ]);
+            }
+
+            $insufficientStockMessages = [];
+            foreach ($requestedByBrochure as $brochureId => $totalQuantity) {
+                $brochure = $brochureMap->get((string) $brochureId);
+                if (! $brochure) {
+                    continue;
+                }
+                $available = (int) ($brochure->stock_warehouse ?? 0);
+                $required = (int) $totalQuantity;
+                if ($available < 100) {
+                    $insufficientStockMessages[] = sprintf(
+                        '%s: 현재 재고 %d권 (100권 이상일 때만 신청 가능)',
+                        $brochure->name,
+                        $available
+                    );
+                    continue;
+                }
+                if ($available < $required) {
+                    $insufficientStockMessages[] = sprintf(
+                        '%s: 요청 %d권, 보유 %d권',
+                        $brochure->name,
+                        $required,
+                        $available
+                    );
+                }
+            }
+
+            if ($insufficientStockMessages !== []) {
+                throw ValidationException::withMessages([
+                    'brochures' => array_merge(['재고가 부족하여 신청을 진행할 수 없습니다.'], $insufficientStockMessages),
+                ]);
+            }
+
             $req = BrochureRequest::create([
                 'date' => $data['date'],
                 'schoolname' => $data['schoolname'],
                 'address' => $data['address'],
                 'phone' => $data['phone'],
                 'contact_id' => $data['contact_id'] ?? null,
-                'contact_name' => $data['contact_name'] ?? null,
+                'contact_name' => $contactName !== '' ? $contactName : null,
             ]);
 
-            foreach ($data['brochures'] as $b) {
+            foreach ($requestedBrochures as $b) {
+                $brochure = $brochureMap->get((string) $b['brochure_id']);
+                if (! $brochure) {
+                    continue;
+                }
                 RequestItem::create([
                     'request_id' => $req->id,
-                    'brochure_id' => $b['brochure'],
-                    'brochure_name' => $b['brochureName'],
+                    'brochure_id' => $brochure->id,
+                    'brochure_name' => $brochure->name,
                     'quantity' => $b['quantity'],
+                ]);
+            }
+
+            foreach ($requestedByBrochure as $brochureId => $totalQuantity) {
+                $brochure = $brochureMap->get((string) $brochureId);
+                if (! $brochure) {
+                    continue;
+                }
+
+                $beforeStock = (int) ($brochure->stock_warehouse ?? 0);
+                $delta = (int) $totalQuantity;
+                $afterStock = $beforeStock - $delta;
+                $brochure->update([
+                    'stock_warehouse' => $afterStock,
+                    'last_warehouse_stock_quantity' => -$delta,
+                    'last_warehouse_stock_date' => $requestDate,
+                ]);
+
+                StockHistory::create([
+                    'type' => '출고',
+                    'location' => 'warehouse',
+                    'date' => $requestDate,
+                    'brochure_id' => $brochure->id,
+                    'brochure_name' => $brochure->name,
+                    'quantity' => $delta,
+                    'contact_name' => $contactName,
+                    'schoolname' => $schoolnameTrimmed,
+                    'before_stock' => $beforeStock,
+                    'after_stock' => $afterStock,
+                    'memo' => null,
                 ]);
             }
 
@@ -141,7 +248,7 @@ class RequestController extends Controller
             'contact_id' => 'nullable|integer',
             'contact_name' => 'nullable|string',
             'brochures' => 'sometimes|array',
-            'brochures.*.brochure' => 'required',
+            'brochures.*.brochure' => 'required|integer|min:1',
             'brochures.*.brochureName' => 'required|string',
             'brochures.*.quantity' => [
                 'required',
@@ -248,6 +355,7 @@ class RequestController extends Controller
 
         try {
             $items = $req->requestItems()->get();
+            $requesterName = trim((string) ($req->contact_name ?? '')) ?: '외부 신청자';
             $brochureFacts = $items->map(fn ($item) => [
                 'name' => $item->brochure_name ?? '-',
                 'value' => ($item->quantity ?? 0).'권',
@@ -267,7 +375,7 @@ class RequestController extends Controller
                     'markdown' => true,
                     'activityTitle' => '**브로셔 발송 요청**',
                     'facts' => [
-                        ['name' => '담당자', 'value' => $req->contact_name ?? '-'],
+                        ['name' => '신청자', 'value' => $requesterName],
                         ['name' => '기관명', 'value' => $req->schoolname ?? '-'],
                         ['name' => '연락처', 'value' => $req->phone ?? '-'],
                         ['name' => '주소', 'value' => $req->address ?? '-'],
@@ -302,6 +410,7 @@ class RequestController extends Controller
         }
 
         try {
+            $requesterName = trim((string) ($req->contact_name ?? '')) ?: '외부 신청자';
             $invoiceFacts = array_map(fn ($num) => ['name' => '운송장 번호', 'value' => $num], $addedNumbers);
             $payload = [
                 '@type' => 'MessageCard',
@@ -311,7 +420,7 @@ class RequestController extends Controller
                 'sections' => [[
                     'activityTitle' => '**운송장 등록 완료** (물류창고)',
                     'facts' => [
-                        ['name' => '담당자', 'value' => $req->contact_name ?? '-'],
+                        ['name' => '신청자', 'value' => $requesterName],
                         ['name' => '기관명', 'value' => $req->schoolname ?? '-'],
                         ['name' => '신청일', 'value' => $req->date ?? '-'],
                     ],

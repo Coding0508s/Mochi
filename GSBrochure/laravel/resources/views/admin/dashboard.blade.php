@@ -25,7 +25,43 @@
         }
     </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-    <script>window.API_BASE_URL = '{{ url("/api/gs-brochure") }}';</script>
+    @php
+        $parseSizeToBytes = static function (?string $value): int {
+            $value = trim((string) $value);
+            if ($value === '') {
+                return 0;
+            }
+            if (! preg_match('/^\s*(\d+)\s*([KMG]?)\s*$/i', $value, $matches)) {
+                return (int) $value;
+            }
+
+            $bytes = (int) $matches[1];
+            $unit = strtoupper($matches[2] ?? '');
+            if ($unit === 'G') {
+                return $bytes * 1024 * 1024 * 1024;
+            }
+            if ($unit === 'M') {
+                return $bytes * 1024 * 1024;
+            }
+            if ($unit === 'K') {
+                return $bytes * 1024;
+            }
+
+            return $bytes;
+        };
+        $phpUploadLimitBytes = $parseSizeToBytes(ini_get('upload_max_filesize'));
+        $phpPostLimitBytes = $parseSizeToBytes(ini_get('post_max_size'));
+        $appImageLimitBytes = 30 * 1024 * 1024;
+        $effectiveUploadMaxBytes = max(1, min(array_filter([
+            $phpUploadLimitBytes,
+            $phpPostLimitBytes,
+            $appImageLimitBytes,
+        ], static fn (int $value): bool => $value > 0) ?: [$appImageLimitBytes]));
+    @endphp
+    <script>
+        window.API_BASE_URL = '{{ url("/api/gs-brochure") }}';
+        window.GS_BROCHURE_UPLOAD_MAX_BYTES = {{ $effectiveUploadMaxBytes }};
+    </script>
     <script src="{{ asset('js/gs-brochure-api.js') }}"></script>
     <style>#dashboardSidebar.open{transform:translateX(0);}</style>
 </head>
@@ -85,7 +121,7 @@
                         <span class="material-symbols-outlined" style="font-size: 24px;">description</span>
                         <span class="text-sm font-medium">브로셔 신청</span>
                     </a>
-                   <!--  <a href="{{ route('co.gs-brochure.requests') }}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                    <!-- <a href="{{ route('co.gs-brochure.request', ['view' => 'list']) }}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                         <span class="material-symbols-outlined" style="font-size: 24px;">campaign</span>
                         <span class="text-sm font-medium">신청 내역</span>
                     </a> -->
@@ -108,7 +144,7 @@
                     </div>
                     <a href="#" data-nav="institutions" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                         <span class="material-symbols-outlined" style="font-size: 24px;">business</span>
-                        <span class="text-sm font-medium">기관 관리</span>
+                        <span class="text-sm font-medium">기관관리</span>
                     </a>
                     <a href="#" data-nav="settings" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                         <span class="material-symbols-outlined" style="font-size: 24px;">settings</span>
@@ -116,20 +152,24 @@
                     </a>
                 </nav>
             </div>
-            <div class="mt-auto p-6 border-t border-slate-200 dark:border-slate-800">
+            <div class="mt-auto px-6 pb-3">
+                <a href="{{ url('/') }}"
+                   onclick="logout(); return false;"
+                   class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 bg-transparent hover:bg-primary/10 dark:hover:bg-primary/20 text-sm font-medium transition-colors">
+                    <span class="material-symbols-outlined" style="font-size: 18px;">logout</span>
+                    Mocchi로 돌아가기
+                </a>
+            </div>
+            <div class="p-6 border-t border-slate-200 dark:border-slate-800">
                 <div class="flex items-center gap-3">
                     <div class="rounded-full size-9 bg-primary/20 flex items-center justify-center">
                         <span class="material-symbols-outlined text-primary" style="font-size: 20px;">person</span>
                     </div>
                     <div class="flex flex-col">
-                        <p class="text-sm font-medium text-slate-900 dark:text-white" id="sidebarUsername">Admin</p>
+                        <p class="text-sm font-medium text-slate-900 dark:text-white" id="sidebarUsername">{{ auth()->user()?->preferredDisplayName() ?? 'Admin' }}</p>
                         <p class="text-xs text-slate-500 dark:text-slate-400">관리자</p>
                     </div>
                 </div>
-                <button type="button" onclick="logout()" class="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium transition-colors">
-                    <span class="material-symbols-outlined" style="font-size: 18px;">logout</span>
-                    로그아웃
-                </button>
             </div>
         </div>
 
@@ -561,7 +601,7 @@
                     </div>
                     <div class="form-group mb-4">
                         <label for="brochureImageFile" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">또는 이미지 파일 업로드 (선택)</label>
-                        <input type="file" id="brochureImageFile" accept="image/jpeg,image/png,image/gif,image/webp" class="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"/>
+                        <input type="file" id="brochureImageFile" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/avif" class="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"/>
                         <img id="brochureImagePreview" src="" alt="" class="mt-2 w-16 h-16 object-cover rounded hidden"/>
                     </div>
                     <div class="form-group mb-4 hidden" id="stockGroup">
@@ -577,7 +617,7 @@
         </div>
     </div>
 
-    <input type="file" id="brochureRowImageFile" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" aria-hidden="true"/>
+    <input type="file" id="brochureRowImageFile" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/avif" class="hidden" aria-hidden="true"/>
 
     <div id="brochureImageMenuDropdown" class="hidden fixed z-50 min-w-[120px] py-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-lg"
         style="left: 0; top: 0;">
@@ -790,7 +830,7 @@
 
     <script>
         function checkLogin() {
-            const username = @json(auth()->user()?->name ?? 'Admin');
+            const username = @json(auth()->user()?->preferredDisplayName() ?? 'Admin');
             const el = document.getElementById('sidebarUsername');
             if (el) el.textContent = username;
             return true;

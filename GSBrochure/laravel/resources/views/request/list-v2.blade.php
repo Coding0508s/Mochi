@@ -65,8 +65,9 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/api.js') }}"></script>
+<script src="{{ asset('js/gs-brochure-api.js') }}"></script>
 <script>
+    const CAN_EDIT_REQUEST = @json(auth()->user()?->can('manageGsBrochureAdmin') ?? false);
     let allRequests = [];
     let filteredRequests = [];
     let currentPage = 1;
@@ -274,7 +275,7 @@
             : '<span class="status-badge pending inline-block py-1.5 px-4 rounded-full text-xs font-semibold bg-amber-400 text-gray-900">배송 대기중</span>';
 
         const cardId = `card-${groupIndex}-${requestIndex}`;
-        const isEditable = !hasInvoices;
+        const isEditable = !hasInvoices && CAN_EDIT_REQUEST;
         card.id = cardId;
         card.dataset.groupIndex = groupIndex;
         card.dataset.requestIndex = requestIndex;
