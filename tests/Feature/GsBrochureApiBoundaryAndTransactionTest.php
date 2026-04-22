@@ -8,6 +8,7 @@ use App\GsBrochure\Models\RequestItem;
 use App\GsBrochure\Models\StockHistory;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class GsBrochureApiBoundaryAndTransactionTest extends TestCase
@@ -31,6 +32,8 @@ class GsBrochureApiBoundaryAndTransactionTest extends TestCase
 
         $this->getJson('/api/gs-brochure/brochures')->assertOk();
         $this->getJson('/api/gs-brochure/institutions')->assertOk();
+
+        Cache::put('phone_verified:01012345678', true, now()->addMinutes(10));
 
         $createResponse = $this->postJson('/api/gs-brochure/requests', [
             'date' => '2026-04-22',
@@ -195,6 +198,8 @@ class GsBrochureApiBoundaryAndTransactionTest extends TestCase
             'stock_warehouse' => 80,
         ]);
 
+        Cache::put('phone_verified:01000000000', true, now()->addMinutes(10));
+
         $response = $this->postJson('/api/gs-brochure/requests', [
             'date' => '2026-04-22',
             'schoolname' => '롤백 기관',
@@ -228,6 +233,8 @@ class GsBrochureApiBoundaryAndTransactionTest extends TestCase
             'stock' => 0,
             'stock_warehouse' => 200,
         ]);
+
+        Cache::put('phone_verified:01099999999', true, now()->addMinutes(10));
 
         $response = $this->postJson('/api/gs-brochure/requests', [
             'date' => '2026-04-22',

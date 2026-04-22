@@ -24,6 +24,7 @@ Laravel is accessible, powerful, and provides tools required for large, robust a
 ## Project Docs
 
 - [GS Brochure Permission Policy](docs/gs-brochure-permission-policy.md)
+- [Profile Email Policy](docs/profile-email-policy.md)
 
 ## Learning Laravel
 

@@ -28,7 +28,11 @@
          openReview: false,
          openGoal: false,
          openSetup: {{ request()->routeIs('setup.*') ? 'true' : 'false' }},
-     }">
+    }">
+    @php
+        $topbarDisplayName = auth()->user()?->preferredDisplayName() ?? 'User';
+        $isCountryManager = (bool) auth()->user()?->isCountryManager();
+    @endphp
 
     {{-- 상단 헤더 (전체 너비) --}}
     <header class="mochi-topbar flex-shrink-0">
@@ -92,7 +96,7 @@
                     ></span>
                     <span class="mochi-topbar-profile__content">
                         <span class="w-6 h-6 rounded-full bg-[#d9e0eb] border border-white/50 flex-shrink-0" aria-hidden="true"></span>
-                        <span class="text-[12px] text-white font-medium truncate max-w-[10rem]" title="{{ auth()->user()->name }}">{{ auth()->user()->name }}</span>
+                        <span class="text-[12px] text-white font-medium truncate max-w-[10rem]" title="{{ $topbarDisplayName }}">{{ $topbarDisplayName }}</span>
                     </span>
                 </a>
                 {{-- 로그아웃 (별도 필) --}}
@@ -248,7 +252,7 @@
                                     ['label' => '기관지원보고서', 'href' => '/supports',     'route' => 'supports',     'icon' => 'document'],
                                     ['label' => '잠재기관리스트', 'href' => route('potential-institutions.index'), 'route' => '', 'routeIs' => 'potential-institutions.index', 'icon' => 'calendar'],
                                     ['label' => '잠재기관보기',   'href' => route('potential-institutions.view'), 'route' => '', 'routeIs' => 'potential-institutions.view', 'icon' => 'eye'],
-                                    ['label' => 'GS Brochure', 'href' => route('co.gs-brochure'), 'route' => '', 'routeIs' => 'co.gs-brochure*', 'icon' => 'document', 'blank' => true],
+                                    ['label' => 'GS Brochure', 'href' => route('co.gs-brochure'), 'route' => '', 'routeIs' => 'co.gs-brochure*', 'icon' => 'document'],
                                     ['label' => 'Store 재고',  'href' => route('store.inventory.index'), 'route' => '', 'routeIs' => 'store.inventory.index', 'icon' => 'cart'],
                                     ['label' => 'Store판매내역',  'href' => route('store.sales.index'), 'route' => '', 'routeIs' => 'store.sales.index', 'icon' => 'cart'],
                                     ['label' => 'Salesforce파일', 'href' => route('salesforce-files.index'), 'route' => '', 'routeIs' => 'salesforce-files.index', 'icon' => 'server'],
@@ -280,111 +284,113 @@
 
             {{-- <div class="sidebar-divider"></div> --}}
 
-            {{-- ── Review ── --}}
-            <div class="sidebar-group">
-                <button type="button"
-                        @click="openReview = !openReview"
-                        class="sidebar-item sidebar-focusable sidebar-item-default">
-                    <span class="sidebar-item-lead">
-                        @include('partials.sidebar-menu-icon', ['name' => 'chat'])
-                        <span class="font-medium">Review</span>
-                    </span>
-                    <svg class="sidebar-chevron transition-transform" :class="openReview ? 'rotate-90' : ''"
-                         fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                    </svg>
-                </button>
-            </div>
-
-            {{-- ── Goal ── --}}
-            <div class="sidebar-group">
-                <button type="button"
-                        @click="openGoal = !openGoal"
-                        class="sidebar-item sidebar-focusable sidebar-item-default">
-                    <span class="sidebar-item-lead">
-                        @include('partials.sidebar-menu-icon', ['name' => 'flag'])
-                        <span class="font-medium">Goal</span>
-                    </span>
-                    <svg class="sidebar-chevron transition-transform" :class="openGoal ? 'rotate-90' : ''"
-                         fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                    </svg>
-                </button>
-            </div>
-
-            {{-- ── Feedback ── --}}
-            <div class="sidebar-group">
-                <button type="button" class="sidebar-item sidebar-focusable sidebar-item-default">
-                    <span class="sidebar-item-lead">
-                        @include('partials.sidebar-menu-icon', ['name' => 'chat'])
-                        <span class="font-medium">Feedback</span>
-                    </span>
-                    <svg class="sidebar-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                    </svg>
-                </button>
-            </div>
-
-            {{-- ── Configuration ── --}}
-            <div class="sidebar-group">
-                <button type="button" class="sidebar-item sidebar-focusable sidebar-item-default">
-                    <span class="sidebar-item-lead">
-                        @include('partials.sidebar-menu-icon', ['name' => 'cog'])
-                        <span class="font-medium">Configuration</span>
-                    </span>
-                    <svg class="sidebar-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                    </svg>
-                </button>
-            </div>
-
-            {{-- ── Setup ── --}}
-            <div class="sidebar-group">
-                <button type="button"
-                        @click="openSetup = !openSetup; if (openSetup) { openCO = false }"
-                        class="sidebar-item sidebar-focusable
-                               {{ request()->routeIs('setup.*') ? 'sidebar-item-active' : 'sidebar-item-default' }}">
-                    <span class="sidebar-item-lead">
-                        @include('partials.sidebar-menu-icon', ['name' => 'cog'])
-                        <span class="font-medium">Setup</span>
-                    </span>
-                    <svg class="sidebar-chevron transition-transform duration-200"
-                         :class="openSetup ? 'rotate-90' : ''"
-                         fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                    </svg>
-                </button>
-
-                <div x-show="openSetup" class="sidebar-sublist">
-                    <a href="{{ route('setup.index') }}"
-                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                              {{ request()->routeIs('setup.index') ? 'sidebar-subitem-active' : '' }}">
-                        <span class="sidebar-subitem-label">SetUp 홈</span>
-                    </a>
-                    <a href="{{ route('setup.team') }}"
-                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                              {{ request()->routeIs('setup.team') ? 'sidebar-subitem-active' : '' }}">
-                        <span class="sidebar-subitem-label">팀 관리</span>
-                    </a>
-                    <a href="{{ route('setup.common-codes') }}"
-                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                              {{ request()->routeIs('setup.common-codes') ? 'sidebar-subitem-active' : '' }}">
-                        <span class="sidebar-subitem-label">공통코드</span>
-                    </a>
-                    <a href="{{ route('setup.roles') }}"
-                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                              {{ request()->routeIs('setup.roles') ? 'sidebar-subitem-active' : '' }}">
-                        <span class="sidebar-subitem-label">역할·권한</span>
-                    </a>
-                    @can('manageEmployeeDepartment')
-                        <a href="{{ route('setup.employees.create') }}"
-                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                                  {{ request()->routeIs('setup.employees.create') ? 'sidebar-subitem-active' : '' }}">
-                            <span class="sidebar-subitem-label">직원 등록</span>
-                        </a>
-                    @endcan
+            @if($isCountryManager)
+                {{-- ── Review ── --}}
+                <div class="sidebar-group">
+                    <button type="button"
+                            @click="openReview = !openReview"
+                            class="sidebar-item sidebar-focusable sidebar-item-default">
+                        <span class="sidebar-item-lead">
+                            @include('partials.sidebar-menu-icon', ['name' => 'chat'])
+                            <span class="font-medium">Review</span>
+                        </span>
+                        <svg class="sidebar-chevron transition-transform" :class="openReview ? 'rotate-90' : ''"
+                             fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </button>
                 </div>
-            </div>
+
+                {{-- ── Goal ── --}}
+                <div class="sidebar-group">
+                    <button type="button"
+                            @click="openGoal = !openGoal"
+                            class="sidebar-item sidebar-focusable sidebar-item-default">
+                        <span class="sidebar-item-lead">
+                            @include('partials.sidebar-menu-icon', ['name' => 'flag'])
+                            <span class="font-medium">Goal</span>
+                        </span>
+                        <svg class="sidebar-chevron transition-transform" :class="openGoal ? 'rotate-90' : ''"
+                             fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- ── Feedback ── --}}
+                <div class="sidebar-group">
+                    <button type="button" class="sidebar-item sidebar-focusable sidebar-item-default">
+                        <span class="sidebar-item-lead">
+                            @include('partials.sidebar-menu-icon', ['name' => 'chat'])
+                            <span class="font-medium">Feedback</span>
+                        </span>
+                        <svg class="sidebar-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- ── Configuration ── --}}
+                <div class="sidebar-group">
+                    <button type="button" class="sidebar-item sidebar-focusable sidebar-item-default">
+                        <span class="sidebar-item-lead">
+                            @include('partials.sidebar-menu-icon', ['name' => 'cog'])
+                            <span class="font-medium">Configuration</span>
+                        </span>
+                        <svg class="sidebar-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- ── Setup ── --}}
+                <div class="sidebar-group">
+                    <button type="button"
+                            @click="openSetup = !openSetup; if (openSetup) { openCO = false }"
+                            class="sidebar-item sidebar-focusable
+                                   {{ request()->routeIs('setup.*') ? 'sidebar-item-active' : 'sidebar-item-default' }}">
+                        <span class="sidebar-item-lead">
+                            @include('partials.sidebar-menu-icon', ['name' => 'cog'])
+                            <span class="font-medium">Setup</span>
+                        </span>
+                        <svg class="sidebar-chevron transition-transform duration-200"
+                             :class="openSetup ? 'rotate-90' : ''"
+                             fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+
+                    <div x-show="openSetup" class="sidebar-sublist">
+                        <a href="{{ route('setup.index') }}"
+                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable
+                                  {{ request()->routeIs('setup.index') ? 'sidebar-subitem-active' : '' }}">
+                            <span class="sidebar-subitem-label">SetUp 홈</span>
+                        </a>
+                        <a href="{{ route('setup.team') }}"
+                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable
+                                  {{ request()->routeIs('setup.team') ? 'sidebar-subitem-active' : '' }}">
+                            <span class="sidebar-subitem-label">팀 관리</span>
+                        </a>
+                        <a href="{{ route('setup.common-codes') }}"
+                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable
+                                  {{ request()->routeIs('setup.common-codes') ? 'sidebar-subitem-active' : '' }}">
+                            <span class="sidebar-subitem-label">공통코드</span>
+                        </a>
+                        <a href="{{ route('setup.roles') }}"
+                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable
+                                  {{ request()->routeIs('setup.roles') ? 'sidebar-subitem-active' : '' }}">
+                            <span class="sidebar-subitem-label">역할·권한</span>
+                        </a>
+                        @can('manageEmployeeDepartment')
+                            <a href="{{ route('setup.employees.create') }}"
+                               class="sidebar-subitem sidebar-subitem-row sidebar-focusable
+                                      {{ request()->routeIs('setup.employees.create') ? 'sidebar-subitem-active' : '' }}">
+                                <span class="sidebar-subitem-label">직원 등록</span>
+                            </a>
+                        @endcan
+                    </div>
+                </div>
+            @endif
 
         </nav>
     </aside>

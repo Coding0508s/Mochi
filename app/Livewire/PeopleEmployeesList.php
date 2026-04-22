@@ -53,8 +53,6 @@ class PeopleEmployeesList extends Component
 
     public string $deleteDeptNo = '';
 
-    public ?int $linkedUserId = null;
-
     public bool $hasLinkedLoginAccount = false;
 
     public bool $editGsBrochureAdmin = false;
@@ -98,6 +96,8 @@ class PeopleEmployeesList extends Component
 
     public function openEditModal(string $empNo): void
     {
+        Gate::authorize('editEmployeeProfile');
+
         $employee = Employee::query()->where('EMPNO', $empNo)->first();
         if (! $employee) {
             return;
@@ -119,7 +119,6 @@ class PeopleEmployeesList extends Component
                 ->whereRaw('LOWER(TRIM(COALESCE(email, \'\'))) = ?', [$normalizedEmail])
                 ->first(['id', 'is_gs_brochure_admin']);
 
-        $this->linkedUserId = $linkedUser?->id;
         $this->hasLinkedLoginAccount = $linkedUser !== null;
         $this->editGsBrochureAdmin = (bool) ($linkedUser?->is_gs_brochure_admin ?? false);
 
@@ -140,7 +139,6 @@ class PeopleEmployeesList extends Component
         $this->editPhone = '';
         $this->editStatus = '';
         $this->editWorkDept = '';
-        $this->linkedUserId = null;
         $this->hasLinkedLoginAccount = false;
         $this->editGsBrochureAdmin = false;
 
@@ -207,12 +205,21 @@ class PeopleEmployeesList extends Component
         $employee->STATUS = $validated['editStatus'] === '' ? null : (int) $validated['editStatus'];
         $employee->save();
 
-        if (Gate::allows('manageEmployeeDepartment') && $this->linkedUserId) {
-            User::query()
-                ->whereKey($this->linkedUserId)
-                ->update([
-                    'is_gs_brochure_admin' => $this->editGsBrochureAdmin,
-                ]);
+        if (Gate::allows('manageEmployeeDepartment')) {
+            $normalizedEmail = mb_strtolower(trim($validated['editEmail']));
+            $secureLinkedUser = $normalizedEmail === ''
+                ? null
+                : User::query()
+                    ->whereRaw('LOWER(TRIM(COALESCE(email, \'\'))) = ?', [$normalizedEmail])
+                    ->first(['id']);
+
+            if ($secureLinkedUser) {
+                User::query()
+                    ->whereKey($secureLinkedUser->id)
+                    ->update([
+                        'is_gs_brochure_admin' => $this->editGsBrochureAdmin,
+                    ]);
+            }
         }
 
         $this->closeEditModal();
@@ -221,7 +228,7 @@ class PeopleEmployeesList extends Component
 
     public function openCreateTeamModal(): void
     {
-        Gate::authorize('manageTeamStructure');
+        Gate::authorize('editEmployeeProfile');
 
         $this->newDeptName = '';
         $this->resetErrorBag();
@@ -239,7 +246,7 @@ class PeopleEmployeesList extends Component
 
     public function createTeam(): void
     {
-        Gate::authorize('manageTeamStructure');
+        Gate::authorize('editEmployeeProfile');
 
         $validated = $this->validate([
             'newDeptName' => ['required', 'string', 'max:25'],
@@ -264,7 +271,7 @@ class PeopleEmployeesList extends Component
 
     public function openDeleteTeamModal(): void
     {
-        Gate::authorize('manageTeamStructure');
+        Gate::authorize('editEmployeeProfile');
 
         $this->deleteDeptNo = '';
         $this->resetErrorBag();
@@ -282,7 +289,7 @@ class PeopleEmployeesList extends Component
 
     public function deleteTeam(): void
     {
-        Gate::authorize('manageTeamStructure');
+        Gate::authorize('editEmployeeProfile');
 
         $validated = $this->validate([
             'deleteDeptNo' => ['required', 'string', Rule::exists('department', 'DEPTNO')],
@@ -383,6 +390,7 @@ class PeopleEmployeesList extends Component
             'statusOptions' => $statusOptions,
             'jobOptions' => $jobOptions,
             'currentTeamLabel' => $this->resolveCurrentTeamLabel($deptOptions),
+            'canManageEmployees' => Gate::allows('editEmployeeProfile'),
         ]);
     }
 

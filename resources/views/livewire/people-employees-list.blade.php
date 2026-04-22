@@ -23,6 +23,9 @@
                 현재 조건 결과: <span class="font-semibold text-gray-700">{{ $employees->total() }}</span>명
             </div>
         </div>
+        @unless($canManageEmployees)
+            <p class="mt-2 text-xs text-amber-700">Country Manager 전용 수정 기능은 비활성화되어 현재 화면은 읽기 전용입니다.</p>
+        @endunless
     </div>
 
     {{-- 필터/검색 --}}
@@ -79,7 +82,7 @@
                 </button>
             @endif
 
-            @can('manageTeamStructure')
+            @if($canManageEmployees)
                 <button type="button"
                         wire:click="openCreateTeamModal"
                         class="py-2 px-3 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 cursor-pointer">
@@ -91,7 +94,7 @@
                         class="py-2 px-3 text-sm text-white bg-rose-600 rounded-lg hover:bg-rose-700 cursor-pointer">
                     팀 삭제
                 </button>
-            @endcan
+            @endif
         </div>
     </div>
 
@@ -119,8 +122,8 @@
                 <tbody class="divide-y divide-gray-100">
                     @forelse($employees as $index => $emp)
                         <tr wire:key="emp-row-{{ $emp->EMPNO }}"
-                            wire:click="openEditModal('{{ $emp->EMPNO }}')"
-                            class="mochi-table-row-hover transition-colors cursor-pointer">
+                            @if($canManageEmployees) wire:click="openEditModal('{{ $emp->EMPNO }}')" @endif
+                            class="mochi-table-row-hover transition-colors {{ $canManageEmployees ? 'cursor-pointer' : 'cursor-default' }}">
                             <td class="px-3 py-2 text-gray-500 text-xs">{{ $employees->firstItem() + $index }}</td>
                             <td class="px-3 py-2 font-medium text-gray-900">{{ $emp->KOREANAME ?? '-' }}</td>
                             <td class="px-3 py-2 text-gray-700">{{ $emp->ENGLISHNAME ?? '-' }}</td>

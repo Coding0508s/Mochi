@@ -67,53 +67,35 @@ class PeopleEmployeePermissionsTest extends TestCase
     {
         $user = User::factory()->create(['is_admin' => false]);
 
-        Livewire::actingAs($user)
+        $component = Livewire::actingAs($user)
             ->test(PeopleEmployeesList::class)
-            ->call('openEditModal', 'E001')
-            ->set('editKoreanName', '홍길동')
-            ->set('editEnglishName', 'Hong')
-            ->set('editJob', '매니저')
-            ->set('editEmail', 'e001@example.com')
-            ->set('editPhone', '010-0000-0000')
-            ->set('editStatus', '1')
-            ->set('editWorkDept', 'A02')
-            ->call('saveEmployee');
+            ->call('openEditModal', 'E001');
 
+        $this->assertNotTrue((bool) ($component->get('showEditModal') ?? false));
         $this->assertSame('A01', (string) Employee::query()->where('EMPNO', 'E001')->value('WORKDEPT'));
     }
 
-    public function test_non_admin_can_save_profile_without_department_change(): void
+    public function test_non_admin_cannot_open_employee_edit_modal(): void
     {
         $user = User::factory()->create(['is_admin' => false]);
 
-        Livewire::actingAs($user)
+        $component = Livewire::actingAs($user)
             ->test(PeopleEmployeesList::class)
-            ->call('openEditModal', 'E001')
-            ->set('editKoreanName', '홍길동')
-            ->set('editEnglishName', 'Hong Gildong')
-            ->set('editJob', '매니저')
-            ->set('editEmail', 'e001@example.com')
-            ->set('editPhone', '010-0000-0000')
-            ->set('editStatus', '1')
-            ->set('editWorkDept', 'A01')
-            ->call('saveEmployee')
-            ->assertHasNoErrors();
+            ->call('openEditModal', 'E001');
 
-        $this->assertSame('홍길동', (string) Employee::query()->where('EMPNO', 'E001')->value('KOREANAME'));
+        $this->assertNotTrue((bool) ($component->get('showEditModal') ?? false));
     }
 
-    public function test_admin_can_change_employee_department(): void
+    public function test_admin_without_country_manager_role_cannot_change_employee_department(): void
     {
         $admin = User::factory()->admin()->create();
 
-        Livewire::actingAs($admin)
+        $component = Livewire::actingAs($admin)
             ->test(PeopleEmployeesList::class)
-            ->call('openEditModal', 'E001')
-            ->set('editWorkDept', 'A02')
-            ->call('saveEmployee')
-            ->assertHasNoErrors();
+            ->call('openEditModal', 'E001');
 
-        $this->assertSame('A02', (string) Employee::query()->where('EMPNO', 'E001')->value('WORKDEPT'));
+        $this->assertNotTrue((bool) ($component->get('showEditModal') ?? false));
+        $this->assertSame('A01', (string) Employee::query()->where('EMPNO', 'E001')->value('WORKDEPT'));
     }
 
     public function test_country_manager_can_change_employee_department(): void
@@ -178,6 +160,48 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->call('openCreateTeamModal');
 
         $this->assertTrue((bool) ($component->get('showCreateTeamModal') ?? false));
+    }
+
+    public function test_country_manager_can_see_setup_related_sidebar_menus(): void
+    {
+        Employee::query()->create([
+            'EMPNO' => 'DM003',
+            'KOREANAME' => '컨트리매니저3',
+            'ENGLISHNAME' => 'Country Manager Three',
+            'JOB' => 'CountryManager',
+            'EMAIL' => 'dm003@example.com',
+            'PHONENO' => '010-9999-0003',
+            'WORKDEPT' => 'A01',
+            'STATUS' => 1,
+        ]);
+
+        $countryManager = User::factory()->create([
+            'email' => 'dm003@example.com',
+            'is_admin' => false,
+        ]);
+
+        $this->actingAs($countryManager)
+            ->get(route('people.index'))
+            ->assertOk()
+            ->assertSee('Review')
+            ->assertSee('Goal')
+            ->assertSee('Feedback')
+            ->assertSee('Configuration')
+            ->assertSee('Setup');
+    }
+
+    public function test_non_country_manager_cannot_see_setup_related_sidebar_menus(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)
+            ->get(route('people.index'))
+            ->assertOk()
+            ->assertDontSee('>Review<', false)
+            ->assertDontSee('>Goal<', false)
+            ->assertDontSee('>Feedback<', false)
+            ->assertDontSee('>Configuration<', false)
+            ->assertDontSee('>Setup<', false);
     }
 
     public function test_admin_can_register_employee_via_setup(): void
@@ -266,7 +290,7 @@ class PeopleEmployeePermissionsTest extends TestCase
         $this->assertTrue((bool) $newUser->is_gs_brochure_admin);
     }
 
-    public function test_admin_can_update_linked_user_gs_brochure_permission_from_employee_modal(): void
+    public function test_admin_without_country_manager_role_cannot_update_linked_user_gs_brochure_permission_from_employee_modal(): void
     {
         $linkedUser = User::factory()->create([
             'email' => 'e001@example.com',
@@ -276,16 +300,14 @@ class PeopleEmployeePermissionsTest extends TestCase
 
         $admin = User::factory()->admin()->create();
 
-        Livewire::actingAs($admin)
+        $component = Livewire::actingAs($admin)
             ->test(PeopleEmployeesList::class)
-            ->call('openEditModal', 'E001')
-            ->set('editGsBrochureAdmin', true)
-            ->call('saveEmployee')
-            ->assertHasNoErrors();
+            ->call('openEditModal', 'E001');
 
+        $this->assertNotTrue((bool) ($component->get('showEditModal') ?? false));
         $this->assertDatabaseHas('users', [
             'id' => $linkedUser->id,
-            'is_gs_brochure_admin' => true,
+            'is_gs_brochure_admin' => false,
         ]);
     }
 
@@ -299,13 +321,11 @@ class PeopleEmployeePermissionsTest extends TestCase
 
         $user = User::factory()->create(['is_admin' => false]);
 
-        Livewire::actingAs($user)
+        $component = Livewire::actingAs($user)
             ->test(PeopleEmployeesList::class)
-            ->call('openEditModal', 'E001')
-            ->set('editGsBrochureAdmin', true)
-            ->call('saveEmployee')
-            ->assertHasNoErrors();
+            ->call('openEditModal', 'E001');
 
+        $this->assertNotTrue((bool) ($component->get('showEditModal') ?? false));
         $this->assertDatabaseHas('users', [
             'id' => $linkedUser->id,
             'is_gs_brochure_admin' => false,

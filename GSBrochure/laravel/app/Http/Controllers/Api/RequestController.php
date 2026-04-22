@@ -9,6 +9,7 @@ use App\Models\Invoice;
 use App\Models\RequestItem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
@@ -114,6 +115,17 @@ class RequestController extends Controller
             'invoices.*' => 'string',
         ]);
         $invoices = $data['invoices'] ?? [];
+
+        if (!auth()->check()) {
+            $normalizedPhone = preg_replace('/\D/', '', $data['phone']);
+            $verifiedKey = 'phone_verified:' . $normalizedPhone;
+            
+            if (!Cache::get($verifiedKey)) {
+                return response()->json(['error' => '전화번호 인증이 완료되지 않았습니다.'], 422);
+            }
+            
+            Cache::forget($verifiedKey);
+        }
 
         $schoolnameTrimmed = trim($data['schoolname']);
         $requestAddress = isset($data['address']) ? trim($data['address']) : null;

@@ -1,29 +1,17 @@
-<x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Profile') }}
-        </h2>
-    </x-slot>
+<x-layouts.app title="프로필 설정">
+    <div class="mx-auto w-full max-w-4xl space-y-6">
+        <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            @include('profile.partials.update-profile-information-form')
+        </section>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-            <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
-                <div class="max-w-xl">
-                    @include('profile.partials.update-profile-information-form')
-                </div>
-            </div>
+        <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            @include('profile.partials.update-password-form')
+        </section>
 
-            <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
-                <div class="max-w-xl">
-                    @include('profile.partials.update-password-form')
-                </div>
-            </div>
-
-            <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
-                <div class="max-w-xl">
-                    @include('profile.partials.delete-user-form')
-                </div>
-            </div>
-        </div>
+        @if (auth()->user()?->hasFullAccess())
+            <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                @include('profile.partials.delete-user-form')
+            </section>
+        @endif
     </div>
-</x-app-layout>
+</x-layouts.app>
