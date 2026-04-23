@@ -117,13 +117,13 @@ class BrochureController extends Controller
 
     public function uploadImage(Request $request, string $id): JsonResponse
     {
-        // max 단위는 KB. 브로셔 표지용으로 30MB까지 허용합니다.
+        // max 단위는 KB. 브로셔 표지용으로 40MB까지 허용합니다.
         $request->validate([
-            'image' => ['required', 'file', 'mimes:jpg,jpeg,png,gif,webp,bmp,avif', 'max:30720'],
+            'image' => ['required', 'file', 'mimes:jpg,jpeg,png,gif,webp,bmp,avif', 'max:40960'],
         ], [
             'image.required' => '이미지 파일을 선택해 주세요.',
             'image.mimes' => 'jpg, jpeg, png, gif, webp, bmp, avif 형식의 이미지만 업로드할 수 있습니다. (heic/heif는 지원하지 않습니다.)',
-            'image.max' => '이미지 용량은 30MB 이하로 올려 주세요.',
+            'image.max' => '이미지 용량은 40MB 이하로 올려 주세요.',
             'image.uploaded' => '이미지 업로드에 실패했습니다. 서버 업로드 제한(php.ini upload_max_filesize/post_max_size)보다 큰 파일일 수 있습니다.',
         ]);
 

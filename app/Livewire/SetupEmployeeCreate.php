@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class SetupEmployeeCreate extends Component
@@ -33,20 +32,11 @@ class SetupEmployeeCreate extends Component
 
     public ?string $hireDate = null;
 
-    public bool $issueLoginAccount = false;
-
     public bool $isGsBrochureAdmin = false;
 
     public function mount(): void
     {
         Gate::authorize('manageEmployeeDepartment');
-    }
-
-    public function updatedIssueLoginAccount($value): void
-    {
-        if (! (bool) $value) {
-            $this->isGsBrochureAdmin = false;
-        }
     }
 
     public function save(): void
@@ -67,10 +57,7 @@ class SetupEmployeeCreate extends Component
             $jobRules[] = Rule::in($jobOptions);
         }
 
-        $emailRules = ['required', 'email', 'max:100'];
-        if ($this->issueLoginAccount) {
-            $emailRules[] = Rule::unique('users', 'email');
-        }
+        $emailRules = ['required', 'email', 'max:100', Rule::unique('users', 'email')];
 
         $validated = $this->validate([
             'empNo' => ['required', 'string', 'max:20', Rule::unique('employee', 'EMPNO')],
@@ -82,7 +69,6 @@ class SetupEmployeeCreate extends Component
             'status' => ['nullable', 'in:0,1'],
             'workDept' => ['required', 'string', Rule::in($deptCodes)],
             'hireDate' => ['nullable', 'date'],
-            'issueLoginAccount' => ['boolean'],
             'isGsBrochureAdmin' => ['boolean'],
         ], [
             'empNo.required' => '사번은 필수입니다.',
@@ -115,32 +101,24 @@ class SetupEmployeeCreate extends Component
                 'HIREDATE' => $validated['hireDate'] ?? null,
             ]);
 
-            if (! $this->issueLoginAccount) {
-                return;
-            }
-
             User::query()->create([
                 'name' => trim($validated['koreanName']),
                 'email' => $email,
+                'employee_empno' => trim($validated['empNo']),
                 'password' => Str::random(48),
                 'is_admin' => false,
                 'is_gs_brochure_admin' => (bool) ($validated['isGsBrochureAdmin'] ?? false),
+                'is_active' => true,
                 'email_verified_at' => null,
             ]);
-
-            $status = Password::sendResetLink(['email' => $email]);
-
-            if ($status !== Password::RESET_LINK_SENT) {
-                throw ValidationException::withMessages([
-                    'email' => [__($status)],
-                ]);
-            }
         });
 
-        if ($this->issueLoginAccount) {
+        $resetLinkSent = $this->sendResetLinkSafely($email);
+        if ($resetLinkSent) {
             session()->flash('success', '신규 직원이 등록되었고, 로그인 비밀번호 설정 안내 메일을 발송했습니다.');
         } else {
-            session()->flash('success', '신규 직원이 등록되었습니다.');
+            session()->flash('success', '신규 직원과 로그인 계정이 생성되었습니다.');
+            session()->flash('error', '메일 서버 인증 문제로 비밀번호 설정 메일 발송에 실패했습니다. 메일 설정을 확인해 주세요.');
         }
 
         $this->redirect(route('people.index'), navigate: true);
@@ -172,5 +150,18 @@ class SetupEmployeeCreate extends Component
             ->distinct()
             ->orderBy('JOB')
             ->pluck('JOB');
+    }
+
+    private function sendResetLinkSafely(string $email): bool
+    {
+        try {
+            $status = Password::sendResetLink(['email' => $email]);
+
+            return $status === Password::RESET_LINK_SENT;
+        } catch (\Throwable $e) {
+            report($e);
+
+            return false;
+        }
     }
 }

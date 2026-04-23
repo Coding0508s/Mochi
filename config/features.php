@@ -13,4 +13,13 @@ return [
     */
     'institution_create_enabled' => (bool) env('INSTITUTION_CREATE_ENABLED', false),
 
+    /*
+    |--------------------------------------------------------------------------
+    | People-Account 분리/운영 플래그
+    |--------------------------------------------------------------------------
+    */
+    'people_use_account_link' => (bool) env('PEOPLE_USE_ACCOUNT_LINK', true),
+    'people_account_email_fallback_enabled' => (bool) env('PEOPLE_ACCOUNT_EMAIL_FALLBACK_ENABLED', false),
+    'people_modal_account_edit_enabled' => (bool) env('PEOPLE_MODAL_ACCOUNT_EDIT_ENABLED', true),
+
 ];

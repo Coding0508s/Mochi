@@ -82,6 +82,14 @@
                 </button>
             @endif
 
+            @if($canManageEmployeeDepartment)
+                <button type="button"
+                   wire:click="openCreateEmployeeModal"
+                   class="py-2 px-3 text-sm text-white bg-sky-600 rounded-lg hover:bg-sky-700 cursor-pointer">
+                    직원 등록
+                </button>
+            @endif
+
             @if($canManageEmployees)
                 <button type="button"
                         wire:click="openCreateTeamModal"
@@ -161,6 +169,140 @@
         @endif
     </div>
 
+    @if($showCreateEmployeeModal)
+        <div class="mochi-modal-overlay" wire:key="employee-create-modal">
+            <div class="mochi-modal-shell max-w-3xl">
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-lg font-semibold text-gray-800">직원 등록</h3>
+                    <button type="button"
+                            wire:click="closeCreateEmployeeModal"
+                            class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <form wire:submit.prevent="createEmployee" class="px-6 py-5 space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">사번 <span class="text-red-500">*</span></label>
+                            <input type="text" wire:model.defer="createEmpNo" maxlength="20"
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   placeholder="예: E2026001"/>
+                            @error('createEmpNo') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">이름(한글) <span class="text-red-500">*</span></label>
+                            <input type="text" wire:model.defer="createKoreanName" maxlength="20"
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                            @error('createKoreanName') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">영어 이름 <span class="text-red-500">*</span></label>
+                            <input type="text" wire:model.defer="createEnglishName" maxlength="50"
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                            @error('createEnglishName') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">직책 <span class="text-red-500">*</span></label>
+                            @if($jobOptions->isEmpty())
+                                <input type="text" wire:model.defer="createJob" maxlength="100"
+                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                       placeholder="직책을 입력하세요"/>
+                                <p class="mt-1 text-[11px] text-amber-700">기존 직원 데이터가 없어 자유 입력입니다.</p>
+                            @else
+                                <select wire:model.defer="createJob"
+                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">직책 선택</option>
+                                    @foreach($jobOptions as $job)
+                                        <option value="{{ $job }}">{{ $job }}</option>
+                                    @endforeach
+                                </select>
+                            @endif
+                            @error('createJob') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">부서(팀) <span class="text-red-500">*</span></label>
+                            <select wire:model.defer="createWorkDept"
+                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">부서 선택</option>
+                                @foreach($deptOptions as $dept)
+                                    <option value="{{ $dept->WORKDEPT }}">
+                                        {{ $dept->dept_name ?: $dept->WORKDEPT }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('createWorkDept') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">이메일 <span class="text-red-500">*</span></label>
+                            <input type="email" wire:model.defer="createEmail" maxlength="100"
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                            @error('createEmail') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+
+                            <p class="mt-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-700">
+                                직원 등록 시 로그인 계정이 자동으로 생성되며, 비밀번호 재설정 링크 메일이 발송됩니다.
+                            </p>
+
+                            <label class="mt-3 flex items-start gap-2 cursor-pointer select-none">
+                                <input type="checkbox" wire:model.defer="createIsGsBrochureAdmin"
+                                       class="mt-0.5 rounded border-gray-300 text-[#2b78c5] focus:ring-[#2b78c5]"/>
+                                <span class="text-sm text-gray-700 leading-snug">
+                                    GS Brochure 관리 권한 부여
+                                </span>
+                            </label>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">연락처 <span class="text-red-500">*</span></label>
+                            <input type="text" wire:model.defer="createPhone" maxlength="20"
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                            @error('createPhone') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">상태</label>
+                            <select wire:model.defer="createStatus"
+                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">미지정</option>
+                                <option value="1">재직</option>
+                                <option value="0">퇴사</option>
+                            </select>
+                            @error('createStatus') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">입사일</label>
+                            <input type="date" wire:model.defer="createHireDate"
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                            @error('createHireDate') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button type="button"
+                                wire:click="closeCreateEmployeeModal"
+                                class="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">
+                            취소
+                        </button>
+                        <button type="submit"
+                                class="px-4 py-2 text-sm text-white bg-[#2b78c5] rounded-lg hover:bg-[#256bb0] cursor-pointer"
+                                wire:loading.attr="disabled"
+                                wire:target="createEmployee">
+                            등록
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
     @if($showEditModal)
         <div class="mochi-modal-overlay" wire:key="employee-edit-modal">
             <div class="mochi-modal-shell max-w-3xl">
@@ -228,28 +370,49 @@
                             @error('editStatus') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
 
-                        @can('manageEmployeeDepartment')
-                            <div class="md:col-span-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
+                        @if($canManageUserAccounts && $isPeopleModalAccountEditEnabled)
+                            <div class="md:col-span-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 space-y-3">
+                                <div class="text-xs font-semibold text-gray-500">계정 권한</div>
+
+                                <div class="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                                    계정 활성은 직원 상태와 자동 동기화됩니다.
+                                    <span class="ml-1 font-semibold">
+                                        {{ $editStatus === '0' ? '현재 비활성(로그인 불가)' : '현재 활성(로그인 가능)' }}
+                                    </span>
+                                </div>
+
+                                <label class="flex items-start gap-2 cursor-pointer select-none">
+                                    <input type="checkbox"
+                                           wire:model.defer="editUserIsAdmin"
+                                           class="mt-0.5 rounded border-gray-300 text-[#2b78c5] focus:ring-[#2b78c5]"/>
+                                    <span class="text-sm text-gray-700 leading-snug">
+                                        관리자 권한
+                                        <span class="mt-0.5 block text-[11px] font-normal text-gray-500">
+                                            Setup, 팀 관리 등 관리자 기능 접근 권한입니다.
+                                        </span>
+                                    </span>
+                                </label>
+                                @error('editUserIsAdmin') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+
                                 <label class="flex items-start gap-2 cursor-pointer select-none">
                                     <input type="checkbox"
                                            wire:model.defer="editGsBrochureAdmin"
-                                           @disabled(! $hasLinkedLoginAccount)
-                                           class="mt-0.5 rounded border-gray-300 text-[#2b78c5] focus:ring-[#2b78c5] disabled:cursor-not-allowed disabled:opacity-60"/>
+                                           class="mt-0.5 rounded border-gray-300 text-[#2b78c5] focus:ring-[#2b78c5]"/>
                                     <span class="text-sm text-gray-700 leading-snug">
-                                        GS Brochure 관리 권한
-                                        @if($hasLinkedLoginAccount)
-                                            <span class="mt-0.5 block text-[11px] font-normal text-gray-500">
-                                                체크 시 해당 로그인 계정은 GS Brochure 관리자 화면 접근이 가능합니다.
-                                            </span>
-                                        @else
-                                            <span class="mt-0.5 block text-[11px] font-normal text-amber-700">
-                                                연결된 로그인 계정이 없어 권한을 변경할 수 없습니다.
-                                            </span>
-                                        @endif
+                                        GS Brochure 권한
+                                        <span class="mt-0.5 block text-[11px] font-normal text-gray-500">
+                                            GS Brochure 관리자 화면 접근 권한입니다.
+                                        </span>
                                     </span>
                                 </label>
+
+                                @if(! $hasLinkedLoginAccount)
+                                    <p class="text-[11px] text-amber-700">
+                                        연결된 로그인 계정이 없어도 저장 시 현재 이메일로 계정을 자동 생성합니다.
+                                    </p>
+                                @endif
                             </div>
-                        @endcan
+                        @endif
 
                         <div class="md:col-span-2">
                             <label class="block text-xs font-semibold text-gray-500 mb-1">부서(팀)</label>

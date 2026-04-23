@@ -7,7 +7,10 @@ use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -53,7 +56,35 @@ class PeopleEmployeesList extends Component
 
     public string $deleteDeptNo = '';
 
+    public bool $showCreateEmployeeModal = false;
+
+    public string $createEmpNo = '';
+
+    public string $createKoreanName = '';
+
+    public string $createEnglishName = '';
+
+    public string $createJob = '';
+
+    public string $createEmail = '';
+
+    public string $createPhone = '';
+
+    public string $createStatus = '1';
+
+    public string $createWorkDept = '';
+
+    public ?string $createHireDate = null;
+
+    public bool $createIsGsBrochureAdmin = false;
+
     public bool $hasLinkedLoginAccount = false;
+
+    public ?int $linkedUserId = null;
+
+    public bool $editUserIsActive = true;
+
+    public bool $editUserIsAdmin = false;
 
     public bool $editGsBrochureAdmin = false;
 
@@ -80,6 +111,13 @@ class PeopleEmployeesList extends Component
     public function updatingFilterDept(): void
     {
         $this->resetPage();
+    }
+
+    public function updatedEditStatus($value): void
+    {
+        $this->editUserIsActive = $this->shouldActivateUserFromEmployeeStatus(
+            $value === null ? null : (string) $value
+        );
     }
 
     public function sort(string $field): void
@@ -112,14 +150,12 @@ class PeopleEmployeesList extends Component
         $this->editStatus = $employee->STATUS === null ? '' : (string) $employee->STATUS;
         $this->editWorkDept = (string) ($employee->WORKDEPT ?? '');
 
-        $normalizedEmail = mb_strtolower(trim((string) ($employee->EMAIL ?? '')));
-        $linkedUser = $normalizedEmail === ''
-            ? null
-            : User::query()
-                ->whereRaw('LOWER(TRIM(COALESCE(email, \'\'))) = ?', [$normalizedEmail])
-                ->first(['id', 'is_gs_brochure_admin']);
+        $linkedUser = $this->resolveLinkedUser($employee);
 
         $this->hasLinkedLoginAccount = $linkedUser !== null;
+        $this->linkedUserId = $linkedUser?->id;
+        $this->editUserIsActive = $this->shouldActivateUserFromEmployeeStatus($this->editStatus);
+        $this->editUserIsAdmin = (bool) ($linkedUser?->is_admin ?? false);
         $this->editGsBrochureAdmin = (bool) ($linkedUser?->is_gs_brochure_admin ?? false);
 
         $this->resetErrorBag();
@@ -140,6 +176,9 @@ class PeopleEmployeesList extends Component
         $this->editStatus = '';
         $this->editWorkDept = '';
         $this->hasLinkedLoginAccount = false;
+        $this->linkedUserId = null;
+        $this->editUserIsActive = true;
+        $this->editUserIsAdmin = false;
         $this->editGsBrochureAdmin = false;
 
         $this->resetErrorBag();
@@ -171,6 +210,8 @@ class PeopleEmployeesList extends Component
             'editPhone' => ['required', 'string', 'max:20'],
             'editStatus' => ['nullable', 'in:0,1'],
             'editWorkDept' => ['required', 'string', Rule::in($deptCodes)],
+            'editUserIsAdmin' => ['boolean'],
+            'editGsBrochureAdmin' => ['boolean'],
         ], [
             'editKoreanName.required' => '이름(한글)은 필수입니다.',
             'editEnglishName.required' => '영어 이름은 필수입니다.',
@@ -184,46 +225,150 @@ class PeopleEmployeesList extends Component
             'editJob.in' => '직책은 목록에서 선택해 주세요.',
         ]);
 
-        $employee = Employee::query()->where('EMPNO', $this->editingEmpNo)->first();
-        if (! $employee) {
-            $this->addError('editKoreanName', '수정 대상 직원을 찾을 수 없습니다.');
+        $this->editUserIsActive = $this->shouldActivateUserFromEmployeeStatus($validated['editStatus'] ?? null);
 
-            return;
-        }
+        $canManageUserAccounts = Gate::allows('manageUserAccounts')
+            && (bool) config('features.people_modal_account_edit_enabled', true);
+        $newlyCreatedUserEmail = null;
+        $resetLinkSentForNewUser = true;
 
-        $previousWorkDept = (string) ($employee->WORKDEPT ?? '');
-        if ($previousWorkDept !== $validated['editWorkDept']) {
-            Gate::authorize('manageEmployeeDepartment');
-        }
+        try {
+            DB::transaction(function () use ($validated, $canManageUserAccounts, &$newlyCreatedUserEmail): void {
+                $employee = Employee::query()
+                    ->where('EMPNO', $this->editingEmpNo)
+                    ->lockForUpdate()
+                    ->first();
 
-        $employee->KOREANAME = trim($validated['editKoreanName']);
-        $employee->ENGLISHNAME = trim($validated['editEnglishName']);
-        $employee->JOB = trim($validated['editJob']);
-        $employee->EMAIL = trim($validated['editEmail']);
-        $employee->PHONENO = trim($validated['editPhone']);
-        $employee->WORKDEPT = $validated['editWorkDept'];
-        $employee->STATUS = $validated['editStatus'] === '' ? null : (int) $validated['editStatus'];
-        $employee->save();
-
-        if (Gate::allows('manageEmployeeDepartment')) {
-            $normalizedEmail = mb_strtolower(trim($validated['editEmail']));
-            $secureLinkedUser = $normalizedEmail === ''
-                ? null
-                : User::query()
-                    ->whereRaw('LOWER(TRIM(COALESCE(email, \'\'))) = ?', [$normalizedEmail])
-                    ->first(['id']);
-
-            if ($secureLinkedUser) {
-                User::query()
-                    ->whereKey($secureLinkedUser->id)
-                    ->update([
-                        'is_gs_brochure_admin' => $this->editGsBrochureAdmin,
+                if (! $employee) {
+                    throw ValidationException::withMessages([
+                        'editKoreanName' => ['수정 대상 직원을 찾을 수 없습니다.'],
                     ]);
-            }
+                }
+
+                $previousWorkDept = (string) ($employee->WORKDEPT ?? '');
+                if ($previousWorkDept !== $validated['editWorkDept']) {
+                    Gate::authorize('manageEmployeeDepartment');
+                }
+
+                $employee->KOREANAME = trim($validated['editKoreanName']);
+                $employee->ENGLISHNAME = trim($validated['editEnglishName']);
+                $employee->JOB = trim($validated['editJob']);
+                $employee->EMAIL = trim($validated['editEmail']);
+                $employee->PHONENO = trim($validated['editPhone']);
+                $employee->WORKDEPT = $validated['editWorkDept'];
+                $employee->STATUS = $validated['editStatus'] === '' ? null : (int) $validated['editStatus'];
+                $employee->save();
+
+                if (! $canManageUserAccounts) {
+                    return;
+                }
+
+                $currentEmployeeEmpNo = trim((string) ($employee->EMPNO ?? ''));
+                $normalizedEmail = mb_strtolower(trim((string) $validated['editEmail']));
+                if ($normalizedEmail === '') {
+                    throw ValidationException::withMessages([
+                        'editEmail' => ['직원 계정 생성을 위해 이메일은 필수입니다.'],
+                    ]);
+                }
+
+                $linkedUser = null;
+                if ($this->linkedUserId !== null) {
+                    $linkedUser = User::query()
+                        ->whereKey($this->linkedUserId)
+                        ->lockForUpdate()
+                        ->first();
+                }
+
+                if (! $linkedUser) {
+                    $linkedByEmail = User::query()
+                        ->whereRaw('LOWER(TRIM(COALESCE(email, \'\'))) = ?', [$normalizedEmail])
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($linkedByEmail) {
+                        $linkedByEmailEmpNo = trim((string) ($linkedByEmail->employee_empno ?? ''));
+                        if ($linkedByEmailEmpNo !== '' && $linkedByEmailEmpNo !== $currentEmployeeEmpNo) {
+                            throw ValidationException::withMessages([
+                                'editEmail' => ['이미 다른 직원 계정에서 사용 중인 이메일입니다.'],
+                            ]);
+                        }
+
+                        $linkedUser = $linkedByEmail;
+                    } else {
+                        $linkedUser = User::query()->create([
+                            'name' => trim((string) $validated['editKoreanName']),
+                            'email' => $normalizedEmail,
+                            'employee_empno' => $currentEmployeeEmpNo,
+                            'password' => Str::random(48),
+                            'is_admin' => (bool) $this->editUserIsAdmin,
+                            'is_gs_brochure_admin' => (bool) $this->editGsBrochureAdmin,
+                            'is_active' => (bool) $this->editUserIsActive,
+                            'email_verified_at' => null,
+                        ]);
+                        $newlyCreatedUserEmail = $normalizedEmail;
+                    }
+                }
+
+                $emailConflictExists = User::query()
+                    ->whereRaw('LOWER(TRIM(COALESCE(email, \'\'))) = ?', [$normalizedEmail])
+                    ->whereKeyNot($linkedUser->id)
+                    ->exists();
+                if ($emailConflictExists) {
+                    throw ValidationException::withMessages([
+                        'editEmail' => ['이미 다른 로그인 계정에서 사용 중인 이메일입니다.'],
+                    ]);
+                }
+
+                $currentUser = auth()->user();
+                if ($currentUser !== null
+                    && (int) $currentUser->getAuthIdentifier() === (int) $linkedUser->id
+                    && ! $this->editUserIsActive
+                ) {
+                    throw ValidationException::withMessages([
+                        'editStatus' => ['현재 로그인한 계정은 비활성화할 수 없습니다.'],
+                    ]);
+                }
+
+                $isCurrentlyActiveAdmin = (bool) $linkedUser->is_active && (bool) $linkedUser->is_admin;
+                $willRemainActiveAdmin = $this->editUserIsActive && $this->editUserIsAdmin;
+                if ($isCurrentlyActiveAdmin && ! $willRemainActiveAdmin) {
+                    $otherActiveAdminCount = User::query()
+                        ->where('is_active', true)
+                        ->where('is_admin', true)
+                        ->whereKeyNot($linkedUser->id)
+                        ->count();
+
+                    if ($otherActiveAdminCount === 0) {
+                        throw ValidationException::withMessages([
+                            'editUserIsAdmin' => ['마지막 활성 관리자 계정은 관리자 권한을 해제하거나 비활성화할 수 없습니다.'],
+                        ]);
+                    }
+                }
+
+                $linkedUser->forceFill([
+                    'name' => trim((string) $validated['editKoreanName']),
+                    'email' => $normalizedEmail,
+                    'employee_empno' => $currentEmployeeEmpNo,
+                    'is_active' => $this->editUserIsActive,
+                    'is_admin' => $this->editUserIsAdmin,
+                    'is_gs_brochure_admin' => $this->editGsBrochureAdmin,
+                ])->save();
+            });
+        } catch (ValidationException $e) {
+            throw $e;
+        }
+
+        if (is_string($newlyCreatedUserEmail) && $newlyCreatedUserEmail !== '') {
+            $resetLinkSentForNewUser = $this->sendResetLinkSafely($newlyCreatedUserEmail);
         }
 
         $this->closeEditModal();
-        session()->flash('success', '직원 정보가 저장되었습니다.');
+        if ($resetLinkSentForNewUser) {
+            session()->flash('success', '직원 정보가 저장되었습니다.');
+        } else {
+            session()->flash('success', '직원 정보와 로그인 계정이 저장되었습니다.');
+            session()->flash('error', '메일 서버 인증 문제로 비밀번호 설정 메일 발송에 실패했습니다. 메일 설정을 확인해 주세요.');
+        }
     }
 
     public function openCreateTeamModal(): void
@@ -234,6 +379,118 @@ class PeopleEmployeesList extends Component
         $this->resetErrorBag();
         $this->resetValidation();
         $this->showCreateTeamModal = true;
+    }
+
+    public function openCreateEmployeeModal(): void
+    {
+        Gate::authorize('manageEmployeeDepartment');
+
+        $this->createEmpNo = '';
+        $this->createKoreanName = '';
+        $this->createEnglishName = '';
+        $this->createJob = '';
+        $this->createEmail = '';
+        $this->createPhone = '';
+        $this->createStatus = '1';
+        $this->createWorkDept = '';
+        $this->createHireDate = null;
+        $this->createIsGsBrochureAdmin = false;
+        $this->resetErrorBag();
+        $this->resetValidation();
+        $this->showCreateEmployeeModal = true;
+    }
+
+    public function closeCreateEmployeeModal(): void
+    {
+        $this->showCreateEmployeeModal = false;
+        $this->resetErrorBag();
+        $this->resetValidation();
+    }
+
+    public function createEmployee(): void
+    {
+        Gate::authorize('manageEmployeeDepartment');
+
+        $deptCodes = $this->getDeptOptions()
+            ->pluck('WORKDEPT')
+            ->map(fn ($deptCode) => (string) $deptCode)
+            ->all();
+
+        $jobOptions = $this->getJobOptions()
+            ->map(fn ($job) => (string) $job)
+            ->all();
+
+        $jobRules = ['required', 'string', 'max:100'];
+        if ($jobOptions !== []) {
+            $jobRules[] = Rule::in($jobOptions);
+        }
+
+        $emailRules = ['required', 'email', 'max:100', Rule::unique('users', 'email')];
+
+        $validated = $this->validate([
+            'createEmpNo' => ['required', 'string', 'max:20', Rule::unique('employee', 'EMPNO')],
+            'createKoreanName' => ['required', 'string', 'max:20'],
+            'createEnglishName' => ['required', 'string', 'max:50'],
+            'createJob' => $jobRules,
+            'createEmail' => $emailRules,
+            'createPhone' => ['required', 'string', 'max:20'],
+            'createStatus' => ['nullable', 'in:0,1'],
+            'createWorkDept' => ['required', 'string', Rule::in($deptCodes)],
+            'createHireDate' => ['nullable', 'date'],
+            'createIsGsBrochureAdmin' => ['boolean'],
+        ], [
+            'createEmpNo.required' => '사번은 필수입니다.',
+            'createEmpNo.unique' => '이미 등록된 사번입니다.',
+            'createKoreanName.required' => '이름(한글)은 필수입니다.',
+            'createEnglishName.required' => '영어 이름은 필수입니다.',
+            'createJob.required' => '직책은 필수입니다.',
+            'createEmail.required' => '이메일은 필수입니다.',
+            'createEmail.email' => '이메일 형식이 올바르지 않습니다.',
+            'createEmail.unique' => '이미 로그인 계정이 있는 이메일입니다. 다른 이메일을 쓰거나 계정 발급을 해제하세요.',
+            'createPhone.required' => '연락처는 필수입니다.',
+            'createWorkDept.required' => '부서는 필수입니다.',
+            'createWorkDept.in' => '선택 가능한 부서를 선택해 주세요.',
+            'createStatus.in' => '상태 값이 올바르지 않습니다.',
+            'createJob.in' => '직책은 목록에서 선택해 주세요.',
+        ]);
+
+        $email = strtolower(trim($validated['createEmail']));
+
+        DB::transaction(function () use ($validated, $email): void {
+            Employee::query()->create([
+                'EMPNO' => trim($validated['createEmpNo']),
+                'KOREANAME' => trim($validated['createKoreanName']),
+                'ENGLISHNAME' => trim($validated['createEnglishName']),
+                'JOB' => trim($validated['createJob']),
+                'EMAIL' => $email,
+                'PHONENO' => trim($validated['createPhone']),
+                'WORKDEPT' => $validated['createWorkDept'],
+                'STATUS' => $validated['createStatus'] === '' || $validated['createStatus'] === null ? null : (int) $validated['createStatus'],
+                'HIREDATE' => $validated['createHireDate'] ?? null,
+            ]);
+
+            User::query()->create([
+                'name' => trim($validated['createKoreanName']),
+                'email' => $email,
+                'employee_empno' => trim($validated['createEmpNo']),
+                'password' => Str::random(48),
+                'is_admin' => false,
+                'is_gs_brochure_admin' => (bool) ($validated['createIsGsBrochureAdmin'] ?? false),
+                'is_active' => true,
+                'email_verified_at' => null,
+            ]);
+        });
+
+        $resetLinkSent = $this->sendResetLinkSafely($email);
+
+        $this->closeCreateEmployeeModal();
+        $this->resetPage();
+        if ($resetLinkSent) {
+            session()->flash('success', '신규 직원이 등록되었고, 로그인 비밀번호 설정 안내 메일을 발송했습니다.');
+        } else {
+            session()->flash('success', '신규 직원과 로그인 계정이 등록되었습니다.');
+            session()->flash('error', '메일 서버 인증 문제로 비밀번호 설정 메일 발송에 실패했습니다. 메일 설정을 확인해 주세요.');
+        }
     }
 
     public function closeCreateTeamModal(): void
@@ -391,6 +648,9 @@ class PeopleEmployeesList extends Component
             'jobOptions' => $jobOptions,
             'currentTeamLabel' => $this->resolveCurrentTeamLabel($deptOptions),
             'canManageEmployees' => Gate::allows('editEmployeeProfile'),
+            'canManageEmployeeDepartment' => Gate::allows('manageEmployeeDepartment'),
+            'canManageUserAccounts' => Gate::allows('manageUserAccounts'),
+            'isPeopleModalAccountEditEnabled' => (bool) config('features.people_modal_account_edit_enabled', true),
         ]);
     }
 
@@ -426,6 +686,54 @@ class PeopleEmployeesList extends Component
             ->distinct()
             ->orderBy('JOB')
             ->pluck('JOB');
+    }
+
+    private function resolveLinkedUser(Employee $employee): ?User
+    {
+        $employeeEmpNo = trim((string) ($employee->EMPNO ?? ''));
+        $useAccountLink = (bool) config('features.people_use_account_link', true);
+
+        if ($useAccountLink && $employeeEmpNo !== '') {
+            $linkedByEmpNo = User::query()
+                ->where('employee_empno', $employeeEmpNo)
+                ->first(['id', 'is_active', 'is_admin', 'is_gs_brochure_admin']);
+
+            if ($linkedByEmpNo) {
+                return $linkedByEmpNo;
+            }
+        }
+
+        $allowEmailFallback = (bool) config('features.people_account_email_fallback_enabled', false);
+        if (! $allowEmailFallback) {
+            return null;
+        }
+
+        $normalizedEmail = mb_strtolower(trim((string) ($employee->EMAIL ?? '')));
+        if ($normalizedEmail === '') {
+            return null;
+        }
+
+        return User::query()
+            ->whereRaw('LOWER(TRIM(COALESCE(email, \'\'))) = ?', [$normalizedEmail])
+            ->first(['id', 'is_active', 'is_admin', 'is_gs_brochure_admin']);
+    }
+
+    private function shouldActivateUserFromEmployeeStatus(?string $employeeStatus): bool
+    {
+        return (string) $employeeStatus !== '0';
+    }
+
+    private function sendResetLinkSafely(string $email): bool
+    {
+        try {
+            $status = Password::sendResetLink(['email' => $email]);
+
+            return $status === Password::RESET_LINK_SENT;
+        } catch (\Throwable $e) {
+            report($e);
+
+            return false;
+        }
     }
 
     private function nextDeptNo(): string

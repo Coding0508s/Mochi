@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class BrochureController extends Controller
 {
@@ -21,6 +22,7 @@ class BrochureController extends Controller
             $tableList = $driver === 'pgsql'
                 ? array_column(DB::select("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename"), 'tablename')
                 : array_map(fn ($t) => $t->name, DB::select("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"));
+
             return response()->json([
                 'ok' => true,
                 'database' => 'connected',
@@ -35,6 +37,7 @@ class BrochureController extends Controller
     public function index(): JsonResponse
     {
         $brochures = Brochure::orderBy('id')->get();
+
         return response()->json($brochures);
     }
 
@@ -86,9 +89,11 @@ class BrochureController extends Controller
                 'before_stock' => 0,
                 'after_stock' => $stock,
             ]));
+
             return response()->json(['id' => $brochure->id, 'name' => $name, 'stock' => $brochure->stock]);
         } catch (\Throwable $e) {
-            \Log::error('Brochure store error: ' . $e->getMessage(), ['exception' => $e]);
+            \Log::error('Brochure store error: '.$e->getMessage(), ['exception' => $e]);
+
             return response()->json([
                 'error' => $e->getMessage() ?: '브로셔 저장 중 오류가 발생했습니다.',
             ], 500);
@@ -112,6 +117,7 @@ class BrochureController extends Controller
         }
         $brochure->fill($data);
         $brochure->save();
+
         return response()->json(['success' => true]);
     }
 
@@ -120,30 +126,31 @@ class BrochureController extends Controller
         try {
             $file = $request->file('image');
             if (! $file || ! $file->isValid()) {
-                $msg = '이미지 업로드에 실패했습니다. 파일 크기(최대 2MB)를 확인하고, 서버의 upload_max_filesize·post_max_size 설정을 확인해 주세요.';
+                $msg = '이미지 업로드에 실패했습니다. 파일 크기(최대 40MB)를 확인하고, 서버의 upload_max_filesize·post_max_size 설정을 확인해 주세요.';
+
                 return response()->json(['error' => $msg, 'errors' => ['image' => [$msg]]], 422);
             }
             $request->validate([
-                'image' => 'required|file|mimes:jpeg,jpg,png,gif,webp|max:2048',
+                'image' => 'required|file|mimes:jpeg,jpg,png,gif,webp|max:40960',
             ], [
                 'image.required' => '이미지 파일을 선택해 주세요.',
-                'image.file' => '이미지 업로드에 실패했습니다. 파일 크기(최대 2MB)를 확인해 주세요.',
-                'image.uploaded' => '이미지 업로드에 실패했습니다. 파일 크기(최대 2MB)와 서버 업로드 제한을 확인해 주세요.',
+                'image.file' => '이미지 업로드에 실패했습니다. 파일 크기(최대 40MB)를 확인해 주세요.',
+                'image.uploaded' => '이미지 업로드에 실패했습니다. 파일 크기(최대 40MB)와 서버 업로드 제한을 확인해 주세요.',
                 'image.mimes' => 'JPEG, PNG, GIF, WebP 형식만 가능합니다.',
-                'image.max' => '이미지 크기는 2MB 이하여야 합니다.',
+                'image.max' => '이미지 크기는 40MB 이하여야 합니다.',
             ]);
             $brochure = Brochure::findOrFail($id);
             $ext = $file->getClientOriginalExtension() ?: $file->guessExtension();
             if (! in_array(strtolower((string) $ext), ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
                 $ext = 'jpg';
             }
-            $path = 'brochures/' . $id . '_' . Str::uuid() . '.' . $ext;
+            $path = 'brochures/'.$id.'_'.Str::uuid().'.'.$ext;
 
             $oldUrl = $brochure->image_url;
             if (is_string($oldUrl) && $oldUrl !== '') {
                 $prefix = '/storage/brochures/';
                 if (str_starts_with($oldUrl, $prefix) || str_contains($oldUrl, '/storage/brochures/')) {
-                    $oldPath = 'brochures/' . basename(parse_url($oldUrl, PHP_URL_PATH));
+                    $oldPath = 'brochures/'.basename(parse_url($oldUrl, PHP_URL_PATH));
                     if (Storage::disk('public')->exists($oldPath)) {
                         Storage::disk('public')->delete($oldPath);
                     }
@@ -155,10 +162,11 @@ class BrochureController extends Controller
             $brochure->update(['image_url' => Storage::url($path)]);
 
             return response()->json(['image_url' => $brochure->fresh()->image_url]);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             throw $e;
         } catch (\Throwable $e) {
-            \Log::error('Brochure uploadImage error: ' . $e->getMessage(), ['id' => $id, 'exception' => $e]);
+            \Log::error('Brochure uploadImage error: '.$e->getMessage(), ['id' => $id, 'exception' => $e]);
+
             return response()->json(['error' => $e->getMessage() ?: '이미지 업로드 중 오류가 발생했습니다.'], 500);
         }
     }
@@ -170,13 +178,14 @@ class BrochureController extends Controller
         if (is_string($oldUrl) && $oldUrl !== '') {
             $prefix = '/storage/brochures/';
             if (str_starts_with($oldUrl, $prefix) || str_contains($oldUrl, '/storage/brochures/')) {
-                $oldPath = 'brochures/' . basename(parse_url($oldUrl, PHP_URL_PATH));
+                $oldPath = 'brochures/'.basename(parse_url($oldUrl, PHP_URL_PATH));
                 if (Storage::disk('public')->exists($oldPath)) {
                     Storage::disk('public')->delete($oldPath);
                 }
             }
         }
         $brochure->update(['image_url' => null]);
+
         return response()->json(['success' => true]);
     }
 
@@ -194,6 +203,7 @@ class BrochureController extends Controller
             }
             throw $e;
         }
+
         return response()->json(['success' => true]);
     }
 
@@ -228,6 +238,7 @@ class BrochureController extends Controller
                 'memo' => $memo,
             ]);
         }
+
         return response()->json(['success' => true, 'stock' => $newStock]);
     }
 
@@ -265,9 +276,10 @@ class BrochureController extends Controller
                 'quantity' => $quantity,
                 'before_stock' => $beforeStock,
                 'after_stock' => $newStock,
-                'memo' => '[화성물류] ' . $memo,
+                'memo' => '[화성물류] '.$memo,
             ]);
         }
+
         return response()->json(['success' => true, 'stock_warehouse' => $newStock]);
     }
 
@@ -299,7 +311,7 @@ class BrochureController extends Controller
             'last_stock_quantity' => $quantity,
             'last_stock_date' => $date,
         ]);
-        $memoText = '물류창고→본사 이동' . ($memo ? ' - ' . $memo : '');
+        $memoText = '물류창고→본사 이동'.($memo ? ' - '.$memo : '');
         // 물류센터 입출고 내역용 (물류 재고 감소)
         StockHistory::create([
             'type' => '이동',
@@ -328,6 +340,7 @@ class BrochureController extends Controller
             'after_stock' => $hqBefore + $quantity,
             'memo' => $memoText,
         ]);
+
         return response()->json([
             'success' => true,
             'stock_warehouse' => $warehouseBefore - $quantity,

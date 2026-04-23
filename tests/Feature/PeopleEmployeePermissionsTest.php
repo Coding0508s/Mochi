@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
@@ -192,9 +193,9 @@ class PeopleEmployeePermissionsTest extends TestCase
 
     public function test_non_country_manager_cannot_see_setup_related_sidebar_menus(): void
     {
-        $admin = User::factory()->admin()->create();
+        $user = User::factory()->create(['is_admin' => false]);
 
-        $this->actingAs($admin)
+        $this->actingAs($user)
             ->get(route('people.index'))
             ->assertOk()
             ->assertDontSee('>Review<', false)
@@ -204,8 +205,86 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->assertDontSee('>Setup<', false);
     }
 
+    public function test_admin_can_see_setup_related_sidebar_menus(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)
+            ->get(route('people.index'))
+            ->assertOk()
+            ->assertSee('Review')
+            ->assertSee('Goal')
+            ->assertSee('Feedback')
+            ->assertSee('Configuration')
+            ->assertSee('Setup');
+    }
+
+    public function test_admin_can_see_employee_register_button_on_people_page(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)
+            ->get(route('people.index'))
+            ->assertOk()
+            ->assertSee('직원 등록');
+    }
+
+    public function test_non_admin_cannot_see_employee_register_button_on_people_page(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+
+        $this->actingAs($user)
+            ->get(route('people.index'))
+            ->assertOk()
+            ->assertDontSee('직원 등록');
+    }
+
+    public function test_admin_can_open_employee_register_modal_from_people_page(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $component = Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openCreateEmployeeModal');
+
+        $this->assertTrue((bool) ($component->get('showCreateEmployeeModal') ?? false));
+    }
+
+    public function test_admin_can_register_employee_via_people_modal(): void
+    {
+        Notification::fake();
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openCreateEmployeeModal')
+            ->set('createEmpNo', 'E996')
+            ->set('createKoreanName', '모달신규')
+            ->set('createEnglishName', 'Modal New')
+            ->set('createJob', '매니저')
+            ->set('createEmail', 'modal-new@example.com')
+            ->set('createPhone', '010-1111-9999')
+            ->set('createWorkDept', 'A01')
+            ->set('createStatus', '1')
+            ->call('createEmployee')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('employee', [
+            'EMPNO' => 'E996',
+            'WORKDEPT' => 'A01',
+            'EMAIL' => 'modal-new@example.com',
+        ]);
+
+        $newUser = User::query()->where('email', 'modal-new@example.com')->first();
+        $this->assertNotNull($newUser);
+        Notification::assertSentTo($newUser, ResetPassword::class);
+    }
+
     public function test_admin_can_register_employee_via_setup(): void
     {
+        Notification::fake();
+
         $admin = User::factory()->admin()->create();
 
         Livewire::actingAs($admin)
@@ -228,10 +307,12 @@ class PeopleEmployeePermissionsTest extends TestCase
             'EMAIL' => 'new@example.com',
         ]);
 
-        $this->assertNull(User::query()->where('email', 'new@example.com')->first());
+        $newUser = User::query()->where('email', 'new@example.com')->first();
+        $this->assertNotNull($newUser);
+        Notification::assertSentTo($newUser, ResetPassword::class);
     }
 
-    public function test_register_employee_with_login_account_creates_user_and_sends_reset_notification(): void
+    public function test_register_employee_via_setup_always_creates_user_and_sends_reset_notification(): void
     {
         Notification::fake();
 
@@ -247,7 +328,6 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->set('phone', '010-3333-4444')
             ->set('workDept', 'A01')
             ->set('status', '1')
-            ->set('issueLoginAccount', true)
             ->call('save')
             ->assertHasNoErrors()
             ->assertRedirect(route('people.index', [], false));
@@ -264,7 +344,7 @@ class PeopleEmployeePermissionsTest extends TestCase
         Notification::assertSentTo($newUser, ResetPassword::class);
     }
 
-    public function test_register_employee_with_login_account_can_assign_gs_brochure_admin_permission(): void
+    public function test_register_employee_via_setup_can_assign_gs_brochure_admin_permission(): void
     {
         Notification::fake();
 
@@ -280,7 +360,6 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->set('phone', '010-7777-9999')
             ->set('workDept', 'A01')
             ->set('status', '1')
-            ->set('issueLoginAccount', true)
             ->set('isGsBrochureAdmin', true)
             ->call('save')
             ->assertHasNoErrors();
@@ -348,10 +427,207 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->set('phone', '010-0000-0001')
             ->set('workDept', 'A01')
             ->set('status', '1')
-            ->set('issueLoginAccount', true)
             ->call('save')
             ->assertHasErrors(['email']);
 
         $this->assertDatabaseMissing('employee', ['EMPNO' => 'E777']);
+    }
+
+    public function test_user_without_manage_user_accounts_gate_cannot_see_or_save_account_checkboxes_from_employee_modal(): void
+    {
+        $linkedUser = User::factory()->create([
+            'employee_empno' => 'E001',
+            'is_active' => true,
+            'is_admin' => false,
+            'is_gs_brochure_admin' => false,
+        ]);
+
+        $countryManager = $this->createCountryManagerUser('DM010', 'dm010@example.com');
+
+        Gate::define('manageUserAccounts', fn (?User $user): bool => false);
+
+        Livewire::actingAs($countryManager)
+            ->test(PeopleEmployeesList::class)
+            ->call('openEditModal', 'E001')
+            ->assertSet('hasLinkedLoginAccount', true)
+            ->assertDontSee('계정 권한')
+            ->set('editUserIsAdmin', true)
+            ->set('editGsBrochureAdmin', true)
+            ->call('saveEmployee')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $linkedUser->id,
+            'is_active' => true,
+            'is_admin' => false,
+            'is_gs_brochure_admin' => false,
+        ]);
+    }
+
+    public function test_user_with_manage_user_accounts_gate_can_save_account_checkboxes_from_employee_modal(): void
+    {
+        $linkedUser = User::factory()->create([
+            'employee_empno' => 'E001',
+            'is_active' => true,
+            'is_admin' => false,
+            'is_gs_brochure_admin' => false,
+        ]);
+
+        $countryManager = $this->createCountryManagerUser('DM011', 'dm011@example.com');
+
+        Livewire::actingAs($countryManager)
+            ->test(PeopleEmployeesList::class)
+            ->call('openEditModal', 'E001')
+            ->assertSet('hasLinkedLoginAccount', true)
+            ->assertSee('계정 권한')
+            ->set('editStatus', '0')
+            ->set('editUserIsAdmin', true)
+            ->set('editGsBrochureAdmin', true)
+            ->call('saveEmployee')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $linkedUser->id,
+            'is_active' => false,
+            'is_admin' => true,
+            'is_gs_brochure_admin' => true,
+        ]);
+    }
+
+    public function test_user_cannot_deactivate_own_account_from_employee_modal(): void
+    {
+        Employee::query()->create([
+            'EMPNO' => 'DM020',
+            'KOREANAME' => '본인',
+            'ENGLISHNAME' => 'Self User',
+            'JOB' => 'CountryManager',
+            'EMAIL' => 'dm020@example.com',
+            'PHONENO' => '010-2222-0000',
+            'WORKDEPT' => 'A01',
+            'STATUS' => 1,
+        ]);
+
+        $countryManager = User::factory()->create([
+            'email' => 'dm020@example.com',
+            'employee_empno' => 'DM020',
+            'is_active' => true,
+            'is_admin' => false,
+        ]);
+
+        Livewire::actingAs($countryManager)
+            ->test(PeopleEmployeesList::class)
+            ->call('openEditModal', 'DM020')
+            ->assertSet('hasLinkedLoginAccount', true)
+            ->set('editStatus', '0')
+            ->call('saveEmployee')
+            ->assertHasErrors(['editStatus']);
+
+        $this->assertDatabaseHas('users', [
+            'id' => $countryManager->id,
+            'is_active' => true,
+        ]);
+    }
+
+    public function test_user_cannot_demote_last_active_admin_from_employee_modal(): void
+    {
+        Employee::query()->create([
+            'EMPNO' => 'E002',
+            'KOREANAME' => '관리자',
+            'ENGLISHNAME' => 'Only Admin',
+            'JOB' => 'Manager',
+            'EMAIL' => 'only-admin@example.com',
+            'PHONENO' => '010-2222-0001',
+            'WORKDEPT' => 'A01',
+            'STATUS' => 1,
+        ]);
+
+        $onlyAdmin = User::factory()->create([
+            'email' => 'only-admin@example.com',
+            'employee_empno' => 'E002',
+            'is_active' => true,
+            'is_admin' => true,
+        ]);
+
+        $countryManager = $this->createCountryManagerUser('DM021', 'dm021@example.com');
+
+        Livewire::actingAs($countryManager)
+            ->test(PeopleEmployeesList::class)
+            ->call('openEditModal', 'E002')
+            ->assertSet('hasLinkedLoginAccount', true)
+            ->set('editUserIsAdmin', false)
+            ->call('saveEmployee')
+            ->assertHasErrors(['editUserIsAdmin']);
+
+        $this->assertDatabaseHas('users', [
+            'id' => $onlyAdmin->id,
+            'is_active' => true,
+            'is_admin' => true,
+        ]);
+    }
+
+    public function test_people_modal_prefers_employee_empno_link_before_email_fallback(): void
+    {
+        config()->set('features.people_account_email_fallback_enabled', true);
+
+        $linkedByEmpNo = User::factory()->create([
+            'email' => 'another-email@example.com',
+            'employee_empno' => 'E001',
+        ]);
+
+        User::factory()->create([
+            'email' => 'e001@example.com',
+            'employee_empno' => 'E999',
+        ]);
+
+        $countryManager = $this->createCountryManagerUser('DM022', 'dm022@example.com');
+
+        Livewire::actingAs($countryManager)
+            ->test(PeopleEmployeesList::class)
+            ->call('openEditModal', 'E001')
+            ->assertSet('linkedUserId', $linkedByEmpNo->id);
+    }
+
+    public function test_people_modal_auto_creates_login_account_when_missing(): void
+    {
+        Notification::fake();
+
+        $countryManager = $this->createCountryManagerUser('DM023', 'dm023@example.com');
+
+        Livewire::actingAs($countryManager)
+            ->test(PeopleEmployeesList::class)
+            ->call('openEditModal', 'E001')
+            ->assertSet('hasLinkedLoginAccount', false)
+            ->set('editUserIsAdmin', false)
+            ->set('editGsBrochureAdmin', true)
+            ->call('saveEmployee')
+            ->assertHasNoErrors();
+
+        $createdUser = User::query()->where('employee_empno', 'E001')->first();
+        $this->assertNotNull($createdUser);
+        $this->assertSame('e001@example.com', $createdUser->email);
+        $this->assertTrue((bool) $createdUser->is_gs_brochure_admin);
+
+        Notification::assertSentTo($createdUser, ResetPassword::class);
+    }
+
+    private function createCountryManagerUser(string $empNo, string $email): User
+    {
+        Employee::query()->create([
+            'EMPNO' => $empNo,
+            'KOREANAME' => '컨트리매니저',
+            'ENGLISHNAME' => 'Country Manager',
+            'JOB' => 'CountryManager',
+            'EMAIL' => $email,
+            'PHONENO' => '010-5555-0000',
+            'WORKDEPT' => 'A01',
+            'STATUS' => 1,
+        ]);
+
+        return User::factory()->create([
+            'email' => $email,
+            'employee_empno' => $empNo,
+            'is_admin' => false,
+            'is_active' => true,
+        ]);
     }
 }

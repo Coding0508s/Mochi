@@ -31,7 +31,7 @@
     }">
     @php
         $topbarDisplayName = auth()->user()?->preferredDisplayName() ?? 'User';
-        $isCountryManager = (bool) auth()->user()?->isCountryManager();
+        $canSeeManagementMenus = (bool) auth()->user()?->hasFullAccess();
     @endphp
 
     {{-- 상단 헤더 (전체 너비) --}}
@@ -284,7 +284,7 @@
 
             {{-- <div class="sidebar-divider"></div> --}}
 
-            @if($isCountryManager)
+            @if($canSeeManagementMenus)
                 {{-- ── Review ── --}}
                 <div class="sidebar-group">
                     <button type="button"
@@ -371,23 +371,11 @@
                                   {{ request()->routeIs('setup.team') ? 'sidebar-subitem-active' : '' }}">
                             <span class="sidebar-subitem-label">팀 관리</span>
                         </a>
-                        <a href="{{ route('setup.common-codes') }}"
-                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                                  {{ request()->routeIs('setup.common-codes') ? 'sidebar-subitem-active' : '' }}">
-                            <span class="sidebar-subitem-label">공통코드</span>
-                        </a>
                         <a href="{{ route('setup.roles') }}"
                            class="sidebar-subitem sidebar-subitem-row sidebar-focusable
                                   {{ request()->routeIs('setup.roles') ? 'sidebar-subitem-active' : '' }}">
                             <span class="sidebar-subitem-label">역할·권한</span>
                         </a>
-                        @can('manageEmployeeDepartment')
-                            <a href="{{ route('setup.employees.create') }}"
-                               class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                                      {{ request()->routeIs('setup.employees.create') ? 'sidebar-subitem-active' : '' }}">
-                                <span class="sidebar-subitem-label">직원 등록</span>
-                            </a>
-                        @endcan
                     </div>
                 </div>
             @endif

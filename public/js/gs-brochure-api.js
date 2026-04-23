@@ -3,7 +3,7 @@ const API_BASE_URL = typeof window !== 'undefined' && window.API_BASE_URL
     : (typeof window !== 'undefined' ? (window.location.origin + '/api/gs-brochure') : '/api/gs-brochure');
 
 function formatMaxUploadSize(bytes) {
-    if (!Number.isFinite(bytes) || bytes <= 0) return '30MB';
+    if (!Number.isFinite(bytes) || bytes <= 0) return '40MB';
     const mb = bytes / (1024 * 1024);
     if (mb >= 1) return `${mb.toFixed(mb < 10 ? 1 : 0)}MB`;
     const kb = bytes / 1024;
@@ -11,7 +11,7 @@ function formatMaxUploadSize(bytes) {
 }
 
 function getEffectiveMaxUploadBytes() {
-    const appMaxBytes = 30 * 1024 * 1024;
+    const appMaxBytes = 40 * 1024 * 1024;
     const runtimeMax = typeof window !== 'undefined'
         ? Number(window.GS_BROCHURE_UPLOAD_MAX_BYTES || 0)
         : 0;

@@ -23,6 +23,7 @@ Laravel is accessible, powerful, and provides tools required for large, robust a
 
 ## Project Docs
 
+- [Mocchi Platform 사용 안내서](docs/platform-user-guide.md)
 - [GS Brochure Permission Policy](docs/gs-brochure-permission-policy.md)
 - [Profile Email Policy](docs/profile-email-policy.md)
 

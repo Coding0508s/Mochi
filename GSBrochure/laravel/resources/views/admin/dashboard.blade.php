@@ -51,7 +51,7 @@
         };
         $phpUploadLimitBytes = $parseSizeToBytes(ini_get('upload_max_filesize'));
         $phpPostLimitBytes = $parseSizeToBytes(ini_get('post_max_size'));
-        $appImageLimitBytes = 30 * 1024 * 1024;
+        $appImageLimitBytes = 40 * 1024 * 1024;
         $effectiveUploadMaxBytes = max(1, min(array_filter([
             $phpUploadLimitBytes,
             $phpPostLimitBytes,

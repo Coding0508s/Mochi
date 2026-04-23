@@ -14,26 +14,12 @@
                 <p class="mt-2 text-sm text-gray-600 leading-5">부서·팀 코드 및 소속 인원</p>
                 <span class="mt-3 inline-block text-xs font-medium text-[#2b78c5]">이동 →</span>
             </a>
-            <a href="{{ route('setup.common-codes') }}"
-               class="block bg-white rounded-xl shadow-sm border border-gray-200 px-5 py-4 hover:border-[#2b78c5]/40 hover:shadow-md transition-colors">
-                <h3 class="text-sm font-semibold text-gray-800">공통코드</h3>
-                <p class="mt-2 text-sm text-gray-600 leading-5">공통 코드값 등록·수정</p>
-                <span class="mt-3 inline-block text-xs font-medium text-[#2b78c5]">이동 →</span>
-            </a>
             <a href="{{ route('setup.roles') }}"
                class="block bg-white rounded-xl shadow-sm border border-gray-200 px-5 py-4 hover:border-[#2b78c5]/40 hover:shadow-md transition-colors">
                 <h3 class="text-sm font-semibold text-gray-800">역할·권한</h3>
                 <p class="mt-2 text-sm text-gray-600 leading-5">역할 및 메뉴 권한</p>
                 <span class="mt-3 inline-block text-xs font-medium text-[#2b78c5]">이동 →</span>
             </a>
-            @can('manageEmployeeDepartment')
-                <a href="{{ route('setup.employees.create') }}"
-                   class="block bg-white rounded-xl shadow-sm border border-gray-200 px-5 py-4 hover:border-[#2b78c5]/40 hover:shadow-md transition-colors">
-                    <h3 class="text-sm font-semibold text-gray-800">직원 등록</h3>
-                    <p class="mt-2 text-sm text-gray-600 leading-5">신규 직원 사번·부서 등록</p>
-                    <span class="mt-3 inline-block text-xs font-medium text-[#2b78c5]">이동 →</span>
-                </a>
-            @endcan
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
