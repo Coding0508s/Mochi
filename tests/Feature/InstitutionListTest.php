@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\InstitutionList;
 use App\Models\Institution;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
@@ -157,7 +158,7 @@ class InstitutionListTest extends TestCase
             ->assertDontSee('비담당 기관');
     }
 
-    public function test_country_manager_in_co_team_can_see_all_institutions(): void
+    public function test_admin_in_co_team_can_see_all_institutions(): void
     {
         Institution::query()->create([
             'SKcode' => 'SK-CO-DM-1',
@@ -181,25 +182,14 @@ class InstitutionListTest extends TestCase
             ],
         ]);
 
-        DB::table('employee')->insert([
-            'EMPNO' => 'DM100',
-            'KOREANAME' => '컨트리매니저',
-            'ENGLISHNAME' => 'Country Manager',
-            'JOB' => 'CountryManager',
-            'EMAIL' => 'dm100@grapeseed.com',
-            'PHONENO' => '010-5555-5555',
-            'WORKDEPT' => 'A02',
-            'STATUS' => 1,
-        ]);
-
-        $countryManager = User::factory()->create([
-            'name' => 'Country Manager User',
-            'email' => 'dm100@grapeseed.com',
+        $admin = User::factory()->create([
+            'name' => 'Peter Kim Admin',
+            'email' => 'peter.admin.co@grapeseed.com',
             'team' => 'CO',
-            'is_admin' => false,
+            'is_admin' => true,
         ]);
 
-        $this->actingAs($countryManager)
+        $this->actingAs($admin)
             ->get(route('institutions.index'))
             ->assertOk()
             ->assertSee('DM 담당 기관')
@@ -238,7 +228,7 @@ class InstitutionListTest extends TestCase
         ]);
 
         Livewire::actingAs($user)
-            ->test(\App\Livewire\InstitutionList::class)
+            ->test(InstitutionList::class)
             ->set('assignmentFilter', 'my_assigned')
             ->assertSee('내 담당 기관')
             ->assertDontSee('타 담당 기관');

@@ -23,14 +23,20 @@ class CreateInstitution
      *     tr?: string|null,
      *     cs?: string|null,
      *     possibility?: string|null,
+     *     ls?: int|null,
+     *     gs_k?: int|null,
+     *     gs_e?: int|null,
      * }  $data
      */
     public function execute(array $data): Institution
     {
         $sk = trim($data['sk_code']);
         $name = trim($data['institution_name']);
+        $ls = max(0, (int) ($data['ls'] ?? 0));
+        $gsK = max(0, (int) ($data['gs_k'] ?? 0));
+        $gsE = max(0, (int) ($data['gs_e'] ?? 0));
 
-        return DB::transaction(function () use ($data, $sk, $name): Institution {
+        return DB::transaction(function () use ($data, $sk, $name, $ls, $gsK, $gsE): Institution {
             $institution = Institution::query()->create([
                 'SKcode' => $sk,
                 'AccountName' => $name,
@@ -43,6 +49,9 @@ class CreateInstitution
                 'Possibility' => isset($data['possibility']) && filled($data['possibility'])
                     ? trim((string) $data['possibility'])
                     : null,
+                'LS' => $ls,
+                'GS_K' => $gsK,
+                'GS_E' => $gsE,
             ]);
 
             AccountInformation::query()->updateOrCreate(

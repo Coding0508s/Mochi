@@ -30,11 +30,27 @@ class StoreInventorySkuManagerPageTest extends TestCase
 
     public function test_non_admin_cannot_open_store_inventory_sku_manager_page(): void
     {
-        $user = User::factory()->create(['is_admin' => false]);
+        $user = User::factory()->create([
+            'is_admin' => false,
+            'can_manage_store_inventory' => false,
+        ]);
 
         $this->actingAs($user)
             ->get(route('store.inventory.skus.index'))
             ->assertForbidden();
+    }
+
+    public function test_store_inventory_editor_can_open_store_inventory_sku_manager_page(): void
+    {
+        $editor = User::factory()->create([
+            'is_admin' => false,
+            'can_manage_store_inventory' => true,
+        ]);
+
+        $this->actingAs($editor)
+            ->get(route('store.inventory.skus.index'))
+            ->assertOk()
+            ->assertSee('스토어 품목 수정 (이미지 수정 및 품목 활성 비활성)');
     }
 
     public function test_admin_can_bulk_add_skus_from_comma_or_newline_text(): void

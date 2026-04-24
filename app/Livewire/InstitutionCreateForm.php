@@ -36,6 +36,12 @@ class InstitutionCreateForm extends Component
 
     public string $newPossibility = '';
 
+    public string $newLS = '';
+
+    public string $newGSK = '';
+
+    public string $newGSE = '';
+
     public function save(CreateInstitution $createInstitution): mixed
     {
         if (! config('features.institution_create_enabled')) {
@@ -56,10 +62,17 @@ class InstitutionCreateForm extends Component
             'newTr' => 'nullable|string|max:255',
             'newCs' => 'nullable|string|max:255',
             'newPossibility' => 'nullable|string|in:A,B,C,D',
+            'newLS' => ['nullable', 'integer', 'min:0'],
+            'newGSK' => ['nullable', 'integer', 'min:0'],
+            'newGSE' => ['nullable', 'integer', 'min:0'],
         ], [
             'newSkCode.required' => 'SK코드를 입력해 주세요.',
             'newSkCode.unique' => '이미 사용 중인 SK코드입니다.',
             'newInstitutionName.required' => '기관명을 입력해 주세요.',
+            'newLS.integer' => 'LittleSEED는 숫자만 입력해 주세요.',
+            'newGSK.integer' => 'GrapeSEED(유)는 숫자만 입력해 주세요.',
+            'newGSE.integer' => 'GrapeSEED(초)는 숫자만 입력해 주세요.',
+            '*.min' => '숫자는 0 이상이어야 합니다.',
         ]);
 
         $createInstitution->execute([
@@ -76,6 +89,9 @@ class InstitutionCreateForm extends Component
             'tr' => $this->newTr,
             'cs' => $this->newCs,
             'possibility' => $this->newPossibility,
+            'ls' => $this->newLS === '' ? 0 : (int) $this->newLS,
+            'gs_k' => $this->newGSK === '' ? 0 : (int) $this->newGSK,
+            'gs_e' => $this->newGSE === '' ? 0 : (int) $this->newGSE,
         ]);
 
         session()->flash('success', '신규 기관이 등록되었습니다.');

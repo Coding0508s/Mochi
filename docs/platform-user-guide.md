@@ -53,30 +53,29 @@
 
 ### 4.1 용어와 판별 기준
 
-- **Country Manager(CM) 판별**: 로그인 이메일이 `employee` 테이블의 이메일과 일치하고, 해당 행의 `JOB`이 `Country Manager` 계열(대소문자·공백 무시)일 때입니다. DB 플래그만으로는 CM이 되지 않습니다.
-- **Full Access**: **`is_admin = true` 일 때만** 해당합니다. CM JOB만으로는 관리자 메뉴·부서 변경·계정 관리 등 Full Access 전용 Gate가 열리지 않습니다.
-- **People 직원 편집 Gate (`editEmployeeProfile`)**: **CM이거나 `is_admin`인 경우** People에서 직원 모달을 열고, 직원 본문 필드·팀 생성/삭제 등 해당 Gate로 보호되는 작업을 할 수 있습니다(부서 **이동**만 별도 Gate).
+- **Full Access**: **`is_admin = true` 일 때만** 해당합니다. 직원 마스터의 `JOB`(예: Country Manager) 값만으로는 관리자 권한이 부여되지 않습니다.
+- **People 직원 편집 Gate (`editEmployeeProfile`)**: **Full Access와 동일**하게 `is_admin`인 경우에만 People에서 직원 모달을 열고, 직원 본문 필드·팀 생성/삭제 등 해당 Gate로 보호되는 작업을 할 수 있습니다(부서 **이동**은 별도 Gate `manageEmployeeDepartment`).
 - **Gate 이름**(코드와 동일): `editEmployeeProfile`, `manageEmployeeDepartment`, `manageTeamStructure`, `manageStoreInventory`, `manageGsBrochureAdmin`, `manageUserAccounts`. 실제 허용 여부는 `App\Providers\AppServiceProvider`에서 정의됩니다.
 
 ### 4.2 역할별 기능 체크리스트
 
-아래 표에서 **CM**은 직원 `JOB` 기준 Country Manager, **관리자(비 CM)**는 `is_admin`만 해당하고 직원 `JOB`은 CM이 아닌 경우, **GS 전용**은 `is_gs_brochure_admin`만 켜져 있고 Full Access가 아닌 경우를 뜻합니다.
+아래 표에서 **관리자**는 `is_admin = true`(Full Access), **GS 전용**은 `is_gs_brochure_admin`만 켜져 있고 Full Access가 아닌 경우를 뜻합니다.
 
-| 기능 | 일반 직원 | CM (JOB) | 관리자 (`is_admin`) | GS 전용 |
-| --- | :---: | :---: | :---: | :---: |
-| 대부분 업무 화면 조회 | O | O | O | O (허용된 메뉴 범위) |
-| GS Brochure 내부 신청 목록 조회 | O | O | O | O |
-| **People** 직원 본문(이름·직책 등)·팀 생성/삭제 UI | X | O | O | X |
-| **People** 소속 **부서 변경**(다른 부서로 이동) | X | X | O | X |
-| **People** 모달 **계정** 필드·직원 등록 모달 등 | X | X | O¹ | X |
-| **Setup** 메뉴·팀·공통코드·역할·직원 등록 | X | X | O | X |
-| **Store** 품목 관리·실제수량 수정 | X | X | O | X |
-| **GS Brochure** 관리자 대시보드 | X | O² | O | O |
+| 기능 | 일반 직원 | 관리자 (`is_admin`) | GS 전용 |
+| --- | :---: | :---: | :---: |
+| 대부분 업무 화면 조회 | O | O | O (허용된 메뉴 범위) |
+| GS Brochure 내부 신청 목록 조회 | O | O | O |
+| **People** 직원 본문(이름·직책 등)·팀 생성/삭제 UI | X | O | X |
+| **People** 소속 **부서 변경**(다른 부서로 이동) | X | O | X |
+| **People** 모달 **계정** 필드·직원 등록 모달 등 | X | O¹ | X |
+| **Setup** 메뉴·팀·공통코드·역할·직원 등록 | X | O | X |
+| **Store** 품목 관리·스토어사이트 재고 수정 | X | O² | X |
+| **GS Brochure** 관리자 대시보드 | X | O | O |
 
 ¹ `manageUserAccounts` + `PEOPLE_MODAL_ACCOUNT_EDIT_ENABLED`(기본 `true`)일 때 계정 UI가 보입니다.  
-² CM이면서 `is_gs_brochure_admin`이면 대시보드 가능(Full Access와 무관).
+² **Full Access**이거나, People 직원 모달의 **「스토어 재고 수량 수정」** 권한(`can_manage_store_inventory`)이 켜진 계정입니다.
 
-**주의**: CO 팀 소속이면서 Full Access가 아닌 사용자(일반 직원·CM 포함)는 **기관리스트** 등에서 담당 CO 이름과 매칭되는 행만 보도록 스코프될 수 있습니다. CM이 예전처럼 전 기관이 보이지 않을 수 있습니다.
+**주의**: CO 팀 소속이면서 Full Access가 아닌 사용자는 **기관리스트** 등에서 담당 CO 이름과 매칭되는 행만 보도록 스코프될 수 있습니다.
 
 ### 4.3 일반 로그인 사용자
 
@@ -91,7 +90,7 @@
 Full Access 사용자는 다음을 포함합니다.
 
 - Setup 메뉴(사이드바) 노출 및 해당 화면 사용
-- Store 재고 품목 관리 및 실제수량 수정
+- Store 재고 품목 관리 및 스토어사이트 재고 수정
 - 팀 구조 / 공통코드 / 역할 관리
 - 직원 등록(Setup)
 - GS Brochure 관리자 대시보드 접근(아래 4.5와 동일 Gate)
@@ -150,15 +149,14 @@ SetUp 랜딩의 일부 카드(예: 사용자 계정 관리)는 UI상 `준비중`
 
 권한이 있는 경우 추가 기능:
 
-- 직원 본문 저장·팀 생성/삭제(동일 Gate 구간): **CM 또는 `is_admin`**(`editEmployeeProfile`)
+- 직원 본문 저장·팀 생성/삭제(동일 Gate 구간): **Full Access**(`editEmployeeProfile`)
 - 소속 **부서를 다른 부서 코드로 변경**: **Full Access**만(`manageEmployeeDepartment`)
 - 직원 등록 모달·모달의 **계정** 필드: **Full Access** + `PEOPLE_MODAL_ACCOUNT_EDIT_ENABLED`(`manageUserAccounts` 등)
 - GS Brochure 관리자 플래그 토글 등: Gate에 맞는 권한이 있을 때
 
 주의:
 
-- **CM만**인 계정은 People에서 직원 정보를 다룰 수 있지만, **다른 부서로 옮기기·Setup·Store 관리·계정 플래그 편집**은 할 수 없습니다.
-- **`is_admin`**이면 People 모달과 Full Access 기능을 함께 사용할 수 있습니다(직원 테이블에 CM JOB이 없어도 됨).
+- **`is_admin`(Full Access)** 인 계정만 People에서 직원 본문·팀 생성/삭제를 포함한 편집 UI를 사용할 수 있으며, 부서 이동·Setup·Store 관리·계정 플래그 편집도 같은 기준에서 허용됩니다.
 
 ## 6.2 기관리스트
 
@@ -285,18 +283,20 @@ SetUp 랜딩의 일부 카드(예: 사용자 계정 관리)는 UI상 `준비중`
 - 상품코드 / 상품명 검색
 - 재고 목록 조회
 - 최근 차감 상세 확인
-- 실제수량 수정
+- 스토어사이트 재고 수정
 - 품목 관리 모달 열기
 
 Full Access 사용자 기능:
 
 - `품목 관리`
-- `실제수량 수정`
+- `스토어사이트 재고 수정`
 
-실제수량 수정 시:
+스토어사이트 재고 수정 시:
 
 - 음수 입력 불가
-- 변경 이력이 기록됩니다.
+- **변경 사유는 필수**입니다. 사유 없이는 저장되지 않으며, 수량이 이전과 동일하면 저장할 수 없습니다.
+- 스토어사이트 재고를 바꿀 때마다 변경 전·후 수량과 사유가 **앱 DB**(`store_gnuboard_stock_change_logs`, Store 재고 화면 저장만)에 남으며, 모달에서는 **최근 스토어사이트 재고 수정 이력**만 볼 수 있습니다. 이카운트 창고재고 변경 내역은 포함되지 않습니다. (그누보드 DB 스키마는 변경하지 않으며, 기존과 동일하게 재고 수치 반영용 업데이트만 수행합니다.)
+- 같은 모달에서 **이카운트 최근 차감 요약**(그누보드 주문 등이 이카운트 수불로 반영된 내용)을 참고할 수 있으며, 상세는 기존「최근 차감 상세」모달로 전환합니다. 이 요약은 **이카운트 API** 조회 결과이며 그누보드 DB를 조회·변경하지 않습니다.
 
 품목 운영 상세는 별도 문서를 참고하세요.
 
@@ -515,7 +515,7 @@ Full Access 사용자가 신규 직원을 등록하는 화면입니다.
 
 1. `Store 재고`에서 품목 검색
 2. 최근 차감 내역 확인
-3. 필요 시 Full Access 권한으로 실제수량 수정
+3. 필요 시 Full Access 권한으로 스토어사이트 재고 수정
 4. 품목 추가/비활성은 `품목 관리`에서 처리
 
 ### 7.4 GS Brochure 운영
@@ -527,9 +527,9 @@ Full Access 사용자가 신규 직원을 등록하는 화면입니다.
 ## 8. 운영 시 주의사항
 
 - 권한이 없으면 일부 버튼이나 메뉴가 보이지 않거나 접근이 차단됩니다.
-- `직원 등록`, `팀 관리`, `공통코드`, `역할·권한`, `Store 재고 품목 관리`는 **Full Access**가 필요합니다.
+- `직원 등록`, `팀 관리`, `공통코드`, `역할·권한`은 **Full Access**가 필요합니다. **Store 재고**의 품목 추가·스토어사이트 재고 수정은 **Full Access** 또는 People에서 부여한 **스토어 재고 수량 수정** 권한이 있으면 됩니다.
 - `GS Brochure` 관리자 대시보드는 **Full Access** 또는 **`is_gs_brochure_admin`** 이면 됩니다.
-- `People`에서 **직원 본문·팀 생성/삭제**는 **CM JOB 또는 `is_admin`**(`editEmployeeProfile`)입니다. **부서 이동**은 **`is_admin`**만 가능합니다.
+- `People`에서 **직원 본문·팀 생성/삭제**는 **Full Access(`is_admin`)**(`editEmployeeProfile`)입니다. **부서 이동**도 동일하게 **Full Access**만 가능합니다.
 - 일부 메뉴는 아직 `준비중` 상태이므로 실제 동작하지 않을 수 있습니다.
 
 ## 9. 관련 문서

@@ -40,7 +40,7 @@ class SupportList extends Component
 
     public string $formInstitutionKeyword = ''; // 기관명 입력 검색어
 
-    public string $formCoName = 'Andrew Hur'; // 로그인 CO명 (추후 Auth 연동)
+    public string $formCoName = '';
 
     public string $formSupportDate = '';
 
@@ -116,7 +116,7 @@ class SupportList extends Component
     public function openContractUploadModal(): void
     {
         $this->resetContractUploadForm();
-        $this->contractConsultant = (string) (auth()->user()?->name ?? '');
+        $this->contractConsultant = (string) (auth()->user()?->nameForCoReports() ?? '');
         $this->contractDocumentDate = now()->format('Y-m-d');
         $this->contractDocumentTime = now()->format('H:i');
         $this->showContractModal = true;
@@ -238,7 +238,7 @@ class SupportList extends Component
             'stored_path' => $path,
             'mime_type' => $detectedMimeType,
             'size_bytes' => $detectedSize,
-            'uploaded_by' => auth()->user()?->name,
+            'uploaded_by' => auth()->user()?->nameForCoReports(),
         ]);
 
         $this->contractUpload = null;
@@ -442,7 +442,7 @@ class SupportList extends Component
         $this->formSkCode = $record->SK_Code ?? '';
         $this->formAccountName = $record->Account_Name ?? '';
         $this->formInstitutionKeyword = $record->Account_Name ?? '';
-        $this->formCoName = $record->TR_Name ?? 'Andrew Hur';
+        $this->formCoName = $record->TR_Name ?? (string) (auth()->user()?->nameForCoReports() ?? '');
         $this->formSupportDate = $record->Support_Date?->format('Y-m-d') ?? '';
         $this->formSupportTime = $this->normalizeTimeForInput($record->Meet_Time);
         $this->formSupportType = $record->Support_Type ?? '전화';
@@ -466,7 +466,7 @@ class SupportList extends Component
         $this->formSkCode = '';
         $this->formAccountName = '';
         $this->formInstitutionKeyword = '';
-        $this->formCoName = 'Andrew Hur';
+        $this->formCoName = (string) (auth()->user()?->nameForCoReports() ?? '');
         $this->formSupportDate = '';
         $this->formSupportTime = '13:00';
         $this->formSupportType = '전화';

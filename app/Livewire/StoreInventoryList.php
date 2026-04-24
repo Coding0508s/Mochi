@@ -7,6 +7,7 @@ use App\Services\Store\StoreInventoryApiClient;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Throwable;
@@ -17,6 +18,9 @@ class StoreInventoryList extends Component
     public array $items = [];
 
     public string $search = '';
+
+    /** 전체: all, 그 외: category_path 값과 일치 */
+    public string $categoryFilter = 'all';
 
     public int $page = 1;
 
@@ -55,6 +59,24 @@ class StoreInventoryList extends Component
 
     public string $actualStockModalLastChangedAt = '';
 
+    /**
+     * @var array<int, array{changed_at:string, changed_by_name:string, before_qty:int, after_qty:int, memo:string}>
+     */
+    public array $actualStockModalHistoryRows = [];
+
+    /** 이카운트 수불 기준 최근 차감(그누보드 주문 등 → 이카운트 자동 반영) — 모달 오픈 시점 목록 행 스냅샷 */
+    public bool $actualStockModalHasEcountDeductSummary = false;
+
+    public ?int $actualStockModalLastDeductQty = null;
+
+    public string $actualStockModalLastDeductAtDisplay = '';
+
+    public string $actualStockModalLastDeductType = '';
+
+    public string $actualStockModalLastDeductRef = '';
+
+    public string $actualStockModalLastDeductReason = '';
+
     public function mount(): void
     {
         $this->refresh();
@@ -84,6 +106,18 @@ class StoreInventoryList extends Component
         $this->page = 1;
     }
 
+    public function updatedCategoryFilter(): void
+    {
+        $this->page = 1;
+    }
+
+    public function resetFilters(): void
+    {
+        $this->search = '';
+        $this->categoryFilter = 'all';
+        $this->page = 1;
+    }
+
     public function openSkuModal(): void
     {
         Gate::authorize('manageStoreInventory');
@@ -99,9 +133,10 @@ class StoreInventoryList extends Component
 
     public function openDeductDetail(string $productCode): void
     {
+        $needle = strtoupper(trim($productCode));
         $target = null;
         foreach ($this->items as $item) {
-            if ((string) ($item['product_code'] ?? '') === $productCode) {
+            if (strtoupper(trim((string) ($item['product_code'] ?? ''))) === $needle) {
                 $target = $item;
                 break;
             }
@@ -130,7 +165,7 @@ class StoreInventoryList extends Component
 
         $code = strtoupper(trim($productCode));
         if ($code === '') {
-            $this->saveError = '상품코드가 비어 있어 실제수량을 수정할 수 없습니다.';
+            $this->saveError = '상품코드가 비어 있어 스토어사이트 재고를 수정할 수 없습니다.';
 
             return;
         }
@@ -160,7 +195,36 @@ class StoreInventoryList extends Component
             $this->actualStockModalLastChangedAt = trim((string) ($latest['changed_at'] ?? ''));
         }
 
+        $this->actualStockModalHistoryRows = $service->listRecentChangesByProductCode($code, 10);
+
+        $this->actualStockModalLastDeductQty = isset($target['last_deduct_qty']) && is_numeric($target['last_deduct_qty'])
+            ? (int) $target['last_deduct_qty']
+            : null;
+        $this->actualStockModalLastDeductAtDisplay = trim((string) ($target['last_deduct_at_display'] ?? ''));
+        $this->actualStockModalLastDeductType = trim((string) ($target['last_deduct_type'] ?? ''));
+        $this->actualStockModalLastDeductRef = trim((string) ($target['last_deduct_ref'] ?? ''));
+        $this->actualStockModalLastDeductReason = trim((string) ($target['last_deduct_reason'] ?? ''));
+        $this->actualStockModalHasEcountDeductSummary = ($this->actualStockModalLastDeductQty !== null && $this->actualStockModalLastDeductQty > 0)
+            || ($this->actualStockModalLastDeductAtDisplay !== '' && $this->actualStockModalLastDeductAtDisplay !== '-')
+            || $this->actualStockModalLastDeductType !== ''
+            || $this->actualStockModalLastDeductRef !== ''
+            || $this->actualStockModalLastDeductReason !== '';
+
         $this->showActualStockModal = true;
+    }
+
+    /**
+     * 스토어사이트 재고 모달을 닫고 동일 품목의 이카운트 차감 상세 모달을 엽니다.
+     */
+    public function switchToEcountDeductDetailFromActualStockModal(): void
+    {
+        $code = strtoupper(trim($this->actualStockModalProductCode));
+        if ($code === '' || ! $this->showActualStockModal) {
+            return;
+        }
+
+        $this->closeActualStockModal();
+        $this->openDeductDetail($code);
     }
 
     public function closeActualStockModal(): void
@@ -174,6 +238,13 @@ class StoreInventoryList extends Component
         $this->actualStockModalMemo = '';
         $this->actualStockModalLastChangedBy = '';
         $this->actualStockModalLastChangedAt = '';
+        $this->actualStockModalHistoryRows = [];
+        $this->actualStockModalHasEcountDeductSummary = false;
+        $this->actualStockModalLastDeductQty = null;
+        $this->actualStockModalLastDeductAtDisplay = '';
+        $this->actualStockModalLastDeductType = '';
+        $this->actualStockModalLastDeductRef = '';
+        $this->actualStockModalLastDeductReason = '';
     }
 
     public function saveActualStockFromModal(): void
@@ -186,20 +257,32 @@ class StoreInventoryList extends Component
         $code = strtoupper(trim($this->actualStockModalProductCode));
         $raw = trim($this->actualStockModalNewQty);
         if ($code === '') {
-            $this->saveError = '상품코드가 비어 있어 실제수량을 수정할 수 없습니다.';
+            $this->saveError = '상품코드가 비어 있어 스토어사이트 재고를 수정할 수 없습니다.';
 
             return;
         }
 
         if ($raw === '' || ! is_numeric($raw)) {
-            $this->saveError = '실제수량은 숫자로 입력해 주세요.';
+            $this->saveError = '스토어사이트 재고는 숫자로 입력해 주세요.';
 
             return;
         }
 
         $newQty = (int) $raw;
         if ($newQty < 0) {
-            $this->saveError = '실제수량은 0 이상이어야 합니다.';
+            $this->saveError = '스토어사이트 재고는 0 이상이어야 합니다.';
+
+            return;
+        }
+
+        if (trim($this->actualStockModalMemo) === '') {
+            $this->saveError = '변경 사유를 입력해 주세요.';
+
+            return;
+        }
+
+        if ($newQty === $this->actualStockModalCurrentQty) {
+            $this->saveError = '수량이 변경되지 않았습니다. 다른 값을 입력하거나 취소해 주세요.';
 
             return;
         }
@@ -215,14 +298,20 @@ class StoreInventoryList extends Component
     {
         $raw = is_scalar($qty) ? trim((string) $qty) : '';
         if ($raw === '' || ! is_numeric($raw)) {
-            $this->saveError = '실제수량은 숫자로 입력해 주세요.';
+            $this->saveError = '스토어사이트 재고는 숫자로 입력해 주세요.';
 
             return;
         }
 
         $newQty = (int) $raw;
         if ($newQty < 0) {
-            $this->saveError = '실제수량은 0 이상이어야 합니다.';
+            $this->saveError = '스토어사이트 재고는 0 이상이어야 합니다.';
+
+            return;
+        }
+
+        if (trim((string) ($memo ?? '')) === '') {
+            $this->saveError = '변경 사유를 입력해 주세요.';
 
             return;
         }
@@ -242,12 +331,14 @@ class StoreInventoryList extends Component
             }
             unset($item);
 
-            $this->saveSuccess = "실제수량을 저장했습니다. ({$code}: ".number_format($afterQty).')';
+            $this->saveSuccess = "스토어사이트 재고를 저장했습니다. ({$code}: ".number_format($afterQty).')';
         } catch (ValidationException $exception) {
+            $this->saveError = $exception->getMessage();
+        } catch (InvalidArgumentException $exception) {
             $this->saveError = $exception->getMessage();
         } catch (Throwable $exception) {
             report($exception);
-            $this->saveError = '실제수량 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.';
+            $this->saveError = '스토어사이트 재고 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.';
         }
     }
 
@@ -272,16 +363,42 @@ class StoreInventoryList extends Component
     }
 
     /**
+     * @return array<int, string>
+     */
+    public function getCategoryOptionsProperty(): array
+    {
+        $paths = [];
+        foreach ($this->items as $item) {
+            $path = trim((string) ($item['category_path'] ?? ''));
+            if ($path !== '') {
+                $paths[$path] = true;
+            }
+        }
+        $list = array_keys($paths);
+        natcasesort($list);
+
+        return array_values($list);
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     public function getFilteredItemsProperty(): array
     {
-        $keyword = mb_strtolower(trim($this->search));
-        if ($keyword === '') {
-            return $this->items;
+        $rows = $this->items;
+        if ($this->categoryFilter !== 'all') {
+            $selected = $this->categoryFilter;
+            $rows = array_values(array_filter($rows, static function (array $item) use ($selected): bool {
+                return (string) ($item['category_path'] ?? '') === $selected;
+            }));
         }
 
-        return array_values(array_filter($this->items, function (array $item) use ($keyword): bool {
+        $keyword = mb_strtolower(trim($this->search));
+        if ($keyword === '') {
+            return $rows;
+        }
+
+        return array_values(array_filter($rows, function (array $item) use ($keyword): bool {
             $code = mb_strtolower((string) ($item['product_code'] ?? ''));
             $name = mb_strtolower((string) ($item['product_name'] ?? ''));
 
@@ -335,6 +452,11 @@ class StoreInventoryList extends Component
             $row['actual_stock_quantity'] = isset($row['actual_stock_quantity']) && is_numeric($row['actual_stock_quantity'])
                 ? max(0, (int) $row['actual_stock_quantity'])
                 : 0;
+            $row['category_l1'] = trim((string) ($row['category_l1'] ?? '')) !== '' ? trim((string) $row['category_l1']) : '미분류';
+            $row['category_l2'] = trim((string) ($row['category_l2'] ?? ''));
+            $row['category_l3'] = trim((string) ($row['category_l3'] ?? ''));
+            $row['category_path'] = trim((string) ($row['category_path'] ?? '')) !== '' ? trim((string) $row['category_path']) : '미분류';
+            $row['category_group_key'] = trim((string) ($row['category_group_key'] ?? '')) !== '' ? trim((string) $row['category_group_key']) : '미분류';
 
             return $row;
         }, $rows);

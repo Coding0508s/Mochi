@@ -25,13 +25,13 @@ class AppServiceProvider extends ServiceProvider
         // GS Brochure 레거시 Blade를 통합 앱에서 직접 렌더링하기 위한 뷰 경로 등록
         View::addLocation(base_path('GSBrochure/laravel/resources/views'));
 
-        Gate::define('editEmployeeProfile', fn (?User $user): bool => (bool) ($user?->isCountryManager()));
+        Gate::define('editEmployeeProfile', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
 
         Gate::define('manageEmployeeDepartment', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
 
         Gate::define('manageTeamStructure', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
 
-        Gate::define('manageStoreInventory', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
+        Gate::define('manageStoreInventory', fn (?User $user): bool => (bool) ($user?->hasFullAccess() || $user?->can_manage_store_inventory));
 
         Gate::define('manageGsBrochureAdmin', fn (?User $user): bool => (bool) ($user?->hasFullAccess() || $user?->is_gs_brochure_admin));
 

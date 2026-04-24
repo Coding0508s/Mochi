@@ -5,6 +5,7 @@ namespace App\Services\Store;
 use App\Repositories\GrapeSeed\GnuboardSalesHistoryRepository;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Pagination\LengthAwarePaginator;
 use RuntimeException;
 
 final class StoreInventoryApiClient
@@ -76,6 +77,21 @@ final class StoreInventoryApiClient
                 $maxRows,
             ),
             default => throw new RuntimeException("지원하지 않는 재고 데이터 소스입니다: {$dataSource}"),
+        };
+    }
+
+    public function fetchAllPaginatedSaleHistories(
+        ?string $search,
+        ?CarbonInterface $startDate,
+        ?CarbonInterface $endDate,
+        int $perPage = 20
+    ): LengthAwarePaginator {
+        $dataSource = strtolower((string) config('store.sales_history_source', config('store.data_source', 'ecount')));
+
+        return match ($dataSource) {
+            'gnuboard' => app(GnuboardSalesHistoryRepository::class)
+                ->getPaginatedAllSaleHistories($search, $startDate, $endDate, $perPage),
+            default => throw new RuntimeException('전체 내역 조회는 gnuboard 소스만 지원합니다.'),
         };
     }
 

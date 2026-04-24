@@ -11,8 +11,8 @@
     $baseClasses = 'relative isolate inline-flex items-center justify-center cursor-pointer gap-2 whitespace-nowrap text-sm font-medium transition-[color,box-shadow,transform] motion-reduce:transition-[color,box-shadow] motion-reduce:hover:scale-100 disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 ' . $round;
 
     $variantClasses = match ($variant) {
-        'mochi-blue' => 'border border-white/25 bg-gradient-to-b from-[#4a9ae8] via-mochi-header to-[#1e5696] text-white shadow-[0_8px_28px_rgba(43,120,197,0.38),0_2px_8px_rgba(30,75,156,0.22)] hover:scale-[1.02] hover:shadow-[0_12px_36px_rgba(43,120,197,0.45),0_4px_12px_rgba(30,75,156,0.28)] duration-300 focus-visible:ring-mochi-excel/70 focus-visible:ring-offset-white',
-        default => 'bg-transparent hover:scale-[1.02] duration-300 transition text-mochi-header focus-visible:ring-mochi-header/40',
+        'mochi-blue' => 'border border-white/30 bg-gradient-to-b from-[#458fd9] via-mochi-header to-[#184a7a] text-white shadow-[0_8px_28px_rgba(43,120,197,0.38),0_2px_8px_rgba(30,75,156,0.22)] hover:scale-[1.02] hover:shadow-[0_12px_36px_rgba(43,120,197,0.45),0_4px_12px_rgba(30,75,156,0.28)] duration-300 focus-visible:ring-mochi-excel/80 focus-visible:ring-offset-2 focus-visible:ring-offset-white motion-reduce:transition-[color,box-shadow,opacity] motion-reduce:hover:scale-100 motion-reduce:hover:shadow-[0_8px_28px_rgba(43,120,197,0.38),0_2px_8px_rgba(30,75,156,0.22)]',
+        default => 'bg-transparent hover:scale-[1.02] duration-300 transition text-mochi-header focus-visible:ring-mochi-header/40 motion-reduce:hover:scale-100',
     };
 
     $depthClasses = match ($variant) {
@@ -37,11 +37,14 @@
         aria-hidden="true"
     ></div>
     <div
-        class="absolute inset-0 -z-10 h-full w-full overflow-hidden {{ $round }} {{ $blurOpacity }}"
+        class="absolute inset-0 -z-10 h-full w-full overflow-hidden {{ $round }} {{ $blurOpacity }} motion-reduce:opacity-0 motion-reduce:[backdrop-filter:none] motion-reduce:[-webkit-backdrop-filter:none]"
         style="backdrop-filter: url('#{{ $filterId }}'); -webkit-backdrop-filter: url('#{{ $filterId }}')"
         aria-hidden="true"
     ></div>
-    <span class="pointer-events-none relative z-10 inline-flex w-full items-center justify-center gap-2 font-semibold">{{ $slot }}</span>
+    <span @class([
+        'pointer-events-none relative z-10 inline-flex w-full items-center justify-center gap-2 font-semibold',
+        'text-white drop-shadow-[0_1px_1px_rgba(0,35,75,0.65)]' => $variant === 'mochi-blue',
+    ])>{{ $slot }}</span>
     <svg class="pointer-events-none absolute h-px w-px overflow-hidden opacity-0" aria-hidden="true" focusable="false">
         <defs>
             <filter

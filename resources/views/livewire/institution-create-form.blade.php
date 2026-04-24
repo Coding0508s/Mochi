@@ -89,6 +89,41 @@
                        placeholder="기관 주소" />
             </div>
 
+            @php
+                $headcountTotal = max(0, (int) ($newLS !== '' && is_numeric($newLS) ? $newLS : 0))
+                    + max(0, (int) ($newGSK !== '' && is_numeric($newGSK) ? $newGSK : 0))
+                    + max(0, (int) ($newGSE !== '' && is_numeric($newGSE) ? $newGSE : 0));
+            @endphp
+            <div class="space-y-3 border-t border-gray-200 pt-4">
+                <h2 class="text-base font-semibold text-gray-900">인원 정보</h2>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">LittleSEED</label>
+                        <input type="number" min="0" wire:model.live.debounce.200ms="newLS"
+                               class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        @error('newLS') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">GrapeSEED(유)</label>
+                        <input type="number" min="0" wire:model.live.debounce.200ms="newGSK"
+                               class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        @error('newGSK') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">GrapeSEED(초)</label>
+                        <input type="number" min="0" wire:model.live.debounce.200ms="newGSE"
+                               class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        @error('newGSE') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">합계</label>
+                        <div class="flex min-h-[42px] items-center rounded-lg border border-gray-200 bg-gray-100 px-3 text-sm font-medium text-gray-800 tabular-nums">
+                            {{ number_format($headcountTotal) }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">담당 CO</label>

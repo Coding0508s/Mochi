@@ -23,9 +23,6 @@
                 현재 조건 결과: <span class="font-semibold text-gray-700">{{ $employees->total() }}</span>명
             </div>
         </div>
-        @unless($canManageEmployees)
-            <p class="mt-2 text-xs text-amber-700">Country Manager 전용 수정 기능은 비활성화되어 현재 화면은 읽기 전용입니다.</p>
-        @endunless
     </div>
 
     {{-- 필터/검색 --}}
@@ -405,6 +402,19 @@
                                         </span>
                                     </span>
                                 </label>
+
+                                <label class="flex items-start gap-2 cursor-pointer select-none">
+                                    <input type="checkbox"
+                                           wire:model.defer="editCanManageStoreInventory"
+                                           class="mt-0.5 rounded border-gray-300 text-[#2b78c5] focus:ring-[#2b78c5]"/>
+                                    <span class="text-sm text-gray-700 leading-snug">
+                                        스토어 재고 수량 수정
+                                        <span class="mt-0.5 block text-[11px] font-normal text-gray-500">
+                                            Store 재고 화면에서 품목 추가·스토어사이트 재고 수정 등을 할 수 있습니다.
+                                        </span>
+                                    </span>
+                                </label>
+                                @error('editCanManageStoreInventory') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
 
                                 @if(! $hasLinkedLoginAccount)
                                     <p class="text-[11px] text-amber-700">

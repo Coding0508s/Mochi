@@ -88,6 +88,8 @@ class PeopleEmployeesList extends Component
 
     public bool $editGsBrochureAdmin = false;
 
+    public bool $editCanManageStoreInventory = false;
+
     protected array $queryString = [
         'filterDept' => ['as' => 'team', 'except' => ''],
     ];
@@ -157,6 +159,7 @@ class PeopleEmployeesList extends Component
         $this->editUserIsActive = $this->shouldActivateUserFromEmployeeStatus($this->editStatus);
         $this->editUserIsAdmin = (bool) ($linkedUser?->is_admin ?? false);
         $this->editGsBrochureAdmin = (bool) ($linkedUser?->is_gs_brochure_admin ?? false);
+        $this->editCanManageStoreInventory = (bool) ($linkedUser?->can_manage_store_inventory ?? false);
 
         $this->resetErrorBag();
         $this->resetValidation();
@@ -180,6 +183,7 @@ class PeopleEmployeesList extends Component
         $this->editUserIsActive = true;
         $this->editUserIsAdmin = false;
         $this->editGsBrochureAdmin = false;
+        $this->editCanManageStoreInventory = false;
 
         $this->resetErrorBag();
         $this->resetValidation();
@@ -212,6 +216,7 @@ class PeopleEmployeesList extends Component
             'editWorkDept' => ['required', 'string', Rule::in($deptCodes)],
             'editUserIsAdmin' => ['boolean'],
             'editGsBrochureAdmin' => ['boolean'],
+            'editCanManageStoreInventory' => ['boolean'],
         ], [
             'editKoreanName.required' => '이름(한글)은 필수입니다.',
             'editEnglishName.required' => '영어 이름은 필수입니다.',
@@ -302,6 +307,7 @@ class PeopleEmployeesList extends Component
                             'password' => Str::random(48),
                             'is_admin' => (bool) $this->editUserIsAdmin,
                             'is_gs_brochure_admin' => (bool) $this->editGsBrochureAdmin,
+                            'can_manage_store_inventory' => (bool) $this->editCanManageStoreInventory,
                             'is_active' => (bool) $this->editUserIsActive,
                             'email_verified_at' => null,
                         ]);
@@ -352,6 +358,7 @@ class PeopleEmployeesList extends Component
                     'is_active' => $this->editUserIsActive,
                     'is_admin' => $this->editUserIsAdmin,
                     'is_gs_brochure_admin' => $this->editGsBrochureAdmin,
+                    'can_manage_store_inventory' => $this->editCanManageStoreInventory,
                 ])->save();
             });
         } catch (ValidationException $e) {
@@ -696,7 +703,7 @@ class PeopleEmployeesList extends Component
         if ($useAccountLink && $employeeEmpNo !== '') {
             $linkedByEmpNo = User::query()
                 ->where('employee_empno', $employeeEmpNo)
-                ->first(['id', 'is_active', 'is_admin', 'is_gs_brochure_admin']);
+                ->first(['id', 'is_active', 'is_admin', 'is_gs_brochure_admin', 'can_manage_store_inventory']);
 
             if ($linkedByEmpNo) {
                 return $linkedByEmpNo;
@@ -715,7 +722,7 @@ class PeopleEmployeesList extends Component
 
         return User::query()
             ->whereRaw('LOWER(TRIM(COALESCE(email, \'\'))) = ?', [$normalizedEmail])
-            ->first(['id', 'is_active', 'is_admin', 'is_gs_brochure_admin']);
+            ->first(['id', 'is_active', 'is_admin', 'is_gs_brochure_admin', 'can_manage_store_inventory']);
     }
 
     private function shouldActivateUserFromEmployeeStatus(?string $employeeStatus): bool

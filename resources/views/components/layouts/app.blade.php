@@ -66,7 +66,7 @@
                         </filter>
                     </defs>
                 </svg>
-                @foreach(['OutLook' => '#', 'Portal' => 'https://account.grapeseed.com/', 'eCount' => 'https://login.ecount.com/Login/KR/', 'Coaching' => 'https://www.gskcoaching.com/'] as $label => $href)
+                @foreach(['OutLook' => '#', 'Portal' => 'https://portal.grapeseed.com/', 'eCount' => 'https://login.ecount.com/Login/KR/', 'Coaching' => 'https://www.gskcoaching.com/'] as $label => $href)
                     <a href="{{ $href }}"
                        class="mochi-topbar-glass-link"
                        @if(str_starts_with($href, 'http'))

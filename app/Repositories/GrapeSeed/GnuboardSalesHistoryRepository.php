@@ -4,6 +4,7 @@ namespace App\Repositories\GrapeSeed;
 
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -116,6 +117,115 @@ class GnuboardSalesHistoryRepository
         }
 
         return $out;
+    }
+
+    /**
+     * 전체 주문 내역을 최신순으로 페이지네이션하여 조회합니다.
+     */
+    public function getPaginatedAllSaleHistories(
+        ?string $search,
+        ?CarbonInterface $startDate,
+        ?CarbonInterface $endDate,
+        int $perPage = 20
+    ): LengthAwarePaginator {
+        $safePerPage = max(1, $perPage);
+
+        if (! (bool) config('store.gnuboard.enabled', true)) {
+            return $this->emptyPaginator($safePerPage);
+        }
+
+        $orderTable = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.order_table', 'g5_shop_order'));
+        $cartTable = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.cart_table', 'g5_shop_cart'));
+        $itemTable = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.item_table', 'g5_shop_item'));
+        $orderIdColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.order_id_column', 'od_id'));
+        $orderDatetimeColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.order_datetime_column', 'od_time'));
+        $orderStatusColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.order_status_column', 'od_status'));
+        $orderSettleCaseColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.order_settle_case_column', 'od_settle_case'));
+        $orderCustomerNameColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.order_customer_name_column', 'od_name'));
+        $cartProductIdColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.cart_product_id_column', 'it_id'));
+        $cartQuantityColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.cart_quantity_column', 'ct_qty'));
+        $cartNameColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.cart_name_column', 'it_name'));
+        $cartStatusColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.cart_status_column', 'ct_status'));
+        $itemProductCodeColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.product_code_column', 'it_model'));
+        $itemFallbackCodeColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.fallback_product_code_column', 'it_id'));
+        $itemNameColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.item_name_column', 'it_name'));
+
+        if (
+            $orderTable === '' || $cartTable === '' || $itemTable === '' || $orderIdColumn === ''
+            || $orderDatetimeColumn === '' || $cartProductIdColumn === '' || $cartQuantityColumn === ''
+            || $itemProductCodeColumn === '' || $itemFallbackCodeColumn === '' || $itemNameColumn === ''
+        ) {
+            return $this->emptyPaginator($safePerPage);
+        }
+
+        $codeExpression = "COALESCE(i.`{$itemProductCodeColumn}`, c.`{$cartProductIdColumn}`)";
+        $normalizedCodeSql = $this->normalizedSqlForExpression($codeExpression);
+        $productNameSql = $cartNameColumn !== ''
+            ? "COALESCE(i.`{$itemNameColumn}`, c.`{$cartNameColumn}`, '')"
+            : "COALESCE(i.`{$itemNameColumn}`, '')";
+
+        try {
+            $query = DB::connection($this->connectionName())
+                ->table("{$cartTable} as c")
+                ->join("{$orderTable} as o", "o.{$orderIdColumn}", '=', "c.{$orderIdColumn}")
+                ->leftJoin("{$itemTable} as i", "i.{$itemFallbackCodeColumn}", '=', "c.{$cartProductIdColumn}")
+                ->selectRaw("{$normalizedCodeSql['sql']} as product_code", $normalizedCodeSql['bindings'])
+                ->selectRaw("{$productNameSql} as product_name")
+                ->selectRaw("c.`{$cartQuantityColumn}` as qty")
+                ->selectRaw("o.`{$orderDatetimeColumn}` as sold_at")
+                ->selectRaw(($orderStatusColumn !== '' ? "o.`{$orderStatusColumn}`" : "''").' as order_status')
+                ->selectRaw("o.`{$orderIdColumn}` as order_ref")
+                ->selectRaw(($orderSettleCaseColumn !== '' ? "o.`{$orderSettleCaseColumn}`" : "''").' as order_reason')
+                ->selectRaw(($orderCustomerNameColumn !== '' ? "o.`{$orderCustomerNameColumn}`" : "''").' as order_customer_name')
+                ->where("c.{$cartQuantityColumn}", '>', 0);
+
+            $excludedOrderStatuses = $this->normalizeStatusFilters((array) config('store.gnuboard.sales.excluded_order_statuses', []));
+            if ($excludedOrderStatuses !== [] && $orderStatusColumn !== '') {
+                $query->where(function ($builder) use ($excludedOrderStatuses, $orderStatusColumn): void {
+                    $builder
+                        ->whereNull("o.{$orderStatusColumn}")
+                        ->orWhereNotIn("o.{$orderStatusColumn}", $excludedOrderStatuses);
+                });
+            }
+
+            $excludedCartStatuses = $this->normalizeStatusFilters((array) config('store.gnuboard.sales.excluded_cart_statuses', []));
+            if ($excludedCartStatuses !== [] && $cartStatusColumn !== '') {
+                $query->where(function ($builder) use ($excludedCartStatuses, $cartStatusColumn): void {
+                    $builder
+                        ->whereNull("c.{$cartStatusColumn}")
+                        ->orWhereNotIn("c.{$cartStatusColumn}", $excludedCartStatuses);
+                });
+            }
+
+            if ($startDate !== null) {
+                $query->where("o.{$orderDatetimeColumn}", '>=', CarbonImmutable::parse($startDate)->startOfDay()->format('Y-m-d H:i:s'));
+            }
+
+            if ($endDate !== null) {
+                $query->where("o.{$orderDatetimeColumn}", '<=', CarbonImmutable::parse($endDate)->endOfDay()->format('Y-m-d H:i:s'));
+            }
+
+            $searchKeyword = trim((string) $search);
+            if ($searchKeyword !== '') {
+                $query->where(function ($builder) use ($searchKeyword, $productNameSql, $orderCustomerNameColumn, $orderIdColumn): void {
+                    $builder
+                        ->whereRaw("{$productNameSql} LIKE ?", ["%{$searchKeyword}%"])
+                        ->orWhere("o.{$orderIdColumn}", 'LIKE', "%{$searchKeyword}%");
+
+                    if ($orderCustomerNameColumn !== '') {
+                        $builder->orWhere("o.{$orderCustomerNameColumn}", 'LIKE', "%{$searchKeyword}%");
+                    }
+                });
+            }
+
+            return $query
+                ->orderByDesc("o.{$orderDatetimeColumn}")
+                ->paginate($safePerPage);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return $this->emptyPaginator($safePerPage);
+        }
     }
 
     /**
@@ -335,5 +445,19 @@ class GnuboardSalesHistoryRepository
     private function connectionName(): string
     {
         return (string) config('store.gnuboard.connection', 'mysql_grapeseed_goods');
+    }
+
+    private function emptyPaginator(int $perPage): LengthAwarePaginator
+    {
+        return new LengthAwarePaginator(
+            [],
+            0,
+            max(1, $perPage),
+            null,
+            [
+                'path' => LengthAwarePaginator::resolveCurrentPath(),
+                'pageName' => 'page',
+            ]
+        );
     }
 }

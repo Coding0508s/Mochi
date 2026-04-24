@@ -7,7 +7,7 @@
 - 좌측 메뉴: `CO Team > Store 재고품목`
 - URL: `/store/inventory/skus`
 - 보조 진입: `CO Team > Store 재고` 화면의 `품목 관리` 버튼(모달)
-- 권한: `manageStoreInventory` (관리자만 접근 가능)
+- 권한: `manageStoreInventory` (Full Access 관리자, 또는 People에서 **스토어 재고 수량 수정** 권한이 켜진 계정)
 
 ## 2) 기본 규칙
 

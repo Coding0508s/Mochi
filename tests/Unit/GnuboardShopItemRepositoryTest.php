@@ -115,6 +115,132 @@ class GnuboardShopItemRepositoryTest extends TestCase
         $this->assertSame(['NM-CODE' => '테스트 상품명'], $map);
     }
 
+    public function test_get_category_path_map_resolves_three_level_names(): void
+    {
+        $this->useSqliteGnuboardConnection();
+
+        Schema::connection('mysql_grapeseed_goods')->create('g5_shop_category', function (Blueprint $table) {
+            $table->string('ca_id')->primary();
+            $table->string('ca_name')->nullable();
+        });
+
+        Schema::connection('mysql_grapeseed_goods')->create('g5_shop_item', function (Blueprint $table) {
+            $table->string('it_id')->primary();
+            $table->string('it_model')->nullable();
+            $table->string('ca_id')->nullable();
+            $table->string('ca_id2')->nullable();
+            $table->string('ca_id3')->nullable();
+            $table->integer('it_stock_qty')->default(0);
+        });
+
+        DB::connection('mysql_grapeseed_goods')->table('g5_shop_category')->insert([
+            ['ca_id' => '10', 'ca_name' => '교재'],
+            ['ca_id' => '1010', 'ca_name' => '초등'],
+            ['ca_id' => '101010', 'ca_name' => '리더스'],
+        ]);
+
+        DB::connection('mysql_grapeseed_goods')->table('g5_shop_item')->insert([
+            'it_id' => 'IT-CAT-1',
+            'it_model' => 'PROD-CAT-1',
+            'ca_id' => '10',
+            'ca_id2' => '1010',
+            'ca_id3' => '101010',
+            'it_stock_qty' => 0,
+        ]);
+
+        $this->applyGnuboardConfig();
+
+        $repo = new GnuboardShopItemRepository;
+        $map = $repo->getCategoryPathMapByProductCodes(['PROD-CAT-1']);
+
+        $this->assertArrayHasKey('PROD-CAT-1', $map);
+        $this->assertSame('교재 > 초등 > 리더스', $map['PROD-CAT-1']['category_path']);
+        $this->assertSame('10|1010|101010', $map['PROD-CAT-1']['category_group_key']);
+    }
+
+    public function test_get_category_path_map_returns_uncategorized_when_category_ids_empty(): void
+    {
+        $this->useSqliteGnuboardConnection();
+
+        Schema::connection('mysql_grapeseed_goods')->create('g5_shop_category', function (Blueprint $table) {
+            $table->string('ca_id')->primary();
+            $table->string('ca_name')->nullable();
+        });
+
+        Schema::connection('mysql_grapeseed_goods')->create('g5_shop_item', function (Blueprint $table) {
+            $table->string('it_id')->primary();
+            $table->string('it_model')->nullable();
+            $table->string('ca_id')->nullable();
+            $table->string('ca_id2')->nullable();
+            $table->string('ca_id3')->nullable();
+            $table->integer('it_stock_qty')->default(0);
+        });
+
+        DB::connection('mysql_grapeseed_goods')->table('g5_shop_item')->insert([
+            'it_id' => 'IT-EMPTY-CAT',
+            'it_model' => 'PROD-NO-CAT',
+            'ca_id' => '',
+            'ca_id2' => '',
+            'ca_id3' => '',
+            'it_stock_qty' => 0,
+        ]);
+
+        $this->applyGnuboardConfig();
+
+        $repo = new GnuboardShopItemRepository;
+        $map = $repo->getCategoryPathMapByProductCodes(['PROD-NO-CAT']);
+
+        $this->assertArrayHasKey('PROD-NO-CAT', $map);
+        $this->assertSame('미분류', $map['PROD-NO-CAT']['category_path']);
+        $this->assertSame('미분류', $map['PROD-NO-CAT']['category_group_key']);
+    }
+
+    public function test_get_category_path_map_returns_empty_when_gnuboard_disabled(): void
+    {
+        $this->useSqliteGnuboardConnection();
+
+        Schema::connection('mysql_grapeseed_goods')->create('g5_shop_item', function (Blueprint $table) {
+            $table->string('it_id')->primary();
+            $table->string('it_model')->nullable();
+            $table->string('ca_id')->nullable();
+            $table->integer('it_stock_qty')->default(0);
+        });
+
+        Config::set('store.gnuboard.enabled', false);
+        Config::set('store.gnuboard.connection', 'mysql_grapeseed_goods');
+        Config::set('store.gnuboard.item_table', 'g5_shop_item');
+
+        $repo = new GnuboardShopItemRepository;
+        $map = $repo->getCategoryPathMapByProductCodes(['ANY']);
+
+        $this->assertSame([], $map);
+    }
+
+    public function test_get_category_path_map_returns_empty_when_all_category_columns_invalid(): void
+    {
+        $this->useSqliteGnuboardConnection();
+
+        Schema::connection('mysql_grapeseed_goods')->create('g5_shop_item', function (Blueprint $table) {
+            $table->string('it_id')->primary();
+            $table->string('it_model')->nullable();
+            $table->integer('it_stock_qty')->default(0);
+        });
+
+        Config::set('store.gnuboard.enabled', true);
+        Config::set('store.gnuboard.connection', 'mysql_grapeseed_goods');
+        Config::set('store.gnuboard.item_table', 'g5_shop_item');
+        Config::set('store.gnuboard.product_code_column', 'it_model');
+        Config::set('store.gnuboard.fallback_product_code_column', 'it_id');
+        Config::set('store.gnuboard.item_category_l1_column', 'bad col');
+        Config::set('store.gnuboard.item_category_l2_column', '');
+        Config::set('store.gnuboard.item_category_l3_column', '');
+
+        $repo = new GnuboardShopItemRepository;
+        $map = $repo->getCategoryPathMapByProductCodes(['X']);
+
+        $this->assertSame([], $map);
+    }
+
     private function useSqliteGnuboardConnection(): void
     {
         $this->sqliteGnuboardUsed = true;

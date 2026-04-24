@@ -217,6 +217,11 @@ final class EcountApiClient
             $actualStockQtyMap = $this->gnuboardShopItemRepository->getStockQuantityMapByProductCodes($productCodes);
         }
 
+        $categoryPathMap = [];
+        if ($productCodes !== []) {
+            $categoryPathMap = $this->gnuboardShopItemRepository->getCategoryPathMapByProductCodes($productCodes);
+        }
+
         $imagePathMap = [];
         if ($productCodes !== []) {
             $imagePathMap = $this->storeInventorySkuRepository->getImagePathMapByProductCodes($productCodes);
@@ -227,7 +232,15 @@ final class EcountApiClient
             $deductMap = $this->fetchRecentDeductLogs($productCodes);
         }
 
-        return array_map(function (array $row) use ($nameMap, $notifyQtyMap, $actualStockQtyMap, $imagePathMap, $deductMap): array {
+        $defaultCategory = [
+            'category_l1' => '미분류',
+            'category_l2' => '',
+            'category_l3' => '',
+            'category_path' => '미분류',
+            'category_group_key' => '미분류',
+        ];
+
+        return array_map(function (array $row) use ($nameMap, $notifyQtyMap, $actualStockQtyMap, $categoryPathMap, $imagePathMap, $deductMap, $defaultCategory): array {
             $productCode = (string) $this->pick($row, ['PROD_CD', 'prod_cd', 'product_code', 'productCode', 'item_code'], '');
             $normalizedCode = strtoupper(trim($productCode));
             $warehouseStock = $this->toInt($this->pick($row, ['BAL_QTY', 'bal_qty', 'warehouse_stock', 'stock_qty'], 0));
@@ -247,6 +260,10 @@ final class EcountApiClient
                 : ($fromRowName !== '' ? $fromRowName : '-');
             $deduct = $deductMap[$productCode] ?? null;
 
+            $categoryMeta = ($normalizedCode !== '' && $normalizedCode !== '-')
+                ? ($categoryPathMap[$normalizedCode] ?? $defaultCategory)
+                : $defaultCategory;
+
             return [
                 'product_code' => $productCode !== '' ? $productCode : '-',
                 'product_name' => $productName,
@@ -264,6 +281,11 @@ final class EcountApiClient
                 'last_deduct_type' => is_array($deduct) ? (string) ($deduct['type'] ?? '') : '',
                 'last_deduct_reason' => is_array($deduct) ? (string) ($deduct['reason'] ?? '') : '',
                 'last_deduct_ref' => is_array($deduct) ? (string) ($deduct['ref'] ?? '') : '',
+                'category_l1' => (string) ($categoryMeta['category_l1'] ?? '미분류'),
+                'category_l2' => (string) ($categoryMeta['category_l2'] ?? ''),
+                'category_l3' => (string) ($categoryMeta['category_l3'] ?? ''),
+                'category_path' => (string) ($categoryMeta['category_path'] ?? '미분류'),
+                'category_group_key' => (string) ($categoryMeta['category_group_key'] ?? '미분류'),
             ];
         }, $warehouseRows);
     }

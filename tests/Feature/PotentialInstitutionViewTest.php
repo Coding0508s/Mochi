@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Livewire\PotentialInstitutionView;
 use App\Models\CoNewTarget;
 use App\Models\CoNewTargetDetail;
+use App\Models\SupportRecord;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
@@ -25,6 +26,26 @@ class PotentialInstitutionViewTest extends TestCase
     {
         Schema::dropIfExists('S_CO_NewTarget_Detail');
         Schema::dropIfExists('S_CO_NewTarget');
+        Schema::dropIfExists('S_SupportInfo_Account');
+
+        Schema::create('S_SupportInfo_Account', function (Blueprint $table): void {
+            $table->increments('ID');
+            $table->integer('Year')->nullable();
+            $table->string('SK_Code', 100)->nullable();
+            $table->unsignedInteger('potential_target_id')->nullable();
+            $table->string('Account_Name', 255)->nullable();
+            $table->string('TR_Name', 255)->nullable();
+            $table->date('Support_Date')->nullable();
+            $table->string('Meet_Time', 50)->nullable();
+            $table->string('Support_Type', 100)->nullable();
+            $table->string('Target', 255)->nullable();
+            $table->text('Issue')->nullable();
+            $table->text('TO_Account')->nullable();
+            $table->text('TO_Depart')->nullable();
+            $table->string('Status', 50)->nullable();
+            $table->timestamp('CompletedDate')->nullable();
+            $table->timestamp('CreatedDate')->nullable();
+        });
 
         Schema::create('S_CO_NewTarget', function (Blueprint $table): void {
             $table->increments('ID');
@@ -212,5 +233,62 @@ class PotentialInstitutionViewTest extends TestCase
             url('/potential-institutions/view'),
             route('potential-institutions.view'),
         );
+    }
+
+    public function test_detail_modal_lists_support_by_potential_target_id_when_sk_missing(): void
+    {
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-10',
+            'AccountManager' => 'Mgr',
+            'AccountCode' => null,
+            'AccountName' => 'View SK없음 기관',
+            'Address' => null,
+            'Director' => null,
+            'Phone' => null,
+            'Connected' => null,
+            'Type' => '신규',
+            'Gubun' => '방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => null,
+        ]);
+
+        SupportRecord::query()->create([
+            'Year' => 2026,
+            'SK_Code' => null,
+            'potential_target_id' => $target->ID,
+            'Account_Name' => 'View SK없음 기관',
+            'TR_Name' => 'CO',
+            'Support_Date' => '2026-04-11',
+            'Meet_Time' => '10:00:00',
+            'Support_Type' => '전화',
+            'Target' => null,
+            'Issue' => null,
+            'TO_Account' => '내용',
+            'TO_Depart' => null,
+            'Status' => '진행중',
+            'CompletedDate' => null,
+            'CreatedDate' => now(),
+        ]);
+
+        $component = Livewire::test(PotentialInstitutionView::class)
+            ->set('yearMonth', '2026-04')
+            ->set('dateBasis', 'created')
+            ->call('openTargetDetail', (int) $target->ID);
+
+        $rows = $component->get('detailSupportRecords');
+        $this->assertCount(1, $rows);
+        $this->assertSame('전화', $rows[0]['support_type'] ?? null);
+        $this->assertStringContainsString('내용', (string) ($rows[0]['to_account'] ?? ''));
     }
 }

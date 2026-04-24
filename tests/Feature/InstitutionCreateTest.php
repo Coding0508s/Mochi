@@ -41,6 +41,9 @@ class InstitutionCreateTest extends TestCase
             $table->string('Address', 255)->nullable();
             $table->string('Gubun', 100)->nullable();
             $table->string('Possibility', 20)->nullable();
+            $table->unsignedInteger('LS')->default(0);
+            $table->unsignedInteger('GS_K')->default(0);
+            $table->unsignedInteger('GS_E')->default(0);
         });
 
         Schema::create('S_Account_Information', function (Blueprint $table): void {
@@ -63,7 +66,9 @@ class InstitutionCreateTest extends TestCase
         $this->actingAs($user)
             ->get(route('institutions.create'))
             ->assertOk()
-            ->assertSee('신규 기관 생성');
+            ->assertSee('신규 기관 생성')
+            ->assertSee('인원 정보')
+            ->assertSee('LittleSEED');
     }
 
     public function test_create_page_redirects_when_feature_disabled(): void
@@ -115,6 +120,30 @@ class InstitutionCreateTest extends TestCase
         $this->assertDatabaseHas('S_AccountName', [
             'SKcode' => $sk,
             'Possibility' => null,
+        ]);
+    }
+
+    public function test_save_new_institution_stores_headcount_fields(): void
+    {
+        $user = User::factory()->create();
+        $sk = 'SK-HC-'.uniqid();
+
+        Livewire::actingAs($user)
+            ->test(InstitutionCreateForm::class)
+            ->set('newSkCode', $sk)
+            ->set('newInstitutionName', '인원 테스트 기관')
+            ->set('newLS', '10')
+            ->set('newGSK', '20')
+            ->set('newGSE', '5')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertRedirect(route('institutions.index'));
+
+        $this->assertDatabaseHas('S_AccountName', [
+            'SKcode' => $sk,
+            'LS' => 10,
+            'GS_K' => 20,
+            'GS_E' => 5,
         ]);
     }
 }

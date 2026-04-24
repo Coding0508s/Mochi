@@ -97,22 +97,21 @@ class StoreSalesHistoryGnuboardPageTest extends TestCase
         $this->actingAs($user)
             ->get(route('store.sales.index'))
             ->assertOk()
-            ->assertSee('그누보드 주문 기준 최근 판매 내역')
+            ->assertSee('Store 전체 판매내역')
             ->assertSee('그누보드 판매 상품')
-            ->assertSee('내역 건수')
+            ->assertSee('주문번호')
             ->assertDontSee('OD-CANCEL');
 
         Http::assertNothingSent();
 
-        $rowKey = 'sale_'.md5('P-GB');
         Livewire::actingAs($user)
             ->test(StoreSalesHistoryList::class)
-            ->call('selectProductRow', $rowKey)
-            ->assertSet('selectedRowKey', $rowKey)
             ->assertSee('OD-OK')
-            ->assertSee('-3')
+            ->assertSee('3')
             ->assertSee('홍길동')
-            ->assertSee('주문자');
+            ->assertSee('결제완료')
+            ->assertSee('신용카드')
+            ->assertDontSee('OD-CANCEL');
     }
 
     private function useSqliteGnuboardConnection(): void

@@ -7,6 +7,7 @@ use App\Models\CoNewTargetDetail;
 use App\Models\SupportRecord;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -157,8 +158,23 @@ class PotentialInstitutionView extends Component
             })
             ->toArray();
 
-        $this->detailSupportRecords = SupportRecord::query()
-            ->where('SK_Code', (string) ($target->AccountCode ?? ''))
+        $skForSupport = trim((string) ($target->AccountCode ?? ''));
+
+        $supportBase = SupportRecord::query();
+        if (Schema::hasColumn('S_SupportInfo_Account', 'potential_target_id')) {
+            $supportBase->where(function ($query) use ($target, $skForSupport): void {
+                $query->where('potential_target_id', (int) $target->ID);
+                if ($skForSupport !== '') {
+                    $query->orWhere('SK_Code', $skForSupport);
+                }
+            });
+        } elseif ($skForSupport !== '') {
+            $supportBase->where('SK_Code', $skForSupport);
+        } else {
+            $supportBase->whereRaw('1 = 0');
+        }
+
+        $this->detailSupportRecords = $supportBase
             ->orderByDesc('Support_Date')
             ->orderByDesc('ID')
             ->limit(50)

@@ -11,6 +11,7 @@ use App\Services\PotentialInstitutionSkCodeService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Throwable;
@@ -81,6 +82,25 @@ class PotentialInstitutionList extends Component
     public string $newClosing = '';
 
     public string $newDroppedOut = '';
+
+    /** 신규 등록 모달에서 기관 지원 보고서(S_SupportInfo_Account)를 함께 저장 */
+    public bool $newIncludeSupportReport = false;
+
+    public string $newSupportReportDate = '';
+
+    public string $newSupportReportTime = '';
+
+    public string $newSupportReportType = '전화';
+
+    public string $newSupportReportTarget = '';
+
+    public string $newSupportReportToAccount = '';
+
+    public string $newSupportReportToDepart = '';
+
+    public bool $newSupportReportCompleted = false;
+
+    public string $newSupportReportTrName = '';
 
     // 상세 모달 상태
     public bool $showDetailModal = false;
@@ -312,6 +332,29 @@ class PotentialInstitutionList extends Component
         $this->showCreateModal = true;
     }
 
+    public function updatedNewIncludeSupportReport(mixed $value): void
+    {
+        if (! filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
+            return;
+        }
+
+        if ($this->newSupportReportDate === '' && $this->newMeetingDate !== '') {
+            $this->newSupportReportDate = $this->newMeetingDate;
+        }
+
+        if ($this->newSupportReportTime === '' && $this->newMeetingTime !== '') {
+            $this->newSupportReportTime = $this->newMeetingTime;
+        }
+
+        if ($this->newSupportReportToAccount === '') {
+            $this->newSupportReportToAccount = (string) config('support_report_defaults.to_account_template', '');
+        }
+
+        if ($this->newSupportReportToDepart === '') {
+            $this->newSupportReportToDepart = (string) config('support_report_defaults.to_depart_template', '');
+        }
+    }
+
     public function closeCreateModal(): void
     {
         $this->showCreateModal = false;
@@ -367,6 +410,31 @@ class PotentialInstitutionList extends Component
                     'ConsultingType' => $validated['newConsultingType'],
                     'Possibility' => $validated['newPossibility'] ?: null,
                 ]);
+
+                if (! empty($validated['newIncludeSupportReport'])
+                    && Schema::hasColumn('S_SupportInfo_Account', 'potential_target_id')) {
+                    $supportDate = Carbon::parse($validated['newSupportReportDate']);
+                    $timeRaw = trim((string) ($validated['newSupportReportTime'] ?? ''));
+                    $meetTimeSuffix = $timeRaw !== '' ? $timeRaw.':00' : '00:00:00';
+
+                    SupportRecord::query()->create([
+                        'Year' => (int) $supportDate->format('Y'),
+                        'SK_Code' => null,
+                        'potential_target_id' => (int) $target->ID,
+                        'Account_Name' => $validated['newAccountName'],
+                        'TR_Name' => $validated['newSupportReportTrName'] ?: null,
+                        'Support_Date' => $supportDate->format('Y-m-d'),
+                        'Meet_Time' => $meetTimeSuffix,
+                        'Support_Type' => $validated['newSupportReportType'],
+                        'Target' => $validated['newSupportReportTarget'] ?: null,
+                        'Issue' => null,
+                        'TO_Account' => $validated['newSupportReportToAccount'] ?: null,
+                        'TO_Depart' => $validated['newSupportReportToDepart'] ?: null,
+                        'Status' => ! empty($validated['newSupportReportCompleted']) ? '완료' : '진행중',
+                        'CompletedDate' => ! empty($validated['newSupportReportCompleted']) ? now() : null,
+                        'CreatedDate' => now(),
+                    ]);
+                }
             });
         } catch (Throwable $e) {
             report($e);
@@ -405,6 +473,28 @@ class PotentialInstitutionList extends Component
             'newConsultingCount' => ['nullable', 'integer', 'min:0'],
             'newClosing' => ['nullable', 'integer', 'min:0'],
             'newDroppedOut' => ['nullable', 'integer', 'min:0'],
+            'newIncludeSupportReport' => ['boolean'],
+            'newSupportReportDate' => [
+                Rule::requiredIf(fn (): bool => $this->newIncludeSupportReport),
+                'nullable',
+                'date',
+            ],
+            'newSupportReportTime' => [
+                Rule::requiredIf(fn (): bool => $this->newIncludeSupportReport),
+                'nullable',
+                'date_format:H:i',
+            ],
+            'newSupportReportType' => [
+                Rule::requiredIf(fn (): bool => $this->newIncludeSupportReport),
+                'nullable',
+                'string',
+                'max:100',
+            ],
+            'newSupportReportTarget' => ['nullable', 'string', 'max:255'],
+            'newSupportReportToAccount' => ['nullable', 'string', 'max:20000'],
+            'newSupportReportToDepart' => ['nullable', 'string', 'max:20000'],
+            'newSupportReportCompleted' => ['boolean'],
+            'newSupportReportTrName' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -427,6 +517,11 @@ class PotentialInstitutionList extends Component
             'newClosing.integer' => '도입제안 횟수는 숫자만 입력해 주세요.',
             'newDroppedOut.integer' => '도입취소 횟수는 숫자만 입력해 주세요.',
             '*.min' => '숫자는 0 이상이어야 합니다.',
+            'newSupportReportDate.required' => '지원 보고서를 함께 등록할 때는 지원 날짜를 입력해 주세요.',
+            'newSupportReportDate.date' => '지원 날짜 형식이 올바르지 않습니다.',
+            'newSupportReportTime.required' => '지원 보고서를 함께 등록할 때는 지원 시간을 입력해 주세요.',
+            'newSupportReportTime.date_format' => '지원 시간 형식이 올바르지 않습니다.',
+            'newSupportReportType.required' => '지원 보고서를 함께 등록할 때는 지원 유형을 입력해 주세요.',
         ];
     }
 
@@ -453,6 +548,15 @@ class PotentialInstitutionList extends Component
         $this->newConsultingCount = '';
         $this->newClosing = '';
         $this->newDroppedOut = '';
+        $this->newIncludeSupportReport = false;
+        $this->newSupportReportDate = '';
+        $this->newSupportReportTime = '';
+        $this->newSupportReportType = '전화';
+        $this->newSupportReportTarget = '';
+        $this->newSupportReportToAccount = '';
+        $this->newSupportReportToDepart = '';
+        $this->newSupportReportCompleted = false;
+        $this->newSupportReportTrName = (string) (auth()->user()?->nameForCoReports() ?? '');
     }
 
     private function toNonNegativeInt(mixed $value): int
@@ -528,8 +632,23 @@ class PotentialInstitutionList extends Component
             })
             ->toArray();
 
-        $this->detailSupportRecords = SupportRecord::query()
-            ->where('SK_Code', (string) ($target->AccountCode ?? ''))
+        $skForSupport = trim((string) ($target->AccountCode ?? ''));
+
+        $supportBase = SupportRecord::query();
+        if (Schema::hasColumn('S_SupportInfo_Account', 'potential_target_id')) {
+            $supportBase->where(function ($query) use ($target, $skForSupport): void {
+                $query->where('potential_target_id', (int) $target->ID);
+                if ($skForSupport !== '') {
+                    $query->orWhere('SK_Code', $skForSupport);
+                }
+            });
+        } elseif ($skForSupport !== '') {
+            $supportBase->where('SK_Code', $skForSupport);
+        } else {
+            $supportBase->whereRaw('1 = 0');
+        }
+
+        $this->detailSupportRecords = $supportBase
             ->orderByDesc('Support_Date')
             ->orderByDesc('ID')
             ->limit(50)

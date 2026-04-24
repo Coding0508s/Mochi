@@ -75,10 +75,11 @@
                        class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
 
-            <a href="{{ route('institutions.create') }}"
-               class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+            <button type="button"
+                    wire:click="openCreateModal"
+                    class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors cursor-pointer">
                 신규 기관 등록
-            </a>
+            </button>
         </div>
         <div class="flex flex-wrap items-center gap-3 pt-3 mt-3 border-t border-gray-200/80">
             <select wire:model.live="filterIntroductionPath"
@@ -201,9 +202,9 @@
                 <form wire:submit="saveNewTarget" class="flex-1 overflow-y-auto">
                     <div class="px-6 py-5 space-y-6">
                         @php
-                            $previewTotal = max(0, (int) ($newLS ?? 0))
-                                + max(0, (int) ($newGSK ?? 0))
-                                + max(0, (int) ($newGSE ?? 0));
+                            $previewTotal = max(0, (int) ($newLS !== '' && is_numeric($newLS) ? $newLS : 0))
+                                + max(0, (int) ($newGSK !== '' && is_numeric($newGSK) ? $newGSK : 0))
+                                + max(0, (int) ($newGSE !== '' && is_numeric($newGSE) ? $newGSE : 0));
                         @endphp
 
                         <section class="space-y-4">
@@ -285,18 +286,47 @@
                                     </select>
                                     @error('newPossibility') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                 </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">주소</label>
+                                    <input type="text" wire:model="newAddress" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="기관 주소" />
+                                    @error('newAddress') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                </div>
                             </div>
 
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">주소</label>
-                                <input type="text" wire:model="newAddress" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="기관 주소" />
-                                @error('newAddress') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                            </div>
-
-                            <div class="md:col-span-2">
+                            <div class="space-y-2">
                                 <p class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
                                     신규 등록 단계에서는 SK코드를 발급하지 않습니다. 계약 처리 시 SK코드가 자동 발급되어 기관리스트에 반영됩니다.
                                 </p>
+                                <p class="text-xs text-gray-600">
+                                    이 모달 아래쪽(미팅내용 다음)에 <span class="font-medium text-gray-800">기관 지원 보고서(선택)</span> 항목이 있습니다. 「같이 등록」을 켜면 저장과 동시에 보고서 한 건이 생성됩니다.
+                                </p>
+                            </div>
+                        </section>
+
+                        <section class="space-y-4 border-t border-gray-200 pt-5">
+                            <h3 class="text-base font-semibold text-gray-900">인원 정보</h3>
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">LittleSEED</label>
+                                    <input type="number" min="0" wire:model.live.debounce.200ms="newLS" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    @error('newLS') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">GrapeSEED(유)</label>
+                                    <input type="number" min="0" wire:model.live.debounce.200ms="newGSK" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    @error('newGSK') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">GrapeSEED(초)</label>
+                                    <input type="number" min="0" wire:model.live.debounce.200ms="newGSE" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    @error('newGSE') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">합계</label>
+                                    <div class="flex min-h-[42px] items-center rounded-lg border border-gray-200 bg-gray-100 px-3 text-sm font-medium text-gray-800 tabular-nums">
+                                        {{ number_format($previewTotal) }}
+                                    </div>
+                                </div>
                             </div>
                         </section>
 
@@ -307,28 +337,67 @@
                         </section>
 
                         <section class="space-y-4 border-t border-gray-200 pt-5">
-                            <h3 class="text-base font-semibold text-gray-900">인원 정보</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">LittleSEED</label>
-                                    <input type="number" min="0" wire:model="newLS" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                                    @error('newLS') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">GrapeSEED(유)</label>
-                                    <input type="number" min="0" wire:model="newGSK" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                                    @error('newGSK') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">GrapeSEED(초)</label>
-                                    <input type="number" min="0" wire:model="newGSE" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                                    @error('newGSE') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">합계</label>
-                                    <input type="text" value="{{ $previewTotal }}" readonly class="w-full py-2 px-3 text-sm border border-gray-200 bg-gray-100 text-gray-700 rounded-lg" />
-                                </div>
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <h3 class="text-base font-semibold text-gray-900">기관 지원 보고서 <span class="text-sm font-normal text-gray-500">(선택)</span></h3>
+                                <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                                    <input type="checkbox" wire:model.live="newIncludeSupportReport" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                    <span class="text-sm text-gray-700">같이 등록</span>
+                                </label>
                             </div>
+                            <p class="text-xs text-gray-500">체크하면 저장과 동시에 기관 지원 보고서 목록에 한 건이 추가됩니다. SK 발급 전에는 첨부 파일 업로드는 「CO 기관지원보고서 작성」 화면에서만 할 수 있습니다.</p>
+
+                            @if($newIncludeSupportReport)
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">지원 날짜 <span class="text-red-500">*</span></label>
+                                        <input type="date" wire:model="newSupportReportDate" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                        @error('newSupportReportDate') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">지원 시간 <span class="text-red-500">*</span></label>
+                                        <input type="time" wire:model="newSupportReportTime" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                        @error('newSupportReportTime') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">지원 방법 <span class="text-red-500">*</span></label>
+                                        <select wire:model="newSupportReportType" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            <option>전화</option>
+                                            <option>대면</option>
+                                            <option>화상</option>
+                                            <option>이메일</option>
+                                            <option>문자</option>
+                                            <option>기타</option>
+                                        </select>
+                                        @error('newSupportReportType') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">CO명</label>
+                                        <input type="text" wire:model="newSupportReportTrName" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="보고서 담당 표기명" />
+                                        @error('newSupportReportTrName') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">참석자</label>
+                                        <input type="text" wire:model="newSupportReportTarget" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="예: 원장, 교사 2명" />
+                                        @error('newSupportReportTarget') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                    </div>
+                                </div>
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">기관과의 소통내용</label>
+                                        <textarea wire:model="newSupportReportToAccount" rows="5" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+                                        @error('newSupportReportToAccount') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">본사/타 부서 공유 내용</label>
+                                        <textarea wire:model="newSupportReportToDepart" rows="3" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+                                        @error('newSupportReportToDepart') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                    </div>
+                                </div>
+                                <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                                    <input type="checkbox" wire:model="newSupportReportCompleted" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                    <span class="text-sm text-gray-700">완료 처리</span>
+                                </label>
+                            @endif
                         </section>
 
                         <section class="space-y-4 border-t border-gray-200 pt-5">

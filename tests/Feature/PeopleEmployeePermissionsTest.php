@@ -20,6 +20,13 @@ class PeopleEmployeePermissionsTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function tearDown(): void
+    {
+        Gate::define('manageUserAccounts', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
+
+        parent::tearDown();
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -87,19 +94,22 @@ class PeopleEmployeePermissionsTest extends TestCase
         $this->assertNotTrue((bool) ($component->get('showEditModal') ?? false));
     }
 
-    public function test_admin_without_country_manager_role_cannot_change_employee_department(): void
+    public function test_admin_can_open_edit_modal_and_change_employee_department(): void
     {
         $admin = User::factory()->admin()->create();
 
-        $component = Livewire::actingAs($admin)
+        Livewire::actingAs($admin)
             ->test(PeopleEmployeesList::class)
-            ->call('openEditModal', 'E001');
+            ->call('openEditModal', 'E001')
+            ->assertSet('showEditModal', true)
+            ->set('editWorkDept', 'A02')
+            ->call('saveEmployee')
+            ->assertHasNoErrors();
 
-        $this->assertNotTrue((bool) ($component->get('showEditModal') ?? false));
-        $this->assertSame('A01', (string) Employee::query()->where('EMPNO', 'E001')->value('WORKDEPT'));
+        $this->assertSame('A02', (string) Employee::query()->where('EMPNO', 'E001')->value('WORKDEPT'));
     }
 
-    public function test_country_manager_can_change_employee_department(): void
+    public function test_country_manager_job_employee_without_admin_cannot_open_edit_modal(): void
     {
         Employee::query()->create([
             'EMPNO' => 'DM001',
@@ -112,19 +122,17 @@ class PeopleEmployeePermissionsTest extends TestCase
             'STATUS' => 1,
         ]);
 
-        $countryManager = User::factory()->create([
+        $user = User::factory()->create([
             'email' => 'dm001@example.com',
             'is_admin' => false,
         ]);
 
-        Livewire::actingAs($countryManager)
+        $component = Livewire::actingAs($user)
             ->test(PeopleEmployeesList::class)
-            ->call('openEditModal', 'E001')
-            ->set('editWorkDept', 'A02')
-            ->call('saveEmployee')
-            ->assertHasNoErrors();
+            ->call('openEditModal', 'E001');
 
-        $this->assertSame('A02', (string) Employee::query()->where('EMPNO', 'E001')->value('WORKDEPT'));
+        $this->assertNotTrue((bool) ($component->get('showEditModal') ?? false));
+        $this->assertSame('A01', (string) Employee::query()->where('EMPNO', 'E001')->value('WORKDEPT'));
     }
 
     public function test_non_admin_cannot_open_create_team_modal(): void
@@ -138,7 +146,7 @@ class PeopleEmployeePermissionsTest extends TestCase
         $this->assertNotTrue((bool) ($component->get('showCreateTeamModal') ?? false));
     }
 
-    public function test_country_manager_can_open_create_team_modal(): void
+    public function test_country_manager_job_user_without_admin_cannot_open_create_team_modal(): void
     {
         Employee::query()->create([
             'EMPNO' => 'DM002',
@@ -151,19 +159,19 @@ class PeopleEmployeePermissionsTest extends TestCase
             'STATUS' => 1,
         ]);
 
-        $countryManager = User::factory()->create([
+        $user = User::factory()->create([
             'email' => 'dm002@example.com',
             'is_admin' => false,
         ]);
 
-        $component = Livewire::actingAs($countryManager)
+        $component = Livewire::actingAs($user)
             ->test(PeopleEmployeesList::class)
             ->call('openCreateTeamModal');
 
-        $this->assertTrue((bool) ($component->get('showCreateTeamModal') ?? false));
+        $this->assertNotTrue((bool) ($component->get('showCreateTeamModal') ?? false));
     }
 
-    public function test_country_manager_can_see_setup_related_sidebar_menus(): void
+    public function test_country_manager_job_user_without_admin_cannot_see_setup_related_sidebar_menus(): void
     {
         Employee::query()->create([
             'EMPNO' => 'DM003',
@@ -176,19 +184,19 @@ class PeopleEmployeePermissionsTest extends TestCase
             'STATUS' => 1,
         ]);
 
-        $countryManager = User::factory()->create([
+        $user = User::factory()->create([
             'email' => 'dm003@example.com',
             'is_admin' => false,
         ]);
 
-        $this->actingAs($countryManager)
+        $this->actingAs($user)
             ->get(route('people.index'))
             ->assertOk()
-            ->assertSee('Review')
-            ->assertSee('Goal')
-            ->assertSee('Feedback')
-            ->assertSee('Configuration')
-            ->assertSee('Setup');
+            ->assertDontSee('>Review<', false)
+            ->assertDontSee('>Goal<', false)
+            ->assertDontSee('>Feedback<', false)
+            ->assertDontSee('>Configuration<', false)
+            ->assertDontSee('>Setup<', false);
     }
 
     public function test_non_country_manager_cannot_see_setup_related_sidebar_menus(): void
@@ -369,7 +377,7 @@ class PeopleEmployeePermissionsTest extends TestCase
         $this->assertTrue((bool) $newUser->is_gs_brochure_admin);
     }
 
-    public function test_admin_without_country_manager_role_cannot_update_linked_user_gs_brochure_permission_from_employee_modal(): void
+    public function test_admin_can_open_edit_modal_for_linked_employee_without_changing_gs_brochure_when_gate_disabled(): void
     {
         $linkedUser = User::factory()->create([
             'email' => 'e001@example.com',
@@ -379,11 +387,18 @@ class PeopleEmployeePermissionsTest extends TestCase
 
         $admin = User::factory()->admin()->create();
 
-        $component = Livewire::actingAs($admin)
-            ->test(PeopleEmployeesList::class)
-            ->call('openEditModal', 'E001');
+        Gate::define('manageUserAccounts', fn (?User $user): bool => false);
 
-        $this->assertNotTrue((bool) ($component->get('showEditModal') ?? false));
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openEditModal', 'E001')
+            ->assertSet('showEditModal', true)
+            ->assertDontSee('계정 권한')
+            ->set('editUserIsAdmin', true)
+            ->set('editGsBrochureAdmin', true)
+            ->call('saveEmployee')
+            ->assertHasNoErrors();
+
         $this->assertDatabaseHas('users', [
             'id' => $linkedUser->id,
             'is_gs_brochure_admin' => false,
@@ -442,11 +457,11 @@ class PeopleEmployeePermissionsTest extends TestCase
             'is_gs_brochure_admin' => false,
         ]);
 
-        $countryManager = $this->createCountryManagerUser('DM010', 'dm010@example.com');
+        $admin = User::factory()->admin()->create();
 
         Gate::define('manageUserAccounts', fn (?User $user): bool => false);
 
-        Livewire::actingAs($countryManager)
+        Livewire::actingAs($admin)
             ->test(PeopleEmployeesList::class)
             ->call('openEditModal', 'E001')
             ->assertSet('hasLinkedLoginAccount', true)
@@ -473,9 +488,9 @@ class PeopleEmployeePermissionsTest extends TestCase
             'is_gs_brochure_admin' => false,
         ]);
 
-        $countryManager = $this->createCountryManagerUser('DM011', 'dm011@example.com');
+        $admin = User::factory()->admin()->create();
 
-        Livewire::actingAs($countryManager)
+        Livewire::actingAs($admin)
             ->test(PeopleEmployeesList::class)
             ->call('openEditModal', 'E001')
             ->assertSet('hasLinkedLoginAccount', true)
@@ -507,14 +522,13 @@ class PeopleEmployeePermissionsTest extends TestCase
             'STATUS' => 1,
         ]);
 
-        $countryManager = User::factory()->create([
+        $actor = User::factory()->admin()->create([
             'email' => 'dm020@example.com',
             'employee_empno' => 'DM020',
             'is_active' => true,
-            'is_admin' => false,
         ]);
 
-        Livewire::actingAs($countryManager)
+        Livewire::actingAs($actor)
             ->test(PeopleEmployeesList::class)
             ->call('openEditModal', 'DM020')
             ->assertSet('hasLinkedLoginAccount', true)
@@ -523,12 +537,12 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->assertHasErrors(['editStatus']);
 
         $this->assertDatabaseHas('users', [
-            'id' => $countryManager->id,
+            'id' => $actor->id,
             'is_active' => true,
         ]);
     }
 
-    public function test_user_cannot_demote_last_active_admin_from_employee_modal(): void
+    public function test_last_active_admin_cannot_remove_own_admin_flag_from_employee_modal(): void
     {
         Employee::query()->create([
             'EMPNO' => 'E002',
@@ -548,9 +562,9 @@ class PeopleEmployeePermissionsTest extends TestCase
             'is_admin' => true,
         ]);
 
-        $countryManager = $this->createCountryManagerUser('DM021', 'dm021@example.com');
+        User::query()->whereKeyNot($onlyAdmin->id)->update(['is_admin' => false]);
 
-        Livewire::actingAs($countryManager)
+        Livewire::actingAs($onlyAdmin)
             ->test(PeopleEmployeesList::class)
             ->call('openEditModal', 'E002')
             ->assertSet('hasLinkedLoginAccount', true)
@@ -579,9 +593,9 @@ class PeopleEmployeePermissionsTest extends TestCase
             'employee_empno' => 'E999',
         ]);
 
-        $countryManager = $this->createCountryManagerUser('DM022', 'dm022@example.com');
+        $admin = User::factory()->admin()->create();
 
-        Livewire::actingAs($countryManager)
+        Livewire::actingAs($admin)
             ->test(PeopleEmployeesList::class)
             ->call('openEditModal', 'E001')
             ->assertSet('linkedUserId', $linkedByEmpNo->id);
@@ -591,9 +605,9 @@ class PeopleEmployeePermissionsTest extends TestCase
     {
         Notification::fake();
 
-        $countryManager = $this->createCountryManagerUser('DM023', 'dm023@example.com');
+        $admin = User::factory()->admin()->create();
 
-        Livewire::actingAs($countryManager)
+        Livewire::actingAs($admin)
             ->test(PeopleEmployeesList::class)
             ->call('openEditModal', 'E001')
             ->assertSet('hasLinkedLoginAccount', false)
@@ -608,26 +622,5 @@ class PeopleEmployeePermissionsTest extends TestCase
         $this->assertTrue((bool) $createdUser->is_gs_brochure_admin);
 
         Notification::assertSentTo($createdUser, ResetPassword::class);
-    }
-
-    private function createCountryManagerUser(string $empNo, string $email): User
-    {
-        Employee::query()->create([
-            'EMPNO' => $empNo,
-            'KOREANAME' => '컨트리매니저',
-            'ENGLISHNAME' => 'Country Manager',
-            'JOB' => 'CountryManager',
-            'EMAIL' => $email,
-            'PHONENO' => '010-5555-0000',
-            'WORKDEPT' => 'A01',
-            'STATUS' => 1,
-        ]);
-
-        return User::factory()->create([
-            'email' => $email,
-            'employee_empno' => $empNo,
-            'is_admin' => false,
-            'is_active' => true,
-        ]);
     }
 }

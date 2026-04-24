@@ -2,6 +2,7 @@
 
 namespace App\Repositories\GrapeSeed;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -67,6 +68,253 @@ class GnuboardShopItemRepository
         $nameColumn = (string) config('store.gnuboard.item_name_column', 'it_name');
 
         return $this->fetchStringMapByCodes($codes, $nameColumn);
+    }
+
+    /**
+     * 상품코드별 그누보드 카테고리 경로(1~3단)와 그룹 키를 조회합니다. (SELECT 전용)
+     *
+     * @param  array<int, string>  $productCodes
+     * @return array<string, array{category_l1:string,category_l2:string,category_l3:string,category_path:string,category_group_key:string}>
+     */
+    public function getCategoryPathMapByProductCodes(array $productCodes): array
+    {
+        if (! (bool) config('store.gnuboard.enabled', true)) {
+            return [];
+        }
+
+        $codes = $this->normalizeCodes($productCodes);
+        if ($codes === []) {
+            return [];
+        }
+
+        $l1 = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.item_category_l1_column', 'ca_id'));
+        $l2 = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.item_category_l2_column', 'ca_id2'));
+        $l3 = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.item_category_l3_column', 'ca_id3'));
+        if ($l1 === '' && $l2 === '' && $l3 === '') {
+            return [];
+        }
+
+        $categoryRows = $this->fetchCategoryRowsByCodeColumn($codes, $l1, $l2, $l3);
+        if ($categoryRows === [] && $this->fallbackProductCodeColumn() !== '' && $this->fallbackProductCodeColumn() !== $this->productCodeColumn()) {
+            $categoryRows = $this->fetchCategoryRowsByFallbackColumn($codes, $l1, $l2, $l3);
+        }
+
+        if ($categoryRows === []) {
+            return [];
+        }
+
+        $categoryIds = [];
+        foreach ($categoryRows as $row) {
+            foreach (['l1', 'l2', 'l3'] as $key) {
+                $id = $this->normalizeCategoryId((string) ($row[$key] ?? ''));
+                if ($id !== '') {
+                    $categoryIds[] = $id;
+                }
+            }
+        }
+        $categoryIds = array_values(array_unique($categoryIds));
+        $nameMap = $categoryIds === [] ? [] : $this->fetchCategoryNameMap($categoryIds);
+
+        return $this->buildCategoryPathMap($categoryRows, $nameMap);
+    }
+
+    /**
+     * @param  array<int, string>  $codes
+     * @return array<string, array{l1:string,l2:string,l3:string}>
+     */
+    private function fetchCategoryRowsByCodeColumn(array $codes, string $l1, string $l2, string $l3): array
+    {
+        $codeColumn = $this->sanitizeSqlIdentifier($this->productCodeColumn());
+        if ($codeColumn === '' || $codes === []) {
+            return [];
+        }
+
+        $match = $this->normalizedCodeMatchSql($codeColumn);
+        if ($match['sql'] === '') {
+            return [];
+        }
+
+        $selectParts = ["{$match['sql']} as product_code"];
+        $bindings = $match['bindings'];
+        foreach ([['l1', $l1], ['l2', $l2], ['l3', $l3]] as [$alias, $col]) {
+            if ($col !== '') {
+                $selectParts[] = "`{$col}` as {$alias}";
+            } else {
+                $selectParts[] = "'' as {$alias}";
+            }
+        }
+
+        $placeholders = implode(',', array_fill(0, count($codes), '?'));
+        $whereBindings = array_merge($bindings, $codes);
+
+        try {
+            $rows = $this->itemTableQuery()
+                ->selectRaw(implode(', ', $selectParts), $bindings)
+                ->whereRaw("{$match['sql']} in ({$placeholders})", $whereBindings)
+                ->get();
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return [];
+        }
+
+        return $this->mapCategoryRows($rows, $codes);
+    }
+
+    /**
+     * @param  array<int, string>  $codes
+     * @return array<string, array{l1:string,l2:string,l3:string}>
+     */
+    private function fetchCategoryRowsByFallbackColumn(array $codes, string $l1, string $l2, string $l3): array
+    {
+        $fallback = $this->sanitizeSqlIdentifier($this->fallbackProductCodeColumn());
+        if ($fallback === '' || $codes === []) {
+            return [];
+        }
+
+        $match = $this->normalizedCodeMatchSql($fallback);
+        if ($match['sql'] === '') {
+            return [];
+        }
+
+        $selectParts = ["{$match['sql']} as product_code"];
+        $bindings = $match['bindings'];
+        foreach ([['l1', $l1], ['l2', $l2], ['l3', $l3]] as [$alias, $col]) {
+            if ($col !== '') {
+                $selectParts[] = "`{$col}` as {$alias}";
+            } else {
+                $selectParts[] = "'' as {$alias}";
+            }
+        }
+
+        $placeholders = implode(',', array_fill(0, count($codes), '?'));
+        $whereBindings = array_merge($bindings, $codes);
+
+        try {
+            $rows = $this->itemTableQuery()
+                ->selectRaw(implode(', ', $selectParts), $bindings)
+                ->whereRaw("{$match['sql']} in ({$placeholders})", $whereBindings)
+                ->get();
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return [];
+        }
+
+        return $this->mapCategoryRows($rows, $codes);
+    }
+
+    /**
+     * @param  Collection<int, object>  $rows
+     * @param  array<int, string>  $codes
+     * @return array<string, array{l1:string,l2:string,l3:string}>
+     */
+    private function mapCategoryRows($rows, array $codes): array
+    {
+        $map = [];
+        foreach ($rows as $row) {
+            $code = $this->normalizeProductCode((string) ($row->product_code ?? ''));
+            if ($code === '' || ! in_array($code, $codes, true)) {
+                continue;
+            }
+            $map[$code] = [
+                'l1' => (string) ($row->l1 ?? ''),
+                'l2' => (string) ($row->l2 ?? ''),
+                'l3' => (string) ($row->l3 ?? ''),
+            ];
+        }
+
+        return $map;
+    }
+
+    /**
+     * @param  array<int, string>  $categoryIds
+     * @return array<string, string>
+     */
+    private function fetchCategoryNameMap(array $categoryIds): array
+    {
+        $table = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.category_table', 'g5_shop_category'));
+        $idCol = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.category_id_column', 'ca_id'));
+        $nameCol = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.category_name_column', 'ca_name'));
+        if ($table === '' || $idCol === '' || $nameCol === '' || $categoryIds === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($categoryIds), '?'));
+
+        try {
+            $rows = $this->categoryTableQuery($table)
+                ->selectRaw("`{$idCol}` as category_id, `{$nameCol}` as category_name")
+                ->whereRaw("`{$idCol}` in ({$placeholders})", $categoryIds)
+                ->get();
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return [];
+        }
+
+        $map = [];
+        foreach ($rows as $row) {
+            $id = $this->normalizeCategoryId((string) ($row->category_id ?? ''));
+            if ($id === '') {
+                continue;
+            }
+            $map[$id] = trim((string) ($row->category_name ?? ''));
+        }
+
+        return $map;
+    }
+
+    /**
+     * @param  array<string, array{l1:string,l2:string,l3:string}>  $categoryRows
+     * @param  array<string, string>  $nameMap
+     * @return array<string, array{category_l1:string,category_l2:string,category_l3:string,category_path:string,category_group_key:string}>
+     */
+    private function buildCategoryPathMap(array $categoryRows, array $nameMap): array
+    {
+        $uncategorized = '미분류';
+        $result = [];
+
+        foreach ($categoryRows as $code => $levels) {
+            $ids = [
+                $this->normalizeCategoryId((string) ($levels['l1'] ?? '')),
+                $this->normalizeCategoryId((string) ($levels['l2'] ?? '')),
+                $this->normalizeCategoryId((string) ($levels['l3'] ?? '')),
+            ];
+            $labels = [];
+            foreach ($ids as $id) {
+                if ($id === '') {
+                    continue;
+                }
+                $name = trim((string) ($nameMap[$id] ?? ''));
+                $labels[] = $name !== '' ? $name : $id;
+            }
+
+            $path = $labels === [] ? $uncategorized : implode(' > ', $labels);
+            $groupKey = implode('|', array_filter($ids, static fn (string $id): bool => $id !== ''));
+
+            $result[$code] = [
+                'category_l1' => $labels[0] ?? $uncategorized,
+                'category_l2' => $labels[1] ?? '',
+                'category_l3' => $labels[2] ?? '',
+                'category_path' => $path,
+                'category_group_key' => $groupKey !== '' ? $groupKey : $uncategorized,
+            ];
+        }
+
+        return $result;
+    }
+
+    private function normalizeCategoryId(string $value): string
+    {
+        $value = trim($value);
+
+        return $value;
+    }
+
+    private function categoryTableQuery(string $table)
+    {
+        return DB::connection($this->connectionName())->table($table);
     }
 
     /**

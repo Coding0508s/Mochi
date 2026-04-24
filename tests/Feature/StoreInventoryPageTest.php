@@ -218,6 +218,9 @@ class StoreInventoryPageTest extends TestCase
         $mock->shouldReceive('getStockQuantityMapByProductCodes')
             ->once()
             ->andReturn(['P-NOTI' => 33]);
+        $mock->shouldReceive('getCategoryPathMapByProductCodes')
+            ->once()
+            ->andReturn([]);
         $this->app->instance(GnuboardShopItemRepository::class, $mock);
 
         Livewire::test(StoreInventoryList::class)
@@ -291,6 +294,7 @@ class StoreInventoryPageTest extends TestCase
         $mock = Mockery::mock(GnuboardShopItemRepository::class);
         $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
         $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn(['P-AUDIT' => 8]);
+        $mock->shouldReceive('getCategoryPathMapByProductCodes')->once()->andReturn([]);
         $this->app->instance(GnuboardShopItemRepository::class, $mock);
 
         $admin = User::factory()->create(['is_admin' => true, 'name' => '관리자A']);
@@ -312,7 +316,121 @@ class StoreInventoryPageTest extends TestCase
             ->assertSet('actualStockModalProductName', '모달 정보 테스트 상품')
             ->assertSet('actualStockModalWarehouseStock', 15)
             ->assertSet('actualStockModalCurrentQty', 8)
-            ->assertSet('actualStockModalLastChangedBy', '관리자A');
+            ->assertSet('actualStockModalLastChangedBy', '관리자A')
+            ->assertCount('actualStockModalHistoryRows', 1);
+    }
+
+    public function test_open_actual_stock_modal_lists_only_store_inventory_source_logs(): void
+    {
+        Http::fake([
+            'https://oapi.ecount.com/OAPI/V2/InventoryBalance/GetListInventoryBalanceStatus*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-SRC', 'BAL_QTY' => '20'],
+                    ],
+                ],
+            ], 200),
+            'https://oapi.ecount.com/OAPI/V2/InventoryBasic/GetBasicProductsList*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-SRC', 'PROD_DES' => '소스 필터 상품'],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
+        $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn(['P-SRC' => 3]);
+        $mock->shouldReceive('getCategoryPathMapByProductCodes')->once()->andReturn([]);
+        $this->app->instance(GnuboardShopItemRepository::class, $mock);
+
+        $admin = User::factory()->create(['is_admin' => true, 'name' => '테스터']);
+
+        StoreGnuboardStockChangeLog::query()->create([
+            'product_code' => 'P-SRC',
+            'before_qty' => 1,
+            'after_qty' => 2,
+            'changed_by' => $admin->id,
+            'source' => 'legacy_import',
+            'memo' => '다른 출처(목록에서 제외)',
+        ]);
+
+        StoreGnuboardStockChangeLog::query()->create([
+            'product_code' => 'P-SRC',
+            'before_qty' => 2,
+            'after_qty' => 3,
+            'changed_by' => $admin->id,
+            'source' => 'store_inventory',
+            'memo' => '재고 화면 저장',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(StoreInventoryList::class)
+            ->call('openActualStockModal', 'P-SRC')
+            ->assertCount('actualStockModalHistoryRows', 1)
+            ->assertSet('actualStockModalHistoryRows.0.memo', '재고 화면 저장')
+            ->assertSet('actualStockModalLastChangedBy', '테스터');
+    }
+
+    public function test_open_actual_stock_modal_snapshot_includes_ecount_last_deduct_and_can_open_deduct_detail(): void
+    {
+        Config::set('store.ecount.movement_endpoint', '/OAPI/V2/InventoryBalance/GetListInventoryMovementHistory');
+        Config::set('store.ecount.fetch_deduct_logs', true);
+
+        Http::fake([
+            'https://oapi.ecount.com/OAPI/V2/InventoryBalance/GetListInventoryBalanceStatus*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-ACT-DED', 'BAL_QTY' => '100'],
+                    ],
+                ],
+            ], 200),
+            'https://oapi.ecount.com/OAPI/V2/InventoryBasic/GetBasicProductsList*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-ACT-DED', 'PROD_DES' => '차감요약 테스트'],
+                    ],
+                ],
+            ], 200),
+            'https://oapi.ecount.com/OAPI/V2/InventoryBalance/GetListInventoryMovementHistory*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        [
+                            'PROD_CD' => 'P-ACT-DED',
+                            'QTY' => '-5',
+                            'PRINT_YN' => 'Y',
+                            'PRINT_DATETIME' => '2026-04-20 10:00:00',
+                            'SLIP_NO' => 'SLIP-ACT-99',
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
+        $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn(['P-ACT-DED' => 95]);
+        $mock->shouldReceive('getCategoryPathMapByProductCodes')->once()->andReturn([]);
+        $this->app->instance(GnuboardShopItemRepository::class, $mock);
+
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        Livewire::actingAs($admin)
+            ->test(StoreInventoryList::class)
+            ->call('openActualStockModal', 'P-ACT-DED')
+            ->assertSet('actualStockModalHasEcountDeductSummary', true)
+            ->assertSet('actualStockModalLastDeductQty', 5)
+            ->assertSet('actualStockModalLastDeductRef', 'SLIP-ACT-99')
+            ->call('switchToEcountDeductDetailFromActualStockModal')
+            ->assertSet('showActualStockModal', false)
+            ->assertSet('showDeductDetailModal', true)
+            ->assertSet('selectedDeductItem.product_code', 'P-ACT-DED');
     }
 
     public function test_admin_can_save_actual_stock_from_modal_and_write_log_with_memo(): void
@@ -339,6 +457,7 @@ class StoreInventoryPageTest extends TestCase
         $mock = Mockery::mock(GnuboardShopItemRepository::class);
         $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
         $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn(['P-UPD' => 7]);
+        $mock->shouldReceive('getCategoryPathMapByProductCodes')->once()->andReturn([]);
         $mock->shouldReceive('updateStockQuantityByProductCode')->once()->with('P-UPD', 25)->andReturn([
             'product_code' => 'P-UPD',
             'before_qty' => 7,
@@ -358,7 +477,7 @@ class StoreInventoryPageTest extends TestCase
             ->assertSet('items.0.actual_stock_quantity', 25)
             ->assertSet('saveError', null)
             ->assertSet('showActualStockModal', false)
-            ->assertSee('실제수량을 저장했습니다.');
+            ->assertSee('스토어사이트 재고를 저장했습니다.');
 
         $this->assertDatabaseHas('store_gnuboard_stock_change_logs', [
             'product_code' => 'P-UPD',
@@ -368,6 +487,86 @@ class StoreInventoryPageTest extends TestCase
             'source' => 'store_inventory',
             'memo' => '월말 실사 반영',
         ]);
+    }
+
+    public function test_save_actual_stock_requires_memo(): void
+    {
+        Http::fake([
+            'https://oapi.ecount.com/OAPI/V2/InventoryBalance/GetListInventoryBalanceStatus*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-MEMO', 'BAL_QTY' => '10'],
+                    ],
+                ],
+            ], 200),
+            'https://oapi.ecount.com/OAPI/V2/InventoryBasic/GetBasicProductsList*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-MEMO', 'PROD_DES' => '메모 필수 테스트'],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
+        $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn(['P-MEMO' => 5]);
+        $mock->shouldReceive('getCategoryPathMapByProductCodes')->once()->andReturn([]);
+        $mock->shouldNotReceive('updateStockQuantityByProductCode');
+        $this->app->instance(GnuboardShopItemRepository::class, $mock);
+
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        Livewire::actingAs($admin)
+            ->test(StoreInventoryList::class)
+            ->call('openActualStockModal', 'P-MEMO')
+            ->set('actualStockModalNewQty', '12')
+            ->set('actualStockModalMemo', '   ')
+            ->call('saveActualStockFromModal')
+            ->assertSet('showActualStockModal', true)
+            ->assertSee('변경 사유를 입력해 주세요.');
+    }
+
+    public function test_save_actual_stock_rejects_when_quantity_unchanged(): void
+    {
+        Http::fake([
+            'https://oapi.ecount.com/OAPI/V2/InventoryBalance/GetListInventoryBalanceStatus*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-SAME', 'BAL_QTY' => '10'],
+                    ],
+                ],
+            ], 200),
+            'https://oapi.ecount.com/OAPI/V2/InventoryBasic/GetBasicProductsList*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-SAME', 'PROD_DES' => '동일 수량 테스트'],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
+        $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn(['P-SAME' => 9]);
+        $mock->shouldReceive('getCategoryPathMapByProductCodes')->once()->andReturn([]);
+        $mock->shouldNotReceive('updateStockQuantityByProductCode');
+        $this->app->instance(GnuboardShopItemRepository::class, $mock);
+
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        Livewire::actingAs($admin)
+            ->test(StoreInventoryList::class)
+            ->call('openActualStockModal', 'P-SAME')
+            ->set('actualStockModalNewQty', '9')
+            ->set('actualStockModalMemo', '의미 없는 동일 저장 시도')
+            ->call('saveActualStockFromModal')
+            ->assertSet('showActualStockModal', true)
+            ->assertSee('수량이 변경되지 않았습니다');
     }
 
     public function test_non_admin_cannot_open_or_save_actual_stock_modal(): void
@@ -394,6 +593,7 @@ class StoreInventoryPageTest extends TestCase
         $mock = Mockery::mock(GnuboardShopItemRepository::class);
         $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->twice()->andReturn([]);
         $mock->shouldReceive('getStockQuantityMapByProductCodes')->twice()->andReturn(['P-NOADMIN' => 3]);
+        $mock->shouldReceive('getCategoryPathMapByProductCodes')->twice()->andReturn([]);
         $this->app->instance(GnuboardShopItemRepository::class, $mock);
 
         $user = User::factory()->create(['is_admin' => false]);
@@ -433,6 +633,7 @@ class StoreInventoryPageTest extends TestCase
         $mock = Mockery::mock(GnuboardShopItemRepository::class);
         $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->twice()->andReturn([]);
         $mock->shouldReceive('getStockQuantityMapByProductCodes')->twice()->andReturn(['P-VALID' => 1]);
+        $mock->shouldReceive('getCategoryPathMapByProductCodes')->twice()->andReturn([]);
         $mock->shouldNotReceive('updateStockQuantityByProductCode');
         $this->app->instance(GnuboardShopItemRepository::class, $mock);
 
@@ -443,14 +644,14 @@ class StoreInventoryPageTest extends TestCase
             ->call('openActualStockModal', 'P-VALID')
             ->set('actualStockModalNewQty', '-3')
             ->call('saveActualStockFromModal')
-            ->assertSet('saveError', '실제수량은 0 이상이어야 합니다.');
+            ->assertSet('saveError', '스토어사이트 재고는 0 이상이어야 합니다.');
 
         Livewire::actingAs($admin)
             ->test(StoreInventoryList::class)
             ->call('openActualStockModal', 'P-VALID')
             ->set('actualStockModalNewQty', 'abc')
             ->call('saveActualStockFromModal')
-            ->assertSet('saveError', '실제수량은 숫자로 입력해 주세요.');
+            ->assertSet('saveError', '스토어사이트 재고는 숫자로 입력해 주세요.');
     }
 
     public function test_inventory_request_joins_comma_separated_product_codes_with_ecount_delimiter(): void
@@ -528,7 +729,7 @@ class StoreInventoryPageTest extends TestCase
             ->assertDontSee('재고수정');
     }
 
-    public function test_inventory_page_shows_sku_manage_button_for_admin_only(): void
+    public function test_inventory_page_shows_sku_manage_button_for_admin_or_store_inventory_editor(): void
     {
         Http::fake([
             'https://oapi.ecount.com/OAPI/V2/InventoryBalance/GetListInventoryBalanceStatus*' => Http::response([
@@ -538,9 +739,21 @@ class StoreInventoryPageTest extends TestCase
         ]);
 
         $admin = User::factory()->create(['is_admin' => true]);
-        $normalUser = User::factory()->create(['is_admin' => false]);
+        $inventoryEditor = User::factory()->create([
+            'is_admin' => false,
+            'can_manage_store_inventory' => true,
+        ]);
+        $normalUser = User::factory()->create([
+            'is_admin' => false,
+            'can_manage_store_inventory' => false,
+        ]);
 
         $this->actingAs($admin)
+            ->get(route('store.inventory.index'))
+            ->assertOk()
+            ->assertSee('품목 추가');
+
+        $this->actingAs($inventoryEditor)
             ->get(route('store.inventory.index'))
             ->assertOk()
             ->assertSee('품목 추가');
@@ -548,7 +761,7 @@ class StoreInventoryPageTest extends TestCase
         $this->actingAs($normalUser)
             ->get(route('store.inventory.index'))
             ->assertOk()
-            ->assertDontSee('품목 관리');
+            ->assertDontSee('품목 추가');
     }
 
     public function test_inventory_page_renders_recent_deduct_fields_from_movement_api(): void
@@ -1014,5 +1227,208 @@ class StoreInventoryPageTest extends TestCase
         Http::assertSent(function ($request): bool {
             return str_contains($request->url(), 'SESSION_ID=session-from-data-datas');
         });
+    }
+
+    public function test_inventory_page_renders_category_filter_dropdown(): void
+    {
+        Http::fake([
+            'https://oapi.ecount.com/OAPI/V2/InventoryBalance/GetListInventoryBalanceStatus*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-CAT-A', 'BAL_QTY' => '5'],
+                        ['PROD_CD' => 'P-CAT-B', 'BAL_QTY' => '6'],
+                    ],
+                ],
+            ], 200),
+            'https://oapi.ecount.com/OAPI/V2/InventoryBasic/GetBasicProductsList*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-CAT-A', 'PROD_DES' => '카테고리 A 상품'],
+                        ['PROD_CD' => 'P-CAT-B', 'PROD_DES' => '카테고리 B 상품'],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
+        $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn([]);
+        $mock->shouldReceive('getCategoryPathMapByProductCodes')
+            ->once()
+            ->andReturn([
+                'P-CAT-A' => [
+                    'category_l1' => '교재',
+                    'category_l2' => '초등',
+                    'category_l3' => '',
+                    'category_path' => '교재 > 초등',
+                    'category_group_key' => '10|1010',
+                ],
+                'P-CAT-B' => [
+                    'category_l1' => '굿즈',
+                    'category_l2' => '',
+                    'category_l3' => '',
+                    'category_path' => '굿즈',
+                    'category_group_key' => '20',
+                ],
+            ]);
+        $this->app->instance(GnuboardShopItemRepository::class, $mock);
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('store.inventory.index'))
+            ->assertOk()
+            ->assertSee('카테고리')
+            ->assertSee('교재 > 초등')
+            ->assertSee('굿즈');
+    }
+
+    public function test_inventory_category_filter_limits_rows(): void
+    {
+        Http::fake([
+            'https://oapi.ecount.com/OAPI/V2/InventoryBalance/GetListInventoryBalanceStatus*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-X1', 'BAL_QTY' => '1'],
+                        ['PROD_CD' => 'P-X2', 'BAL_QTY' => '2'],
+                    ],
+                ],
+            ], 200),
+            'https://oapi.ecount.com/OAPI/V2/InventoryBasic/GetBasicProductsList*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-X1', 'PROD_DES' => '알파'],
+                        ['PROD_CD' => 'P-X2', 'PROD_DES' => '베타'],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
+        $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn([]);
+        $mock->shouldReceive('getCategoryPathMapByProductCodes')
+            ->once()
+            ->andReturn([
+                'P-X1' => [
+                    'category_l1' => 'A',
+                    'category_l2' => '',
+                    'category_l3' => '',
+                    'category_path' => 'A',
+                    'category_group_key' => 'a1',
+                ],
+                'P-X2' => [
+                    'category_l1' => 'B',
+                    'category_l2' => '',
+                    'category_l3' => '',
+                    'category_path' => 'B',
+                    'category_group_key' => 'b1',
+                ],
+            ]);
+        $this->app->instance(GnuboardShopItemRepository::class, $mock);
+
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(StoreInventoryList::class)
+            ->assertSet('totalItems', 2)
+            ->set('categoryFilter', 'B')
+            ->assertSet('totalItems', 1)
+            ->assertSee('베타');
+    }
+
+    public function test_inventory_search_and_category_filter_combined(): void
+    {
+        Http::fake([
+            'https://oapi.ecount.com/OAPI/V2/InventoryBalance/GetListInventoryBalanceStatus*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-Y1', 'BAL_QTY' => '1'],
+                        ['PROD_CD' => 'P-Y2', 'BAL_QTY' => '2'],
+                    ],
+                ],
+            ], 200),
+            'https://oapi.ecount.com/OAPI/V2/InventoryBasic/GetBasicProductsList*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-Y1', 'PROD_DES' => '공통 접두어 알파'],
+                        ['PROD_CD' => 'P-Y2', 'PROD_DES' => '공통 접두어 베타'],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
+        $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn([]);
+        $mock->shouldReceive('getCategoryPathMapByProductCodes')
+            ->once()
+            ->andReturn([
+                'P-Y1' => [
+                    'category_l1' => '같은카테',
+                    'category_l2' => '',
+                    'category_l3' => '',
+                    'category_path' => '같은카테',
+                    'category_group_key' => 'g1',
+                ],
+                'P-Y2' => [
+                    'category_l1' => '같은카테',
+                    'category_l2' => '',
+                    'category_l3' => '',
+                    'category_path' => '같은카테',
+                    'category_group_key' => 'g1',
+                ],
+            ]);
+        $this->app->instance(GnuboardShopItemRepository::class, $mock);
+
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(StoreInventoryList::class)
+            ->set('categoryFilter', '같은카테')
+            ->set('search', '베타')
+            ->assertSet('totalItems', 1)
+            ->assertSee('베타');
+    }
+
+    public function test_inventory_category_path_defaults_to_uncategorized_when_map_missing(): void
+    {
+        Http::fake([
+            'https://oapi.ecount.com/OAPI/V2/InventoryBalance/GetListInventoryBalanceStatus*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-UN', 'BAL_QTY' => '1'],
+                    ],
+                ],
+            ], 200),
+            'https://oapi.ecount.com/OAPI/V2/InventoryBasic/GetBasicProductsList*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-UN', 'PROD_DES' => '미분류 상품'],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
+        $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn([]);
+        $mock->shouldReceive('getCategoryPathMapByProductCodes')->once()->andReturn([]);
+        $this->app->instance(GnuboardShopItemRepository::class, $mock);
+
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(StoreInventoryList::class)
+            ->assertSet('items.0.category_path', '미분류')
+            ->assertSee('미분류');
     }
 }

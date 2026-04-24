@@ -30,7 +30,7 @@
             <p class="mt-2 text-sm text-slate-500">{{ __('Log in to access Mochi') }}</p>
         </div>
 
-        <form method="POST" action="{{ route('login') }}" class="mt-8 space-y-5">
+        <form id="login-form" method="POST" action="{{ route('login') }}" class="mt-8 space-y-5">
             @csrf
             {{-- 회사 이메일 (shadcn/motion 스타일 플로팅 라벨 — Blade 포팅) --}}
             <div>
@@ -97,14 +97,45 @@
             </div>
 
             <div class="pt-1">
-                <x-ui.liquid-glass-button pill="true" filter-id="login-glass-filter" variant="mochi-blue" class="w-full">
-                    {{ __('Sign In') }}
-                    <svg class="size-4 opacity-90" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-                    </svg>
+                <x-ui.liquid-glass-button id="login-submit" pill="true" filter-id="login-glass-filter" variant="mochi-blue" class="w-full">
+                    <span data-login-submit-idle class="inline-flex items-center justify-center gap-2">
+                        {{ __('Sign In') }}
+                        <svg class="size-4 opacity-90" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                        </svg>
+                    </span>
+                    <span data-login-submit-busy class="hidden items-center justify-center gap-2" aria-hidden="true">
+                        <svg class="size-4 shrink-0 animate-spin text-white/95 motion-reduce:animate-none" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        {{ __('Signing in') }}
+                    </span>
                 </x-ui.liquid-glass-button>
             </div>
         </form>
+
+        <script>
+            (function () {
+                const form = document.getElementById('login-form');
+                const btn = document.getElementById('login-submit');
+                if (!form || !btn) {
+                    return;
+                }
+                form.addEventListener('submit', function () {
+                    if (btn.disabled) {
+                        return;
+                    }
+                    btn.disabled = true;
+                    btn.setAttribute('aria-busy', 'true');
+                    const idle = btn.querySelector('[data-login-submit-idle]');
+                    const busy = btn.querySelector('[data-login-submit-busy]');
+                    idle?.classList.add('hidden');
+                    busy?.classList.remove('hidden');
+                    busy?.classList.add('inline-flex');
+                });
+            })();
+        </script>
     </div>
 
     {{-- 푸터 링크 --}}

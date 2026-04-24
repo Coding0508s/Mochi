@@ -65,6 +65,9 @@ class Institution extends Model
         'Address',
         'Gubun',
         'Possibility',
+        'LS',
+        'GS_K',
+        'GS_E',
     ];
 
     // ─── 날짜/타입 자동 변환 설정 ────────────────────────────────────

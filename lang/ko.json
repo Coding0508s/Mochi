@@ -9,8 +9,17 @@
     "Password": "비밀번호",
     "Forgot password?": "비밀번호를 잊으셨나요?",
     "Sign In": "로그인",
+    "Signing in": "로그인 중…",
     "Internal Wiki": "내부 위키",
     "IT Support": "IT 지원",
     "Help Desk": "헬프 데스크",
-    "Footer navigation": "하단 링크"
+    "Footer navigation": "하단 링크",
+    "Password recovery": "비밀번호 재설정",
+    "Password recovery subtitle": "회사 이메일을 입력하시면 재설정 링크를 보내 드립니다.",
+    "Password recovery hint inbox": "메일이 도착하지 않으면 스팸·프로모션함을 확인해 주세요.",
+    "Password recovery hint security": "계정 보호를 위해 해당 이메일 등록 여부는 화면에 표시하지 않습니다.",
+    "Password recovery hint expiry": "링크는 일정 시간 후 만료될 수 있습니다.",
+    "Back to sign in": "로그인으로 돌아가기",
+    "Send reset link": "재설정 링크 보내기",
+    "Account recovery": "계정 복구"
 }

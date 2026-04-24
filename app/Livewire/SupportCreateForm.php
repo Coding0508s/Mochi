@@ -82,7 +82,8 @@ class SupportCreateForm extends Component
 
     public function mount(): void
     {
-        $this->formCoName = (string) (auth()->user()?->name ?? 'Andrew Hur');
+        $user = auth()->user();
+        $this->formCoName = $user !== null ? $user->nameForCoReports() : '';
         $this->formSupportDate = now()->format('Y-m-d');
         $this->formSupportTime = now()->format('H:i');
     }
@@ -280,13 +281,13 @@ class SupportCreateForm extends Component
                         'business_number' => null,
                         'document_date' => $this->formSupportDate,
                         'document_time' => $documentTime,
-                        'consultant' => $this->formCoName ?: (string) (auth()->user()?->name ?? ''),
+                        'consultant' => $this->formCoName ?: (string) (auth()->user()?->nameForCoReports() ?? ''),
                         'original_filename' => $filenameForRecord,
                         'stored_disk' => 'local',
                         'stored_path' => $storedPath,
                         'mime_type' => $detectedMimeType,
                         'size_bytes' => $detectedSize,
-                        'uploaded_by' => auth()->user()?->name,
+                        'uploaded_by' => auth()->user()?->nameForCoReports(),
                     ]);
 
                     if (Schema::hasTable('SF_Files')) {
@@ -294,7 +295,7 @@ class SupportCreateForm extends Component
                             'fileName' => $this->buildSfUploadFileName($filenameForRecord, $this->formAccountName),
                             'download_Cnt' => 0,
                             'LastUpdate_Date' => now()->format('Y-m-d H:i:s'),
-                            'User' => (string) (auth()->user()?->name ?? $this->formCoName),
+                            'User' => (string) (auth()->user()?->nameForCoReports() ?? $this->formCoName),
                             'created_Date' => now()->format('Y-m-d H:i:s'),
                         ]);
                     }

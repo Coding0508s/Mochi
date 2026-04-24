@@ -108,6 +108,7 @@ class SetupEmployeeCreate extends Component
                 'password' => Str::random(48),
                 'is_admin' => false,
                 'is_gs_brochure_admin' => (bool) ($validated['isGsBrochureAdmin'] ?? false),
+                'can_manage_store_inventory' => false,
                 'is_active' => true,
                 'email_verified_at' => null,
             ]);

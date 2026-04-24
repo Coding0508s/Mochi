@@ -25,6 +25,7 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => 'password',
             'is_admin' => false,
+            'can_manage_store_inventory' => false,
             'is_active' => true,
             'remember_token' => Str::random(10),
         ];
