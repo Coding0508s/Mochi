@@ -2,7 +2,7 @@
 <div class="w-full max-w-[420px] mx-auto">
     <x-auth-session-status class="mb-4 rounded-lg border border-mochi-header/15 bg-white/90 px-4 py-2 text-sm text-slate-700 shadow-sm" :status="session('status')" />
 
-    <div class="rounded-2xl bg-white px-8 py-10 shadow-xl shadow-slate-300/40 ring-1 ring-mochi-header/10">
+    <div class="mochi-auth-card-view-transition rounded-2xl bg-white px-8 py-10 shadow-xl shadow-slate-300/40 ring-1 ring-mochi-header/10">
         {{-- 뱃지 --}}
         <div class="flex justify-center mb-4">
             <div
@@ -62,7 +62,8 @@
                     @if (Route::has('password.request'))
                         <a
                             href="{{ route('password.request') }}"
-                            class="text-xs font-medium text-mochi-header transition hover:text-mochi-excel focus:outline-none focus:underline"
+                            rel="prefetch"
+                            class="text-xs font-medium text-mochi-header transition-colors duration-200 ease-out hover:text-mochi-excel focus:outline-none focus:underline"
                         >
                             {{ __('Forgot password?') }}
                         </a>
