@@ -41,6 +41,13 @@ return [
         'logistics_url' => env('GS_BROCHURE_TEAMS_LOGISTICS_URL'),
     ],
 
+    /*
+    | 외부 플랫폼 → 기관 마스터(S_AccountName) upsert API (Bearer)
+    */
+    'external_institutions' => [
+        'bearer_token' => env('EXTERNAL_INSTITUTION_INGEST_TOKEN'),
+    ],
+
     'gs_brochure_solapi' => [
         'key' => env('GS_BROCHURE_SOLAPI_KEY'),
         'secret' => env('GS_BROCHURE_SOLAPI_SECRET'),

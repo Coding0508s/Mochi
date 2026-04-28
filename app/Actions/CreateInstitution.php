@@ -3,8 +3,10 @@
 namespace App\Actions;
 
 use App\Models\AccountInformation;
+use App\Models\GsNumber;
 use App\Models\Institution;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class CreateInstitution
 {
@@ -65,6 +67,17 @@ class CreateInstitution
                     'Address' => isset($data['address']) ? trim((string) $data['address']) ?: null : null,
                 ]
             );
+
+            $gsNo = isset($data['gs_no']) ? trim((string) $data['gs_no']) : '';
+            if (Schema::hasTable('S_GSNumber') && $gsNo !== '') {
+                GsNumber::query()->updateOrCreate(
+                    ['SKCode' => $sk],
+                    [
+                        'AccountName' => $name,
+                        'GSnumber' => $gsNo,
+                    ]
+                );
+            }
 
             return $institution;
         });

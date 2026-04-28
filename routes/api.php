@@ -8,7 +8,15 @@ use App\GsBrochure\Http\Controllers\Api\RequestController;
 use App\GsBrochure\Http\Controllers\Api\ResetDataController;
 use App\GsBrochure\Http\Controllers\Api\StockHistoryController;
 use App\GsBrochure\Http\Controllers\Api\VerificationController;
+use App\Http\Controllers\Api\ExternalInstitutionController;
 use Illuminate\Support\Facades\Route;
+
+/*
+| CRM 기관 마스터(S_AccountName) 외부 연동 — gs-brochure API 와 분리
+*/
+Route::middleware(['external.institution.ingest', 'throttle:external-institution-ingest'])
+    ->put('internal/institutions/{sk}', [ExternalInstitutionController::class, 'upsert'])
+    ->where('sk', '[A-Za-z0-9._\-]+');
 
 Route::prefix('gs-brochure')->group(function () {
     Route::get('/health', [BrochureController::class, 'health']);

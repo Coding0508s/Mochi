@@ -229,7 +229,7 @@
                         @if($sfUpload)
                             선택된 파일: <span class="font-medium text-gray-800 break-all">{{ $sfUpload->getClientOriginalName() }}</span>
                         @elseif($institutionSelected && !$sfUploadEnabled)
-                            SK코드 발급 전(미계약 잠재기관)에는 파일 업로드 없이 보고서만 저장됩니다.
+                            파일 첨부는 SK 코드가 있는 정식 기관에서만 가능합니다. 계약·SK 발급이 완료된 기관을 선택해 주세요.
                         @else
                             파일을 선택하면 이름이 여기에 표시됩니다.
                         @endif

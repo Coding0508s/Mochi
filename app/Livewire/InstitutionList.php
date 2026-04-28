@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\AccountInformation;
 use App\Models\Employee;
+use App\Models\GsNumber;
 use App\Models\Institution;
 use App\Models\SupportRecord;
 use Illuminate\Database\Eloquent\Builder;
@@ -107,7 +108,7 @@ class InstitutionList extends Component
     {
         $institution = Institution::query()
             ->tap(fn (Builder $query) => $this->applyCoTeamInstitutionScope($query))
-            ->with('accountInfo')
+            ->with($this->institutionEagerLoads())
             ->withCount('teachers')
             ->withCount('supportRecords')
             ->withMax('supportRecords', 'Support_Date')
@@ -128,7 +129,7 @@ class InstitutionList extends Component
             'tr' => $institution->accountInfo?->TR,
             'cs' => $institution->accountInfo?->CS,
             'customer_type' => $institution->accountInfo?->Customer_Type,
-            'gs_no' => $institution->GSno,
+            'gs_no' => ($resolvedGs = $institution->resolvedGsNumber()) !== '' ? $resolvedGs : null,
             'teacher_count' => $institution->teachers_count,
             'support_count' => $institution->support_records_count,
             'latest_support_date' => $institution->support_records_max_support_date,
@@ -136,7 +137,7 @@ class InstitutionList extends Component
 
         $this->isEditingDetail = false;
         $this->editCustomerType = (string) ($institution->accountInfo?->Customer_Type ?? '');
-        $this->editGsNo = (string) ($institution->GSno ?? '');
+        $this->editGsNo = $institution->resolvedGsNumber();
         $this->editDetailCo = (string) ($institution->accountInfo?->CO ?? '');
         $this->editDetailTr = (string) ($institution->accountInfo?->TR ?? '');
         $this->editDetailCs = (string) ($institution->accountInfo?->CS ?? '');
@@ -238,23 +239,43 @@ class InstitutionList extends Component
         }
 
         $institution = Institution::query()->findOrFail($institutionId);
-        $institution->update([
-            'GSno' => trim($this->editGsNo) ?: null,
-        ]);
+        $trimmedGs = trim($this->editGsNo);
+        $accountName = (string) ($this->selectedInstitution['name'] ?? $institution->AccountName ?? '');
 
-        AccountInformation::query()->updateOrCreate(
-            ['SK_Code' => $skCode],
-            [
-                'Account_Name' => (string) ($this->selectedInstitution['name'] ?? $institution->AccountName ?? ''),
-                'Customer_Type' => trim($this->editCustomerType) ?: null,
-                'CO' => trim($this->editDetailCo) ?: null,
-                'TR' => trim($this->editDetailTr) ?: null,
-                'CS' => trim($this->editDetailCs) ?: null,
-            ]
-        );
+        DB::transaction(function () use ($institution, $skCode, $trimmedGs, $accountName): void {
+            $institution->update([
+                'GSno' => $trimmedGs !== '' ? $trimmedGs : null,
+            ]);
+
+            AccountInformation::query()->updateOrCreate(
+                ['SK_Code' => $skCode],
+                [
+                    'Account_Name' => $accountName,
+                    'Customer_Type' => trim($this->editCustomerType) ?: null,
+                    'CO' => trim($this->editDetailCo) ?: null,
+                    'TR' => trim($this->editDetailTr) ?: null,
+                    'CS' => trim($this->editDetailCs) ?: null,
+                ]
+            );
+
+            if (Schema::hasTable('S_GSNumber')) {
+                GsNumber::query()->updateOrCreate(
+                    ['SKCode' => $skCode],
+                    [
+                        'AccountName' => $accountName !== '' ? $accountName : null,
+                        'GSnumber' => $trimmedGs !== '' ? $trimmedGs : null,
+                    ]
+                );
+            }
+        });
+
+        if (Schema::hasTable('S_GSNumber')) {
+            $institution->load('gsNumber');
+        }
 
         $this->selectedInstitution['customer_type'] = trim($this->editCustomerType) ?: null;
-        $this->selectedInstitution['gs_no'] = trim($this->editGsNo) ?: null;
+        $resolvedAfter = $institution->resolvedGsNumber();
+        $this->selectedInstitution['gs_no'] = $resolvedAfter !== '' ? $resolvedAfter : null;
         $this->selectedInstitution['co'] = trim($this->editDetailCo) ?: null;
         $this->selectedInstitution['tr'] = trim($this->editDetailTr) ?: null;
         $this->selectedInstitution['cs'] = trim($this->editDetailCs) ?: null;
@@ -410,8 +431,8 @@ class InstitutionList extends Component
             ->ofType($this->filterGubun)
             // 기관 구분(유치원/어린이집 등) 필터
 
-            ->with('accountInfo')
-            // 담당자(CO/TR/CS) 정보를 한 번에 가져옵니다. (N+1 방지)
+            ->with($this->institutionEagerLoads())
+            // 담당자(CO/TR/CS) 및 S_GSNumber (테이블 있을 때만, N+1 방지)
 
             ->when($this->assignmentFilter === 'assigned', function ($query) {
                 $query->whereHas('accountInfo', function ($q) {
@@ -482,6 +503,19 @@ class InstitutionList extends Component
             'csManagerOptions' => $csManagerOptions,
             'customerTypeOptions' => $customerTypeOptions,
         ]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function institutionEagerLoads(): array
+    {
+        $loads = ['accountInfo'];
+        if (Schema::hasTable('S_GSNumber')) {
+            $loads[] = 'gsNumber';
+        }
+
+        return $loads;
     }
 
     /**

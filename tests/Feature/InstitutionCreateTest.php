@@ -24,6 +24,7 @@ class InstitutionCreateTest extends TestCase
 
     private function createAccountTables(): void
     {
+        Schema::dropIfExists('S_GSNumber');
         Schema::dropIfExists('S_Account_Information');
         Schema::dropIfExists('S_AccountName');
 
@@ -56,6 +57,16 @@ class InstitutionCreateTest extends TestCase
             $table->string('Customer_Type', 255)->nullable();
             $table->string('Affiliate', 255)->nullable();
             $table->string('Address', 255)->nullable();
+        });
+
+        Schema::create('S_GSNumber', function (Blueprint $table): void {
+            $table->increments('ID');
+            $table->string('SKCode', 100)->unique();
+            $table->string('AccountName', 255)->nullable();
+            $table->string('GSnumber', 100)->nullable();
+            $table->string('CO', 255)->nullable();
+            $table->string('TR', 255)->nullable();
+            $table->string('CS', 255)->nullable();
         });
     }
 
@@ -144,6 +155,32 @@ class InstitutionCreateTest extends TestCase
             'LS' => 10,
             'GS_K' => 20,
             'GS_E' => 5,
+        ]);
+    }
+
+    public function test_save_new_institution_writes_s_gs_number_when_gs_no_set(): void
+    {
+        $user = User::factory()->create();
+        $sk = 'SK-GS-CREATE-'.uniqid();
+
+        Livewire::actingAs($user)
+            ->test(InstitutionCreateForm::class)
+            ->set('newSkCode', $sk)
+            ->set('newInstitutionName', 'GS 동기화 기관')
+            ->set('newGsNo', '3.21')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertRedirect(route('institutions.index'));
+
+        $this->assertDatabaseHas('S_AccountName', [
+            'SKcode' => $sk,
+            'GSno' => '3.21',
+        ]);
+
+        $this->assertDatabaseHas('S_GSNumber', [
+            'SKCode' => $sk,
+            'GSnumber' => '3.21',
+            'AccountName' => 'GS 동기화 기관',
         ]);
     }
 }

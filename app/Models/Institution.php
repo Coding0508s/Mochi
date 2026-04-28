@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -34,6 +35,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string $Address 주소
  * @property string $Gubun 구분(유치원/초등 등)
  * @property string|null $Possibility 영업 가능성(A/B/C/D 등)
+ * @property-read GsNumber|null $gsNumber
  */
 class Institution extends Model
 {
@@ -96,6 +98,32 @@ class Institution extends Model
     {
         return $this->hasOne(AccountInformation::class, 'SK_Code', 'SKcode');
         // "S_Account_Information 테이블에서 SK_Code = 이 기관의 SKcode 인 행을 가져와"
+    }
+
+    /**
+     * 레거시 S_GSNumber 행 (SKCode ↔ SKcode)
+     */
+    public function gsNumber(): HasOne
+    {
+        return $this->hasOne(GsNumber::class, 'SKCode', 'SKcode');
+    }
+
+    /**
+     * 목록·상세 표시용 GS 번호: S_GSNumber.GSnumber 우선, 없으면 S_AccountName.GSno.
+     */
+    public function resolvedGsNumber(): string
+    {
+        if (! Schema::hasTable('S_GSNumber')) {
+            return trim((string) ($this->GSno ?? ''));
+        }
+
+        $fromRow = trim((string) ($this->gsNumber?->GSnumber ?? ''));
+
+        if ($fromRow !== '') {
+            return $fromRow;
+        }
+
+        return trim((string) ($this->GSno ?? ''));
     }
 
     /**

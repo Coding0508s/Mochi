@@ -103,6 +103,9 @@
                             <th class="px-3 py-2 text-center text-xs font-semibold">GS(유)</th>
                             <th class="px-3 py-2 text-center text-xs font-semibold">GS(초)</th>
                             <th class="px-3 py-2 text-center text-xs font-semibold">합계</th>
+                            @can('managePotentialInstitutions')
+                                <th class="px-3 py-2 text-center text-xs font-semibold">지원보고서</th>
+                            @endcan
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
@@ -121,10 +124,20 @@
                                 <td class="px-3 py-2 text-center text-gray-700">{{ $target->GS_K ?? 0 }}</td>
                                 <td class="px-3 py-2 text-center text-gray-700">{{ $target->GS_E ?? 0 }}</td>
                                 <td class="px-3 py-2 text-center font-semibold text-gray-800">{{ $target->Total ?? 0 }}</td>
+                                @can('managePotentialInstitutions')
+                                    <td class="px-3 py-2 text-center" onclick="event.stopPropagation()">
+                                        @if($target->IsContract ?? false)
+                                            <a href="{{ route('supports.create', ['potential_target_id' => $target->ID]) }}"
+                                               class="text-xs font-medium text-blue-600 hover:text-blue-800 underline">작성</a>
+                                        @else
+                                            <span class="text-xs text-gray-400" title="계약·SK 발급 후 작성 가능">-</span>
+                                        @endif
+                                    </td>
+                                @endcan
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="11" class="px-4 py-16 text-center text-gray-400">
+                                <td colspan="{{ \Illuminate\Support\Facades\Gate::allows('managePotentialInstitutions') ? 12 : 11 }}" class="px-4 py-16 text-center text-gray-400">
                                     <p class="font-medium">해당 월에 등록된 잠재기관이 없습니다</p>
                                     <p class="text-sm mt-1">연·월 또는 검색어를 바꿔 보세요.</p>
                                 </td>
@@ -261,6 +274,15 @@
                         </table>
                     </div>
 
+                    @if(!($selectedTarget['is_contract'] ?? false))
+                        @can('managePotentialInstitutions')
+                            <livewire:potential-institution-meeting-form
+                                :co-new-target-id="$selectedTarget['id']"
+                                :wire:key="'pim-form-'.$selectedTarget['id']"
+                            />
+                        @endcan
+                    @endif
+
                     <div>
                         <div class="flex items-center justify-between mb-2">
                             <h4 class="text-sm font-bold text-[#1f4f8f]">미팅/컨설팅 이력</h4>
@@ -301,12 +323,25 @@
                     </div>
 
                     <div>
-                        <div class="flex items-center justify-between mb-2">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
                             <h4 class="text-sm font-bold text-[#1f4f8f]">기관지원보고서 이력</h4>
-                            <span class="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
-                                총 {{ count($detailSupportRecords) }}건
-                            </span>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
+                                    총 {{ count($detailSupportRecords) }}건
+                                </span>
+                                @can('managePotentialInstitutions')
+                                    @if($selectedTarget['is_contract'] ?? false)
+                                        <a href="{{ route('supports.create', ['potential_target_id' => $selectedTarget['id']]) }}"
+                                           class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                                            지원 보고서 작성
+                                        </a>
+                                    @endif
+                                @endcan
+                            </div>
                         </div>
+                        @if($selectedTarget['is_contract'] ?? false)
+                            <p class="text-xs text-gray-500 mb-2">정식 기관(계약·SK 발급) 이후 작성 가능합니다. 저장 시 미팅 이력에도 반영될 수 있습니다.</p>
+                        @endif
                         <div class="border border-gray-200 rounded-lg overflow-hidden">
                             <div class="max-h-44 overflow-y-auto overflow-x-auto">
                                 <table class="w-full text-xs whitespace-nowrap">

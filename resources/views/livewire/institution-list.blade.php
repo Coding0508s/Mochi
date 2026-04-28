@@ -96,19 +96,23 @@
                             @endif
                         </button>
                     </th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold">담당 CO</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold">담당 TR</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold">CO</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold">TR</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold">CS</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold">GS번호</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">구분</th>
-                    <th class="px-3 py-2 text-center text-xs font-semibold">현황</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold">원장명</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold">전화번호</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold">Type</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold">기관장</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold">연락처</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold">기관연락처</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">주소</th>
                 </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                 @forelse($institutions as $index => $inst)
                     @php
-                        $isTerminated = str_contains((string) ($inst->accountInfo?->Customer_Type ?? ''), '해지');
+                        $customerType = (string) ($inst->accountInfo?->Customer_Type ?? '');
+                        $isTerminated = str_contains($customerType, '해지');
                     @endphp
                     <tr wire:key="institution-row-{{ $inst->ID }}"
                         wire:click="openDetailModal({{ $inst->ID }})"
@@ -127,6 +131,8 @@
                         </td>
                         <td class="px-3 py-2 text-gray-600">{{ $inst->accountInfo?->CO ?? '-' }}</td>
                         <td class="px-3 py-2 text-gray-600">{{ $inst->accountInfo?->TR ?? '-' }}</td>
+                        <td class="px-3 py-2 text-gray-600">{{ $inst->accountInfo?->CS ?? '-' }}</td>
+                        <td class="px-3 py-2 text-gray-600 font-mono text-xs">{{ $inst->resolvedGsNumber() ?: '-' }}</td>
                         <td class="px-3 py-2">
                             @if($inst->Gubun)
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
@@ -136,26 +142,30 @@
                                 <span class="text-gray-400">-</span>
                             @endif
                         </td>
-                        <td class="px-3 py-2 text-center">
-                            @if($isTerminated)
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-                                    해지
-                                </span>
+                        <td class="px-3 py-2 text-gray-600 max-w-[14rem]">
+                            @if($customerType === '')
+                                <span class="text-gray-400">-</span>
                             @else
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                                    관리중
-                                </span>
+                                <div class="flex flex-col gap-1 items-start">
+                                    @if($isTerminated)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 shrink-0">
+                                            해지
+                                        </span>
+                                    @endif
+                                    <span class="text-xs leading-snug break-words whitespace-normal">{{ $customerType }}</span>
+                                </div>
                             @endif
                         </td>
                         <td class="px-3 py-2 text-gray-600">{{ $inst->Director ?? '-' }}</td>
                         <td class="px-3 py-2 text-gray-600">{{ $inst->Phone ?? '-' }}</td>
+                        <td class="px-3 py-2 text-gray-600">{{ $inst->AccountTel ?? '-' }}</td>
                         <td class="px-3 py-2 text-gray-500 max-w-56 truncate" title="{{ $inst->Address }}">
                             {{ $inst->Address ?? '-' }}
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="10" class="px-4 py-16 text-center text-gray-400">
+                        <td colspan="13" class="px-4 py-16 text-center text-gray-400">
                             <p class="font-medium">검색 결과가 없습니다</p>
                             <p class="text-sm mt-1">다른 조건으로 다시 검색해 보세요.</p>
                         </td>

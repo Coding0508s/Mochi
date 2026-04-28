@@ -14,6 +14,12 @@ return [
     'institution_create_enabled' => (bool) env('INSTITUTION_CREATE_ENABLED', false),
 
     /*
+    | 외부 연동 upsert 성공 시 institution_visibility_overrides 행 삭제(숨김 해제)
+    | false: 숨김 유지 (기본)
+    */
+    'external_institution_ingest_clears_hidden' => (bool) env('EXTERNAL_INSTITUTION_INGEST_CLEARS_HIDDEN', false),
+
+    /*
     |--------------------------------------------------------------------------
     | People-Account 분리/운영 플래그
     |--------------------------------------------------------------------------

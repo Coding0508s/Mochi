@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\InstitutionList;
+use App\Models\GsNumber;
 use App\Models\Institution;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
@@ -26,6 +27,9 @@ class InstitutionListTest extends TestCase
 
     private function createAccountTables(): void
     {
+        Schema::dropIfExists('S_SupportInfo_Account');
+        Schema::dropIfExists('Teachers');
+        Schema::dropIfExists('S_GSNumber');
         Schema::dropIfExists('S_Account_Information');
         Schema::dropIfExists('S_AccountName');
         Schema::dropIfExists('employee');
@@ -56,6 +60,28 @@ class InstitutionListTest extends TestCase
             $table->string('Customer_Type', 255)->nullable();
             $table->string('Affiliate', 255)->nullable();
             $table->string('Address', 255)->nullable();
+        });
+
+        Schema::create('S_GSNumber', function (Blueprint $table): void {
+            $table->increments('ID');
+            $table->string('SKCode', 100)->unique();
+            $table->string('AccountName', 255)->nullable();
+            $table->string('GSnumber', 100)->nullable();
+            $table->string('CO', 255)->nullable();
+            $table->string('TR', 255)->nullable();
+            $table->string('CS', 255)->nullable();
+        });
+
+        Schema::create('Teachers', function (Blueprint $table): void {
+            $table->increments('ID');
+            $table->string('SK_Code', 100)->nullable();
+        });
+
+        Schema::create('S_SupportInfo_Account', function (Blueprint $table): void {
+            $table->increments('ID');
+            $table->string('SK_Code', 100)->nullable();
+            $table->dateTime('Support_Date')->nullable();
+            $table->integer('Year')->nullable();
         });
 
         Schema::create('employee', function (Blueprint $table): void {
@@ -232,5 +258,62 @@ class InstitutionListTest extends TestCase
             ->set('assignmentFilter', 'my_assigned')
             ->assertSee('내 담당 기관')
             ->assertDontSee('타 담당 기관');
+    }
+
+    public function test_list_prefers_gs_number_from_s_gs_number_table(): void
+    {
+        $user = User::factory()->create();
+
+        Institution::query()->create([
+            'SKcode' => 'SK-GS-LIST-1',
+            'AccountName' => 'GS 표시 기관',
+            'GSno' => '9.99',
+        ]);
+
+        GsNumber::query()->create([
+            'SKCode' => 'SK-GS-LIST-1',
+            'AccountName' => 'GS 표시 기관',
+            'GSnumber' => '1.14',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->assertSee('1.14')
+            ->assertDontSee('9.99');
+    }
+
+    public function test_save_detail_syncs_s_gs_number(): void
+    {
+        $user = User::factory()->create();
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-GS-SAVE-1',
+            'AccountName' => '저장 테스트 기관',
+            'GSno' => '1',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-GS-SAVE-1',
+            'Account_Name' => '저장 테스트 기관',
+            'CO' => 'CO One',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->call('startDetailEdit')
+            ->set('editGsNo', '2.5')
+            ->call('saveDetailFields')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_GSNumber', [
+            'SKCode' => 'SK-GS-SAVE-1',
+            'GSnumber' => '2.5',
+        ]);
+
+        $this->assertDatabaseHas('S_AccountName', [
+            'ID' => $institution->ID,
+            'GSno' => '2.5',
+        ]);
     }
 }

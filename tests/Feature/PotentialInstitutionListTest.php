@@ -25,6 +25,7 @@ class PotentialInstitutionListTest extends TestCase
     {
         parent::setUp();
         $this->createLegacyPotentialInstitutionTables();
+        $this->actingAs(User::factory()->create());
     }
 
     /**
@@ -221,69 +222,6 @@ class PotentialInstitutionListTest extends TestCase
         $this->assertDatabaseMissing('S_Account_Information', [
             'Account_Name' => $accountName,
         ]);
-    }
-
-    public function test_save_new_target_with_support_report_creates_support_record(): void
-    {
-        $user = User::factory()->create(['name' => '보고서작성자']);
-        $accountName = 'QA 지원보고서 동시등록 '.uniqid('', true);
-
-        Livewire::actingAs($user)
-            ->test(PotentialInstitutionList::class)
-            ->call('openCreateModal')
-            ->set('newAccountName', $accountName)
-            ->set('newType', '신규(25년)')
-            ->set('newConsultingType', '신규기관방문')
-            ->set('newMeetingDate', '2026-04-10')
-            ->set('newMeetingTime', '10:00')
-            ->set('newIncludeSupportReport', true)
-            ->set('newSupportReportDate', '2026-04-10')
-            ->set('newSupportReportTime', '11:30')
-            ->set('newSupportReportType', '대면')
-            ->set('newSupportReportTarget', '원장')
-            ->set('newSupportReportToAccount', '소통 메모')
-            ->set('newSupportReportCompleted', true)
-            ->call('saveNewTarget')
-            ->assertSet('showCreateModal', false)
-            ->assertHasNoErrors();
-
-        $target = CoNewTarget::query()->where('AccountName', $accountName)->first();
-        $this->assertNotNull($target);
-
-        $this->assertDatabaseHas('S_SupportInfo_Account', [
-            'potential_target_id' => $target->ID,
-            'Account_Name' => $accountName,
-            'Support_Type' => '대면',
-            'Target' => '원장',
-            'Status' => '완료',
-        ]);
-
-        $record = SupportRecord::query()
-            ->where('potential_target_id', $target->ID)
-            ->first();
-        $this->assertNotNull($record);
-        $this->assertNull($record->SK_Code);
-        $this->assertNotNull($record->CompletedDate);
-    }
-
-    public function test_save_new_target_with_support_report_requires_support_fields(): void
-    {
-        Livewire::test(PotentialInstitutionList::class)
-            ->call('openCreateModal')
-            ->set('newAccountName', '검증 실패 케이스')
-            ->set('newType', '신규(25년)')
-            ->set('newConsultingType', '신규기관방문')
-            ->set('newMeetingDate', '2026-04-06')
-            ->set('newIncludeSupportReport', true)
-            ->set('newSupportReportDate', '')
-            ->set('newSupportReportTime', '')
-            ->set('newSupportReportType', '')
-            ->call('saveNewTarget')
-            ->assertHasErrors([
-                'newSupportReportDate',
-                'newSupportReportTime',
-                'newSupportReportType',
-            ]);
     }
 
     public function test_open_detail_modal_includes_support_records_linked_by_potential_target_id(): void

@@ -174,18 +174,18 @@ class SupportCreateFormTest extends TestCase
         ]);
     }
 
-    public function test_save_mirrors_to_potential_detail_for_uncontracted_target(): void
+    public function test_save_persists_sk_only_without_potential_target_id_for_formal_institution(): void
     {
         Institution::query()->create([
-            'SKcode' => 'SK-POT-1',
-            'AccountName' => '잠재 기관',
+            'SKcode' => 'SK-FORMAL-1',
+            'AccountName' => '정식 기관명',
         ]);
 
         CoNewTarget::query()->create([
-            'AccountCode' => 'SK-POT-1',
-            'AccountName' => '잠재 기관',
+            'AccountCode' => 'SK-FORMAL-1',
+            'AccountName' => '정식 기관명',
             'AccountManager' => 'CO 담당자',
-            'IsContract' => false,
+            'IsContract' => true,
             'Possibility' => 'B',
         ]);
 
@@ -193,7 +193,7 @@ class SupportCreateFormTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(SupportCreateForm::class)
-            ->call('selectInstitution', 'SK-POT-1', true)
+            ->call('selectInstitution', 'SK-FORMAL-1')
             ->set('formSupportDate', '2026-04-11')
             ->set('formSupportTime', '14:30')
             ->set('formSupportType', '전화')
@@ -202,13 +202,10 @@ class SupportCreateFormTest extends TestCase
             ->call('save')
             ->assertHasNoErrors();
 
-        $this->assertDatabaseHas('S_CO_NewTarget_Detail', [
-            'AccountName' => '잠재 기관',
-            'AccountManager' => 'CO 담당자',
-            'MeetingDate' => '2026-04-11 00:00:00',
-            'MeetingTime' => '14:30',
-            'ConsultingType' => '전화',
-            'Possibility' => 'B',
+        $this->assertDatabaseHas('S_SupportInfo_Account', [
+            'SK_Code' => 'SK-FORMAL-1',
+            'potential_target_id' => null,
+            'Account_Name' => '정식 기관명',
         ]);
     }
 
@@ -242,7 +239,7 @@ class SupportCreateFormTest extends TestCase
         ]);
     }
 
-    public function test_save_for_uncontracted_potential_without_sk_records_potential_target_id(): void
+    public function test_select_institution_rejects_uncontracted_potential_by_id(): void
     {
         $potential = CoNewTarget::query()->create([
             'AccountCode' => null,
@@ -257,56 +254,7 @@ class SupportCreateFormTest extends TestCase
         Livewire::actingAs($user)
             ->test(SupportCreateForm::class)
             ->call('selectInstitution', '', true, (int) $potential->ID)
-            ->set('formSupportDate', '2026-04-21')
-            ->set('formSupportTime', '15:10')
-            ->set('formSupportType', '대면')
-            ->set('formToAccount', '무SK 잠재기관 소통')
-            ->set('formToDepart', '내부 공유')
-            ->call('save')
-            ->assertHasNoErrors();
-
-        $this->assertDatabaseHas('S_SupportInfo_Account', [
-            'potential_target_id' => (int) $potential->ID,
-            'SK_Code' => null,
-            'Account_Name' => '무SK 잠재 기관',
-            'Support_Type' => '대면',
-        ]);
-
-        $this->assertDatabaseHas('S_CO_NewTarget_Detail', [
-            'AccountName' => '무SK 잠재 기관',
-            'AccountManager' => '잠재 담당자',
-            'MeetingDate' => '2026-04-21 00:00:00',
-            'MeetingTime' => '15:10',
-            'ConsultingType' => '대면',
-            'Possibility' => 'C',
-        ]);
-    }
-
-    public function test_save_rejects_sf_upload_for_uncontracted_potential_without_sk(): void
-    {
-        $potential = CoNewTarget::query()->create([
-            'AccountCode' => null,
-            'AccountName' => '무SK 파일제한 기관',
-            'AccountManager' => '잠재 담당자',
-            'IsContract' => false,
-            'Possibility' => 'B',
-        ]);
-
-        Storage::fake('local');
-        $user = User::factory()->create(['name' => '테스터']);
-        $upload = UploadedFile::fake()->create('무sk-업로드.pdf', 100, 'application/pdf');
-
-        Livewire::actingAs($user)
-            ->test(SupportCreateForm::class)
-            ->call('selectInstitution', '', true, (int) $potential->ID)
-            ->set('formSupportDate', '2026-04-22')
-            ->set('formSupportTime', '11:20')
-            ->set('sfUpload', $upload)
-            ->call('save')
-            ->assertHasErrors(['sfUpload']);
-
-        $this->assertDatabaseCount('contract_documents', 0);
-        $this->assertDatabaseCount('SF_Files', 0);
+            ->assertHasErrors(['formInstitutionKeyword']);
     }
 
     public function test_save_with_sf_upload_creates_contract_document_and_sf_file_with_account_prefix(): void
@@ -384,5 +332,63 @@ class SupportCreateFormTest extends TestCase
             ->first();
 
         $this->assertNotNull($sfFile);
+    }
+
+    public function test_mount_prefills_formal_potential_target_from_parameter(): void
+    {
+        $user = User::factory()->create();
+        Institution::query()->create([
+            'SKcode' => 'SK-PREFILL-1',
+            'AccountName' => '프리필 기관명',
+        ]);
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountManager' => 'Mgr',
+            'AccountCode' => 'SK-PREFILL-1',
+            'AccountName' => '프리필 기관명',
+            'Type' => '신규',
+            'Gubun' => '방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'IsContract' => true,
+            'Possibility' => 'C',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SupportCreateForm::class, ['potentialTargetId' => (int) $target->ID])
+            ->assertSet('formSkCode', 'SK-PREFILL-1')
+            ->assertSet('formAccountName', '프리필 기관명')
+            ->assertSet('formPotentialTargetId', null)
+            ->assertSet('formIsPotential', false)
+            ->assertSet('formPossibility', 'C');
+    }
+
+    public function test_mount_does_not_prefill_uncontracted_potential(): void
+    {
+        $user = User::factory()->create();
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountManager' => 'Mgr',
+            'AccountCode' => null,
+            'AccountName' => '미계약 잠재',
+            'Type' => '신규',
+            'Gubun' => '방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'IsContract' => false,
+            'Possibility' => 'C',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SupportCreateForm::class, ['potentialTargetId' => (int) $target->ID])
+            ->assertSet('formSkCode', '')
+            ->assertSet('formAccountName', '')
+            ->assertSet('formPotentialTargetId', null);
     }
 }

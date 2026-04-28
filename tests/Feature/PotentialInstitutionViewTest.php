@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\PotentialInstitutionMeetingForm;
 use App\Livewire\PotentialInstitutionView;
 use App\Models\CoNewTarget;
 use App\Models\CoNewTargetDetail;
 use App\Models\SupportRecord;
+use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
@@ -290,5 +292,83 @@ class PotentialInstitutionViewTest extends TestCase
         $this->assertCount(1, $rows);
         $this->assertSame('전화', $rows[0]['support_type'] ?? null);
         $this->assertStringContainsString('내용', (string) ($rows[0]['to_account'] ?? ''));
+    }
+
+    public function test_meeting_form_creates_detail_for_uncontracted_target(): void
+    {
+        $user = User::factory()->create();
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-10',
+            'AccountManager' => '담당A',
+            'AccountCode' => null,
+            'AccountName' => '미팅폼 테스트 기관',
+            'Address' => null,
+            'Director' => null,
+            'Phone' => null,
+            'Connected' => null,
+            'Type' => '신규',
+            'Gubun' => '방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'B',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionMeetingForm::class, ['coNewTargetId' => (int) $target->ID])
+            ->set('meetingDate', '2026-04-18')
+            ->set('consultingType', '재방문')
+            ->set('description', '추가 미팅 메모')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_CO_NewTarget_Detail', [
+            'AccountName' => '미팅폼 테스트 기관',
+            'ConsultingType' => '재방문',
+            'AccountManager' => '담당A',
+        ]);
+
+        $detail = CoNewTargetDetail::query()
+            ->where('AccountName', '미팅폼 테스트 기관')
+            ->whereDate('MeetingDate', '2026-04-18')
+            ->first();
+        $this->assertNotNull($detail);
+        $this->assertStringContainsString('추가 미팅', (string) $detail->Description);
+    }
+
+    public function test_meeting_form_rejects_contracted_target(): void
+    {
+        $user = User::factory()->create();
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-10',
+            'AccountManager' => null,
+            'AccountCode' => 'SK-DONE',
+            'AccountName' => '계약 완료 기관',
+            'Type' => '신규',
+            'Gubun' => '방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'IsContract' => true,
+            'Possibility' => null,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionMeetingForm::class, ['coNewTargetId' => (int) $target->ID])
+            ->set('meetingDate', '2026-04-18')
+            ->set('consultingType', '재방문')
+            ->call('save')
+            ->assertHasErrors(['meetingForm']);
     }
 }

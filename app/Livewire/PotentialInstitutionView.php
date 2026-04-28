@@ -8,6 +8,7 @@ use App\Models\SupportRecord;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Schema;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -85,6 +86,23 @@ class PotentialInstitutionView extends Component
     {
         $target = CoNewTarget::query()->findOrFail($targetId);
         $this->loadDetailData($target);
+    }
+
+    #[On('potential-meeting-saved')]
+    public function refreshDetailAfterMeeting(int $targetId): void
+    {
+        if (! $this->showDetailModal) {
+            return;
+        }
+
+        if ((int) ($this->selectedTarget['id'] ?? 0) !== $targetId) {
+            return;
+        }
+
+        $target = CoNewTarget::query()->find($targetId);
+        if ($target) {
+            $this->loadDetailData($target);
+        }
     }
 
     public function openTargetDetailFromMeeting(int $meetingId): void
