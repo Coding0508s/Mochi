@@ -85,7 +85,7 @@
             </nav>
 
             <div class="mochi-topbar-user">
-                <span class="mochi-topbar-action" aria-hidden="true"></span>
+                <livewire:inbound-notification-bell />
                 {{-- 프로필 (편집 페이지로 이동) --}}
                 <a href="{{ route('profile.edit') }}" class="mochi-topbar-profile">
                     <span class="mochi-topbar-profile__depth" aria-hidden="true"></span>
@@ -108,13 +108,16 @@
                         aria-hidden="true"
                     ></span>
                     <div class="mochi-topbar-logout__content">
-                        <form method="POST" action="{{ route('logout') }}" class="m-0 inline leading-none">
+                        <form method="POST" action="{{ route('logout') }}" class="m-0 inline-flex items-center justify-center leading-none">
                             @csrf
                             <button
                                 type="submit"
-                                class="m-0 cursor-pointer rounded-sm border-0 bg-transparent p-0 text-[12px] font-medium text-white/92 transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50"
+                                class="m-0 inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-sm border-0 bg-transparent p-0 text-[12px] font-medium text-white/92 transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50 md:gap-0"
                             >
-                                로그아웃
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[18px] shrink-0 md:hidden" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
+                                </svg>
+                                <span class="whitespace-nowrap max-md:sr-only">로그아웃</span>
                             </button>
                         </form>
                     </div>
@@ -248,16 +251,16 @@
                                 $coMenus = [
                                     // ['label' => '전체기관리스트', 'href' => '/institutions', 'route' => 'institutions', 'icon' => 'building'],
                                     ['label' => '기관리스트',     'href' => '/institutions', 'route' => 'institutions', 'icon' => 'building'],
-                                    ['label' => '기관연락처보기', 'href' => '/contacts',     'route' => 'contacts',     'icon' => 'phone'],
+                                    ['label' => '교직원 연락처보기', 'href' => '/contacts',     'route' => 'contacts',     'icon' => 'phone'],
                                     ['label' => '기관지원보고서', 'href' => '/supports',     'route' => 'supports',     'icon' => 'document'],
-                                    ['label' => '잠재기관리스트', 'href' => route('potential-institutions.index'), 'route' => '', 'routeIs' => 'potential-institutions.index', 'icon' => 'calendar'],
-                                    ['label' => '잠재기관보기',   'href' => route('potential-institutions.view'), 'route' => '', 'routeIs' => 'potential-institutions.view', 'icon' => 'eye'],
+                                    ['label' => '잠재기관 등록하기', 'href' => route('potential-institutions.index'), 'route' => '', 'routeIs' => 'potential-institutions.index', 'icon' => 'calendar'],
+                                    ['label' => '잠재기관 목록보기',   'href' => route('potential-institutions.view'), 'route' => '', 'routeIs' => 'potential-institutions.view', 'icon' => 'eye'],
                                     ['label' => 'GS Brochure', 'href' => route('co.gs-brochure'), 'route' => '', 'routeIs' => 'co.gs-brochure*', 'icon' => 'document'],
                                     ['label' => 'Store 재고',  'href' => route('store.inventory.index'), 'route' => '', 'routeIs' => 'store.inventory.index', 'icon' => 'cart'],
                                     ['label' => 'Store판매내역',  'href' => route('store.sales.index'), 'route' => '', 'routeIs' => 'store.sales.index', 'icon' => 'cart'],
                                     ['label' => 'Salesforce파일', 'href' => route('salesforce-files.index'), 'route' => '', 'routeIs' => 'salesforce-files.index', 'icon' => 'server'],
-                                    ['label' => '계약물건',       'href' => '#',             'route' => '',             'icon' => 'clipboard'],
-                                    ['label' => '평가기관리스트', 'href' => '#',             'route' => '',             'icon' => 'chart'],
+                                    //['label' => '계약물건',       'href' => '#',             'route' => '',             'icon' => 'clipboard'],
+                                    //['label' => '평가기관리스트', 'href' => '#',             'route' => '',             'icon' => 'chart'],
                                 ];
                             @endphp
 

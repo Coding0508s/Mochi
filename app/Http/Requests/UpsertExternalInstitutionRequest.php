@@ -38,6 +38,7 @@ class UpsertExternalInstitutionRequest extends FormRequest
             'tr' => ['sometimes', 'nullable', 'string', 'max:255'],
             'cs' => ['sometimes', 'nullable', 'string', 'max:255'],
             'customer_type' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'replaces_sk' => ['sometimes', 'nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9._\-]+$/'],
         ];
     }
 
@@ -52,7 +53,27 @@ class UpsertExternalInstitutionRequest extends FormRequest
             }
 
             $exists = Institution::query()->where('SKcode', $sk)->exists();
+            $replacesSk = $this->replacesSk();
+
+            if ($replacesSk !== null && $replacesSk === $sk) {
+                $v->errors()->add('replaces_sk', '등록 대상 기관 SK와 등록된 기관 SK가 같습니다.');
+
+                return;
+            }
+
             if ($exists) {
+                if ($replacesSk !== null) {
+                    $v->errors()->add('replaces_sk', '이미 존재하는 SK에는 replaces_sk를 사용할 수 없습니다.');
+                }
+
+                return;
+            }
+
+            if ($replacesSk !== null) {
+                if (! Institution::query()->where('SKcode', $replacesSk)->exists()) {
+                    $v->errors()->add('replaces_sk', '치환 대상 SK가 기관 목록에 없습니다.');
+                }
+
                 return;
             }
 
@@ -68,6 +89,20 @@ class UpsertExternalInstitutionRequest extends FormRequest
      */
     public function validatedPatch(): array
     {
-        return $this->validated();
+        return collect($this->validated())
+            ->except('replaces_sk')
+            ->all();
+    }
+
+    public function replacesSk(): ?string
+    {
+        $replacesSk = $this->input('replaces_sk');
+        if (! is_string($replacesSk)) {
+            return null;
+        }
+
+        $replacesSk = trim($replacesSk);
+
+        return $replacesSk === '' ? null : $replacesSk;
     }
 }

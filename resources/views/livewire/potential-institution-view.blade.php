@@ -1,4 +1,10 @@
 <div class="mochi-page">
+    @if(session('success'))
+        <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-800" role="status">
+            {{ session('success') }}
+        </div>
+    @endif
+
     {{-- 상단 안내 --}}
     <div class="mochi-summary-card">
         <div class="flex flex-wrap items-center gap-4 text-sm">
@@ -126,11 +132,11 @@
                                 <td class="px-3 py-2 text-center font-semibold text-gray-800">{{ $target->Total ?? 0 }}</td>
                                 @can('managePotentialInstitutions')
                                     <td class="px-3 py-2 text-center" onclick="event.stopPropagation()">
-                                        @if($target->IsContract ?? false)
+                                        @if(!($target->IsContract ?? false))
                                             <a href="{{ route('supports.create', ['potential_target_id' => $target->ID]) }}"
                                                class="text-xs font-medium text-blue-600 hover:text-blue-800 underline">작성</a>
                                         @else
-                                            <span class="text-xs text-gray-400" title="계약·SK 발급 후 작성 가능">-</span>
+                                            <span class="text-xs text-gray-400">-</span>
                                         @endif
                                     </td>
                                 @endcan
@@ -274,6 +280,28 @@
                         </table>
                     </div>
 
+                    @error('deleteTarget')
+                        <p class="text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+
+                    @can('deletePotentialInstitutions')
+                        @if(!($selectedTarget['is_contract'] ?? false))
+                            <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-100 bg-red-50/60 px-4 py-3">
+                                <p class="text-xs text-red-900 max-w-xl leading-relaxed">
+                                    미계약 잠재기관만 삭제할 수 있습니다. 삭제하면 이 기관에 묶인
+                                    <span class="font-semibold">미팅·상담 이력</span>과
+                                    <span class="font-semibold">잠재기관 연결 지원 보고서</span>도 함께 제거되며, 되돌릴 수 없습니다.
+                                </p>
+                                <button type="button"
+                                        wire:click="deleteUncontractedTarget({{ (int) $selectedTarget['id'] }})"
+                                        wire:confirm="이 잠재기관과 연결된 미팅 이력·지원 보고서(잠재 연결)를 모두 삭제할까요? 되돌릴 수 없습니다."
+                                        class="inline-flex shrink-0 items-center justify-center rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-semibold text-red-700 shadow-sm hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-1">
+                                    잠재기관 삭제
+                                </button>
+                            </div>
+                        @endif
+                    @endcan
+
                     @if(!($selectedTarget['is_contract'] ?? false))
                         @can('managePotentialInstitutions')
                             <livewire:potential-institution-meeting-form
@@ -304,7 +332,9 @@
                                     </thead>
                                     <tbody class="divide-y divide-gray-100">
                                         @forelse($detailMeetings as $meeting)
-                                            <tr>
+                                            <tr wire:key="piv-meeting-row-{{ $meeting['id'] }}"
+                                                wire:click.stop="openMeetingDetailModal({{ $meeting['id'] }})"
+                                                class="hover:bg-blue-50 cursor-pointer transition-colors">
                                                 <td class="px-3 py-2">{{ $meeting['meeting_date'] }}</td>
                                                 <td class="px-3 py-2">{{ $meeting['meeting_time'] }} ~ {{ $meeting['meeting_time_end'] }}</td>
                                                 <td class="px-3 py-2">{{ $meeting['account_manager'] }}</td>
@@ -330,7 +360,7 @@
                                     총 {{ count($detailSupportRecords) }}건
                                 </span>
                                 @can('managePotentialInstitutions')
-                                    @if($selectedTarget['is_contract'] ?? false)
+                                    @if(!($selectedTarget['is_contract'] ?? false))
                                         <a href="{{ route('supports.create', ['potential_target_id' => $selectedTarget['id']]) }}"
                                            class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
                                             지원 보고서 작성
@@ -339,9 +369,7 @@
                                 @endcan
                             </div>
                         </div>
-                        @if($selectedTarget['is_contract'] ?? false)
-                            <p class="text-xs text-gray-500 mb-2">정식 기관(계약·SK 발급) 이후 작성 가능합니다. 저장 시 미팅 이력에도 반영될 수 있습니다.</p>
-                        @endif
+                        <p class="text-xs text-gray-500 mb-2">작성 화면으로 이동합니다. 저장 시 미팅 이력에도 반영될 수 있습니다.</p>
                         <div class="border border-gray-200 rounded-lg overflow-hidden">
                             <div class="max-h-44 overflow-y-auto overflow-x-auto">
                                 <table class="w-full text-xs whitespace-nowrap">
@@ -376,6 +404,80 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- 미팅/컨설팅 상세 모달 (행 클릭 시 전문) --}}
+    @if($showMeetingDetailModal && $selectedMeeting)
+        <div class="mochi-modal-overlay z-[60]" wire:click.self="closeMeetingDetailModal">
+            <div class="mochi-modal-shell max-w-3xl h-[70vh] max-h-[70vh] flex flex-col" wire:click.stop>
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white">
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900">미팅/컨설팅 상세</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">
+                            {{ $selectedMeeting['account_name'] ?? '-' }} · {{ $selectedMeeting['meeting_date'] ?? '-' }}
+                        </p>
+                    </div>
+                    <button type="button" wire:click="closeMeetingDetailModal" class="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="px-6 py-5 flex-1 overflow-y-auto">
+                    <div class="border border-gray-200 rounded-lg overflow-hidden mb-4">
+                        <table class="w-full text-sm">
+                            <tbody class="divide-y divide-gray-100">
+                                <tr>
+                                    <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">기관명</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedMeeting['account_name'] ?? '-' }}</td>
+                                    <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당자</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedMeeting['account_manager'] ?? '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">일자</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedMeeting['meeting_date'] ?? '-' }}</td>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">시간</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">
+                                        {{ $selectedMeeting['meeting_time'] ?? '-' }} ~ {{ $selectedMeeting['meeting_time_end'] ?? '-' }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">유형</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedMeeting['consulting_type'] ?? '-' }}</td>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">가능성</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedMeeting['possibility'] ?? '-' }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div>
+                        <h4 class="text-sm font-semibold text-gray-700 mb-2">미팅내용</h4>
+                        <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 leading-6 whitespace-pre-wrap break-words">
+                            {{ $selectedMeeting['description'] ?? '-' }}
+                        </div>
+                    </div>
+                </div>
+                @can('managePotentialInstitutions')
+                    @if(!($selectedTarget['is_contract'] ?? false))
+                        <div class="flex flex-col gap-2 border-t border-gray-200 px-6 py-4 bg-gray-50/80 sm:flex-row sm:items-center sm:justify-between">
+                            @error('deleteMeeting')
+                                <p class="text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                            <div class="flex justify-end sm:ml-auto">
+                                <button type="button"
+                                        wire:click="deleteMeetingDetail({{ $selectedMeeting['id'] }})"
+                                        wire:confirm="이 미팅/컨설팅 이력을 삭제할까요? 되돌릴 수 없습니다."
+                                        class="inline-flex items-center rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 shadow-sm hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 cursor-pointer">
+                                    삭제
+                                </button>
+                            </div>
+                        </div>
+                    @endif
+                @endcan
             </div>
         </div>
     @endif

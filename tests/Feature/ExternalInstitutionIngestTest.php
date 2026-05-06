@@ -68,6 +68,23 @@ class ExternalInstitutionIngestTest extends TestCase
             $table->string('TR', 255)->nullable();
             $table->string('CS', 255)->nullable();
         });
+
+        if (! Schema::hasTable('S_CO_NewTarget')) {
+            Schema::create('S_CO_NewTarget', function (Blueprint $table): void {
+                $table->increments('ID');
+                $table->string('AccountCode', 100)->nullable();
+                $table->string('AccountName', 255);
+                $table->boolean('IsContract')->default(false);
+            });
+        }
+
+        if (! Schema::hasTable('S_SupportInfo_Account')) {
+            Schema::create('S_SupportInfo_Account', function (Blueprint $table): void {
+                $table->increments('ID');
+                $table->string('SK_Code', 100)->nullable();
+                $table->string('Account_Name', 255)->nullable();
+            });
+        }
     }
 
     public function test_returns_503_when_token_not_configured(): void
@@ -116,6 +133,12 @@ class ExternalInstitutionIngestTest extends TestCase
             'SKCode' => $sk,
             'GSnumber' => '1.25',
         ]);
+
+        $this->assertDatabaseHas('external_assignment_inbound_logs', [
+            'sk_code' => $sk,
+            'co' => 'CO One',
+            'status' => 'applied',
+        ]);
     }
 
     public function test_second_put_updates_without_duplicating(): void
@@ -145,6 +168,91 @@ class ExternalInstitutionIngestTest extends TestCase
         $this->putJson("/api/internal/institutions/{$sk}", [
             'co' => 'Only CO',
         ], $this->authHeaders())->assertStatus(422);
+
+        $this->assertDatabaseMissing('external_assignment_inbound_logs', [
+            'sk_code' => $sk,
+        ]);
+    }
+
+    public function test_updates_assignment_for_existing_institution_with_co_tr_cs_only(): void
+    {
+        $sk = 'SK-ASSIGNMENT-'.uniqid();
+
+        DB::table('S_AccountName')->insert([
+            'SKcode' => $sk,
+            'AccountName' => '기존 기관',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => $sk,
+            'Account_Name' => '기존 기관',
+            'CO' => 'Old CO',
+            'TR' => 'Old TR',
+            'CS' => 'Old CS',
+        ]);
+
+        $this->putJson("/api/internal/institutions/{$sk}", [
+            'co' => 'New CO',
+            'tr' => 'New TR',
+            'cs' => 'New CS',
+        ], $this->authHeaders())->assertOk()
+            ->assertJson(['ok' => true, 'sk' => $sk, 'created' => false]);
+
+        $this->assertDatabaseHas('S_Account_Information', [
+            'SK_Code' => $sk,
+            'Account_Name' => '기존 기관',
+            'CO' => 'New CO',
+            'TR' => 'New TR',
+            'CS' => 'New CS',
+        ]);
+
+        $this->assertDatabaseHas('S_AccountName', [
+            'SKcode' => $sk,
+            'AccountName' => '기존 기관',
+        ]);
+
+        $this->assertDatabaseHas('external_assignment_inbound_logs', [
+            'sk_code' => $sk,
+            'co' => 'New CO',
+            'tr' => 'New TR',
+            'cs' => 'New CS',
+            'status' => 'applied',
+        ]);
+    }
+
+    public function test_repeated_assignment_import_is_idempotent_for_master_data(): void
+    {
+        $sk = 'SK-IDEMPOTENT-'.uniqid();
+
+        DB::table('S_AccountName')->insert([
+            'SKcode' => $sk,
+            'AccountName' => '반복 수신 기관',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+        ]);
+
+        $payload = [
+            'co' => 'Same CO',
+            'tr' => 'Same TR',
+            'cs' => 'Same CS',
+        ];
+
+        $this->putJson("/api/internal/institutions/{$sk}", $payload, $this->authHeaders())->assertOk();
+        $this->putJson("/api/internal/institutions/{$sk}", $payload, $this->authHeaders())->assertOk();
+
+        $this->assertSame(1, DB::table('S_Account_Information')->where('SK_Code', $sk)->count());
+        $this->assertSame(2, DB::table('external_assignment_inbound_logs')->where('sk_code', $sk)->count());
+
+        $this->assertDatabaseHas('S_Account_Information', [
+            'SK_Code' => $sk,
+            'CO' => 'Same CO',
+            'TR' => 'Same TR',
+            'CS' => 'Same CS',
+        ]);
     }
 
     public function test_clears_visibility_override_when_config_enabled(): void
@@ -175,6 +283,118 @@ class ExternalInstitutionIngestTest extends TestCase
 
         $this->assertDatabaseMissing('institution_visibility_overrides', [
             'sk_code' => $sk,
+        ]);
+    }
+
+    public function test_replaces_temporary_sk_with_confirmed_external_sk(): void
+    {
+        $oldSk = 'LEAD-'.uniqid();
+        $newSk = 'SK-CONFIRMED-'.uniqid();
+
+        DB::table('S_AccountName')->insert([
+            'SKcode' => $oldSk,
+            'AccountName' => '임시 기관',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => $oldSk,
+            'Account_Name' => '임시 기관',
+            'CO' => 'Old CO',
+        ]);
+
+        DB::table('S_GSNumber')->insert([
+            'SKCode' => $oldSk,
+            'AccountName' => '임시 기관',
+            'GSnumber' => '1.0',
+        ]);
+
+        DB::table('S_CO_NewTarget')->insert([
+            'Year' => 2026,
+            'CreatedDate' => now()->toDateString(),
+            'AccountCode' => $oldSk,
+            'AccountName' => '임시 기관',
+            'Type' => '신규/진행중',
+            'Gubun' => '유치원',
+            'IsContract' => true,
+        ]);
+
+        DB::table('S_SupportInfo_Account')->insert([
+            'SK_Code' => $oldSk,
+            'Account_Name' => '임시 기관',
+        ]);
+
+        $this->putJson("/api/internal/institutions/{$newSk}", [
+            'replaces_sk' => $oldSk,
+            'institution_name' => '확정 기관',
+            'co' => 'New CO',
+            'tr' => 'New TR',
+            'cs' => 'New CS',
+            'gs_no' => '2.0',
+        ], $this->authHeaders())->assertOk()
+            ->assertJson(['ok' => true, 'sk' => $newSk, 'created' => false]);
+
+        $this->assertDatabaseMissing('S_AccountName', ['SKcode' => $oldSk]);
+        $this->assertDatabaseHas('S_AccountName', [
+            'SKcode' => $newSk,
+            'AccountName' => '확정 기관',
+            'GSno' => '2.0',
+        ]);
+        $this->assertDatabaseHas('S_Account_Information', [
+            'SK_Code' => $newSk,
+            'Account_Name' => '확정 기관',
+            'CO' => 'New CO',
+            'TR' => 'New TR',
+            'CS' => 'New CS',
+        ]);
+        $this->assertDatabaseHas('S_GSNumber', [
+            'SKCode' => $newSk,
+            'GSnumber' => '2.0',
+        ]);
+        $this->assertDatabaseHas('S_CO_NewTarget', ['AccountCode' => $newSk]);
+        $this->assertDatabaseHas('S_SupportInfo_Account', ['SK_Code' => $newSk]);
+    }
+
+    public function test_rejects_replaces_sk_when_confirmed_sk_already_exists(): void
+    {
+        $oldSk = 'LEAD-'.uniqid();
+        $newSk = 'SK-EXISTS-'.uniqid();
+
+        DB::table('S_AccountName')->insert([
+            'SKcode' => $oldSk,
+            'AccountName' => '임시 기관',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+        ]);
+        DB::table('S_AccountName')->insert([
+            'SKcode' => $newSk,
+            'AccountName' => '기존 확정 기관',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+        ]);
+
+        $this->putJson("/api/internal/institutions/{$newSk}", [
+            'replaces_sk' => $oldSk,
+            'co' => 'New CO',
+        ], $this->authHeaders())->assertStatus(422);
+
+        $this->assertDatabaseHas('S_AccountName', ['SKcode' => $oldSk]);
+        $this->assertDatabaseHas('S_AccountName', ['SKcode' => $newSk]);
+    }
+
+    public function test_rejects_missing_replaces_sk_target(): void
+    {
+        $this->putJson('/api/internal/institutions/SK-MISSING-REPLACE', [
+            'replaces_sk' => 'LEAD-NOT-FOUND',
+            'co' => 'New CO',
+        ], $this->authHeaders())->assertStatus(422);
+
+        $this->assertDatabaseMissing('S_AccountName', [
+            'SKcode' => 'SK-MISSING-REPLACE',
         ]);
     }
 

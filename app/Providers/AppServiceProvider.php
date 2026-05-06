@@ -46,5 +46,11 @@ class AppServiceProvider extends ServiceProvider
 
         /** 잠재기관 리스트/보기에서 미팅 추가 등 (로그인 사용자 — 라우트가 auth 그룹) */
         Gate::define('managePotentialInstitutions', fn (?User $user): bool => $user !== null);
+
+        /** 기관 지원 보고서(S_SupportInfo_Account) 삭제 — 관리자만 */
+        Gate::define('deleteSupportRecords', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
+
+        /** 잠재기관(CoNewTarget) 삭제 — 관리자만 (미계약만 허용은 컴포넌트에서 추가 검증) */
+        Gate::define('deletePotentialInstitutions', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
     }
 }

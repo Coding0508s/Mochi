@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SyncInstitutionOutboundJob;
 use App\Livewire\InstitutionList;
 use App\Models\GsNumber;
 use App\Models\Institution;
@@ -10,6 +11,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -22,6 +24,7 @@ class InstitutionListTest extends TestCase
     {
         parent::setUp();
         Config::set('features.institution_create_enabled', true);
+        Queue::fake();
         $this->createAccountTables();
     }
 
@@ -314,6 +317,134 @@ class InstitutionListTest extends TestCase
         $this->assertDatabaseHas('S_AccountName', [
             'ID' => $institution->ID,
             'GSno' => '2.5',
+        ]);
+    }
+
+    public function test_save_detail_updates_master_and_account_information(): void
+    {
+        $user = User::factory()->create();
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-FULL-1',
+            'AccountName' => 'Old Name',
+            'EnglishName' => 'Old En',
+            'Director' => 'Dir',
+            'Address' => 'Old Addr',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-FULL-1',
+            'Account_Name' => 'Old Name',
+            'CO' => 'C',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->call('startDetailEdit')
+            ->set('editDetailInstitutionName', 'New Name')
+            ->set('editDetailEnglishName', 'New En')
+            ->set('editDetailDirector', 'New Dir')
+            ->set('editDetailAddress', 'Addr 1')
+            ->call('saveDetailFields')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_AccountName', [
+            'ID' => $institution->ID,
+            'AccountName' => 'New Name',
+            'EnglishName' => 'New En',
+            'Director' => 'New Dir',
+            'Address' => 'Addr 1',
+        ]);
+        $this->assertDatabaseHas('S_Account_Information', [
+            'SK_Code' => 'SK-FULL-1',
+            'Account_Name' => 'New Name',
+            'Address' => 'Addr 1',
+        ]);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_save_managers_queues_outbound_when_enabled(): void
+    {
+        Config::set('services.institution_outbound.enabled', true);
+        $user = User::factory()->create();
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-MANAGER-SYNC-1',
+            'AccountName' => '담당자 동기화 테스트',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openManagerModal', $institution->ID)
+            ->set('editCo', 'CO Sync')
+            ->set('editTr', 'TR Sync')
+            ->set('editCs', 'CS Sync')
+            ->call('saveManagers')
+            ->assertHasNoErrors();
+
+        Queue::assertPushed(SyncInstitutionOutboundJob::class, function (SyncInstitutionOutboundJob $job): bool {
+            return $job->sk === 'SK-MANAGER-SYNC-1';
+        });
+    }
+
+    public function test_save_detail_fields_queues_outbound_when_enabled(): void
+    {
+        Config::set('services.institution_outbound.enabled', true);
+        $user = User::factory()->create();
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-DETAIL-SYNC-1',
+            'AccountName' => '상세 동기화 테스트',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->call('startDetailEdit')
+            ->set('editDetailCo', 'CO Detail Sync')
+            ->set('editDetailTr', 'TR Detail Sync')
+            ->set('editDetailCs', 'CS Detail Sync')
+            ->call('saveDetailFields')
+            ->assertHasNoErrors();
+
+        Queue::assertPushed(SyncInstitutionOutboundJob::class, function (SyncInstitutionOutboundJob $job): bool {
+            return $job->sk === 'SK-DETAIL-SYNC-1';
+        });
+    }
+
+    public function test_save_detail_sk_rename_cascades_sk_code_on_support_records(): void
+    {
+        $user = User::factory()->create();
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-OLD-X',
+            'AccountName' => 'SK 변경 테스트',
+        ]);
+
+        DB::table('S_SupportInfo_Account')->insert([
+            'SK_Code' => 'SK-OLD-X',
+            'Year' => 2025,
+            'Support_Date' => '2025-01-15',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->call('startDetailEdit')
+            ->set('editDetailSkCode', 'SK-NEW-X')
+            ->call('saveDetailFields')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_AccountName', [
+            'ID' => $institution->ID,
+            'SKcode' => 'SK-NEW-X',
+        ]);
+        $this->assertDatabaseHas('S_SupportInfo_Account', [
+            'SK_Code' => 'SK-NEW-X',
+        ]);
+        $this->assertDatabaseMissing('S_SupportInfo_Account', [
+            'SK_Code' => 'SK-OLD-X',
         ]);
     }
 }

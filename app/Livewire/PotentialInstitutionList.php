@@ -3,16 +3,19 @@
 namespace App\Livewire;
 
 use App\Actions\CreatePotentialMeetingDetail;
-use App\Models\AccountInformation;
+use App\Actions\DeletePotentialMeetingDetail;
+use App\Actions\PromotePotentialInstitutionToMaster;
+use App\Enums\SyncOrigin;
+use App\Jobs\SyncInstitutionOutboundJob;
 use App\Models\CoNewTarget;
 use App\Models\CoNewTargetDetail;
-use App\Models\Institution;
 use App\Models\SupportRecord;
-use App\Services\PotentialInstitutionSkCodeService;
 use Carbon\Carbon;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Livewire\Attributes\On;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Throwable;
@@ -83,6 +86,25 @@ class PotentialInstitutionList extends Component
     public string $newClosing = '';
 
     public string $newDroppedOut = '';
+
+    /** 신규 등록 모달에서 기관 지원 보고서(S_SupportInfo_Account)를 함께 저장 */
+    public bool $newIncludeSupportReport = false;
+
+    public string $newSupportReportDate = '';
+
+    public string $newSupportReportTime = '';
+
+    public string $newSupportReportType = '전화';
+
+    public string $newSupportReportTarget = '';
+
+    public string $newSupportReportToAccount = '';
+
+    public string $newSupportReportToDepart = '';
+
+    public bool $newSupportReportCompleted = false;
+
+    public string $newSupportReportTrName = '';
 
     // 상세 모달 상태
     public bool $showDetailModal = false;
@@ -195,104 +217,23 @@ class PotentialInstitutionList extends Component
                     'IsContract' => true,
                     'ContractedDate' => now()->toDateString(),
                 ]);
+
+                $sk = app(PromotePotentialInstitutionToMaster::class)->execute($target);
+
+                DB::afterCommit(function () use ($sk): void {
+                    SyncInstitutionOutboundJob::dispatchIf(
+                        (bool) config('services.institution_outbound.enabled'),
+                        $sk,
+                        SyncOrigin::Local
+                    );
+                });
             } else {
                 $target->update([
                     'IsContract' => false,
                     'ContractedDate' => null,
                 ]);
             }
-
-            if ($contracted) {
-                $target->refresh();
-                $this->syncContractedLeadToInstitutionList($target);
-            } else {
-                $target->refresh();
-                $this->removeUncontractedLeadFromInstitutionList($target);
-            }
         });
-    }
-
-    /**
-     * 계약 확정 시 기관리스트(S_AccountName)에 없으면 등록하고, 담당정보(S_Account_Information)를 맞춥니다.
-     * 신규 잠재기관 등록(saveNewTarget)과 동일한 SK 정책(비어 있으면 LEAD-{ID})을 따릅니다.
-     */
-    private function syncContractedLeadToInstitutionList(CoNewTarget $target): void
-    {
-        $name = trim((string) ($target->AccountName ?? ''));
-        if ($name === '') {
-            return;
-        }
-
-        $skService = app(PotentialInstitutionSkCodeService::class);
-        $userSk = trim((string) ($target->AccountCode ?? ''));
-        $sk = $userSk !== ''
-            ? $userSk
-            : $skService->resolveForManualRegistration('', (int) $target->ID);
-
-        $this->clearInstitutionHiddenFlag($sk);
-
-        if ($userSk === '') {
-            $target->update(['AccountCode' => $sk]);
-        }
-
-        if (Institution::query()->where('SKcode', $sk)->exists()) {
-            return;
-        }
-
-        Institution::query()->create([
-            'SKcode' => $sk,
-            'AccountName' => $name,
-            'Director' => $target->Director ? trim((string) $target->Director) : null,
-            'Phone' => $target->Phone ? trim((string) $target->Phone) : null,
-            'Address' => $target->Address ? trim((string) $target->Address) : null,
-            'Gubun' => $target->Gubun ? trim((string) $target->Gubun) : null,
-            'Possibility' => $target->Possibility ? trim((string) $target->Possibility) : null,
-        ]);
-
-        AccountInformation::query()->updateOrCreate(
-            ['SK_Code' => $sk],
-            [
-                'Account_Name' => $name,
-                'Address' => $target->Address ? trim((string) $target->Address) : null,
-                'Customer_Type' => $target->Type ? trim((string) $target->Type) : null,
-            ]
-        );
-    }
-
-    /**
-     * 미계약 전환 시 기관리스트에서 숨김 처리합니다.
-     */
-    private function removeUncontractedLeadFromInstitutionList(CoNewTarget $target): void
-    {
-        $sk = trim((string) ($target->AccountCode ?? ''));
-        if ($sk === '') {
-            return;
-        }
-
-        if (! Schema::hasTable('institution_visibility_overrides')) {
-            return;
-        }
-
-        DB::table('institution_visibility_overrides')->updateOrInsert(
-            ['sk_code' => $sk],
-            [
-                'hidden_reason' => 'uncontracted',
-                'hidden_at' => now(),
-                'updated_at' => now(),
-                'created_at' => now(),
-            ]
-        );
-    }
-
-    private function clearInstitutionHiddenFlag(string $sk): void
-    {
-        if ($sk === '' || ! Schema::hasTable('institution_visibility_overrides')) {
-            return;
-        }
-
-        DB::table('institution_visibility_overrides')
-            ->where('sk_code', $sk)
-            ->delete();
     }
 
     private function syncSelectedTargetContractFields(bool $contracted): void
@@ -312,6 +253,29 @@ class PotentialInstitutionList extends Component
         $this->resetValidation();
         $this->resetCreateForm();
         $this->showCreateModal = true;
+    }
+
+    public function updatedNewIncludeSupportReport(mixed $value): void
+    {
+        if (! filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
+            return;
+        }
+
+        if ($this->newSupportReportDate === '' && $this->newMeetingDate !== '') {
+            $this->newSupportReportDate = $this->newMeetingDate;
+        }
+
+        if ($this->newSupportReportTime === '' && $this->newMeetingTime !== '') {
+            $this->newSupportReportTime = $this->newMeetingTime;
+        }
+
+        if ($this->newSupportReportToAccount === '') {
+            $this->newSupportReportToAccount = (string) config('support_report_defaults.to_account_template', '');
+        }
+
+        if ($this->newSupportReportToDepart === '') {
+            $this->newSupportReportToDepart = (string) config('support_report_defaults.to_depart_template', '');
+        }
     }
 
     public function closeCreateModal(): void
@@ -367,6 +331,31 @@ class PotentialInstitutionList extends Component
                     'possibility' => $validated['newPossibility'] ?: null,
                     'account_manager' => $validated['newManager'] ?: null,
                 ]);
+
+                if (! empty($validated['newIncludeSupportReport'])
+                    && Schema::hasColumn('S_SupportInfo_Account', 'potential_target_id')) {
+                    $supportDate = Carbon::parse($validated['newSupportReportDate']);
+                    $timeRaw = trim((string) ($validated['newSupportReportTime'] ?? ''));
+                    $meetTimeSuffix = $timeRaw !== '' ? $timeRaw.':00' : '00:00:00';
+
+                    SupportRecord::query()->create([
+                        'Year' => (int) $supportDate->format('Y'),
+                        'SK_Code' => null,
+                        'potential_target_id' => (int) $target->ID,
+                        'Account_Name' => $validated['newAccountName'],
+                        'TR_Name' => $validated['newSupportReportTrName'] ?: null,
+                        'Support_Date' => $supportDate->format('Y-m-d'),
+                        'Meet_Time' => $meetTimeSuffix,
+                        'Support_Type' => $validated['newSupportReportType'],
+                        'Target' => $validated['newSupportReportTarget'] ?: null,
+                        'Issue' => null,
+                        'TO_Account' => $validated['newSupportReportToAccount'] ?: null,
+                        'TO_Depart' => $validated['newSupportReportToDepart'] ?: null,
+                        'Status' => ! empty($validated['newSupportReportCompleted']) ? '완료' : '진행중',
+                        'CompletedDate' => ! empty($validated['newSupportReportCompleted']) ? now() : null,
+                        'CreatedDate' => now(),
+                    ]);
+                }
             });
         } catch (Throwable $e) {
             report($e);
@@ -405,6 +394,28 @@ class PotentialInstitutionList extends Component
             'newConsultingCount' => ['nullable', 'integer', 'min:0'],
             'newClosing' => ['nullable', 'integer', 'min:0'],
             'newDroppedOut' => ['nullable', 'integer', 'min:0'],
+            'newIncludeSupportReport' => ['boolean'],
+            'newSupportReportDate' => [
+                Rule::requiredIf(fn (): bool => $this->newIncludeSupportReport),
+                'nullable',
+                'date',
+            ],
+            'newSupportReportTime' => [
+                Rule::requiredIf(fn (): bool => $this->newIncludeSupportReport),
+                'nullable',
+                'date_format:H:i',
+            ],
+            'newSupportReportType' => [
+                Rule::requiredIf(fn (): bool => $this->newIncludeSupportReport),
+                'nullable',
+                'string',
+                'max:100',
+            ],
+            'newSupportReportTarget' => ['nullable', 'string', 'max:255'],
+            'newSupportReportToAccount' => ['nullable', 'string', 'max:20000'],
+            'newSupportReportToDepart' => ['nullable', 'string', 'max:20000'],
+            'newSupportReportCompleted' => ['boolean'],
+            'newSupportReportTrName' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -427,6 +438,11 @@ class PotentialInstitutionList extends Component
             'newClosing.integer' => '도입제안 횟수는 숫자만 입력해 주세요.',
             'newDroppedOut.integer' => '도입취소 횟수는 숫자만 입력해 주세요.',
             '*.min' => '숫자는 0 이상이어야 합니다.',
+            'newSupportReportDate.required' => '지원 보고서를 함께 등록할 때는 지원 날짜를 입력해 주세요.',
+            'newSupportReportDate.date' => '지원 날짜 형식이 올바르지 않습니다.',
+            'newSupportReportTime.required' => '지원 보고서를 함께 등록할 때는 지원 시간을 입력해 주세요.',
+            'newSupportReportTime.date_format' => '지원 시간 형식이 올바르지 않습니다.',
+            'newSupportReportType.required' => '지원 보고서를 함께 등록할 때는 지원 유형을 입력해 주세요.',
         ];
     }
 
@@ -453,6 +469,15 @@ class PotentialInstitutionList extends Component
         $this->newConsultingCount = '';
         $this->newClosing = '';
         $this->newDroppedOut = '';
+        $this->newIncludeSupportReport = false;
+        $this->newSupportReportDate = '';
+        $this->newSupportReportTime = '';
+        $this->newSupportReportType = '전화';
+        $this->newSupportReportTarget = '';
+        $this->newSupportReportToAccount = '';
+        $this->newSupportReportToDepart = '';
+        $this->newSupportReportCompleted = false;
+        $this->newSupportReportTrName = (string) (auth()->user()?->nameForCoReports() ?? '');
     }
 
     private function toNonNegativeInt(mixed $value): int
@@ -569,20 +594,6 @@ class PotentialInstitutionList extends Component
         $this->showDetailModal = true;
     }
 
-    #[On('potential-meeting-saved')]
-    public function refreshDetailAfterMeeting(int $targetId): void
-    {
-        if (! $this->showDetailModal) {
-            return;
-        }
-
-        if ((int) ($this->selectedTarget['id'] ?? 0) !== $targetId) {
-            return;
-        }
-
-        $this->openDetailModal($targetId);
-    }
-
     public function closeDetailModal(): void
     {
         $this->showDetailModal = false;
@@ -626,6 +637,40 @@ class PotentialInstitutionList extends Component
     {
         $this->showMeetingDetailModal = false;
         $this->selectedMeeting = null;
+    }
+
+    public function deleteMeetingDetail(int $detailId): void
+    {
+        if ($this->selectedTarget === null) {
+            return;
+        }
+
+        $targetId = (int) ($this->selectedTarget['id'] ?? 0);
+        if ($targetId <= 0) {
+            return;
+        }
+
+        $target = CoNewTarget::query()->find($targetId);
+        if (! $target) {
+            return;
+        }
+
+        try {
+            app(DeletePotentialMeetingDetail::class)($target, $detailId);
+        } catch (AuthorizationException $e) {
+            $this->addError('deleteMeeting', $e->getMessage());
+
+            return;
+        } catch (ModelNotFoundException $e) {
+            report($e);
+            $this->addError('deleteMeeting', '삭제할 미팅 이력을 찾을 수 없습니다.');
+
+            return;
+        }
+
+        $this->closeMeetingDetailModal();
+        $this->openDetailModal($targetId);
+        session()->flash('success', '미팅/컨설팅 이력을 삭제했습니다.');
     }
 
     public function openSupportDetailModal(int $supportRecordId): void

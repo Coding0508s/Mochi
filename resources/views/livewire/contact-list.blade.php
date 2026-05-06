@@ -208,17 +208,43 @@
                             <label class="block text-sm font-medium text-gray-700 mb-1">
                                 기관명 <span class="text-red-500">*</span>
                             </label>
-                            <select wire:model.live="newSkCode"
-                                    class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 {{ $errors->has('newSkCode') ? 'border-red-400' : 'border-gray-300' }}">
-                                <option value="">기관을 선택하세요</option>
-                                @foreach($institutions as $inst)
-                                    <option value="{{ $inst->SKcode }}">[{{ $inst->SKcode }}] {{ $inst->AccountName }}</option>
-                                @endforeach
-                            </select>
-                            @error('newSkCode') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                            @if($newSchoolName)
-                                <p class="mt-1 text-xs text-gray-500">선택 기관: {{ $newSchoolName }}</p>
+                            @if(filled($newSkCode))
+                                <div class="flex flex-wrap items-center gap-2 rounded-lg border border-blue-200 bg-blue-50/60 px-3 py-2.5 text-sm">
+                                    <span class="font-medium text-gray-900">
+                                        <span class="text-blue-700">[{{ $newSkCode }}]</span>
+                                        {{ $newSchoolName }}
+                                    </span>
+                                    <button type="button"
+                                            wire:click="clearTeacherInstitutionSelection"
+                                            class="ml-auto shrink-0 text-xs font-medium text-blue-700 hover:text-blue-900 underline cursor-pointer">
+                                        다른 기관 선택
+                                    </button>
+                                </div>
+                            @else
+                                <input type="text"
+                                       wire:model.live.debounce.250ms="newInstitutionKeyword"
+                                       placeholder="기관명 또는 SK 코드로 검색…"
+                                       autocomplete="off"
+                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 {{ $errors->has('newSkCode') ? 'border-red-400' : 'border-gray-300' }}"/>
+                                @if(filled(trim($newInstitutionKeyword)) && $teacherInstitutionSuggestions->isNotEmpty())
+                                    <div class="mt-2 max-h-52 overflow-auto border border-gray-200 rounded-lg bg-white shadow-sm divide-y divide-gray-100">
+                                        @foreach($teacherInstitutionSuggestions as $inst)
+                                            <button type="button"
+                                                    wire:click="selectTeacherInstitution({{ json_encode($inst->SKcode) }})"
+                                                    class="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors cursor-pointer">
+                                                <span class="font-medium text-gray-900">{{ $inst->AccountName }}</span>
+                                                <span class="ml-2 text-xs text-gray-500 tabular-nums">({{ $inst->SKcode }})</span>
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                @elseif(filled(trim($newInstitutionKeyword)) && $teacherInstitutionSuggestions->isEmpty())
+                                    <p class="mt-2 text-xs text-gray-500">검색 결과가 없습니다. 기관명 또는 SK 코드를 확인해 주세요.</p>
+                                @endif
                             @endif
+                            @error('newSkCode') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                            @unless(filled($newSkCode))
+                                <p class="mt-1 text-xs text-gray-500">목록에서 선택하거나, 기관명·SK 코드를 정확히 입력해 자동 선택할 수 있습니다.</p>
+                            @endunless
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">

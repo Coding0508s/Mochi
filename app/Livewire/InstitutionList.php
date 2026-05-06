@@ -2,14 +2,18 @@
 
 namespace App\Livewire;
 
+use App\Enums\SyncOrigin;
+use App\Jobs\SyncInstitutionOutboundJob;
 use App\Models\AccountInformation;
 use App\Models\Employee;
 use App\Models\GsNumber;
 use App\Models\Institution;
 use App\Models\SupportRecord;
+use App\Models\Teacher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -56,6 +60,27 @@ class InstitutionList extends Component
     public string $editDetailTr = '';
 
     public string $editDetailCs = '';
+
+    /** 상세 모달 편집: 기관 마스터(S_AccountName) 전체 */
+    public string $editDetailSkCode = '';
+
+    public string $editDetailInstitutionName = '';
+
+    public string $editDetailEnglishName = '';
+
+    public string $editDetailPortalName = '';
+
+    public string $editDetailAccountNo = '';
+
+    public string $editDetailGubun = '';
+
+    public string $editDetailDirector = '';
+
+    public string $editDetailPhone = '';
+
+    public string $editDetailAccountTel = '';
+
+    public string $editDetailAddress = '';
 
     // ─── 담당자 변경 모달 상태 ───────────────────────────────────────
     public bool $showManagerModal = false;
@@ -120,6 +145,7 @@ class InstitutionList extends Component
             'name' => $institution->AccountName,
             'english_name' => $institution->EnglishName,
             'portal_name' => $institution->PortalAccountName,
+            'account_no' => $institution->AccountNo,
             'gubun' => $institution->Gubun,
             'director' => $institution->Director,
             'phone' => $institution->Phone,
@@ -141,6 +167,16 @@ class InstitutionList extends Component
         $this->editDetailCo = (string) ($institution->accountInfo?->CO ?? '');
         $this->editDetailTr = (string) ($institution->accountInfo?->TR ?? '');
         $this->editDetailCs = (string) ($institution->accountInfo?->CS ?? '');
+        $this->editDetailSkCode = (string) ($institution->SKcode ?? '');
+        $this->editDetailInstitutionName = (string) ($institution->AccountName ?? '');
+        $this->editDetailEnglishName = (string) ($institution->EnglishName ?? '');
+        $this->editDetailPortalName = (string) ($institution->PortalAccountName ?? '');
+        $this->editDetailAccountNo = (string) ($institution->AccountNo ?? '');
+        $this->editDetailGubun = (string) ($institution->Gubun ?? '');
+        $this->editDetailDirector = (string) ($institution->Director ?? '');
+        $this->editDetailPhone = (string) ($institution->Phone ?? '');
+        $this->editDetailAccountTel = (string) ($institution->AccountTel ?? '');
+        $this->editDetailAddress = (string) ($institution->Address ?? '');
 
         // 최근 10년 이력(지원/소통) 조회
         $startYear = now()->year - 9;
@@ -183,6 +219,16 @@ class InstitutionList extends Component
         $this->editDetailCo = '';
         $this->editDetailTr = '';
         $this->editDetailCs = '';
+        $this->editDetailSkCode = '';
+        $this->editDetailInstitutionName = '';
+        $this->editDetailEnglishName = '';
+        $this->editDetailPortalName = '';
+        $this->editDetailAccountNo = '';
+        $this->editDetailGubun = '';
+        $this->editDetailDirector = '';
+        $this->editDetailPhone = '';
+        $this->editDetailAccountTel = '';
+        $this->editDetailAddress = '';
         $this->resetValidation();
         $this->closeSupportDetailModal();
     }
@@ -199,6 +245,16 @@ class InstitutionList extends Component
         $this->editDetailCo = (string) ($this->selectedInstitution['co'] ?? '');
         $this->editDetailTr = (string) ($this->selectedInstitution['tr'] ?? '');
         $this->editDetailCs = (string) ($this->selectedInstitution['cs'] ?? '');
+        $this->editDetailSkCode = (string) ($this->selectedInstitution['skcode'] ?? '');
+        $this->editDetailInstitutionName = (string) ($this->selectedInstitution['name'] ?? '');
+        $this->editDetailEnglishName = (string) ($this->selectedInstitution['english_name'] ?? '');
+        $this->editDetailPortalName = (string) ($this->selectedInstitution['portal_name'] ?? '');
+        $this->editDetailAccountNo = (string) ($this->selectedInstitution['account_no'] ?? '');
+        $this->editDetailGubun = (string) ($this->selectedInstitution['gubun'] ?? '');
+        $this->editDetailDirector = (string) ($this->selectedInstitution['director'] ?? '');
+        $this->editDetailPhone = (string) ($this->selectedInstitution['phone'] ?? '');
+        $this->editDetailAccountTel = (string) ($this->selectedInstitution['account_tel'] ?? '');
+        $this->editDetailAddress = (string) ($this->selectedInstitution['address'] ?? '');
         $this->resetValidation();
     }
 
@@ -214,6 +270,16 @@ class InstitutionList extends Component
         $this->editDetailCo = (string) ($this->selectedInstitution['co'] ?? '');
         $this->editDetailTr = (string) ($this->selectedInstitution['tr'] ?? '');
         $this->editDetailCs = (string) ($this->selectedInstitution['cs'] ?? '');
+        $this->editDetailSkCode = (string) ($this->selectedInstitution['skcode'] ?? '');
+        $this->editDetailInstitutionName = (string) ($this->selectedInstitution['name'] ?? '');
+        $this->editDetailEnglishName = (string) ($this->selectedInstitution['english_name'] ?? '');
+        $this->editDetailPortalName = (string) ($this->selectedInstitution['portal_name'] ?? '');
+        $this->editDetailAccountNo = (string) ($this->selectedInstitution['account_no'] ?? '');
+        $this->editDetailGubun = (string) ($this->selectedInstitution['gubun'] ?? '');
+        $this->editDetailDirector = (string) ($this->selectedInstitution['director'] ?? '');
+        $this->editDetailPhone = (string) ($this->selectedInstitution['phone'] ?? '');
+        $this->editDetailAccountTel = (string) ($this->selectedInstitution['account_tel'] ?? '');
+        $this->editDetailAddress = (string) ($this->selectedInstitution['address'] ?? '');
         $this->resetValidation();
     }
 
@@ -223,64 +289,109 @@ class InstitutionList extends Component
             return;
         }
 
-        $this->validate([
-            'editCustomerType' => 'nullable|string|max:255',
-            'editGsNo' => 'nullable|string|max:255',
-            'editDetailCo' => 'nullable|string|max:255',
-            'editDetailTr' => 'nullable|string|max:255',
-            'editDetailCs' => 'nullable|string|max:255',
-        ]);
-
         $institutionId = (int) ($this->selectedInstitution['id'] ?? 0);
-        $skCode = (string) ($this->selectedInstitution['skcode'] ?? '');
+        $originalSk = trim((string) ($this->selectedInstitution['skcode'] ?? ''));
 
-        if ($institutionId <= 0 || blank($skCode)) {
+        if ($institutionId <= 0 || $originalSk === '') {
             return;
         }
 
-        $institution = Institution::query()->findOrFail($institutionId);
-        $trimmedGs = trim($this->editGsNo);
-        $accountName = (string) ($this->selectedInstitution['name'] ?? $institution->AccountName ?? '');
+        $this->validate([
+            'editDetailSkCode' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('S_AccountName', 'SKcode')->ignore($institutionId, 'ID'),
+            ],
+            'editDetailInstitutionName' => ['required', 'string', 'max:255'],
+            'editDetailEnglishName' => ['nullable', 'string', 'max:255'],
+            'editDetailPortalName' => ['nullable', 'string', 'max:255'],
+            'editDetailAccountNo' => ['nullable', 'string', 'max:100'],
+            'editDetailGubun' => ['nullable', 'string', 'max:100'],
+            'editDetailDirector' => ['nullable', 'string', 'max:255'],
+            'editDetailPhone' => ['nullable', 'string', 'max:100'],
+            'editDetailAccountTel' => ['nullable', 'string', 'max:100'],
+            'editDetailAddress' => ['nullable', 'string', 'max:500'],
+            'editCustomerType' => ['nullable', 'string', 'max:255'],
+            'editGsNo' => ['nullable', 'string', 'max:255'],
+            'editDetailCo' => ['nullable', 'string', 'max:255'],
+            'editDetailTr' => ['nullable', 'string', 'max:255'],
+            'editDetailCs' => ['nullable', 'string', 'max:255'],
+        ], [
+            'editDetailSkCode.required' => 'SK 코드를 입력해 주세요.',
+            'editDetailSkCode.unique' => '이미 사용 중인 SK 코드입니다.',
+            'editDetailInstitutionName.required' => '기관명을 입력해 주세요.',
+        ]);
 
-        DB::transaction(function () use ($institution, $skCode, $trimmedGs, $accountName): void {
+        $institution = Institution::query()->findOrFail($institutionId);
+        $oldSk = trim((string) $institution->SKcode);
+        $newSk = trim($this->editDetailSkCode);
+        $trimmedGs = trim($this->editGsNo);
+        $accountName = trim($this->editDetailInstitutionName);
+
+        DB::transaction(function () use ($institution, $oldSk, $newSk, $accountName, $trimmedGs): void {
+            if ($oldSk !== $newSk) {
+                if (Schema::hasTable('Teachers')) {
+                    Teacher::query()->where('SK_Code', $oldSk)->update(['SK_Code' => $newSk]);
+                }
+                SupportRecord::query()->where('SK_Code', $oldSk)->update(['SK_Code' => $newSk]);
+                if (Schema::hasTable('S_GSNumber')) {
+                    GsNumber::query()->where('SKCode', $oldSk)->update(['SKCode' => $newSk]);
+                }
+                AccountInformation::query()->where('SK_Code', $oldSk)->update(['SK_Code' => $newSk]);
+                if (Schema::hasTable('institution_visibility_overrides')) {
+                    DB::table('institution_visibility_overrides')
+                        ->where('sk_code', $oldSk)
+                        ->update(['sk_code' => $newSk, 'updated_at' => now()]);
+                }
+            }
+
             $institution->update([
+                'SKcode' => $newSk,
+                'AccountName' => $accountName,
+                'EnglishName' => trim($this->editDetailEnglishName) !== '' ? trim($this->editDetailEnglishName) : null,
+                'PortalAccountName' => trim($this->editDetailPortalName) !== '' ? trim($this->editDetailPortalName) : null,
+                'AccountNo' => trim($this->editDetailAccountNo) !== '' ? trim($this->editDetailAccountNo) : null,
+                'Director' => trim($this->editDetailDirector) !== '' ? trim($this->editDetailDirector) : null,
+                'Phone' => trim($this->editDetailPhone) !== '' ? trim($this->editDetailPhone) : null,
+                'AccountTel' => trim($this->editDetailAccountTel) !== '' ? trim($this->editDetailAccountTel) : null,
+                'Address' => trim($this->editDetailAddress) !== '' ? trim($this->editDetailAddress) : null,
+                'Gubun' => trim($this->editDetailGubun) !== '' ? trim($this->editDetailGubun) : null,
                 'GSno' => $trimmedGs !== '' ? $trimmedGs : null,
             ]);
 
             AccountInformation::query()->updateOrCreate(
-                ['SK_Code' => $skCode],
+                ['SK_Code' => $newSk],
                 [
                     'Account_Name' => $accountName,
                     'Customer_Type' => trim($this->editCustomerType) ?: null,
                     'CO' => trim($this->editDetailCo) ?: null,
                     'TR' => trim($this->editDetailTr) ?: null,
                     'CS' => trim($this->editDetailCs) ?: null,
+                    'Address' => trim($this->editDetailAddress) !== '' ? trim($this->editDetailAddress) : null,
                 ]
             );
 
             if (Schema::hasTable('S_GSNumber')) {
                 GsNumber::query()->updateOrCreate(
-                    ['SKCode' => $skCode],
+                    ['SKCode' => $newSk],
                     [
                         'AccountName' => $accountName !== '' ? $accountName : null,
                         'GSnumber' => $trimmedGs !== '' ? $trimmedGs : null,
                     ]
                 );
             }
+
+            DB::afterCommit(function () use ($newSk): void {
+                SyncInstitutionOutboundJob::dispatchIf(
+                    (bool) config('services.institution_outbound.enabled'),
+                    $newSk,
+                    SyncOrigin::Local
+                );
+            });
         });
 
-        if (Schema::hasTable('S_GSNumber')) {
-            $institution->load('gsNumber');
-        }
-
-        $this->selectedInstitution['customer_type'] = trim($this->editCustomerType) ?: null;
-        $resolvedAfter = $institution->resolvedGsNumber();
-        $this->selectedInstitution['gs_no'] = $resolvedAfter !== '' ? $resolvedAfter : null;
-        $this->selectedInstitution['co'] = trim($this->editDetailCo) ?: null;
-        $this->selectedInstitution['tr'] = trim($this->editDetailTr) ?: null;
-        $this->selectedInstitution['cs'] = trim($this->editDetailCs) ?: null;
-
-        $this->isEditingDetail = false;
+        $this->openDetailModal($institutionId);
         $this->resetValidation();
         session()->flash('success', '기관 상세 정보가 저장되었습니다.');
     }
@@ -373,6 +484,14 @@ class InstitutionList extends Component
                 'CS' => trim($this->editCs) ?: null,
             ]
         );
+
+        DB::afterCommit(function (): void {
+            SyncInstitutionOutboundJob::dispatchIf(
+                (bool) config('services.institution_outbound.enabled'),
+                $this->editSkCode,
+                SyncOrigin::Local
+            );
+        });
 
         // 상세 모달 열려 있으면 즉시 표시값도 갱신
         if ($this->selectedInstitution && $this->selectedInstitution['skcode'] === $this->editSkCode) {

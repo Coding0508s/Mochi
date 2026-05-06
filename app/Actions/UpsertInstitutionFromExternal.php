@@ -5,9 +5,11 @@ namespace App\Actions;
 use App\Models\AccountInformation;
 use App\Models\GsNumber;
 use App\Models\Institution;
+use App\Services\PotentialInstitutionSkCodeService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 
 /**
  * 외부 플랫폼 연동: S_AccountName(마스터) + S_Account_Information + S_GSNumber 를 SK 기준으로 upsert.
@@ -19,7 +21,7 @@ class UpsertInstitutionFromExternal
      * @param  array<string, mixed>  $patch  API 스네이크 케이스 키만 허용 (검증된 값)
      * @return array{created: bool, institution: Institution}
      */
-    public function execute(string $sk, array $patch): array
+    public function execute(string $sk, array $patch, ?string $replacesSk = null): array
     {
         $sk = trim($sk);
         if ($sk === '') {
@@ -27,6 +29,20 @@ class UpsertInstitutionFromExternal
         }
 
         $existed = Institution::query()->where('SKcode', $sk)->exists();
+        $replacesSk = is_string($replacesSk) ? trim($replacesSk) : null;
+        if ($replacesSk === '') {
+            $replacesSk = null;
+        }
+
+        if ($replacesSk !== null) {
+            try {
+                app(PotentialInstitutionSkCodeService::class)->renameInstitutionSk($replacesSk, $sk);
+            } catch (InvalidArgumentException $e) {
+                throw ValidationException::withMessages(['replaces_sk' => $e->getMessage()]);
+            }
+
+            $existed = true;
+        }
 
         $institution = DB::transaction(function () use ($sk, $patch, $existed): Institution {
             $institutionAttrs = $this->buildInstitutionAttributes($sk, $patch, $existed);

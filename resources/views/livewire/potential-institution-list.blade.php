@@ -78,7 +78,7 @@
             <button type="button"
                     wire:click="openCreateModal"
                     class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors cursor-pointer">
-                신규 기관 등록
+                신규 잠재 기관 등록
             </button>
         </div>
         <div class="flex flex-wrap items-center gap-3 pt-3 mt-3 border-t border-gray-200/80">
@@ -104,77 +104,78 @@
         </div>
     </div>
 
-    {{-- 메인 리스트 테이블 --}}
+    {{-- 메인 리스트 테이블 (가로 스크롤 없이 뷰포트 너비에 맞춤: table-fixed + 줄바꿈/말줄임) --}}
     <div class="mochi-table-card">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm whitespace-nowrap">
+        <div class="w-full min-w-0">
+            <table class="w-full table-fixed border-collapse text-xs text-gray-700">
                 <thead class="mochi-table-head">
                     <tr class="text-gray-700">
-                        <th class="px-3 py-2 text-left text-xs font-semibold">No</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold">ID</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold">담당자</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold">일자</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold">신규구분</th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold">미팅횟수</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold">컨설팅타입</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold">기관명</th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold">LS</th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold">GS(유)</th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold">GS(초)</th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold">합계</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold">소개경로</th>
-                        <th class="px-3 py-2 text-center text-xs font-semibold">계약가능성</th>
-                        @can('managePotentialInstitutions')
-                            <th class="px-3 py-2 text-center text-xs font-semibold">지원보고서</th>
-                        @endcan
-                        <th class="px-3 py-2 text-center text-xs font-semibold">액션</th>
+                        <th class="w-[3%] px-1.5 py-2 text-left text-[11px] font-semibold leading-tight">No</th>
+                        <th class="w-[4%] px-1.5 py-2 text-left text-[11px] font-semibold leading-tight">ID</th>
+                        <th class="w-[7%] min-w-0 px-1.5 py-2 text-left text-[11px] font-semibold leading-tight">담당자</th>
+                        <th class="w-[7%] px-1.5 py-2 text-left text-[11px] font-semibold leading-tight">일자</th>
+                        <th class="w-[8%] min-w-0 px-1.5 py-2 text-left text-[11px] font-semibold leading-tight">구분</th>
+                        <th class="w-[4%] px-1.5 py-2 text-center text-[11px] font-semibold leading-tight">미팅</th>
+                        <th class="w-[8%] min-w-0 px-1.5 py-2 text-left text-[11px] font-semibold leading-tight">컨설팅</th>
+                        <th class="w-[20%] min-w-0 px-1.5 py-2 text-left text-[11px] font-semibold leading-tight">기관명</th>
+                        <th class="w-[3%] px-1.5 py-2 text-center text-[11px] font-semibold leading-tight">LS</th>
+                        <th class="w-[3.5%] px-0.5 py-2 text-center text-[10px] font-semibold leading-tight">GS<br>유</th>
+                        <th class="w-[3.5%] px-0.5 py-2 text-center text-[10px] font-semibold leading-tight">GS<br>초</th>
+                        <th class="w-[4%] px-1.5 py-2 text-center text-[11px] font-semibold leading-tight">합계</th>
+                        <th class="w-[8%] min-w-0 px-1.5 py-2 text-left text-[11px] font-semibold leading-tight">소개</th>
+                        <th class="w-[5%] px-1 py-2 text-center text-[10px] font-semibold leading-tight">가능</th>
+                        <th class="w-[12%] px-1.5 py-2 text-center text-[11px] font-semibold leading-tight">액션</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     @forelse($targets as $index => $target)
                         @php
                             $meetingCount = (int) ($meetingCountByAccount[$target->AccountName] ?? 0);
+                            $manager = (string) ($target->AccountManager ?? '');
+                            $type = (string) ($target->Type ?? '');
+                            $gubun = (string) ($target->Gubun ?? '');
+                            $accountName = (string) ($target->AccountName ?? '');
+                            $connected = (string) ($target->Connected ?? '');
                         @endphp
                         <tr wire:key="potential-target-row-{{ $target->ID }}"
                             wire:click="openDetailModal({{ $target->ID }})"
-                            class="mochi-table-row-hover transition-colors cursor-pointer">
-                            <td class="px-3 py-2 text-gray-500 text-xs">{{ $targets->firstItem() + $index }}</td>
-                            <td class="px-3 py-2 text-gray-700">{{ $target->ID }}</td>
-                            <td class="px-3 py-2 text-gray-700">{{ $target->AccountManager ?? '-' }}</td>
-                            <td class="px-3 py-2 text-gray-700">{{ $target->CreatedDate?->format('Y-m-d') ?? '-' }}</td>
-                            <td class="px-3 py-2 text-gray-700">{{ $target->Type ?? '-' }}</td>
-                            <td class="px-3 py-2 text-center text-gray-700">{{ $meetingCount }}</td>
-                            <td class="px-3 py-2 text-gray-700">{{ $target->Gubun ?? '-' }}</td>
-                            <td class="px-3 py-2 font-medium text-gray-900">{{ $target->AccountName ?? '-' }}</td>
-                            <td class="px-3 py-2 text-center text-gray-700">{{ $target->LS ?? 0 }}</td>
-                            <td class="px-3 py-2 text-center text-gray-700">{{ $target->GS_K ?? 0 }}</td>
-                            <td class="px-3 py-2 text-center text-gray-700">{{ $target->GS_E ?? 0 }}</td>
-                            <td class="px-3 py-2 text-center font-semibold text-gray-800">{{ $target->Total ?? 0 }}</td>
-                            <td class="px-3 py-2 text-gray-700 max-w-[14rem] truncate" title="{{ $target->Connected ?? '' }}">{{ filled($target->Connected) ? $target->Connected : '-' }}</td>
-                            <td class="px-3 py-2 text-center text-gray-700">
+                            class="mochi-table-row-hover transition-colors cursor-pointer align-top">
+                            <td class="px-1.5 py-2 text-gray-500 tabular-nums">{{ $targets->firstItem() + $index }}</td>
+                            <td class="px-1.5 py-2 tabular-nums">{{ $target->ID }}</td>
+                            <td class="min-w-0 px-1.5 py-2">
+                                <span class="line-clamp-2 break-words leading-snug" title="{{ $manager }}">{{ $manager !== '' ? $manager : '-' }}</span>
+                            </td>
+                            <td class="px-1.5 py-2 whitespace-nowrap tabular-nums">{{ $target->CreatedDate?->format('Y-m-d') ?? '-' }}</td>
+                            <td class="min-w-0 px-1.5 py-2">
+                                <span class="line-clamp-2 break-words leading-snug" title="{{ $type }}">{{ $type !== '' ? $type : '-' }}</span>
+                            </td>
+                            <td class="px-1.5 py-2 text-center tabular-nums">{{ $meetingCount }}</td>
+                            <td class="min-w-0 px-1.5 py-2">
+                                <span class="line-clamp-2 break-words leading-snug" title="{{ $gubun }}">{{ $gubun !== '' ? $gubun : '-' }}</span>
+                            </td>
+                            <td class="min-w-0 px-1.5 py-2 font-medium text-gray-900">
+                                <span class="line-clamp-2 break-words leading-snug" title="{{ $accountName }}">{{ $accountName !== '' ? $accountName : '-' }}</span>
+                            </td>
+                            <td class="px-1.5 py-2 text-center tabular-nums">{{ $target->LS ?? 0 }}</td>
+                            <td class="px-0.5 py-2 text-center tabular-nums">{{ $target->GS_K ?? 0 }}</td>
+                            <td class="px-0.5 py-2 text-center tabular-nums">{{ $target->GS_E ?? 0 }}</td>
+                            <td class="px-1.5 py-2 text-center font-semibold text-gray-800 tabular-nums">{{ $target->Total ?? 0 }}</td>
+                            <td class="min-w-0 px-1.5 py-2 truncate" title="{{ $connected }}">{{ filled($target->Connected) ? $target->Connected : '-' }}</td>
+                            <td class="px-1 py-2 text-center">
                                 @if($target->IsContract)
                                     <span class="font-medium text-emerald-700">계약</span>
                                 @else
-                                    {{ filled($target->Possibility) ? $target->Possibility : '-' }}
+                                    <span class="tabular-nums">{{ filled($target->Possibility) ? $target->Possibility : '-' }}</span>
                                 @endif
                             </td>
-                            @can('managePotentialInstitutions')
-                                <td class="px-3 py-2 text-center" onclick="event.stopPropagation()">
-                                    @if($target->IsContract)
-                                        <a href="{{ route('supports.create', ['potential_target_id' => $target->ID]) }}"
-                                           class="text-xs font-medium text-blue-600 hover:text-blue-800 underline">작성</a>
-                                    @else
-                                        <span class="text-xs text-gray-400" title="계약·SK 발급 후 작성 가능">-</span>
-                                    @endif
-                                </td>
-                            @endcan
-                            <td class="px-3 py-2 text-center">
+                            <td class="px-1.5 py-2 text-center whitespace-nowrap">
                                 @if($target->IsContract)
-                                    <span class="text-xs text-gray-500">계약완료됨</span>
+                                    <span class="text-[11px] text-gray-500" title="계약 완료 처리됨">완료</span>
                                 @else
                                     <button type="button"
                                             wire:click.stop="markContractComplete({{ $target->ID }})"
-                                            class="inline-flex items-center justify-center rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-1">
+                                            title="계약 완료 처리"
+                                            class="inline-flex items-center justify-center rounded-md bg-orange-500 px-2 py-1 text-[11px] font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-1">
                                         계약완료
                                     </button>
                                 @endif
@@ -182,7 +183,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ \Illuminate\Support\Facades\Gate::allows('managePotentialInstitutions') ? 16 : 15 }}" class="px-4 py-16 text-center text-gray-400">
+                            <td colspan="15" class="px-4 py-16 text-center text-gray-400">
                                 <p class="font-medium">잠재고객 데이터가 없습니다</p>
                                 <p class="text-sm mt-1">필터 조건을 변경해 보세요.</p>
                             </td>
@@ -308,7 +309,10 @@
 
                             <div class="space-y-2">
                                 <p class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-                                    신규 등록 단계에서는 SK코드를 발급하지 않습니다. 계약 처리 시 SK코드가 자동 발급되어 기관리스트에 반영됩니다. 기관 지원 보고서는 정식 기관(계약·SK 발급) 이후에 작성할 수 있습니다.
+                                    신규 등록 단계에서는 SK코드를 발급하지 않습니다. 기관리스트 정식 등록은 「기관 등록」 메뉴에서 별도로 진행합니다.
+                                </p>
+                                <p class="text-xs text-gray-600">
+                                    이 모달 아래쪽(미팅내용 다음)에 <span class="font-medium text-gray-800">기관 지원 보고서(선택)</span> 항목이 있습니다. 「같이 등록」을 켜면 저장과 동시에 보고서 한 건이 생성됩니다.
                                 </p>
                             </div>
                         </section>
@@ -344,6 +348,70 @@
                             <h3 class="text-base font-semibold text-gray-900">미팅내용</h3>
                             <textarea wire:model="newDescription" rows="6" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y" placeholder="미팅/컨설팅 내용을 입력하세요"></textarea>
                             @error('newDescription') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                        </section>
+
+                        <section class="space-y-4 border-t border-gray-200 pt-5">
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <h3 class="text-base font-semibold text-gray-900">기관 지원 보고서 <span class="text-sm font-normal text-gray-500">(선택)</span></h3>
+                                <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                                    <input type="checkbox" wire:model.live="newIncludeSupportReport" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                    <span class="text-sm text-gray-700">같이 등록</span>
+                                </label>
+                            </div>
+                            <p class="text-xs text-gray-500">체크하면 저장과 동시에 기관 지원 보고서 목록에 한 건이 추가됩니다. SK 발급 전에는 첨부 파일 업로드는 「CO 기관지원보고서 작성」 화면에서만 할 수 있습니다.</p>
+
+                            @if($newIncludeSupportReport)
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">지원 날짜 <span class="text-red-500">*</span></label>
+                                        <input type="date" wire:model="newSupportReportDate" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                        @error('newSupportReportDate') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">지원 시간 <span class="text-red-500">*</span></label>
+                                        <input type="time" wire:model="newSupportReportTime" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                        @error('newSupportReportTime') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">지원 방법 <span class="text-red-500">*</span></label>
+                                        <select wire:model="newSupportReportType" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            <option>전화</option>
+                                            <option>대면</option>
+                                            <option>화상</option>
+                                            <option>이메일</option>
+                                            <option>문자</option>
+                                            <option>기타</option>
+                                        </select>
+                                        @error('newSupportReportType') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">CO명</label>
+                                        <input type="text" wire:model="newSupportReportTrName" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="보고서 담당 표기명" />
+                                        @error('newSupportReportTrName') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">참석자</label>
+                                        <input type="text" wire:model="newSupportReportTarget" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="예: 원장, 교사 2명" />
+                                        @error('newSupportReportTarget') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                    </div>
+                                </div>
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">기관과의 소통내용</label>
+                                        <textarea wire:model="newSupportReportToAccount" rows="5" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+                                        @error('newSupportReportToAccount') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">본사/타 부서 공유 내용</label>
+                                        <textarea wire:model="newSupportReportToDepart" rows="3" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+                                        @error('newSupportReportToDepart') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                    </div>
+                                </div>
+                                <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                                    <input type="checkbox" wire:model="newSupportReportCompleted" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                    <span class="text-sm text-gray-700">완료 처리</span>
+                                </label>
+                            @endif
                         </section>
 
                         <section class="space-y-4 border-t border-gray-200 pt-5">
@@ -540,7 +608,7 @@
                                     총 {{ count($detailSupportRecords) }}건
                                 </span>
                                 @can('managePotentialInstitutions')
-                                    @if($selectedTarget['is_contract'] ?? false)
+                                    @if(!($selectedTarget['is_contract'] ?? false))
                                         <a href="{{ route('supports.create', ['potential_target_id' => $selectedTarget['id']]) }}"
                                            class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
                                             지원 보고서 작성
@@ -549,9 +617,7 @@
                                 @endcan
                             </div>
                         </div>
-                        @if($selectedTarget['is_contract'] ?? false)
-                            <p class="text-xs text-gray-500 mb-2">정식 기관(계약·SK 발급) 이후 작성 가능합니다. 저장 시 미팅 이력에도 반영될 수 있습니다.</p>
-                        @endif
+                        <p class="text-xs text-gray-500 mb-2">작성 화면으로 이동합니다. 저장 시 미팅 이력에도 반영될 수 있습니다.</p>
                         <div class="border border-gray-200 rounded-lg overflow-hidden">
                             <div class="max-h-56 overflow-y-auto overflow-x-auto">
                                 <table class="w-full text-xs whitespace-nowrap">
@@ -716,6 +782,23 @@
                         </div>
                     </div>
                 </div>
+                @can('managePotentialInstitutions')
+                    @if(!($selectedTarget['is_contract'] ?? false))
+                        <div class="flex flex-col gap-2 border-t border-gray-200 px-6 py-4 bg-gray-50/80 sm:flex-row sm:items-center sm:justify-between">
+                            @error('deleteMeeting')
+                                <p class="text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                            <div class="flex justify-end sm:ml-auto">
+                                <button type="button"
+                                        wire:click="deleteMeetingDetail({{ $selectedMeeting['id'] }})"
+                                        wire:confirm="이 미팅/컨설팅 이력을 삭제할까요? 되돌릴 수 없습니다."
+                                        class="inline-flex items-center rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 shadow-sm hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 cursor-pointer">
+                                    삭제
+                                </button>
+                            </div>
+                        </div>
+                    @endif
+                @endcan
             </div>
         </div>
     @endif

@@ -4,8 +4,11 @@ namespace App\Services;
 
 use App\Models\AccountInformation;
 use App\Models\CoNewTarget;
+use App\Models\GsNumber;
 use App\Models\Institution;
+use App\Models\SupportRecord;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 
 /**
@@ -48,6 +51,61 @@ final class PotentialInstitutionSkCodeService
     }
 
     /**
+     * 기관 마스터 및 관련 테이블의 SK 키를 한 번에 치환합니다.
+     *
+     * 계약 완료 후 생성된 임시 SK(예: LEAD-520)를 상대 플랫폼의 확정 SK로 바꿀 때 사용합니다.
+     *
+     * @throws InvalidArgumentException 대상 없음·중복·충돌
+     */
+    public function renameInstitutionSk(string $oldSk, string $newSk): void
+    {
+        $oldSk = trim($oldSk);
+        $newSk = trim($newSk);
+
+        if ($oldSk === '' || $newSk === '') {
+            throw new InvalidArgumentException('SK 코드가 비어 있습니다.');
+        }
+
+        if ($oldSk === $newSk) {
+            return;
+        }
+
+        $oldCount = Institution::query()->where('SKcode', $oldSk)->count();
+        if ($oldCount === 0) {
+            throw new InvalidArgumentException('등록 대상 기관 SK가 기관 목록에 없습니다.');
+        }
+
+        if ($oldCount > 1) {
+                throw new InvalidArgumentException('등록 대상 기관 SK가 기관 목록에 중복되어 있습니다. 데이터 정리 후 다시 시도하세요.');
+        }
+
+        if (Institution::query()->where('SKcode', $newSk)->exists()) {
+            throw new InvalidArgumentException('이미 기관 목록에 등록된 SK 코드입니다.');
+        }
+
+        DB::transaction(function () use ($oldSk, $newSk): void {
+            Institution::query()->where('SKcode', $oldSk)->update(['SKcode' => $newSk]);
+            AccountInformation::query()->where('SK_Code', $oldSk)->update(['SK_Code' => $newSk]);
+
+            if (Schema::hasTable('S_GSNumber')) {
+                GsNumber::query()->where('SKCode', $oldSk)->update(['SKCode' => $newSk]);
+            }
+
+            if (Schema::hasTable('S_CO_NewTarget')) {
+                CoNewTarget::query()->where('AccountCode', $oldSk)->update(['AccountCode' => $newSk]);
+            }
+
+            if (Schema::hasTable('S_SupportInfo_Account') && Schema::hasColumn('S_SupportInfo_Account', 'SK_Code')) {
+                SupportRecord::query()->where('SK_Code', $oldSk)->update(['SK_Code' => $newSk]);
+            }
+
+            if (Schema::hasTable('institution_visibility_overrides')) {
+                DB::table('institution_visibility_overrides')->where('sk_code', $oldSk)->update(['sk_code' => $newSk]);
+            }
+        });
+    }
+
+    /**
      * 외부 API에서 확정된 SK 코드를 잠재기관·기관(S_AccountName)·담당정보(S_Account_Information)에 반영합니다.
      *
      * 기존에 `LEAD-*` 등으로 등록된 행의 PK(SK 컬럼)를 API에서 받은 코드로 바꿀 때 사용합니다.
@@ -73,8 +131,7 @@ final class PotentialInstitutionSkCodeService
 
         DB::transaction(function () use ($lead, $oldSk, $newSk): void {
             if ($oldSk !== '') {
-                Institution::query()->where('SKcode', $oldSk)->update(['SKcode' => $newSk]);
-                AccountInformation::query()->where('SK_Code', $oldSk)->update(['SK_Code' => $newSk]);
+                $this->renameInstitutionSk($oldSk, $newSk);
             }
 
             $lead->update(['AccountCode' => $newSk]);

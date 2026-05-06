@@ -315,6 +315,8 @@
         display: flex;
         align-items: center;
         gap: 16px;
+        min-width: 0;
+        flex-shrink: 0;
     }
 
     .mochi-topbar-action {
@@ -326,6 +328,30 @@
         align-items: center;
         justify-content: center;
         color: #ffffff;
+    }
+
+    /* 알림 종 — action 타일과 동일 크기, 호버만 보강 */
+    .mochi-topbar-bell {
+        flex-shrink: 0;
+        border: none;
+        padding: 0;
+        margin: 0;
+        cursor: pointer;
+        color: #ffffff;
+        transition:
+            background-color 0.2s ease,
+            transform 0.2s ease;
+    }
+
+    .mochi-topbar-bell:hover,
+    .mochi-topbar-bell:focus-visible {
+        background: rgba(255, 255, 255, 0.24);
+        transform: scale(1.05);
+    }
+
+    .mochi-topbar-bell:focus-visible {
+        outline: 2px solid rgba(255, 255, 255, 0.45);
+        outline-offset: 2px;
     }
 
     /* 탑바 프로필 / 로그아웃 — 각각 독립 글라스 필 (네비 링크와 동일 필터) */
@@ -357,6 +383,7 @@
 
     .mochi-topbar-logout {
         padding: 0 14px;
+        flex-shrink: 0;
     }
 
     .mochi-topbar-profile__depth,
@@ -407,6 +434,20 @@
         z-index: 10;
         display: inline-flex;
         align-items: center;
+        justify-content: center;
+        min-width: 0;
+    }
+
+    .mochi-topbar-logout__content form {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 0;
+    }
+
+    .mochi-topbar-logout__content button {
+        white-space: nowrap;
+        line-height: 1.25;
     }
 
     .mochi-topbar-profile:hover,
@@ -448,6 +489,56 @@
         .mochi-topbar-logout:hover,
         .mochi-topbar-logout:focus-within {
             transform: none;
+        }
+    }
+
+    @media (max-width: 1023px) {
+        .mochi-topbar-inner {
+            padding-inline: 12px;
+            column-gap: 12px;
+        }
+
+        .mochi-topbar-nav {
+            gap: 12px;
+        }
+    }
+
+    @media (max-width: 767px) {
+        .mochi-topbar-inner {
+            padding-inline: 10px;
+            column-gap: 8px;
+        }
+
+        .mochi-topbar-brand {
+            font-size: 11px;
+        }
+
+        .mochi-topbar-nav {
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+            row-gap: 6px;
+        }
+
+        .mochi-topbar-glass-link {
+            padding: 0.25rem 0.55rem;
+            font-size: 12px;
+            line-height: 1.2;
+        }
+
+        .mochi-topbar-user {
+            gap: 8px;
+        }
+
+        .mochi-topbar-profile {
+            min-width: 0;
+            max-width: min(10rem, 42vw);
+            padding-inline: 8px;
+        }
+
+        .mochi-topbar-logout {
+            padding-inline: 0.5rem;
+            min-width: 2.25rem;
         }
     }
 
@@ -1013,5 +1104,9 @@
     box-shadow:
         0 0 0 1000px #ffffff inset,
         0 1px 0 0 rgba(94, 184, 232, 0.45) !important;
+}
+
+[x-cloak] {
+    display: none !important;
 }
 

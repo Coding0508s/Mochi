@@ -113,6 +113,13 @@
                     @php
                         $customerType = (string) ($inst->accountInfo?->Customer_Type ?? '');
                         $isTerminated = str_contains($customerType, '해지');
+                        $customerTypeWithoutTerminateBadge = $customerType;
+                        if ($isTerminated) {
+                            $customerTypeWithoutTerminateBadge = trim((string) preg_replace('/^해지$/u', '', $customerTypeWithoutTerminateBadge));
+                            $customerTypeWithoutTerminateBadge = trim((string) preg_replace('/^해지\s+/u', '', $customerTypeWithoutTerminateBadge));
+                            $customerTypeWithoutTerminateBadge = trim((string) preg_replace('/\s+해지$/u', '', $customerTypeWithoutTerminateBadge));
+                            $customerTypeWithoutTerminateBadge = trim((string) preg_replace('/\s+/u', ' ', $customerTypeWithoutTerminateBadge));
+                        }
                     @endphp
                     <tr wire:key="institution-row-{{ $inst->ID }}"
                         wire:click="openDetailModal({{ $inst->ID }})"
@@ -152,7 +159,9 @@
                                             해지
                                         </span>
                                     @endif
-                                    <span class="text-xs leading-snug break-words whitespace-normal">{{ $customerType }}</span>
+                                    @if($customerTypeWithoutTerminateBadge !== '')
+                                        <span class="text-xs leading-snug break-words whitespace-normal">{{ $customerTypeWithoutTerminateBadge }}</span>
+                                    @endif
                                 </div>
                             @endif
                         </td>
@@ -230,17 +239,90 @@
                             <tbody class="divide-y divide-gray-100">
                                 <tr>
                                     <th class="w-28 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">SKcode</th>
-                                    <td class="px-3 py-2 font-mono text-sm font-semibold text-gray-900">{{ $selectedInstitution['skcode'] ?? '-' }}</td>
+                                    <td class="px-3 py-2 font-mono text-sm text-gray-900">
+                                        @if($isEditingDetail)
+                                            <input type="text" wire:model.defer="editDetailSkCode"
+                                                   class="w-full py-1.5 px-2 text-sm font-mono border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                            @error('editDetailSkCode')
+                                                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                            @enderror
+                                        @else
+                                            <span class="font-semibold">{{ $selectedInstitution['skcode'] ?? '-' }}</span>
+                                        @endif
+                                    </td>
                                     <th class="w-28 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">기관명</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedInstitution['name'] ?? '-' }}</td>
+                                    <td class="px-3 py-2 font-medium text-gray-900">
+                                        @if($isEditingDetail)
+                                            <input type="text" wire:model.defer="editDetailInstitutionName"
+                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                            @error('editDetailInstitutionName')
+                                                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                            @enderror
+                                        @else
+                                            {{ $selectedInstitution['name'] ?? '-' }}
+                                        @endif
+                                    </td>
                                 </tr>
                                 <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">영문명</th>
-                                    <td colspan="3" class="px-3 py-2 font-medium text-gray-900">{{ $selectedInstitution['english_name'] ?? '-' }}</td>
+                                    <td colspan="3" class="px-3 py-2 font-medium text-gray-900">
+                                        @if($isEditingDetail)
+                                            <input type="text" wire:model.defer="editDetailEnglishName"
+                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                            @error('editDetailEnglishName')
+                                                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                            @enderror
+                                        @else
+                                            {{ $selectedInstitution['english_name'] ?? '-' }}
+                                        @endif
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">포털 표시명</th>
+                                    <td colspan="3" class="px-3 py-2 font-medium text-gray-900">
+                                        @if($isEditingDetail)
+                                            <input type="text" wire:model.defer="editDetailPortalName"
+                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                            @error('editDetailPortalName')
+                                                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                            @enderror
+                                        @else
+                                            {{ $selectedInstitution['portal_name'] ?? '-' }}
+                                        @endif
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">사업자/기관번호</th>
+                                    <td colspan="3" class="px-3 py-2 font-medium text-gray-900">
+                                        @if($isEditingDetail)
+                                            <input type="text" wire:model.defer="editDetailAccountNo"
+                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                            @error('editDetailAccountNo')
+                                                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                            @enderror
+                                        @else
+                                            {{ $selectedInstitution['account_no'] ?? '-' }}
+                                        @endif
+                                    </td>
                                 </tr>
                                 <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">구분</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedInstitution['gubun'] ?? '-' }}</td>
+                                    <td class="px-3 py-2 font-medium text-gray-900">
+                                        @if($isEditingDetail)
+                                            <input type="text" wire:model.defer="editDetailGubun" list="institution-detail-gubun-options"
+                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                            <datalist id="institution-detail-gubun-options">
+                                                @foreach($gubunList as $gubunOption)
+                                                    <option value="{{ $gubunOption }}"></option>
+                                                @endforeach
+                                            </datalist>
+                                            @error('editDetailGubun')
+                                                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                            @enderror
+                                        @else
+                                            {{ $selectedInstitution['gubun'] ?? '-' }}
+                                        @endif
+                                    </td>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">고객유형</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">
                                         @if($isEditingDetail)
@@ -334,21 +416,64 @@
                                 </tr>
                                 <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">원장명</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedInstitution['director'] ?? '-' }}</td>
+                                    <td class="px-3 py-2 font-medium text-gray-900">
+                                        @if($isEditingDetail)
+                                            <input type="text" wire:model.defer="editDetailDirector"
+                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                            @error('editDetailDirector')
+                                                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                            @enderror
+                                        @else
+                                            {{ $selectedInstitution['director'] ?? '-' }}
+                                        @endif
+                                    </td>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">대표전화</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedInstitution['phone'] ?? '-' }}</td>
+                                    <td class="px-3 py-2 font-medium text-gray-900">
+                                        @if($isEditingDetail)
+                                            <input type="text" wire:model.defer="editDetailPhone"
+                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                            @error('editDetailPhone')
+                                                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                            @enderror
+                                        @else
+                                            {{ $selectedInstitution['phone'] ?? '-' }}
+                                        @endif
+                                    </td>
                                 </tr>
                                 <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">직통 연락처</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedInstitution['account_tel'] ?? '-' }}</td>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">최근 지원일</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">
+                                        @if($isEditingDetail)
+                                            <input type="text" wire:model.defer="editDetailAccountTel"
+                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                            @error('editDetailAccountTel')
+                                                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                            @enderror
+                                        @else
+                                            {{ $selectedInstitution['account_tel'] ?? '-' }}
+                                        @endif
+                                    </td>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">최근 지원일</th>
+                                    <td class="px-3 py-2 font-medium text-gray-500">
                                         {{ $selectedInstitution['latest_support_date'] ? substr((string) $selectedInstitution['latest_support_date'], 0, 10) : '-' }}
+                                        @if($isEditingDetail)
+                                            <p class="mt-1 text-[11px] text-gray-400">지원 이력에서 자동 집계됩니다.</p>
+                                        @endif
                                     </td>
                                 </tr>
                                 <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">주소</th>
-                                    <td colspan="3" class="px-3 py-2 font-medium text-gray-900">{{ $selectedInstitution['address'] ?? '-' }}</td>
+                                    <td colspan="3" class="px-3 py-2 font-medium text-gray-900">
+                                        @if($isEditingDetail)
+                                            <textarea wire:model.defer="editDetailAddress" rows="2"
+                                                      class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                                            @error('editDetailAddress')
+                                                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                            @enderror
+                                        @else
+                                            {{ $selectedInstitution['address'] ?? '-' }}
+                                        @endif
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>

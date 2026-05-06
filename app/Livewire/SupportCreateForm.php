@@ -95,21 +95,17 @@ class SupportCreateForm extends Component
 
     private function applyPotentialTargetPrefill(int $id): void
     {
-        $potential = $this->findFormalCoNewTargetForSupport($id);
+        $potential = $this->findPotentialById($id);
         if (! $potential) {
-            session()->flash('warning', '지원 보고서는 정식 기관(계약 완료·SK 발급) 후에만 작성할 수 있습니다.');
+            session()->flash('warning', '잠재기관을 찾을 수 없거나 이미 계약 처리되었습니다.');
 
             return;
         }
 
-        $sk = trim((string) ($potential->AccountCode ?? ''));
-        $inst = Institution::query()->where('SKcode', $sk)->first();
-
-        $this->formSkCode = $sk;
-        $this->formAccountName = (string) ($inst?->AccountName ?? $potential->AccountName ?? '');
-        $this->formInstitutionKeyword = $this->formAccountName;
-        $this->formPotentialTargetId = null;
-        $this->formIsPotential = false;
+        $this->formPotentialTargetId = (int) $potential->ID;
+        $this->formSkCode = trim((string) ($potential->AccountCode ?? ''));
+        $this->formAccountName = (string) ($potential->AccountName ?? '');
+        $this->formIsPotential = true;
         $this->formPossibility = (string) ($potential->Possibility ?? '');
         $this->applyDefaultCommunicationTemplatesIfEmpty();
     }
@@ -125,30 +121,12 @@ class SupportCreateForm extends Component
             return;
         }
 
+        $potential = $this->findPotentialBySkCode($value);
         $inst = Institution::query()->where('SKcode', $value)->first();
-        $legacyLead = $this->findPotentialBySkCode($value);
-
-        if ($inst) {
-            $this->formAccountName = (string) $inst->AccountName;
-            $this->formPotentialTargetId = null;
-            $this->formIsPotential = false;
-            $this->formPossibility = '';
-        } elseif ($legacyLead !== null) {
-            $this->addError('formSkCode', '지원 보고서는 정식 기관(계약 완료·SK 발급) 후에만 작성할 수 있습니다.');
-            $this->formSkCode = '';
-            $this->formAccountName = '';
-            $this->formPotentialTargetId = null;
-            $this->formIsPotential = false;
-            $this->formPossibility = '';
-
-            return;
-        } else {
-            $this->formAccountName = '';
-            $this->formPotentialTargetId = null;
-            $this->formIsPotential = false;
-            $this->formPossibility = '';
-        }
-
+        $this->formAccountName = (string) ($inst?->AccountName ?? $potential?->AccountName ?? '');
+        $this->formPotentialTargetId = $potential?->ID ? (int) $potential->ID : null;
+        $this->formIsPotential = $potential !== null;
+        $this->formPossibility = $potential ? (string) ($potential->Possibility ?? '') : '';
         if (filled($value)) {
             $this->applyDefaultCommunicationTemplatesIfEmpty();
         }
@@ -172,8 +150,8 @@ class SupportCreateForm extends Component
         if ($potential) {
             $this->formSkCode = trim((string) ($potential->AccountCode ?? ''));
             $this->formAccountName = (string) $potential->AccountName;
-            $this->formPotentialTargetId = null;
-            $this->formIsPotential = false;
+            $this->formPotentialTargetId = (int) $potential->ID;
+            $this->formIsPotential = true;
             $this->formPossibility = (string) ($potential->Possibility ?? '');
             $this->applyDefaultCommunicationTemplatesIfEmpty();
 
@@ -209,24 +187,11 @@ class SupportCreateForm extends Component
         $inst = $trimmedSkCode !== ''
             ? Institution::query()->where('SKcode', $trimmedSkCode)->first()
             : null;
-
-        $potential = null;
-        if ($potentialTargetId !== null && $potentialTargetId > 0) {
-            $potential = $this->findFormalCoNewTargetForSupport($potentialTargetId);
-            if ($isPotential && $potential === null) {
-                $this->addError('formInstitutionKeyword', '지원 보고서는 정식 기관(계약 완료·SK 발급) 후에만 작성할 수 있습니다.');
-
-                return;
-            }
-        }
-
-        if ($potential === null && $trimmedSkCode !== '' && $inst === null) {
-            $legacyLead = $this->findPotentialBySkCode($trimmedSkCode);
-            if ($legacyLead !== null) {
-                $this->addError('formInstitutionKeyword', '지원 보고서는 정식 기관(계약 완료·SK 발급) 후에만 작성할 수 있습니다.');
-
-                return;
-            }
+        $potential = $potentialTargetId !== null
+            ? $this->findPotentialById($potentialTargetId)
+            : null;
+        if ($potential === null && $trimmedSkCode !== '') {
+            $potential = $this->findPotentialBySkCode($trimmedSkCode);
         }
 
         if (! $inst && ! $isPotential && $potential === null) {
@@ -240,9 +205,11 @@ class SupportCreateForm extends Component
             ? (string) $inst->AccountName
             : (string) ($potential?->AccountName ?? '');
         $this->formInstitutionKeyword = $this->formAccountName;
-        $this->formPotentialTargetId = null;
-        $this->formIsPotential = false;
-        $this->formPossibility = $potential !== null ? (string) ($potential->Possibility ?? '') : '';
+        $this->formPotentialTargetId = ($isPotential || $potential !== null) && $potential?->ID
+            ? (int) $potential->ID
+            : null;
+        $this->formIsPotential = $this->formPotentialTargetId !== null;
+        $this->formPossibility = $this->formIsPotential ? (string) ($potential?->Possibility ?? '') : '';
         $this->applyDefaultCommunicationTemplatesIfEmpty();
     }
 
@@ -268,20 +235,14 @@ class SupportCreateForm extends Component
     {
         $this->validate();
 
-        if ($this->formPotentialTargetId !== null && $this->formPotentialTargetId > 0) {
-            $this->addError('formInstitutionKeyword', '지원 보고서는 정식 기관(계약 완료·SK 발급) 후에만 작성할 수 있습니다. 기관을 SK 코드로 다시 선택해 주세요.');
-
-            return;
-        }
-
         $upload = $this->sfUpload;
         if ($upload instanceof TemporaryUploadedFile && blank($this->formSkCode)) {
-            $this->addError('sfUpload', 'SK코드가 발급된 기관만 파일 업로드가 가능합니다.');
+            $this->addError('sfUpload', 'SK코드가 발급된 기관만 파일 업로드가 가능합니다. (미계약 잠재기관은 보고서만 저장)');
 
             return;
         }
 
-        $resolvedPotentialTargetId = null;
+        $resolvedPotentialTargetId = $this->resolveUncontractedPotentialTargetId();
         $storedPath = null;
         $originalFilename = null;
         $detectedMimeType = null;
@@ -525,9 +486,7 @@ class SupportCreateForm extends Component
         }
 
         return CoNewTarget::query()
-            ->where('IsContract', true)
-            ->whereNotNull('AccountCode')
-            ->whereRaw("TRIM(AccountCode) <> ''")
+            ->where('IsContract', false)
             ->where(function ($query) use ($trimmedKeyword): void {
                 $query->where('AccountName', $trimmedKeyword)
                     ->orWhere('AccountCode', $trimmedKeyword);
@@ -544,9 +503,7 @@ class SupportCreateForm extends Component
 
         return collect(
             CoNewTarget::query()
-                ->where('IsContract', true)
-                ->whereNotNull('AccountCode')
-                ->whereRaw("TRIM(AccountCode) <> ''")
+                ->where('IsContract', false)
                 ->where(function ($query) use ($normalizedKeyword): void {
                     $query->whereRaw("REPLACE(AccountName, ' ', '') like ?", ["%{$normalizedKeyword}%"])
                         ->orWhereRaw("REPLACE(IFNULL(AccountCode,''), ' ', '') like ?", ["%{$normalizedKeyword}%"]);
@@ -557,9 +514,11 @@ class SupportCreateForm extends Component
         )->map(fn (CoNewTarget $target): array => [
             'SKcode' => trim((string) ($target->AccountCode ?? '')),
             'AccountName' => (string) $target->AccountName,
-            'is_potential' => false,
-            'potential_target_id' => null,
-            'dedupe_key' => 'sk:'.(string) $target->AccountCode,
+            'is_potential' => true,
+            'potential_target_id' => (int) $target->ID,
+            'dedupe_key' => filled($target->AccountCode)
+                ? 'sk:'.(string) $target->AccountCode
+                : 'pot:'.(int) $target->ID,
         ]);
     }
 
@@ -568,17 +527,18 @@ class SupportCreateForm extends Component
         return filled($this->formSkCode) || $this->formPotentialTargetId !== null;
     }
 
-    /**
-     * 지원 보고서 작성이 허용되는 잠재기관: 계약 완료 후 SK 코드가 부여된 경우만.
-     */
-    private function findFormalCoNewTargetForSupport(int $id): ?CoNewTarget
+    private function resolveUncontractedPotentialTargetId(): ?int
     {
-        return CoNewTarget::query()
-            ->whereKey($id)
-            ->where('IsContract', true)
-            ->whereNotNull('AccountCode')
-            ->whereRaw("TRIM(AccountCode) <> ''")
-            ->first();
+        if ($this->formPotentialTargetId === null || $this->formPotentialTargetId <= 0) {
+            return null;
+        }
+
+        $target = CoNewTarget::query()
+            ->whereKey($this->formPotentialTargetId)
+            ->where('IsContract', false)
+            ->first(['ID']);
+
+        return $target?->ID ? (int) $target->ID : null;
     }
 
     private function buildSfUploadFileName(string $originalFilename, string $accountName): string

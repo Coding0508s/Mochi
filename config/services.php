@@ -48,6 +48,15 @@ return [
         'bearer_token' => env('EXTERNAL_INSTITUTION_INGEST_TOKEN'),
     ],
 
+    /*
+    | 기관 마스터(S_AccountName) → 외부 플랫폼 outbound API (Bearer)
+    */
+    'institution_outbound' => [
+        'enabled' => env('INSTITUTION_OUTBOUND_ENABLED', false),
+        'base_url' => env('INSTITUTION_OUTBOUND_BASE_URL'),
+        'bearer_token' => env('INSTITUTION_OUTBOUND_BEARER_TOKEN'),
+    ],
+
     'gs_brochure_solapi' => [
         'key' => env('GS_BROCHURE_SOLAPI_KEY'),
         'secret' => env('GS_BROCHURE_SOLAPI_SECRET'),

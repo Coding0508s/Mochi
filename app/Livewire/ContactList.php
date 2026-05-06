@@ -2,8 +2,8 @@
 
 namespace App\Livewire;
 
-use App\Models\Teacher;
 use App\Models\Institution;
+use App\Models\Teacher;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -18,41 +18,58 @@ class ContactList extends Component
     // 'name' | 'email' | 'school' | 'phone'
 
     public string $search = '';
+
     // 검색창에 입력한 텍스트
     public string $employmentFilter = 'all';
     // 재직 상태 필터: all | active | inactive
 
     // ─── 생성/수정 모달 상태 ────────────────────────────────────────
     public bool $showModal = false;
+
     public ?int $editingId = null; // null: 신규, 숫자: 수정
 
     // ─── 삭제 확인 모달 상태 ────────────────────────────────────────
     public bool $showDeleteModal = false;
+
     public ?int $deleteTargetId = null;
+
     public string $deleteTargetName = '';
 
     // ─── 상세 보기 모달 상태 ────────────────────────────────────────
     public bool $showDetailModal = false;
+
     public ?array $selectedContact = null;
 
     // 모달 내 입력 필드들
-    public string $newName        = '';
-    public string $newPhone       = '';
-    public string $newEmail       = '';
-    public string $originalEmail  = '';
-    public string $newPosition    = '';  // 직급
+    public string $newName = '';
+
+    public string $newPhone = '';
+
+    public string $newEmail = '';
+
+    public string $originalEmail = '';
+
+    public string $newPosition = '';  // 직급
+
     public string $newEmploymentStatus = 'active'; // 계정상태: active|inactive
+
     public string $newClassParticipation = 'in';   // 수업참여: in|out
-    public string $newSkCode      = '';  // 선택한 기관의 SKcode
-    public string $newSchoolName  = '';  // 선택한 기관명
+
+    public string $newSkCode = '';  // 선택한 기관의 SKcode
+
+    public string $newSchoolName = '';  // 선택한 기관명
+
+    /** 기관 검색(모달): 기관명 또는 SK 코드 입력 */
+    public string $newInstitutionKeyword = '';
+
     public string $newDescription = '';  // 비고
 
     protected array $messages = [
-        'newName.required'  => '이름을 입력해 주세요.',
+        'newName.required' => '이름을 입력해 주세요.',
         'newEmail.required' => '이메일을 입력해 주세요.',
-        'newEmail.email'    => '올바른 이메일 형식이 아닙니다.',
-        'newEmail.unique'   => '이미 등록된 이메일입니다.',
-        'newSkCode.required' => '기관을 선택해 주세요.',
+        'newEmail.email' => '올바른 이메일 형식이 아닙니다.',
+        'newEmail.unique' => '이미 등록된 이메일입니다.',
+        'newSkCode.required' => '기관을 검색하여 선택해 주세요.',
     ];
 
     // ─── 검색어가 바뀌면 1페이지로 초기화 ────────────────────────
@@ -119,7 +136,7 @@ class ContactList extends Component
         $institution = $teacher->institution;
 
         // 일부 데이터는 SK_Code 앞에 '*'가 붙어 관계 매칭이 실패할 수 있어 보정 조회를 수행합니다.
-        if (!$institution) {
+        if (! $institution) {
             $normalizedSkCode = $this->normalizeSkCode($teacher->SK_Code);
             if ($normalizedSkCode) {
                 $institution = Institution::query()
@@ -161,30 +178,73 @@ class ContactList extends Component
 
     private function resetModal(): void
     {
-        $this->newName        = '';
-        $this->newPhone       = '';
-        $this->newEmail       = '';
-        $this->originalEmail  = '';
-        $this->newPosition    = '';
+        $this->newName = '';
+        $this->newPhone = '';
+        $this->newEmail = '';
+        $this->originalEmail = '';
+        $this->newPosition = '';
         $this->newEmploymentStatus = 'active';
         $this->newClassParticipation = 'in';
-        $this->newSkCode      = '';
-        $this->newSchoolName  = '';
+        $this->newSkCode = '';
+        $this->newSchoolName = '';
+        $this->newInstitutionKeyword = '';
         $this->newDescription = '';
-        $this->editingId      = null;
+        $this->editingId = null;
         $this->resetValidation();
     }
 
-    // ─── 기관 선택 시 기관명 자동 채우기 ─────────────────────────
-    public function updatedNewSkCode(string $value): void
+    public function updatedNewInstitutionKeyword(string $value): void
     {
-        if (blank($value)) {
-            $this->newSchoolName = '';
+        if (filled($this->newSkCode)) {
             return;
         }
 
-        $inst = Institution::where('SKcode', $value)->first();
-        $this->newSchoolName = $inst?->AccountName ?? '';
+        $keyword = trim($value);
+        if ($keyword === '') {
+            $this->newSchoolName = '';
+
+            return;
+        }
+
+        $inst = Institution::query()
+            ->whereNotNull('SKcode')
+            ->where(function ($q) use ($keyword): void {
+                $q->where('AccountName', $keyword)
+                    ->orWhere('SKcode', $keyword);
+            })
+            ->first();
+
+        if ($inst) {
+            $this->newSkCode = (string) $inst->SKcode;
+            $this->newSchoolName = (string) ($inst->AccountName ?? '');
+            $this->newInstitutionKeyword = '';
+            $this->resetErrorBag('newSkCode');
+        }
+    }
+
+    public function selectTeacherInstitution(string $skCode): void
+    {
+        $trimmed = trim($skCode);
+        if ($trimmed === '') {
+            return;
+        }
+
+        $inst = Institution::query()->where('SKcode', $trimmed)->first();
+        if (! $inst) {
+            return;
+        }
+
+        $this->newSkCode = (string) $inst->SKcode;
+        $this->newSchoolName = (string) ($inst->AccountName ?? '');
+        $this->newInstitutionKeyword = '';
+        $this->resetErrorBag('newSkCode');
+    }
+
+    public function clearTeacherInstitutionSelection(): void
+    {
+        $this->newSkCode = '';
+        $this->newSchoolName = '';
+        $this->newInstitutionKeyword = '';
     }
 
     // ─── 신규 교사 저장 ───────────────────────────────────────────
@@ -201,7 +261,7 @@ class ContactList extends Component
 
         // 수정 시 "이메일이 실제로 바뀐 경우"에만 유니크 검사를 적용합니다.
         // (기존 데이터에 중복 이메일이 있어도, 이메일 유지 수정은 가능해야 합니다.)
-        $isEmailChanged = !$this->editingId || ($normalizedNewEmail !== $normalizedOriginalEmail);
+        $isEmailChanged = ! $this->editingId || ($normalizedNewEmail !== $normalizedOriginalEmail);
         if ($isEmailChanged) {
             $emailUniqueRule = Rule::unique('Teachers', 'Email');
             if ($this->editingId) {
@@ -211,7 +271,7 @@ class ContactList extends Component
         }
 
         $this->validate([
-            'newName'  => 'required|string|max:190',
+            'newName' => 'required|string|max:190',
             'newEmail' => $emailRules,
             'newPhone' => 'nullable|string|max:190',
             'newSkCode' => 'required',
@@ -223,15 +283,15 @@ class ContactList extends Component
         $isClassIn = $this->newClassParticipation === 'in';
 
         $data = [
-            'Name'        => $this->newName,
-            'Phone'       => $this->newPhone,
-            'Email'       => $this->newEmail,
-            'Position'    => $this->newPosition,
-            'SK_Code'     => $this->newSkCode,
+            'Name' => $this->newName,
+            'Phone' => $this->newPhone,
+            'Email' => $this->newEmail,
+            'Position' => $this->newPosition,
+            'SK_Code' => $this->newSkCode,
             'School_Name' => $this->newSchoolName,
             'Description' => $this->newDescription,
-            'Status'      => $isActive ? '활성화' : '비활성화',
-            'ClassInOut'  => $isClassIn,
+            'Status' => $isActive ? '활성화' : '비활성화',
+            'ClassInOut' => $isClassIn,
         ];
 
         if ($this->editingId) {
@@ -248,7 +308,7 @@ class ContactList extends Component
 
     public function retire(): void
     {
-        if (!$this->editingId) {
+        if (! $this->editingId) {
             return;
         }
 
@@ -274,7 +334,7 @@ class ContactList extends Component
 
     public function delete(): void
     {
-        if (!$this->deleteTargetId) {
+        if (! $this->deleteTargetId) {
             return;
         }
 
@@ -301,7 +361,7 @@ class ContactList extends Component
 
         $teacherRows = $teachers->getCollection();
         $normalizedSkCodes = $teacherRows
-            ->filter(fn (Teacher $teacher) => !$teacher->institution)
+            ->filter(fn (Teacher $teacher) => ! $teacher->institution)
             ->map(fn (Teacher $teacher) => $this->normalizeSkCode($teacher->SK_Code))
             ->filter()
             ->unique()
@@ -320,7 +380,7 @@ class ContactList extends Component
                 }
 
                 $normalizedSkCode = $this->normalizeSkCode($teacher->SK_Code);
-                if (!$normalizedSkCode) {
+                if (! $normalizedSkCode) {
                     return;
                 }
 
@@ -335,24 +395,34 @@ class ContactList extends Component
         $activeCount = Teacher::query()->where('ClassInOut', true)->count();
         $inactiveCount = max(0, $totalCount - $activeCount);
 
-        // 모달의 기관 선택 드롭다운용 목록
-        $institutions = Institution::query()
-            ->whereNotNull('SKcode')
-            ->orderBy('AccountName')
-            ->get(['SKcode', 'AccountName']);
+        $teacherInstitutionSuggestions = collect();
+        if ($this->showModal && blank($this->newSkCode)) {
+            $normalizedKeyword = preg_replace('/\s+/u', '', trim($this->newInstitutionKeyword)) ?? '';
+            if ($normalizedKeyword !== '') {
+                $teacherInstitutionSuggestions = Institution::query()
+                    ->whereNotNull('SKcode')
+                    ->where(function ($query) use ($normalizedKeyword): void {
+                        $query->whereRaw("REPLACE(IFNULL(AccountName,''), ' ', '') like ?", ["%{$normalizedKeyword}%"])
+                            ->orWhereRaw("REPLACE(IFNULL(SKcode,''), ' ', '') like ?", ["%{$normalizedKeyword}%"]);
+                    })
+                    ->orderBy('AccountName')
+                    ->limit(15)
+                    ->get(['SKcode', 'AccountName']);
+            }
+        }
 
         return view('livewire.contact-list', [
-            'teachers'     => $teachers,
-            'institutions' => $institutions,
-            'totalCount'   => $totalCount,
-            'activeCount'  => $activeCount,
-            'inactiveCount'=> $inactiveCount,
+            'teachers' => $teachers,
+            'teacherInstitutionSuggestions' => $teacherInstitutionSuggestions,
+            'totalCount' => $totalCount,
+            'activeCount' => $activeCount,
+            'inactiveCount' => $inactiveCount,
         ]);
     }
 
     private function formatDate(mixed $value): string
     {
-        if (!$value) {
+        if (! $value) {
             return '-';
         }
 

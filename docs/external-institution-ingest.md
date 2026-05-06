@@ -11,6 +11,7 @@
 - **Upsert**: 해당 `SKcode`가 없으면 생성, 있으면 갱신.
 - **PATCH**: JSON에 **포함된 키만** DB에 반영. 없는 키는 기존 값 유지.
 - **신규** 시 `institution_name` 필수 (본문).
+- **계약 후 SK 치환**: 계약 완료로 생성된 임시 SK(예: `LEAD-520`)를 확정 SK로 바꿀 때는 경로에 확정 SK를 넣고, 본문에 `replaces_sk`로 기존 임시 SK를 전달.
 - **테이블**: `S_AccountName`(마스터), `S_Account_Information`, (존재 시) `S_GSNumber`.
 
 ## 환경 변수
@@ -42,6 +43,7 @@
 | `tr` | `TR` |
 | `cs` | `CS` |
 | `customer_type` | `Customer_Type` |
+| `replaces_sk` | 확정 SK로 치환할 기존 임시 SK. DB 컬럼에 직접 저장하지 않음 |
 
 ## curl 예시
 
@@ -54,3 +56,18 @@ curl -sS -X PUT "http://localhost:8000/api/internal/institutions/SK1234" \
 ```
 
 익답 예: `{"ok":true,"sk":"SK1234","created":true}`
+
+## 계약 후 임시 SK 치환 예시
+
+잠재기관 계약 완료 후 우리 플랫폼에 `LEAD-520`으로 등록된 행을 상대 플랫폼의 확정 SK `SK1234`로 바꿀 때:
+
+```bash
+curl -sS -X PUT "http://localhost:8000/api/internal/institutions/SK1234" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -H "Content-Type: application/json" \
+  -H "X-Request-Id: $(uuidgen)" \
+  -d '{"replaces_sk":"LEAD-520","institution_name":"샘플 유치원","co":"Jane Doe","tr":"Trainer One","cs":"CS One"}'
+```
+
+- `SK1234`가 이미 기관 목록에 존재하면 `replaces_sk`는 사용할 수 없습니다. 기존 기관 갱신으로 처리해 주세요.
+- `replaces_sk` 대상이 없거나 중복되어 있으면 `422`로 실패합니다. 먼저 임시 SK 데이터를 정리해야 합니다.

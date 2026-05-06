@@ -294,6 +294,168 @@ class PotentialInstitutionViewTest extends TestCase
         $this->assertStringContainsString('내용', (string) ($rows[0]['to_account'] ?? ''));
     }
 
+    public function test_detail_meeting_detail_modal_shows_full_description(): void
+    {
+        $longBody = 'FULL_MEETING_BODY_'.str_repeat('x', 180);
+
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-10',
+            'AccountManager' => 'Mgr',
+            'AccountCode' => null,
+            'AccountName' => 'ModalLong 기관',
+            'Address' => null,
+            'Director' => null,
+            'Phone' => null,
+            'Connected' => null,
+            'Type' => '신규',
+            'Gubun' => '방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => null,
+        ]);
+
+        $detail = CoNewTargetDetail::query()->create([
+            'Year' => 2026,
+            'AccountName' => 'ModalLong 기관',
+            'AccountManager' => 'Mgr',
+            'MeetingDate' => '2026-04-05',
+            'MeetingTime' => '10:00',
+            'MeetingTime_End' => '11:00',
+            'Description' => $longBody,
+            'ConsultingType' => '전화',
+            'Possibility' => 'A',
+        ]);
+
+        Livewire::test(PotentialInstitutionView::class)
+            ->set('yearMonth', '2026-04')
+            ->set('dateBasis', 'created')
+            ->call('openTargetDetail', (int) $target->ID)
+            ->assertSet('showMeetingDetailModal', false)
+            ->call('openMeetingDetailModal', (int) $detail->ID)
+            ->assertSet('showMeetingDetailModal', true)
+            ->assertSee($longBody);
+    }
+
+    public function test_delete_meeting_detail_removes_record(): void
+    {
+        $user = User::factory()->create();
+        $accountName = '뷰 미팅삭제 '.uniqid('', true);
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-10',
+            'AccountManager' => 'Mgr',
+            'AccountCode' => null,
+            'AccountName' => $accountName,
+            'Address' => null,
+            'Director' => null,
+            'Phone' => null,
+            'Connected' => null,
+            'Type' => '신규',
+            'Gubun' => '방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => null,
+        ]);
+
+        $detail = CoNewTargetDetail::query()->create([
+            'Year' => 2026,
+            'AccountName' => $accountName,
+            'AccountManager' => 'Mgr',
+            'MeetingDate' => '2026-04-11',
+            'MeetingTime' => '14:00',
+            'MeetingTime_End' => null,
+            'Description' => '뷰에서 삭제',
+            'ConsultingType' => '전화',
+            'Possibility' => null,
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(PotentialInstitutionView::class)
+            ->set('yearMonth', '2026-04')
+            ->set('dateBasis', 'created')
+            ->call('openTargetDetail', (int) $target->ID)
+            ->call('openMeetingDetailModal', (int) $detail->ID)
+            ->call('deleteMeetingDetail', (int) $detail->ID);
+
+        $component->assertSet('showMeetingDetailModal', false);
+        $component->assertHasNoErrors();
+        $this->assertDatabaseMissing('S_CO_NewTarget_Detail', ['ID' => $detail->ID]);
+        $this->assertCount(0, $component->get('detailMeetings'));
+    }
+
+    public function test_delete_meeting_detail_rejects_contracted_target_on_view(): void
+    {
+        $user = User::factory()->create();
+        $name = '뷰 계약 미팅삭제 '.uniqid('', true);
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-10',
+            'AccountManager' => 'M1',
+            'AccountCode' => 'SK-V',
+            'AccountName' => $name,
+            'Address' => null,
+            'Director' => null,
+            'Phone' => null,
+            'Connected' => null,
+            'Type' => '신규',
+            'Gubun' => '방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => true,
+            'ContractedDate' => '2026-01-10',
+            'Possibility' => null,
+        ]);
+
+        $detail = CoNewTargetDetail::query()->create([
+            'Year' => 2026,
+            'AccountName' => $name,
+            'AccountManager' => 'M1',
+            'MeetingDate' => '2026-04-02',
+            'MeetingTime' => '09:00',
+            'MeetingTime_End' => null,
+            'Description' => '계약 타깃',
+            'ConsultingType' => '전화',
+            'Possibility' => null,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionView::class)
+            ->set('yearMonth', '2026-04')
+            ->set('dateBasis', 'created')
+            ->call('openTargetDetail', (int) $target->ID)
+            ->call('openMeetingDetailModal', (int) $detail->ID)
+            ->call('deleteMeetingDetail', (int) $detail->ID)
+            ->assertHasErrors(['deleteMeeting']);
+
+        $this->assertDatabaseHas('S_CO_NewTarget_Detail', ['ID' => $detail->ID]);
+    }
+
     public function test_meeting_form_creates_detail_for_uncontracted_target(): void
     {
         $user = User::factory()->create();
@@ -370,5 +532,141 @@ class PotentialInstitutionViewTest extends TestCase
             ->set('consultingType', '재방문')
             ->call('save')
             ->assertHasErrors(['meetingForm']);
+    }
+
+    public function test_delete_uncontracted_target_removes_target_details_and_support_records(): void
+    {
+        $user = User::factory()->admin()->create();
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-10',
+            'AccountManager' => '삭제테스트담당',
+            'AccountCode' => null,
+            'AccountName' => '삭제테스트기관',
+            'Address' => null,
+            'Director' => null,
+            'Phone' => null,
+            'Connected' => null,
+            'Type' => '신규',
+            'Gubun' => '방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'B',
+        ]);
+
+        CoNewTargetDetail::query()->create([
+            'Year' => 2026,
+            'AccountName' => '삭제테스트기관',
+            'AccountManager' => '삭제테스트담당',
+            'MeetingDate' => '2026-04-12',
+            'ConsultingType' => '콜',
+        ]);
+
+        SupportRecord::query()->create([
+            'Year' => 2026,
+            'SK_Code' => null,
+            'potential_target_id' => $target->ID,
+            'Account_Name' => '삭제테스트기관',
+            'TR_Name' => 'CO',
+            'Support_Date' => '2026-04-11',
+            'Meet_Time' => '10:00:00',
+            'Support_Type' => '전화',
+            'Target' => null,
+            'Issue' => null,
+            'TO_Account' => '내용',
+            'TO_Depart' => null,
+            'Status' => '진행중',
+            'CompletedDate' => null,
+            'CreatedDate' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionView::class)
+            ->call('openTargetDetail', (int) $target->ID)
+            ->assertSet('showDetailModal', true)
+            ->call('deleteUncontractedTarget', (int) $target->ID)
+            ->assertHasNoErrors()
+            ->assertSet('showDetailModal', false);
+
+        $this->assertDatabaseMissing('S_CO_NewTarget', [
+            'ID' => $target->ID,
+        ]);
+        $this->assertDatabaseMissing('S_CO_NewTarget_Detail', [
+            'AccountName' => '삭제테스트기관',
+            'AccountManager' => '삭제테스트담당',
+        ]);
+        $this->assertDatabaseMissing('S_SupportInfo_Account', [
+            'potential_target_id' => $target->ID,
+        ]);
+    }
+
+    public function test_delete_rejects_contracted_target(): void
+    {
+        $user = User::factory()->admin()->create();
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-10',
+            'AccountManager' => null,
+            'AccountCode' => 'SK-LOCK',
+            'AccountName' => '계약됨 삭제불가',
+            'Type' => '신규',
+            'Gubun' => '방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'IsContract' => true,
+            'Possibility' => null,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionView::class)
+            ->call('openTargetDetail', (int) $target->ID)
+            ->call('deleteUncontractedTarget', (int) $target->ID)
+            ->assertHasErrors(['deleteTarget']);
+
+        $this->assertDatabaseHas('S_CO_NewTarget', [
+            'ID' => $target->ID,
+            'AccountName' => '계약됨 삭제불가',
+        ]);
+    }
+
+    public function test_non_admin_cannot_delete_uncontracted_potential_target(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-10',
+            'AccountManager' => '일반',
+            'AccountCode' => null,
+            'AccountName' => '비관리자 삭제 시도',
+            'Type' => '신규',
+            'Gubun' => '방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'IsContract' => false,
+            'Possibility' => null,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionView::class)
+            ->call('openTargetDetail', (int) $target->ID)
+            ->call('deleteUncontractedTarget', (int) $target->ID);
+
+        $this->assertDatabaseHas('S_CO_NewTarget', [
+            'ID' => $target->ID,
+            'AccountName' => '비관리자 삭제 시도',
+        ]);
     }
 }

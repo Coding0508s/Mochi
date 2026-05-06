@@ -2,11 +2,16 @@
 
 namespace App\Livewire;
 
+use App\Actions\DeletePotentialMeetingDetail;
 use App\Models\CoNewTarget;
 use App\Models\CoNewTargetDetail;
 use App\Models\SupportRecord;
 use Carbon\Carbon;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -36,6 +41,10 @@ class PotentialInstitutionView extends Component
     public array $detailMeetings = [];
 
     public array $detailSupportRecords = [];
+
+    public bool $showMeetingDetailModal = false;
+
+    public ?array $selectedMeeting = null;
 
     public function mount(): void
     {
@@ -130,6 +139,107 @@ class PotentialInstitutionView extends Component
         $this->selectedTarget = null;
         $this->detailMeetings = [];
         $this->detailSupportRecords = [];
+        $this->showMeetingDetailModal = false;
+        $this->selectedMeeting = null;
+    }
+
+    public function openMeetingDetailModal(int $meetingId): void
+    {
+        $meeting = collect($this->detailMeetings)->firstWhere('id', $meetingId);
+
+        if (! $meeting) {
+            return;
+        }
+
+        $this->selectedMeeting = $meeting;
+        $this->showMeetingDetailModal = true;
+    }
+
+    public function closeMeetingDetailModal(): void
+    {
+        $this->showMeetingDetailModal = false;
+        $this->selectedMeeting = null;
+    }
+
+    public function deleteMeetingDetail(int $detailId): void
+    {
+        if ($this->selectedTarget === null) {
+            return;
+        }
+
+        $targetId = (int) ($this->selectedTarget['id'] ?? 0);
+        if ($targetId <= 0) {
+            return;
+        }
+
+        $target = CoNewTarget::query()->find($targetId);
+        if (! $target) {
+            return;
+        }
+
+        try {
+            app(DeletePotentialMeetingDetail::class)($target, $detailId);
+        } catch (AuthorizationException $e) {
+            $this->addError('deleteMeeting', $e->getMessage());
+
+            return;
+        } catch (ModelNotFoundException $e) {
+            report($e);
+            $this->addError('deleteMeeting', '삭제할 미팅 이력을 찾을 수 없습니다.');
+
+            return;
+        }
+
+        $this->closeMeetingDetailModal();
+        $this->openTargetDetail($targetId);
+        session()->flash('success', '미팅/컨설팅 이력을 삭제했습니다.');
+    }
+
+    /**
+     * 미계약 잠재기관(CoNewTarget) 1건 삭제. 계약·정식 전환된 행은 삭제 불가. 관리자만.
+     */
+    public function deleteUncontractedTarget(int $id): void
+    {
+        Gate::authorize('deletePotentialInstitutions');
+
+        $target = CoNewTarget::query()->findOrFail($id);
+
+        if ($target->IsContract) {
+            $this->addError('deleteTarget', '계약 처리된 잠재기관(정식 기관)은 삭제할 수 없습니다.');
+
+            return;
+        }
+
+        $accountName = (string) ($target->AccountName ?? '');
+
+        try {
+            DB::transaction(function () use ($target, $accountName): void {
+                if (Schema::hasColumn('S_SupportInfo_Account', 'potential_target_id')) {
+                    SupportRecord::query()
+                        ->where('potential_target_id', (int) $target->ID)
+                        ->delete();
+                }
+
+                $detailQuery = CoNewTargetDetail::query()->ofAccount($accountName);
+                if (filled($target->AccountManager)) {
+                    $detailQuery->where('AccountManager', $target->AccountManager);
+                }
+                $detailQuery->delete();
+
+                $target->delete();
+            });
+        } catch (\Throwable $e) {
+            report($e);
+            $this->addError('deleteTarget', '삭제 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+
+            return;
+        }
+
+        if ($this->showDetailModal && (int) ($this->selectedTarget['id'] ?? 0) === $id) {
+            $this->closeDetailModal();
+        }
+
+        session()->flash('success', '잠재기관을 삭제했습니다.');
     }
 
     private function loadDetailData(CoNewTarget $target): void
@@ -165,6 +275,7 @@ class PotentialInstitutionView extends Component
             ->map(function (CoNewTargetDetail $detail): array {
                 return [
                     'id' => $detail->ID,
+                    'account_name' => $detail->AccountName ?? '-',
                     'meeting_date' => $detail->MeetingDate?->format('Y-m-d') ?? '-',
                     'meeting_time' => $detail->MeetingTime ?: '-',
                     'meeting_time_end' => $detail->MeetingTime_End ?: '-',

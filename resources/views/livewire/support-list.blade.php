@@ -104,6 +104,9 @@
                     <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500 uppercase">상태</th>
                     <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500 uppercase">완료처리</th>
                     <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500 uppercase">수정</th>
+                    @can('deleteSupportRecords')
+                        <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500 uppercase">삭제</th>
+                    @endcan
                 </tr>
                 </thead>
 
@@ -218,10 +221,25 @@
                             </button>
                         </td>
 
+                        @can('deleteSupportRecords')
+                            <td class="px-3 py-2.5 text-center" onclick="event.stopPropagation()">
+                                <button type="button"
+                                        wire:click.stop="deleteRecord({{ $record->ID }})"
+                                        wire:confirm="이 지원 보고서를 삭제할까요? 되돌릴 수 없습니다."
+                                        class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        title="삭제">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                            </td>
+                        @endcan
+
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="13" class="px-4 py-16 text-center text-gray-400">
+                        <td colspan="{{ \Illuminate\Support\Facades\Gate::allows('deleteSupportRecords') ? 14 : 13 }}" class="px-4 py-16 text-center text-gray-400">
                             <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -402,7 +420,19 @@
                     </div>
 
                     {{-- 모달 하단 버튼 영역 --}}
-                    <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between flex-shrink-0 rounded-b-2xl">
+                    <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-wrap items-center justify-between gap-3 flex-shrink-0 rounded-b-2xl">
+
+                        <div class="flex flex-wrap items-center gap-3">
+                        @can('deleteSupportRecords')
+                            @if($editingId)
+                                <button type="button"
+                                        wire:click="deleteRecord({{ $editingId }})"
+                                        wire:confirm="이 지원 보고서를 삭제할까요? 되돌릴 수 없습니다."
+                                        class="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors">
+                                    삭제
+                                </button>
+                            @endif
+                        @endcan
 
                         {{-- 완료처리 토글 --}}
                         <label class="flex items-center gap-3 cursor-pointer">
@@ -422,6 +452,7 @@
                                 {{ $formCompleted ? '완료됨' : '진행중' }}
                             </span>
                         </label>
+                        </div>
 
                         {{-- 버튼들 --}}
                         <div class="flex items-center gap-3">

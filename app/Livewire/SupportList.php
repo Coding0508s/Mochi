@@ -6,6 +6,7 @@ use App\Models\ContractDocument;
 use App\Models\Institution;
 use App\Models\SupportRecord;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
@@ -514,6 +515,23 @@ class SupportList extends Component
     {
         $record = SupportRecord::findOrFail($id);
         $record->toggleComplete(is_null($record->CompletedDate));
+    }
+
+    /**
+     * 기관 지원 보고서 1건 삭제 (관리자만).
+     */
+    public function deleteRecord(int $id): void
+    {
+        Gate::authorize('deleteSupportRecords');
+
+        $record = SupportRecord::query()->findOrFail($id);
+        $record->delete();
+
+        if ($this->editingId === $id) {
+            $this->closeModal();
+        }
+
+        session()->flash('success', '지원 내역이 삭제되었습니다.');
     }
 
     // ─── 렌더링 ──────────────────────────────────────────────────

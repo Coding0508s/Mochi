@@ -1,6 +1,6 @@
 <div class="rounded-lg border border-gray-200 bg-gray-50/80 p-4 space-y-3">
     <p class="text-xs text-gray-600 leading-relaxed">
-        정식 기관(계약·SK 발급) 이후에는 「지원 보고서 작성」에서 기록할 수 있습니다. 해당 화면에서 저장하면 미팅 이력에 자동으로 한 줄 더 생길 수 있어, 중복 입력에 유의해 주세요.
+        지원 보고서를 별도 화면에서 저장하면 미팅 이력에 자동으로 한 줄 더 생길 수 있습니다. 중복 입력에 유의해 주세요.
     </p>
     @error('meetingForm')
         <p class="text-sm text-red-600">{{ $message }}</p>
