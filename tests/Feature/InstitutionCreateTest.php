@@ -34,6 +34,7 @@ class InstitutionCreateTest extends TestCase
             $table->string('AccountName', 255);
             $table->string('EnglishName', 255)->nullable();
             $table->string('PortalAccountName', 255)->nullable();
+            $table->string('PortalCampusID', 100)->nullable();
             $table->string('AccountNo', 100)->nullable();
             $table->string('GSno', 100)->nullable();
             $table->string('Director', 255)->nullable();

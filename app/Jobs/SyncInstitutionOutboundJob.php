@@ -58,6 +58,7 @@ class SyncInstitutionOutboundJob implements ShouldQueue
                 'co' => $institution->accountInfo?->CO,
                 'tr' => $institution->accountInfo?->TR,
                 'cs' => $institution->accountInfo?->CS,
+                'temporary_sk' => $this->sk,
             ])
             ->throw();
     }

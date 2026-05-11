@@ -1,8 +1,10 @@
 # 외부 플랫폼 기관 마스터 연동 (S_AccountName)
 
+**HTTP로 받지 않고** 상대 DB만 두고 우리가 테이블을 읽어 오는 운영이면 이 문서 대신 [`partner-institution-db-sync.md`](partner-institution-db-sync.md)를 본다. (내부적으로는 같은 upsert 규칙을 쓰지만, 전달 경로는 다르다.)
+
 ## 엔드포인트
 
-- **메서드·경로**: `PUT /api/internal/institutions/{sk}`
+- **메서드·경로**: `POST /api/internal/institutions/{sk}`
 - **인증**: `Authorization: Bearer <EXTERNAL_INSTITUTION_INGEST_TOKEN>`
 - **SK**: URL 경로에 **외부 시스템 값 그대로** (예: `SK1234`). 필요 시 퍼센트 인코딩.
 
@@ -28,6 +30,7 @@
 | `institution_name` | `S_AccountName.AccountName` |
 | `english_name` | `EnglishName` |
 | `portal_account_name` | `PortalAccountName` |
+| `portal_campus_id` | `PortalCampusID` |
 | `account_no` | `AccountNo` |
 | `gs_no` | `GSno` + `S_GSNumber.GSnumber` |
 | `director` | `Director` |
@@ -48,7 +51,7 @@
 ## curl 예시
 
 ```bash
-curl -sS -X PUT "http://localhost:8000/api/internal/institutions/SK1234" \
+curl -sS -X POST "http://localhost:8000/api/internal/institutions/SK1234" \
   -H "Authorization: Bearer YOUR_TOKEN_HERE" \
   -H "Content-Type: application/json" \
   -H "X-Request-Id: $(uuidgen)" \
@@ -62,7 +65,7 @@ curl -sS -X PUT "http://localhost:8000/api/internal/institutions/SK1234" \
 잠재기관 계약 완료 후 우리 플랫폼에 `LEAD-520`으로 등록된 행을 상대 플랫폼의 확정 SK `SK1234`로 바꿀 때:
 
 ```bash
-curl -sS -X PUT "http://localhost:8000/api/internal/institutions/SK1234" \
+curl -sS -X POST "http://localhost:8000/api/internal/institutions/SK1234" \
   -H "Authorization: Bearer YOUR_TOKEN_HERE" \
   -H "Content-Type: application/json" \
   -H "X-Request-Id: $(uuidgen)" \

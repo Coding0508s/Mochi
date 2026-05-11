@@ -24,8 +24,10 @@ class InstitutionListTest extends TestCase
     {
         parent::setUp();
         Config::set('features.institution_create_enabled', true);
+        Config::set('services.institution_outbound.enabled', false);
         Queue::fake();
         $this->createAccountTables();
+        $this->createSkCodeRequestsTable();
     }
 
     private function createAccountTables(): void
@@ -43,6 +45,7 @@ class InstitutionListTest extends TestCase
             $table->string('AccountName', 255);
             $table->string('EnglishName', 255)->nullable();
             $table->string('PortalAccountName', 255)->nullable();
+            $table->string('PortalCampusID', 100)->nullable();
             $table->string('AccountNo', 100)->nullable();
             $table->string('GSno', 100)->nullable();
             $table->string('Director', 255)->nullable();
@@ -97,6 +100,30 @@ class InstitutionListTest extends TestCase
             $table->string('PHONENO')->nullable();
             $table->integer('STATUS')->nullable();
             $table->date('HIREDATE')->nullable();
+        });
+    }
+
+    private function createSkCodeRequestsTable(): void
+    {
+        Schema::dropIfExists('sk_code_requests');
+
+        Schema::create('sk_code_requests', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('co_new_target_id');
+            $table->string('institution_name', 200);
+            $table->string('temp_sk_code', 64);
+            $table->string('final_sk_code', 64)->nullable();
+            $table->string('portal_campus_id', 100)->nullable();
+            $table->string('account_no', 100)->nullable();
+            $table->string('co', 255)->nullable();
+            $table->string('tr', 255)->nullable();
+            $table->string('cs', 255)->nullable();
+            $table->string('status', 20)->default('pending');
+            $table->text('error_message')->nullable();
+            $table->timestamp('requested_at')->useCurrent();
+            $table->timestamp('completed_at')->nullable();
+            $table->timestamp('applied_at')->nullable();
+            $table->timestamps();
         });
     }
 
@@ -364,6 +391,118 @@ class InstitutionListTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    public function test_save_detail_fields_reverse_syncs_completed_sk_code_request(): void
+    {
+        $user = User::factory()->create();
+        $appliedAt = now()->subMinutes(5);
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-REVERSE-1',
+            'AccountName' => '이전 기관명',
+            'PortalCampusID' => 'OLD-CAMPUS',
+            'AccountNo' => 'OLD-ACCOUNT',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-REVERSE-1',
+            'Account_Name' => '이전 기관명',
+            'CO' => 'Old CO',
+            'TR' => 'Old TR',
+            'CS' => 'Old CS',
+        ]);
+
+        DB::table('sk_code_requests')->insert([
+            'co_new_target_id' => 1001,
+            'institution_name' => '이전 기관명',
+            'temp_sk_code' => 'LEAD-1001',
+            'final_sk_code' => 'SK-REVERSE-1',
+            'portal_campus_id' => 'OLD-CAMPUS',
+            'account_no' => 'OLD-ACCOUNT',
+            'co' => 'Old CO',
+            'tr' => 'Old TR',
+            'cs' => 'Old CS',
+            'status' => 'completed',
+            'requested_at' => now()->subHour(),
+            'completed_at' => now()->subHour(),
+            'applied_at' => $appliedAt,
+            'created_at' => $appliedAt,
+            'updated_at' => $appliedAt,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->call('startDetailEdit')
+            ->set('editDetailInstitutionName', '우리쪽 수정 기관명')
+            ->set('editDetailPortalCampusId', 'LOCAL-CAMPUS')
+            ->set('editDetailAccountNo', 'LOCAL-ACCOUNT')
+            ->set('editDetailCo', 'Local CO')
+            ->set('editDetailTr', 'Local TR')
+            ->set('editDetailCs', 'Local CS')
+            ->call('saveDetailFields')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('sk_code_requests', [
+            'final_sk_code' => 'SK-REVERSE-1',
+            'institution_name' => '우리쪽 수정 기관명',
+            'portal_campus_id' => 'LOCAL-CAMPUS',
+            'account_no' => 'LOCAL-ACCOUNT',
+            'co' => 'Local CO',
+            'tr' => 'Local TR',
+            'cs' => 'Local CS',
+        ]);
+
+        $request = DB::table('sk_code_requests')->where('final_sk_code', 'SK-REVERSE-1')->first();
+        $this->assertNotNull($request->applied_at);
+        $this->assertTrue($request->applied_at >= $request->updated_at);
+    }
+
+    public function test_save_managers_reverse_syncs_completed_sk_code_request(): void
+    {
+        $user = User::factory()->create();
+        $appliedAt = now()->subMinutes(5);
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-REVERSE-MANAGER-1',
+            'AccountName' => '담당자 역동기화 기관',
+        ]);
+
+        DB::table('sk_code_requests')->insert([
+            'co_new_target_id' => 1002,
+            'institution_name' => '담당자 역동기화 기관',
+            'temp_sk_code' => 'LEAD-1002',
+            'final_sk_code' => 'SK-REVERSE-MANAGER-1',
+            'portal_campus_id' => null,
+            'account_no' => null,
+            'co' => 'Old CO',
+            'tr' => 'Old TR',
+            'cs' => 'Old CS',
+            'status' => 'completed',
+            'requested_at' => now()->subHour(),
+            'completed_at' => now()->subHour(),
+            'applied_at' => $appliedAt,
+            'created_at' => $appliedAt,
+            'updated_at' => $appliedAt,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openManagerModal', $institution->ID)
+            ->set('editCo', 'New CO')
+            ->set('editTr', 'New TR')
+            ->set('editCs', 'New CS')
+            ->call('saveManagers')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('sk_code_requests', [
+            'final_sk_code' => 'SK-REVERSE-MANAGER-1',
+            'institution_name' => '담당자 역동기화 기관',
+            'co' => 'New CO',
+            'tr' => 'New TR',
+            'cs' => 'New CS',
+        ]);
+    }
+
     public function test_save_managers_queues_outbound_when_enabled(): void
     {
         Config::set('services.institution_outbound.enabled', true);
@@ -445,6 +584,90 @@ class InstitutionListTest extends TestCase
         ]);
         $this->assertDatabaseMissing('S_SupportInfo_Account', [
             'SK_Code' => 'SK-OLD-X',
+        ]);
+    }
+
+    /**
+     * 담당자 드롭다운 옵션이
+     *   - 부서 매핑(A02=CO, A05=Coach, A03=CS) 기준으로
+     *   - STATUS=1 활성 직원만
+     *   - employee 마스터에 존재하는 이름만
+     * 포함되는지 검증합니다.
+     */
+    public function test_manager_dropdown_options_only_show_active_employees_in_mapped_department(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        // 활성: 각 부서에 1명씩 정상 직원
+        $this->insertEmployee('E001', 'A02', 'Peter Kim', 1);     // CO 후보
+        $this->insertEmployee('E002', 'A05', 'Coach Hong', 1);     // Coach 후보
+        $this->insertEmployee('E003', 'A03', 'CS Choi', 1);        // CS 후보
+
+        // 비활성: 옵션에서 제외되어야 함
+        $this->insertEmployee('E004', 'A02', 'Inactive Co', 0);
+        $this->insertEmployee('E005', 'A05', 'Inactive Coach', 0);
+        $this->insertEmployee('E006', 'A03', 'Inactive Cs', 0);
+
+        // 다른 부서: 옵션에서 제외되어야 함
+        $this->insertEmployee('E007', 'A01', 'Admin Lee', 1);
+
+        // 과거 S_Account_Information 이력에만 남아있는 비직원 이름.
+        // 변경 전이면 드롭다운에 떴겠지만, 이제 employee 기준이므로 빠져야 합니다.
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-LEGACY-1',
+            'CO' => 'Ghost Co',
+            'TR' => 'Ghost Tr',
+            'CS' => 'Ghost Cs',
+        ]);
+
+        $component = Livewire::actingAs($admin)->test(InstitutionList::class);
+
+        $coOptions = $component->viewData('coManagerOptions')->all();
+        $trOptions = $component->viewData('trManagerOptions')->all();
+        $csOptions = $component->viewData('csManagerOptions')->all();
+
+        $this->assertSame(['Peter Kim'], $coOptions);
+        $this->assertSame(['Coach Hong'], $trOptions);
+        $this->assertSame(['CS Choi'], $csOptions);
+
+        foreach (['Ghost Co', 'Ghost Tr', 'Ghost Cs', 'Inactive Co', 'Inactive Coach', 'Inactive Cs', 'Admin Lee'] as $excluded) {
+            $this->assertNotContains($excluded, $coOptions);
+            $this->assertNotContains($excluded, $trOptions);
+            $this->assertNotContains($excluded, $csOptions);
+        }
+    }
+
+    /**
+     * ENGLISHNAME 이 비어 있는 경우 KOREANAME 으로 폴백되는지 확인합니다.
+     */
+    public function test_manager_dropdown_falls_back_to_korean_name_when_english_is_blank(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        DB::table('employee')->insert([
+            'EMPNO' => 'E100',
+            'WORKDEPT' => 'A02',
+            'KOREANAME' => '김기획',
+            'ENGLISHNAME' => '',
+            'STATUS' => 1,
+        ]);
+
+        $coOptions = Livewire::actingAs($admin)
+            ->test(InstitutionList::class)
+            ->viewData('coManagerOptions')
+            ->all();
+
+        $this->assertSame(['김기획'], $coOptions);
+    }
+
+    private function insertEmployee(string $empno, string $workdept, string $englishName, int $status): void
+    {
+        DB::table('employee')->insert([
+            'EMPNO' => $empno,
+            'WORKDEPT' => $workdept,
+            'KOREANAME' => $englishName,
+            'ENGLISHNAME' => $englishName,
+            'STATUS' => $status,
         ]);
     }
 }

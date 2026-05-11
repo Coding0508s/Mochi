@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title ?? 'GrapeSEED MOCHI' }}</title>
+    @include('partials.favicon-links')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
@@ -16,7 +17,8 @@
         || request()->is('potential-institutions*')
         || request()->is('salesforce-files*')
         || request()->is('store/*')
-        || request()->is('co/*');
+        || request()->is('co/*')
+        || request()->is('schedules*');
 @endphp
 
 {{-- Alpine.js: 사이드바 아코디언(열고 닫기) 에 사용 --}}
@@ -219,9 +221,9 @@
                             </svg>
                         </button>
 
-                        {{-- TR Team --}}
+                        {{-- Coach Team --}}
                         <button type="button" class="sidebar-subitem sidebar-focusable flex w-full items-start justify-between gap-1 text-left">
-                            <span class="min-w-0 flex-1 break-words text-left">TR Team</span>
+                            <span class="min-w-0 flex-1 break-words text-left">Coach Team</span>
                             <svg class="h-3 w-3 shrink-0 text-[#98a2b3]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
                             </svg>
@@ -253,6 +255,7 @@
                                     ['label' => '기관리스트',     'href' => '/institutions', 'route' => 'institutions', 'icon' => 'building'],
                                     ['label' => '교직원 연락처보기', 'href' => '/contacts',     'route' => 'contacts',     'icon' => 'phone'],
                                     ['label' => '기관지원보고서', 'href' => '/supports',     'route' => 'supports',     'icon' => 'document'],
+                                    ['label' => '일정 관리', 'href' => route('schedules.index'), 'route' => '', 'routeIs' => 'schedules.index', 'icon' => 'calendar'],
                                     ['label' => '잠재기관 등록하기', 'href' => route('potential-institutions.index'), 'route' => '', 'routeIs' => 'potential-institutions.index', 'icon' => 'calendar'],
                                     ['label' => '잠재기관 목록보기',   'href' => route('potential-institutions.view'), 'route' => '', 'routeIs' => 'potential-institutions.view', 'icon' => 'eye'],
                                     ['label' => 'GS Brochure', 'href' => route('co.gs-brochure'), 'route' => '', 'routeIs' => 'co.gs-brochure*', 'icon' => 'document'],

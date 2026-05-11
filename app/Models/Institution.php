@@ -27,6 +27,7 @@ use Illuminate\Support\Facades\Schema;
  * @property string $AccountName 기관명(한글)
  * @property string $EnglishName 기관명(영문)
  * @property string $PortalAccountName 포털 표시 기관명
+ * @property string|null $PortalCampusID 포털 캠퍼스 ID (School MST 등)
  * @property string $AccountNo 사업자/기관 번호
  * @property string $GSno GrapeSEED 번호
  * @property string $Director 원장명
@@ -59,6 +60,7 @@ class Institution extends Model
         'AccountName',
         'EnglishName',
         'PortalAccountName',
+        'PortalCampusID',
         'AccountNo',
         'GSno',
         'Director',

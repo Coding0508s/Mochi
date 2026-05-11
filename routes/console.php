@@ -1,16 +1,28 @@
 <?php
 
+use App\Jobs\ProcessSkCodeRequestsJob;
+use App\Jobs\PullInstitutionFromPartnerJob;
 use App\Models\StoreInventorySku;
 use App\Services\Store\EcountApiClient;
 use Illuminate\Console\Command;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Schema;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Schedule::job(new PullInstitutionFromPartnerJob)
+    ->cron((string) config('services.partner_institutions.schedule', '*/5 * * * *'))
+    ->when(fn (): bool => (bool) config('services.partner_institutions.enabled', false))
+    ->withoutOverlapping();
+
+Schedule::job(new ProcessSkCodeRequestsJob)
+    ->everyMinute()
+    ->withoutOverlapping();
 
 Artisan::command(
     'ecount:session {--refresh : 캐시를 비우고 OAPILogin으로 세션을 다시 받습니다}',

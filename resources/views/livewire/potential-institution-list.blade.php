@@ -173,7 +173,7 @@
                                     <span class="text-[11px] text-gray-500" title="계약 완료 처리됨">완료</span>
                                 @else
                                     <button type="button"
-                                            wire:click.stop="markContractComplete({{ $target->ID }})"
+                                            wire:click.stop="openContractModal({{ $target->ID }})"
                                             title="계약 완료 처리"
                                             class="inline-flex items-center justify-center rounded-md bg-orange-500 px-2 py-1 text-[11px] font-medium text-white shadow-sm hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-1">
                                         계약완료
@@ -527,13 +527,25 @@
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">계약여부</th>
                                     <td class="px-3 py-2" wire:click.stop>
                                         <select wire:model="detailModalContract"
-                                                wire:change="commitDetailContract"
+                                                wire:change="requestContractChange"
                                                 class="w-full max-w-[11rem] py-1.5 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                             <option value="0">미계약</option>
                                             <option value="1">계약</option>
                                         </select>
                                     </td>
                                 </tr>
+                                @if(!($selectedTarget['is_contract'] ?? false))
+                                <tr>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">SK CODE</th>
+                                    <td colspan="3" class="px-3 py-2" wire:click.stop>
+                                        <input type="text"
+                                               wire:model.defer="detailModalSkCode"
+                                               placeholder="계약 처리 시 부여할 SK CODE (비우면 자동발급)"
+                                               class="w-full max-w-xs py-1.5 px-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                        <p class="mt-1 text-xs text-gray-400">비워두면 LEAD-xxx 임시 코드가 발급됩니다.</p>
+                                    </td>
+                                </tr>
+                                @endif
                                 <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">주소</th>
                                     <td colspan="3" class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['address'] ?? '-' }}</td>
@@ -799,6 +811,105 @@
                         </div>
                     @endif
                 @endcan
+            </div>
+        </div>
+    @endif
+
+    {{-- 상세 모달 계약 변경 확인 모달 --}}
+    @if($showContractChangeConfirmModal)
+        <div class="mochi-modal-overlay" wire:click.self="cancelContractChange">
+            <div class="mochi-modal-shell max-w-md flex flex-col" wire:click.stop>
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white">
+                    <h2 class="text-base font-semibold text-gray-900">
+                        {{ $pendingContractChange ? '계약 전환 확인' : '미계약 전환 확인' }}
+                    </h2>
+                    <button wire:click="cancelContractChange" class="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="px-6 py-5 space-y-3">
+                    <p class="text-sm font-semibold text-gray-900">{{ $pendingContractChangeName ?: '-' }}</p>
+                    @if($pendingContractChange)
+                        <p class="text-sm text-gray-600">
+                            이 잠재기관을 계약으로 변경합니다. 처리 후 기관 리스트에 반영됩니다.
+                        </p>
+                    @else
+                        <p class="text-sm text-gray-600">
+                            이 기관을 미계약으로 전환합니다. 처리 후 기관 리스트에서는 숨김 처리되고 잠재기관에서 다시 관리할 수 있습니다.
+                        </p>
+                    @endif
+                </div>
+                <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-2">
+                    <button type="button"
+                            wire:click="cancelContractChange"
+                            class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+                        취소
+                    </button>
+                    <button type="button"
+                            wire:click="confirmContractChange"
+                            wire:loading.attr="disabled"
+                            wire:loading.class="opacity-70 cursor-not-allowed"
+                            wire:target="confirmContractChange"
+                            class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors cursor-pointer">
+                        <span wire:loading.remove wire:target="confirmContractChange">
+                            {{ $pendingContractChange ? '계약으로 변경' : '미계약으로 전환' }}
+                        </span>
+                        <span wire:loading wire:target="confirmContractChange">처리 중...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- 계약완료 확인 미니 모달 --}}
+    @if($showContractModal)
+        <div class="mochi-modal-overlay" wire:click.self="closeContractModal">
+            <div class="mochi-modal-shell max-w-md flex flex-col" wire:click.stop>
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-orange-50/80 to-white">
+                    <h2 class="text-base font-semibold text-gray-900">계약 완료 처리</h2>
+                    <button wire:click="closeContractModal" class="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="px-6 py-5 space-y-4">
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">계약 처리 대상</p>
+                        <p class="mt-1 text-sm font-semibold text-gray-900">{{ $pendingContractName ?: '-' }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            SK CODE <span class="text-gray-400 font-normal">(선택)</span>
+                        </label>
+                        <input type="text"
+                               wire:model.defer="contractSkCode"
+                               placeholder="예: ABC-001 — 비워두면 자동 발급"
+                               class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                        <p class="mt-1.5 text-xs text-gray-500">
+                            비워두면 임시 코드(LEAD-xxx)가 자동 발급되고,
+                            외부 플랫폼에서 확정 SK를 입력하면 5분 이내 자동 치환됩니다.
+                        </p>
+                    </div>
+                </div>
+                <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-2">
+                    <button type="button"
+                            wire:click="closeContractModal"
+                            class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+                        취소
+                    </button>
+                    <button type="button"
+                            wire:click="markContractComplete({{ $pendingContractId }})"
+                            wire:loading.attr="disabled"
+                            wire:loading.class="opacity-70 cursor-not-allowed"
+                            wire:target="markContractComplete"
+                            class="px-4 py-2 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors cursor-pointer">
+                        <span wire:loading.remove wire:target="markContractComplete">계약 완료 처리</span>
+                        <span wire:loading wire:target="markContractComplete">처리 중...</span>
+                    </button>
+                </div>
             </div>
         </div>
     @endif

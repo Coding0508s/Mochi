@@ -55,13 +55,25 @@
                 @endunless
             </div>
             @if(auth()->user()->hasFullAccess())
-                <button
-                    type="button"
-                    wire:click="markAllAsRead"
-                    class="shrink-0 text-xs font-medium text-[#2b78c5] hover:underline"
-                >
-                    모두 읽음
-                </button>
+                <div class="flex shrink-0 items-center gap-2">
+                    <button
+                        type="button"
+                        wire:click="markAllAsRead"
+                        class="text-xs font-medium text-[#2b78c5] hover:underline"
+                    >
+                        모두 읽음
+                    </button>
+                    @if(count($recentRows) > 0)
+                        <button
+                            type="button"
+                            wire:click="deleteAllLogs"
+                            wire:confirm="알림 목록을 모두 삭제할까요? 되돌릴 수 없습니다."
+                            class="text-xs font-medium text-gray-400 hover:text-red-500 hover:underline"
+                        >
+                            전체 삭제
+                        </button>
+                    @endif
+                </div>
             @endif
         </div>
 
@@ -73,13 +85,28 @@
                         : route('institutions.index');
                 @endphp
                 @if(auth()->user()->hasFullAccess())
-                    <a
-                        href="{{ $href }}"
+                    <div
                         wire:key="inbound-row-admin-{{ $row['id'] }}"
-                        class="block border-b border-gray-50 px-3 py-2.5 text-left transition hover:bg-gray-50 {{ ($row['is_unread'] ?? false) ? 'bg-sky-50/80' : '' }}"
+                        class="group relative border-b border-gray-50 {{ ($row['is_unread'] ?? false) ? 'bg-sky-50/80' : '' }}"
                     >
-                        @include('livewire.partials.inbound-notification-row-body', ['row' => $row])
-                    </a>
+                        <a
+                            href="{{ $href }}"
+                            class="block px-3 py-2.5 pr-8 text-left transition hover:bg-gray-50"
+                        >
+                            @include('livewire.partials.inbound-notification-row-body', ['row' => $row])
+                        </a>
+                        <button
+                            type="button"
+                            wire:click.stop="deleteLog({{ $row['id'] }})"
+                            title="이 알림 삭제"
+                            class="absolute right-2 top-2.5 hidden rounded p-0.5 text-gray-300 hover:bg-red-50 hover:text-red-400 group-hover:flex"
+                            aria-label="알림 삭제"
+                        >
+                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
                 @else
                     <div
                         wire:key="inbound-row-view-{{ $row['id'] }}"

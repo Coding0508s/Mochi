@@ -92,7 +92,7 @@
                     <th class="px-3 py-2 text-center text-xs font-semibold">상태</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">GrapeSEED Essentials</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">LittleSEED Essentials</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold">담당 TR</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold">담당 Coach</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">CS</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">CO</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">주소</th>
@@ -434,7 +434,7 @@
                                 <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">기관명</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['school_name'] ?? '-' }}</td>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당 TR</th>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당 Coach</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['tr'] ?? '-' }}</td>
                                 </tr>
                                 <tr>

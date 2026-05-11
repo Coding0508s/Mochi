@@ -16,6 +16,7 @@ class ExternalInstitutionIngestTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        Config::set('services.external_institutions.enabled', true);
         Config::set('services.external_institutions.bearer_token', 'test-ingest-token');
         $this->createAccountTables();
     }
@@ -34,6 +35,7 @@ class ExternalInstitutionIngestTest extends TestCase
             $table->string('AccountName', 255);
             $table->string('EnglishName', 255)->nullable();
             $table->string('PortalAccountName', 255)->nullable();
+            $table->string('PortalCampusID', 100)->nullable();
             $table->string('AccountNo', 100)->nullable();
             $table->string('GSno', 100)->nullable();
             $table->string('Director', 255)->nullable();
@@ -91,16 +93,25 @@ class ExternalInstitutionIngestTest extends TestCase
     {
         Config::set('services.external_institutions.bearer_token', '');
 
-        $this->putJson('/api/internal/institutions/SK-X', [
+        $this->postJson('/api/internal/institutions/SK-X', [
             'institution_name' => 'A',
         ], [
             'Authorization' => 'Bearer x',
         ])->assertStatus(503);
     }
 
+    public function test_returns_503_when_ingest_api_disabled(): void
+    {
+        Config::set('services.external_institutions.enabled', false);
+
+        $this->postJson('/api/internal/institutions/SK-X', [
+            'institution_name' => 'A',
+        ], $this->authHeaders())->assertStatus(503);
+    }
+
     public function test_returns_401_without_valid_bearer(): void
     {
-        $this->putJson('/api/internal/institutions/SK-X', [
+        $this->postJson('/api/internal/institutions/SK-X', [
             'institution_name' => 'A',
         ], [
             'Authorization' => 'Bearer wrong',
@@ -111,7 +122,7 @@ class ExternalInstitutionIngestTest extends TestCase
     {
         $sk = 'SK-INGEST-'.uniqid();
 
-        $this->putJson("/api/internal/institutions/{$sk}", [
+        $this->postJson("/api/internal/institutions/{$sk}", [
             'institution_name' => '연동 테스트 기관',
             'co' => 'CO One',
             'gs_no' => '1.25',
@@ -141,16 +152,35 @@ class ExternalInstitutionIngestTest extends TestCase
         ]);
     }
 
+    public function test_creates_institution_with_portal_campus_id_and_account_no(): void
+    {
+        $sk = 'SK-INGEST-PC-'.uniqid();
+
+        $this->postJson("/api/internal/institutions/{$sk}", [
+            'institution_name' => '포털·사업자 연동 테스트',
+            'portal_campus_id' => 'PORTAL-C-1',
+            'account_no' => '987-65-43210',
+        ], $this->authHeaders())->assertOk()
+            ->assertJson(['ok' => true, 'sk' => $sk, 'created' => true]);
+
+        $this->assertDatabaseHas('S_AccountName', [
+            'SKcode' => $sk,
+            'AccountName' => '포털·사업자 연동 테스트',
+            'PortalCampusID' => 'PORTAL-C-1',
+            'AccountNo' => '987-65-43210',
+        ]);
+    }
+
     public function test_second_put_updates_without_duplicating(): void
     {
         $sk = 'SK-INGEST-2-'.uniqid();
 
-        $this->putJson("/api/internal/institutions/{$sk}", [
+        $this->postJson("/api/internal/institutions/{$sk}", [
             'institution_name' => '첫 이름',
             'phone' => '010-1111-1111',
         ], $this->authHeaders())->assertJson(['created' => true]);
 
-        $this->putJson("/api/internal/institutions/{$sk}", [
+        $this->postJson("/api/internal/institutions/{$sk}", [
             'phone' => '010-2222-2222',
         ], $this->authHeaders())->assertJson(['created' => false, 'ok' => true]);
 
@@ -161,11 +191,68 @@ class ExternalInstitutionIngestTest extends TestCase
         ]);
     }
 
+    public function test_existing_institution_updates_name_from_institution_name_camel_case_alias(): void
+    {
+        $sk = 'SK-INGEST-CAMEL-'.uniqid();
+
+        DB::table('S_AccountName')->insert([
+            'SKcode' => $sk,
+            'AccountName' => '이전 기관명',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+        ]);
+
+        $this->postJson("/api/internal/institutions/{$sk}", [
+            'institutionName' => '포도씨 킨더거든',
+        ], $this->authHeaders())->assertOk()
+            ->assertJson(['ok' => true, 'sk' => $sk, 'created' => false]);
+
+        $this->assertDatabaseHas('S_AccountName', [
+            'SKcode' => $sk,
+            'AccountName' => '포도씨 킨더거든',
+        ]);
+    }
+
+    public function test_existing_institution_keeps_name_when_empty_institution_name_sent(): void
+    {
+        $sk = 'SK-INGEST-KEEP-NAME-'.uniqid();
+
+        DB::table('S_AccountName')->insert([
+            'SKcode' => $sk,
+            'AccountName' => '유지할 기관명',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => $sk,
+            'Account_Name' => '유지할 기관명',
+            'CO' => 'CO1',
+        ]);
+
+        $this->postJson("/api/internal/institutions/{$sk}", [
+            'institution_name' => '',
+            'co' => 'CO2',
+        ], $this->authHeaders())->assertOk();
+
+        $this->assertDatabaseHas('S_AccountName', [
+            'SKcode' => $sk,
+            'AccountName' => '유지할 기관명',
+        ]);
+        $this->assertDatabaseHas('S_Account_Information', [
+            'SK_Code' => $sk,
+            'Account_Name' => '유지할 기관명',
+            'CO' => 'CO2',
+        ]);
+    }
+
     public function test_new_institution_requires_institution_name(): void
     {
         $sk = 'SK-INGEST-NEW-'.uniqid();
 
-        $this->putJson("/api/internal/institutions/{$sk}", [
+        $this->postJson("/api/internal/institutions/{$sk}", [
             'co' => 'Only CO',
         ], $this->authHeaders())->assertStatus(422);
 
@@ -194,7 +281,7 @@ class ExternalInstitutionIngestTest extends TestCase
             'CS' => 'Old CS',
         ]);
 
-        $this->putJson("/api/internal/institutions/{$sk}", [
+        $this->postJson("/api/internal/institutions/{$sk}", [
             'co' => 'New CO',
             'tr' => 'New TR',
             'cs' => 'New CS',
@@ -241,8 +328,8 @@ class ExternalInstitutionIngestTest extends TestCase
             'cs' => 'Same CS',
         ];
 
-        $this->putJson("/api/internal/institutions/{$sk}", $payload, $this->authHeaders())->assertOk();
-        $this->putJson("/api/internal/institutions/{$sk}", $payload, $this->authHeaders())->assertOk();
+        $this->postJson("/api/internal/institutions/{$sk}", $payload, $this->authHeaders())->assertOk();
+        $this->postJson("/api/internal/institutions/{$sk}", $payload, $this->authHeaders())->assertOk();
 
         $this->assertSame(1, DB::table('S_Account_Information')->where('SK_Code', $sk)->count());
         $this->assertSame(2, DB::table('external_assignment_inbound_logs')->where('sk_code', $sk)->count());
@@ -277,7 +364,7 @@ class ExternalInstitutionIngestTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $this->putJson("/api/internal/institutions/{$sk}", [
+        $this->postJson("/api/internal/institutions/{$sk}", [
             'director' => '원장',
         ], $this->authHeaders())->assertOk();
 
@@ -326,7 +413,7 @@ class ExternalInstitutionIngestTest extends TestCase
             'Account_Name' => '임시 기관',
         ]);
 
-        $this->putJson("/api/internal/institutions/{$newSk}", [
+        $this->postJson("/api/internal/institutions/{$newSk}", [
             'replaces_sk' => $oldSk,
             'institution_name' => '확정 기관',
             'co' => 'New CO',
@@ -377,7 +464,7 @@ class ExternalInstitutionIngestTest extends TestCase
             'GS_E' => 0,
         ]);
 
-        $this->putJson("/api/internal/institutions/{$newSk}", [
+        $this->postJson("/api/internal/institutions/{$newSk}", [
             'replaces_sk' => $oldSk,
             'co' => 'New CO',
         ], $this->authHeaders())->assertStatus(422);
@@ -388,7 +475,7 @@ class ExternalInstitutionIngestTest extends TestCase
 
     public function test_rejects_missing_replaces_sk_target(): void
     {
-        $this->putJson('/api/internal/institutions/SK-MISSING-REPLACE', [
+        $this->postJson('/api/internal/institutions/SK-MISSING-REPLACE', [
             'replaces_sk' => 'LEAD-NOT-FOUND',
             'co' => 'New CO',
         ], $this->authHeaders())->assertStatus(422);

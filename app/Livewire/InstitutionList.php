@@ -8,6 +8,7 @@ use App\Models\AccountInformation;
 use App\Models\Employee;
 use App\Models\GsNumber;
 use App\Models\Institution;
+use App\Models\SkCodeRequest;
 use App\Models\SupportRecord;
 use App\Models\Teacher;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,13 +23,19 @@ class InstitutionList extends Component
     use WithPagination;
     // WithPagination: "다음 페이지", "이전 페이지" 기능을 자동으로 제공합니다.
 
+    // ─── 담당자 드롭다운 부서 매핑 ─────────────────────────────────
+    // 상세 모달의 CO / Coach / CS 드롭다운은 아래 부서(WORKDEPT) 활성 직원만 후보로 노출합니다.
+    private const DEPT_CO = 'A02'; // Consulting Team
+    private const DEPT_TR = 'A05'; // Training Team (Coach)
+    private const DEPT_CS = 'A03'; // Customer Support Team
+
     // ─── 검색/필터 상태 ────────────────────────────────────────────
     public string $search = '';
     // 상단 검색창에 입력된 텍스트. 빈 문자열로 시작합니다.
 
-    public string $filterGubun = '';
+    public string $statusFilter = 'active';
+    // 기관 상태 필터: active | terminated | all
 
-    // 기관 구분 필터 (유치원 / 어린이집 / 전체)
     public string $assignmentFilter = '';
     // 담당자 배정 상태 필터: '' | assigned | unassigned | my_assigned
 
@@ -70,6 +77,8 @@ class InstitutionList extends Component
 
     public string $editDetailPortalName = '';
 
+    public string $editDetailPortalCampusId = '';
+
     public string $editDetailAccountNo = '';
 
     public string $editDetailGubun = '';
@@ -104,7 +113,7 @@ class InstitutionList extends Component
         // 검색어가 바뀌었을 때 2페이지에 있다면 자동으로 1페이지로 이동합니다.
     }
 
-    public function updatingFilterGubun(): void
+    public function updatingStatusFilter(): void
     {
         $this->resetPage();
     }
@@ -145,6 +154,7 @@ class InstitutionList extends Component
             'name' => $institution->AccountName,
             'english_name' => $institution->EnglishName,
             'portal_name' => $institution->PortalAccountName,
+            'portal_campus_id' => $institution->PortalCampusID,
             'account_no' => $institution->AccountNo,
             'gubun' => $institution->Gubun,
             'director' => $institution->Director,
@@ -171,6 +181,7 @@ class InstitutionList extends Component
         $this->editDetailInstitutionName = (string) ($institution->AccountName ?? '');
         $this->editDetailEnglishName = (string) ($institution->EnglishName ?? '');
         $this->editDetailPortalName = (string) ($institution->PortalAccountName ?? '');
+        $this->editDetailPortalCampusId = (string) ($institution->PortalCampusID ?? '');
         $this->editDetailAccountNo = (string) ($institution->AccountNo ?? '');
         $this->editDetailGubun = (string) ($institution->Gubun ?? '');
         $this->editDetailDirector = (string) ($institution->Director ?? '');
@@ -223,6 +234,7 @@ class InstitutionList extends Component
         $this->editDetailInstitutionName = '';
         $this->editDetailEnglishName = '';
         $this->editDetailPortalName = '';
+        $this->editDetailPortalCampusId = '';
         $this->editDetailAccountNo = '';
         $this->editDetailGubun = '';
         $this->editDetailDirector = '';
@@ -249,6 +261,7 @@ class InstitutionList extends Component
         $this->editDetailInstitutionName = (string) ($this->selectedInstitution['name'] ?? '');
         $this->editDetailEnglishName = (string) ($this->selectedInstitution['english_name'] ?? '');
         $this->editDetailPortalName = (string) ($this->selectedInstitution['portal_name'] ?? '');
+        $this->editDetailPortalCampusId = (string) ($this->selectedInstitution['portal_campus_id'] ?? '');
         $this->editDetailAccountNo = (string) ($this->selectedInstitution['account_no'] ?? '');
         $this->editDetailGubun = (string) ($this->selectedInstitution['gubun'] ?? '');
         $this->editDetailDirector = (string) ($this->selectedInstitution['director'] ?? '');
@@ -274,6 +287,7 @@ class InstitutionList extends Component
         $this->editDetailInstitutionName = (string) ($this->selectedInstitution['name'] ?? '');
         $this->editDetailEnglishName = (string) ($this->selectedInstitution['english_name'] ?? '');
         $this->editDetailPortalName = (string) ($this->selectedInstitution['portal_name'] ?? '');
+        $this->editDetailPortalCampusId = (string) ($this->selectedInstitution['portal_campus_id'] ?? '');
         $this->editDetailAccountNo = (string) ($this->selectedInstitution['account_no'] ?? '');
         $this->editDetailGubun = (string) ($this->selectedInstitution['gubun'] ?? '');
         $this->editDetailDirector = (string) ($this->selectedInstitution['director'] ?? '');
@@ -306,6 +320,7 @@ class InstitutionList extends Component
             'editDetailInstitutionName' => ['required', 'string', 'max:255'],
             'editDetailEnglishName' => ['nullable', 'string', 'max:255'],
             'editDetailPortalName' => ['nullable', 'string', 'max:255'],
+            'editDetailPortalCampusId' => ['nullable', 'string', 'max:100'],
             'editDetailAccountNo' => ['nullable', 'string', 'max:100'],
             'editDetailGubun' => ['nullable', 'string', 'max:100'],
             'editDetailDirector' => ['nullable', 'string', 'max:255'],
@@ -351,6 +366,7 @@ class InstitutionList extends Component
                 'AccountName' => $accountName,
                 'EnglishName' => trim($this->editDetailEnglishName) !== '' ? trim($this->editDetailEnglishName) : null,
                 'PortalAccountName' => trim($this->editDetailPortalName) !== '' ? trim($this->editDetailPortalName) : null,
+                'PortalCampusID' => trim($this->editDetailPortalCampusId) !== '' ? trim($this->editDetailPortalCampusId) : null,
                 'AccountNo' => trim($this->editDetailAccountNo) !== '' ? trim($this->editDetailAccountNo) : null,
                 'Director' => trim($this->editDetailDirector) !== '' ? trim($this->editDetailDirector) : null,
                 'Phone' => trim($this->editDetailPhone) !== '' ? trim($this->editDetailPhone) : null,
@@ -371,6 +387,15 @@ class InstitutionList extends Component
                     'Address' => trim($this->editDetailAddress) !== '' ? trim($this->editDetailAddress) : null,
                 ]
             );
+
+            $this->reverseSyncToSkCodeRequest($newSk, [
+                'institution_name' => $accountName,
+                'portal_campus_id' => trim($this->editDetailPortalCampusId) !== '' ? trim($this->editDetailPortalCampusId) : null,
+                'account_no' => trim($this->editDetailAccountNo) !== '' ? trim($this->editDetailAccountNo) : null,
+                'co' => trim($this->editDetailCo) ?: null,
+                'tr' => trim($this->editDetailTr) ?: null,
+                'cs' => trim($this->editDetailCs) ?: null,
+            ]);
 
             if (Schema::hasTable('S_GSNumber')) {
                 GsNumber::query()->updateOrCreate(
@@ -485,6 +510,13 @@ class InstitutionList extends Component
             ]
         );
 
+        $this->reverseSyncToSkCodeRequest($this->editSkCode, [
+            'institution_name' => $this->editInstitutionName,
+            'co' => trim($this->editCo) ?: null,
+            'tr' => trim($this->editTr) ?: null,
+            'cs' => trim($this->editCs) ?: null,
+        ]);
+
         DB::afterCommit(function (): void {
             SyncInstitutionOutboundJob::dispatchIf(
                 (bool) config('services.institution_outbound.enabled'),
@@ -512,6 +544,7 @@ class InstitutionList extends Component
         // 상단 요약 카드용 집계
         $allInstitutionCount = Institution::query()
             ->tap(fn (Builder $query) => $this->applyCoTeamInstitutionScope($query))
+            ->tap(fn (Builder $query) => $this->applyStatusFilter($query))
             ->when($hiddenInstitutionSkCodes !== [], function ($query) use ($hiddenInstitutionSkCodes): void {
                 $query->whereNotIn('SKcode', $hiddenInstitutionSkCodes);
             })
@@ -519,6 +552,7 @@ class InstitutionList extends Component
 
         $assignedCoCount = Institution::query()
             ->tap(fn (Builder $query) => $this->applyCoTeamInstitutionScope($query))
+            ->tap(fn (Builder $query) => $this->applyStatusFilter($query))
             ->when($hiddenInstitutionSkCodes !== [], function ($query) use ($hiddenInstitutionSkCodes): void {
                 $query->whereNotIn('SKcode', $hiddenInstitutionSkCodes);
             })
@@ -530,6 +564,7 @@ class InstitutionList extends Component
 
         $myAssignedCoCount = Institution::query()
             ->tap(fn (Builder $query) => $this->applyCoTeamInstitutionScope($query))
+            ->tap(fn (Builder $query) => $this->applyStatusFilter($query))
             ->when($hiddenInstitutionSkCodes !== [], function ($query) use ($hiddenInstitutionSkCodes): void {
                 $query->whereNotIn('SKcode', $hiddenInstitutionSkCodes);
             })
@@ -540,15 +575,13 @@ class InstitutionList extends Component
 
         $institutions = Institution::query()
             ->tap(fn (Builder $query) => $this->applyCoTeamInstitutionScope($query))
+            ->tap(fn (Builder $query) => $this->applyStatusFilter($query))
             ->search($this->search)
             // Institution 모델에 정의한 search 스코프 사용
             // 기관명, SKcode, 원장명, 주소에서 검색어를 찾습니다.
             ->when($hiddenInstitutionSkCodes !== [], function ($query) use ($hiddenInstitutionSkCodes): void {
                 $query->whereNotIn('SKcode', $hiddenInstitutionSkCodes);
             })
-
-            ->ofType($this->filterGubun)
-            // 기관 구분(유치원/어린이집 등) 필터
 
             ->with($this->institutionEagerLoads())
             // 담당자(CO/TR/CS) 및 S_GSNumber (테이블 있을 때만, N+1 방지)
@@ -573,6 +606,7 @@ class InstitutionList extends Component
         // 기관 구분 목록 (필터 드롭다운용)
         $gubunList = Institution::query()
             ->tap(fn (Builder $query) => $this->applyCoTeamInstitutionScope($query))
+            ->tap(fn (Builder $query) => $this->applyStatusFilter($query))
             ->when($hiddenInstitutionSkCodes !== [], function ($query) use ($hiddenInstitutionSkCodes): void {
                 $query->whereNotIn('SKcode', $hiddenInstitutionSkCodes);
             })
@@ -581,27 +615,15 @@ class InstitutionList extends Component
             ->distinct()
             ->pluck('Gubun');
 
-        // 담당자 드롭다운 옵션 (기존 배정 이력 기준)
-        $coManagerOptions = AccountInformation::query()
-            ->whereNotNull('CO')
-            ->where('CO', '!=', '')
-            ->distinct()
-            ->orderBy('CO')
-            ->pluck('CO');
-
-        $trManagerOptions = AccountInformation::query()
-            ->whereNotNull('TR')
-            ->where('TR', '!=', '')
-            ->distinct()
-            ->orderBy('TR')
-            ->pluck('TR');
-
-        $csManagerOptions = AccountInformation::query()
-            ->whereNotNull('CS')
-            ->where('CS', '!=', '')
-            ->distinct()
-            ->orderBy('CS')
-            ->pluck('CS');
+        // 담당자 드롭다운 옵션 (직원 마스터 기준, 부서 매핑 + 활성 직원만)
+        //  - CO    -> Consulting Team (A02)
+        //  - Coach -> Training Team   (A05)
+        //  - CS    -> Customer Support Team (A03)
+        // 과거 S_Account_Information 이력값을 그대로 끌어오면 퇴사자/비직원도 후보로 떴기 때문에,
+        // employee 테이블의 활성 직원(STATUS=1) 만 영문명 기준으로 노출합니다.
+        $coManagerOptions = $this->managerOptionsForDept(self::DEPT_CO);
+        $trManagerOptions = $this->managerOptionsForDept(self::DEPT_TR);
+        $csManagerOptions = $this->managerOptionsForDept(self::DEPT_CS);
 
         $customerTypeOptions = AccountInformation::query()
             ->whereNotNull('Customer_Type')
@@ -638,6 +660,39 @@ class InstitutionList extends Component
     }
 
     /**
+     * 부서(WORKDEPT) 기준 활성 직원의 영문명(없으면 한글명) 목록을 옵션으로 반환합니다.
+     *
+     * - STATUS = 1 (활성)만 대상
+     * - ENGLISHNAME 우선, 비어 있으면 KOREANAME 으로 대체 (현장에서 입력값이 영문 기준이라 ENGLISHNAME 우선)
+     * - 중복 제거 + 알파벳 정렬
+     *
+     * @return \Illuminate\Support\Collection<int, string>
+     */
+    private function managerOptionsForDept(string $deptNo): \Illuminate\Support\Collection
+    {
+        if (! Schema::hasTable('employee')) {
+            return collect();
+        }
+
+        return Employee::query()
+            ->where('WORKDEPT', $deptNo)
+            ->where('STATUS', 1)
+            ->get(['ENGLISHNAME', 'KOREANAME'])
+            ->map(function (Employee $employee): string {
+                $english = trim((string) ($employee->ENGLISHNAME ?? ''));
+                if ($english !== '') {
+                    return $english;
+                }
+
+                return trim((string) ($employee->KOREANAME ?? ''));
+            })
+            ->filter(fn (string $name): bool => $name !== '')
+            ->unique()
+            ->sort()
+            ->values();
+    }
+
+    /**
      * @return array<int, string>
      */
     private function hiddenInstitutionSkCodes(): array
@@ -654,6 +709,78 @@ class InstitutionList extends Component
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * 로컬에서 마스터 데이터를 수정하면 sk_code_requests도 같은 값으로 맞춥니다.
+     * applied_at을 함께 갱신해 queued job이 동일 값을 다시 적용하지 않게 합니다.
+     *
+     * @param  array<string, mixed>  $values
+     */
+    private function reverseSyncToSkCodeRequest(string $skCode, array $values): void
+    {
+        $request = SkCodeRequest::query()
+            ->where('final_sk_code', $skCode)
+            ->where('status', 'completed')
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $request) {
+            return;
+        }
+
+        $patch = [];
+        foreach ($values as $column => $value) {
+            if ($value === null) {
+                continue;
+            }
+
+            $trimmed = trim((string) $value);
+            if ($trimmed === '') {
+                continue;
+            }
+
+            $patch[$column] = $trimmed;
+        }
+
+        if ($patch === []) {
+            return;
+        }
+
+        $syncedAt = now();
+
+        $request->timestamps = false;
+        $request->update(array_merge($patch, [
+            'applied_at' => $syncedAt,
+            'updated_at' => $syncedAt,
+        ]));
+        $request->timestamps = true;
+    }
+
+    private function applyStatusFilter(Builder $query): void
+    {
+        if ($this->statusFilter === 'all') {
+            return;
+        }
+
+        if ($this->statusFilter === 'terminated') {
+            $query->whereHas('accountInfo', function (Builder $sub): void {
+                $sub->where('Customer_Type', 'like', '%해지%');
+            });
+
+            return;
+        }
+
+        $query->where(function (Builder $statusQuery): void {
+            $statusQuery->whereDoesntHave('accountInfo')
+                ->orWhereHas('accountInfo', function (Builder $sub): void {
+                    $sub->where(function (Builder $customerTypeQuery): void {
+                        $customerTypeQuery->whereNull('Customer_Type')
+                            ->orWhere('Customer_Type', '')
+                            ->orWhere('Customer_Type', 'not like', '%해지%');
+                    });
+                });
+        });
     }
 
     private function applyCoTeamInstitutionScope(Builder $query): void

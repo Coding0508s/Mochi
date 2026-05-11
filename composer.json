@@ -10,6 +10,7 @@
         "laravel/framework": "^13.0",
         "laravel/tinker": "^3.0",
         "livewire/livewire": "^4.2",
+        "phpoffice/phpspreadsheet": "^5.7",
         "solapi/sdk": "^5.1"
     },
     "require-dev": {

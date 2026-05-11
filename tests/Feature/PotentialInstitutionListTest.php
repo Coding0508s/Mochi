@@ -29,6 +29,7 @@ class PotentialInstitutionListTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        Config::set('services.institution_outbound.enabled', false);
         $this->createLegacyPotentialInstitutionTables();
         $this->actingAs(User::factory()->create());
     }
@@ -51,6 +52,7 @@ class PotentialInstitutionListTest extends TestCase
             $table->string('AccountName', 255);
             $table->string('EnglishName', 255)->nullable();
             $table->string('PortalAccountName', 255)->nullable();
+            $table->string('PortalCampusID', 100)->nullable();
             $table->string('AccountNo', 100)->nullable();
             $table->string('GSno', 100)->nullable();
             $table->string('Director', 255)->nullable();
@@ -594,6 +596,74 @@ class PotentialInstitutionListTest extends TestCase
         $this->assertSame(1, Institution::query()->where('SKcode', $existingSk)->count());
     }
 
+    public function test_recontract_preserves_existing_master_row_and_clears_termination(): void
+    {
+        Queue::fake();
+
+        $existingSk = 'SK-RECONTRACT-'.uniqid('', true);
+        Institution::query()->create([
+            'SKcode' => $existingSk,
+            'AccountName' => '기존 기관명',
+            'Director' => '기존 원장',
+            'Phone' => '02-1111-1111',
+            'Address' => '기존 주소',
+            'Gubun' => '기존 구분',
+            'Possibility' => 'A',
+        ]);
+
+        AccountInformation::query()->create([
+            'SK_Code' => $existingSk,
+            'Account_Name' => '기존 기관명',
+            'Customer_Type' => 'VIP 해지',
+            'Address' => '기존 담당 주소',
+        ]);
+
+        $row = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountCode' => $existingSk,
+            'AccountName' => '재계약 잠재명',
+            'Director' => '새 원장',
+            'Phone' => '02-2222-2222',
+            'Address' => '새 주소',
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'B',
+        ]);
+
+        Livewire::test(PotentialInstitutionList::class)
+            ->call('markContractComplete', (int) $row->ID);
+
+        $this->assertDatabaseHas('S_AccountName', [
+            'SKcode' => $existingSk,
+            'AccountName' => '기존 기관명',
+            'Director' => '기존 원장',
+            'Phone' => '02-1111-1111',
+            'Address' => '기존 주소',
+            'Gubun' => '기존 구분',
+            'Possibility' => 'A',
+        ]);
+        $this->assertDatabaseHas('S_Account_Information', [
+            'SK_Code' => $existingSk,
+            'Account_Name' => '기존 기관명',
+            'Customer_Type' => 'VIP',
+            'Address' => '기존 담당 주소',
+        ]);
+        $this->assertSame(1, Institution::query()->where('SKcode', $existingSk)->count());
+        $this->assertSame(1, AccountInformation::query()->where('SK_Code', $existingSk)->count());
+    }
+
     public function test_mark_contract_complete_clears_hidden_institution_override(): void
     {
         Queue::fake();
@@ -849,7 +919,9 @@ class PotentialInstitutionListTest extends TestCase
             ->call('openDetailModal', $id)
             ->assertSet('detailModalContract', '0')
             ->set('detailModalContract', '1')
-            ->call('commitDetailContract');
+            ->call('requestContractChange')
+            ->assertSet('showContractChangeConfirmModal', true)
+            ->call('confirmContractChange');
 
         $row->refresh();
         $this->assertTrue((bool) $row->IsContract);
@@ -895,11 +967,101 @@ class PotentialInstitutionListTest extends TestCase
             ->call('openDetailModal', $id)
             ->assertSet('detailModalContract', '1')
             ->set('detailModalContract', '0')
-            ->call('commitDetailContract');
+            ->call('requestContractChange')
+            ->assertSet('showContractChangeConfirmModal', true)
+            ->call('confirmContractChange');
 
         $row->refresh();
         $this->assertFalse((bool) $row->IsContract);
         $this->assertNull($row->ContractedDate);
+    }
+
+    public function test_uncontract_via_detail_modal_adds_visibility_override(): void
+    {
+        $name = '상세미계약숨김 QA '.uniqid('', true);
+        $sk = 'SK-HIDE-'.uniqid('', true);
+        CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountCode' => $sk,
+            'AccountName' => $name,
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => true,
+            'ContractedDate' => '2026-01-15',
+            'Possibility' => null,
+        ]);
+
+        $row = CoNewTarget::query()->where('AccountCode', $sk)->firstOrFail();
+
+        Livewire::test(PotentialInstitutionList::class)
+            ->call('openDetailModal', (int) $row->ID)
+            ->set('detailModalContract', '0')
+            ->call('requestContractChange')
+            ->call('confirmContractChange');
+
+        $this->assertDatabaseHas('institution_visibility_overrides', [
+            'sk_code' => $sk,
+            'hidden_reason' => 'uncontracted',
+        ]);
+        $this->assertNotNull(DB::table('institution_visibility_overrides')->where('sk_code', $sk)->value('hidden_at'));
+    }
+
+    public function test_recontract_after_uncontract_removes_visibility_override(): void
+    {
+        Queue::fake();
+
+        $name = '재계약숨김해제 QA '.uniqid('', true);
+        $sk = 'SK-RESHOW-'.uniqid('', true);
+        Institution::query()->create([
+            'SKcode' => $sk,
+            'AccountName' => $name,
+        ]);
+
+        DB::table('institution_visibility_overrides')->insert([
+            'sk_code' => $sk,
+            'hidden_reason' => 'uncontracted',
+            'hidden_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $row = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountCode' => $sk,
+            'AccountName' => $name,
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => null,
+        ]);
+
+        Livewire::test(PotentialInstitutionList::class)
+            ->call('markContractComplete', (int) $row->ID);
+
+        $this->assertDatabaseMissing('institution_visibility_overrides', [
+            'sk_code' => $sk,
+        ]);
     }
 
     public function test_delete_meeting_detail_removes_record_and_refreshes_list(): void

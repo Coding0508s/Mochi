@@ -79,6 +79,7 @@ class UpsertInstitutionFromExternal
             'institution_name' => 'AccountName',
             'english_name' => 'EnglishName',
             'portal_account_name' => 'PortalAccountName',
+            'portal_campus_id' => 'PortalCampusID',
             'account_no' => 'AccountNo',
             'gs_no' => 'GSno',
             'director' => 'Director',
@@ -95,7 +96,13 @@ class UpsertInstitutionFromExternal
             if (! array_key_exists($apiKey, $patch)) {
                 continue;
             }
-            $attrs[$column] = $this->normalizeStringOrNull($patch[$apiKey]);
+            $normalized = $this->normalizeStringOrNull($patch[$apiKey]);
+            // 기존 기관: 빈 institution_name 은 "삭제"가 아니라 무시 — 상대 DB/API가 빈 값을 보내 마스터명을 지우거나
+            // 오래된 빈 컬럼으로 최신명을 덮지 않게 한다.
+            if ($apiKey === 'institution_name' && $existed && $normalized === null) {
+                continue;
+            }
+            $attrs[$column] = $normalized;
         }
 
         foreach (['ls' => 'LS', 'gs_k' => 'GS_K', 'gs_e' => 'GS_E'] as $apiKey => $column) {
@@ -132,9 +139,13 @@ class UpsertInstitutionFromExternal
             return;
         }
 
-        $name = array_key_exists('institution_name', $patch)
-            ? $this->normalizeStringOrNull($patch['institution_name'])
-            : $institution->AccountName;
+        $name = $institution->AccountName;
+        if (array_key_exists('institution_name', $patch)) {
+            $fromPatch = $this->normalizeStringOrNull($patch['institution_name']);
+            if ($fromPatch !== null) {
+                $name = $fromPatch;
+            }
+        }
 
         $row = [
             'Account_Name' => $name,

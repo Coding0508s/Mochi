@@ -96,6 +96,10 @@ Route::middleware(['auth'])->group(function () {
         return view('pages.supports.create');
     })->name('supports.create');
 
+    Route::get('/schedules', function () {
+        return view('pages.schedules.index');
+    })->name('schedules.index');
+
     Route::get('/co/gs-brochure/main', function () {
         return view('pages.co.gs-brochure-main');
     })->name('co.gs-brochure.main');

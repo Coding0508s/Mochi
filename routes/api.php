@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Route;
 | CRM 기관 마스터(S_AccountName) 외부 연동 — gs-brochure API 와 분리
 */
 Route::middleware(['external.institution.ingest', 'throttle:external-institution-ingest'])
-    ->put('internal/institutions/{sk}', [ExternalInstitutionController::class, 'upsert'])
+    ->post('internal/institutions/{sk}', [ExternalInstitutionController::class, 'upsert'])
     ->where('sk', '[A-Za-z0-9._\-]+');
 
 Route::prefix('gs-brochure')->group(function () {

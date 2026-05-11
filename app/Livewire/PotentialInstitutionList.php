@@ -9,6 +9,7 @@ use App\Enums\SyncOrigin;
 use App\Jobs\SyncInstitutionOutboundJob;
 use App\Models\CoNewTarget;
 use App\Models\CoNewTargetDetail;
+use App\Models\SkCodeRequest;
 use App\Models\SupportRecord;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -126,6 +127,25 @@ class PotentialInstitutionList extends Component
     /** 상세 모달 계약여부 편집: '0'=미계약, '1'=계약 */
     public string $detailModalContract = '0';
 
+    // 계약완료 미니 모달용
+    public bool $showContractModal = false;
+
+    public ?int $pendingContractId = null;
+
+    public string $contractSkCode = '';
+
+    public string $pendingContractName = '';
+
+    // 상세 모달 계약 변경 확인 모달용
+    public bool $showContractChangeConfirmModal = false;
+
+    public ?bool $pendingContractChange = null;
+
+    public string $pendingContractChangeName = '';
+
+    // 상세 모달 SK CODE 입력용
+    public string $detailModalSkCode = '';
+
     public function updatingSearch(): void
     {
         $this->resetPage();
@@ -166,6 +186,24 @@ class PotentialInstitutionList extends Component
         $this->resetPage();
     }
 
+    public function openContractModal(int $id): void
+    {
+        $target = CoNewTarget::query()->findOrFail($id);
+
+        $this->pendingContractId = $id;
+        $this->pendingContractName = (string) ($target->AccountName ?? '');
+        $this->contractSkCode = '';
+        $this->showContractModal = true;
+    }
+
+    public function closeContractModal(): void
+    {
+        $this->showContractModal = false;
+        $this->pendingContractId = null;
+        $this->contractSkCode = '';
+        $this->pendingContractName = '';
+    }
+
     public function markContractComplete(int $id): void
     {
         $target = CoNewTarget::query()->findOrFail($id);
@@ -174,7 +212,13 @@ class PotentialInstitutionList extends Component
             return;
         }
 
+        $inputSk = trim($this->contractSkCode);
+        if ($inputSk !== '') {
+            $target->AccountCode = $inputSk;
+        }
+
         $this->applyContractState($target, true);
+        $this->closeContractModal();
 
         session()->flash('success', '계약완료 처리되었습니다.');
     }
@@ -183,6 +227,11 @@ class PotentialInstitutionList extends Component
      * 상세 모달에서 계약여부 select 변경 시 호출 (`wire:change`).
      */
     public function commitDetailContract(): void
+    {
+        $this->requestContractChange();
+    }
+
+    public function requestContractChange(): void
     {
         if ($this->selectedTarget === null) {
             return;
@@ -200,13 +249,66 @@ class PotentialInstitutionList extends Component
             return;
         }
 
+        $this->pendingContractChange = $contracted;
+        $this->pendingContractChangeName = (string) ($target->AccountName ?? '');
+        $this->showContractChangeConfirmModal = true;
+    }
+
+    public function confirmContractChange(): void
+    {
+        if ($this->selectedTarget === null || $this->pendingContractChange === null) {
+            $this->cancelContractChange();
+
+            return;
+        }
+
+        $id = (int) ($this->selectedTarget['id'] ?? 0);
+        if ($id <= 0) {
+            $this->cancelContractChange();
+
+            return;
+        }
+
+        $contracted = $this->pendingContractChange;
+        $target = CoNewTarget::query()->findOrFail($id);
+
+        if ((bool) $target->IsContract === $contracted) {
+            $this->cancelContractChange();
+
+            return;
+        }
+
+        if ($contracted) {
+            $inputSk = trim($this->detailModalSkCode);
+            if ($inputSk !== '') {
+                $target->AccountCode = $inputSk;
+            }
+        }
+
         $this->applyContractState($target, $contracted);
         $target->refresh();
         $this->syncSelectedTargetContractFields($contracted);
         if ($contracted && $this->selectedTarget !== null && (int) ($this->selectedTarget['id'] ?? 0) === $id) {
             $this->selectedTarget['account_code'] = $target->AccountCode;
         }
+        $this->resetContractChangeConfirmation();
         session()->flash('success', $contracted ? '계약으로 변경되었습니다.' : '미계약으로 변경되었습니다.');
+    }
+
+    public function cancelContractChange(): void
+    {
+        if ($this->selectedTarget !== null) {
+            $this->detailModalContract = ($this->selectedTarget['is_contract'] ?? false) ? '1' : '0';
+        }
+
+        $this->resetContractChangeConfirmation();
+    }
+
+    private function resetContractChangeConfirmation(): void
+    {
+        $this->showContractChangeConfirmModal = false;
+        $this->pendingContractChange = null;
+        $this->pendingContractChangeName = '';
     }
 
     private function applyContractState(CoNewTarget $target, bool $contracted): void
@@ -220,6 +322,18 @@ class PotentialInstitutionList extends Component
 
                 $sk = app(PromotePotentialInstitutionToMaster::class)->execute($target);
 
+                // LEAD- 임시 코드가 발급된 경우에만 브릿지 테이블에 pending 레코드 생성.
+                // 실제 SK를 직접 입력한 경우엔 외부 검증이 불필요하므로 건너뛴다.
+                if (str_starts_with($sk, 'LEAD-')) {
+                    SkCodeRequest::create([
+                        'co_new_target_id' => (int) $target->ID,
+                        'institution_name' => (string) ($target->AccountName ?? ''),
+                        'temp_sk_code' => $sk,
+                        'status' => 'pending',
+                        'requested_at' => now(),
+                    ]);
+                }
+
                 DB::afterCommit(function () use ($sk): void {
                     SyncInstitutionOutboundJob::dispatchIf(
                         (bool) config('services.institution_outbound.enabled'),
@@ -232,6 +346,19 @@ class PotentialInstitutionList extends Component
                     'IsContract' => false,
                     'ContractedDate' => null,
                 ]);
+
+                $sk = trim((string) ($target->AccountCode ?? ''));
+                if ($sk !== '' && Schema::hasTable('institution_visibility_overrides')) {
+                    DB::table('institution_visibility_overrides')->updateOrInsert(
+                        ['sk_code' => $sk],
+                        [
+                            'hidden_reason' => 'uncontracted',
+                            'hidden_at' => now(),
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]
+                    );
+                }
             }
         });
     }
@@ -601,6 +728,7 @@ class PotentialInstitutionList extends Component
         $this->detailMeetings = [];
         $this->detailSupportRecords = [];
         $this->detailModalContract = '0';
+        $this->detailModalSkCode = '';
         $this->showMeetingDetailModal = false;
         $this->selectedMeeting = null;
         $this->showSupportDetailModal = false;

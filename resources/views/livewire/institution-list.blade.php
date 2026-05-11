@@ -44,16 +44,15 @@
     {{-- 필터 영역 --}}
     <div class="mochi-filter-card">
         <div class="flex flex-wrap items-center gap-3">
-            <select wire:model.live="filterGubun"
+            <select wire:model.live="statusFilter"
                     class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">전체 구분</option>
-                @foreach($gubunList as $gubun)
-                    <option value="{{ $gubun }}">{{ $gubun }}</option>
-                @endforeach
+                <option value="active">운영 기관</option>
+                <option value="terminated">해지 기관</option>
+                <option value="all">전체</option>
             </select>
 
-            @if($search || $filterGubun || $assignmentFilter)
-                <button wire:click="$set('search', ''); $set('filterGubun', ''); $set('assignmentFilter', '')"
+            @if($search || $assignmentFilter || $statusFilter !== 'active')
+                <button wire:click="$set('search', ''); $set('assignmentFilter', ''); $set('statusFilter', 'active')"
                         class="py-2 px-3 text-sm text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50">
                     초기화
                 </button>
@@ -97,7 +96,7 @@
                         </button>
                     </th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">CO</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold">TR</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold">Coach</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">CS</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">GS번호</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">구분</th>
@@ -149,18 +148,18 @@
                                 <span class="text-gray-400">-</span>
                             @endif
                         </td>
-                        <td class="px-3 py-2 text-gray-600 max-w-[14rem]">
+                        <td class="px-3 py-2 text-gray-600 max-w-[14rem] min-w-0">
                             @if($customerType === '')
                                 <span class="text-gray-400">-</span>
                             @else
-                                <div class="flex flex-col gap-1 items-start">
+                                <div class="flex min-w-0 items-center gap-1">
                                     @if($isTerminated)
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 shrink-0">
+                                        <span class="inline-flex shrink-0 items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
                                             해지
                                         </span>
                                     @endif
                                     @if($customerTypeWithoutTerminateBadge !== '')
-                                        <span class="text-xs leading-snug break-words whitespace-normal">{{ $customerTypeWithoutTerminateBadge }}</span>
+                                        <span class="min-w-0 truncate text-xs" title="{{ $customerType }}">{{ $customerTypeWithoutTerminateBadge }}</span>
                                     @endif
                                 </div>
                             @endif
@@ -226,7 +225,7 @@
                                 SK {{ $selectedInstitution['skcode'] ?? '-' }}
                             </span>
                             <span class="text-gray-600">담당 CO: <span class="font-medium text-gray-800">{{ $selectedInstitution['co'] ?? '-' }}</span></span>
-                            <span class="text-gray-600">담당 TR: <span class="font-medium text-gray-800">{{ $selectedInstitution['tr'] ?? '-' }}</span></span>
+                            <span class="text-gray-600">담당 Coach: <span class="font-medium text-gray-800">{{ $selectedInstitution['tr'] ?? '-' }}</span></span>
                             <span class="text-gray-600">담당 CS: <span class="font-medium text-gray-800">{{ $selectedInstitution['cs'] ?? '-' }}</span></span>
                             <span class="text-gray-600">교사 수: <span class="font-medium text-gray-800">{{ $selectedInstitution['teacher_count'] ?? 0 }}</span></span>
                             <span class="text-gray-600">지원 내역: <span class="font-medium text-gray-800">{{ $selectedInstitution['support_count'] ?? 0 }}</span>건</span>
@@ -288,6 +287,20 @@
                                             @enderror
                                         @else
                                             {{ $selectedInstitution['portal_name'] ?? '-' }}
+                                        @endif
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">Portal Campus ID</th>
+                                    <td colspan="3" class="px-3 py-2 font-medium text-gray-900 font-mono text-sm">
+                                        @if($isEditingDetail)
+                                            <input type="text" wire:model.defer="editDetailPortalCampusId"
+                                                   class="w-full py-1.5 px-2 text-sm font-mono border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                            @error('editDetailPortalCampusId')
+                                                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                            @enderror
+                                        @else
+                                            {{ $selectedInstitution['portal_campus_id'] ?? '-' }}
                                         @endif
                                     </td>
                                 </tr>
@@ -379,7 +392,7 @@
                                     </td>
                                 </tr>
                                 <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당 TR</th>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당 Coach</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">
                                         @if($isEditingDetail)
                                             <select wire:model.defer="editDetailTr"
@@ -587,7 +600,7 @@
 
                 <div class="px-6 py-4 grid grid-cols-2 gap-4 text-sm overflow-y-auto flex-1">
                     <div>
-                        <div class="text-xs text-gray-500 mb-1">담당자(TR)</div>
+                        <div class="text-xs text-gray-500 mb-1">담당자(Coach)</div>
                         <div class="font-medium text-gray-900">{{ $selectedSupportRecord['tr_name'] ?? '-' }}</div>
                     </div>
                     <div>
@@ -673,7 +686,7 @@
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">담당 TR</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">담당 Coach</label>
                         <select wire:model="editTr"
                                 class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="">미지정</option>

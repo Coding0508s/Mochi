@@ -123,4 +123,11 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Favicon (public/ 기준 경로, 예: favicon.png, images/mochi-icon.png)
+    |--------------------------------------------------------------------------
+    */
+    'favicon_path' => env('APP_FAVICON') ?: 'favicon.png',
+
 ];

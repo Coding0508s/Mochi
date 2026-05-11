@@ -27,25 +27,32 @@ class PromotePotentialInstitutionToMaster
 
         $name = trim((string) $target->AccountName);
 
-        Institution::query()->updateOrCreate(
-            ['SKcode' => $sk],
+        $institution = Institution::query()->firstOrNew(['SKcode' => $sk]);
+        $institution->fill($this->mergePreservingExisting(
+            $institution,
             [
-                'AccountName' => $name,
+                'AccountName' => $name !== '' ? $name : null,
                 'Director' => $this->normalizeStringOrNull($target->Director),
                 'Phone' => $this->normalizeStringOrNull($target->Phone),
                 'Address' => $this->normalizeStringOrNull($target->Address),
                 'Gubun' => $this->normalizeStringOrNull($target->Gubun),
                 'Possibility' => $this->normalizeStringOrNull($target->Possibility),
             ]
-        );
+        ));
+        $institution->save();
 
-        AccountInformation::query()->updateOrCreate(
-            ['SK_Code' => $sk],
+        $accountInfo = AccountInformation::query()->firstOrNew(['SK_Code' => $sk]);
+        $accountInfo->fill($this->mergePreservingExisting(
+            $accountInfo,
             [
-                'Account_Name' => $name,
+                'Account_Name' => $name !== '' ? $name : null,
                 'Address' => $this->normalizeStringOrNull($target->Address),
             ]
+        ));
+        $accountInfo->Customer_Type = $this->stripTerminationFromCustomerType(
+            $accountInfo->Customer_Type
         );
+        $accountInfo->save();
 
         if (Schema::hasColumn('S_SupportInfo_Account', 'potential_target_id')) {
             SupportRecord::query()
@@ -66,6 +73,36 @@ class PromotePotentialInstitutionToMaster
         }
 
         DB::table('institution_visibility_overrides')->where('sk_code', $sk)->delete();
+    }
+
+    /**
+     * @param  array<string, mixed>  $incoming
+     * @return array<string, mixed>
+     */
+    private function mergePreservingExisting(object $model, array $incoming): array
+    {
+        $merged = [];
+
+        foreach ($incoming as $key => $value) {
+            $existing = $model->{$key} ?? null;
+            $merged[$key] = filled($existing) ? $existing : $value;
+        }
+
+        return $merged;
+    }
+
+    private function stripTerminationFromCustomerType(mixed $value): ?string
+    {
+        $customerType = trim((string) $value);
+
+        if ($customerType === '') {
+            return null;
+        }
+
+        $customerType = (string) preg_replace('/(^|\s+)해지(\s+|$)/u', ' ', $customerType);
+        $customerType = trim(preg_replace('/\s+/u', ' ', $customerType) ?? '');
+
+        return $customerType === '' ? null : $customerType;
     }
 
     private function normalizeStringOrNull(mixed $value): ?string

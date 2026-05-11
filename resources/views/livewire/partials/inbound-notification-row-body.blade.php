@@ -1,6 +1,6 @@
 <div class="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
     <p class="min-w-0 flex-1 text-sm font-semibold leading-snug text-gray-900">
-        {{ $row['headline'] ?? '외부 시스템 연동 알림' }}
+        {{ $row['headline'] ?? 'E-Ordering 알림' }}
     </p>
     <span class="shrink-0 text-xs tabular-nums text-gray-500">{{ $row['received_at'] ?? '—' }}</span>
 </div>
@@ -40,9 +40,35 @@
     @endif
 </dl>
 
-<p class="mt-2 text-xs leading-snug text-gray-600">
-    {{ $row['assignment_summary'] ?? '' }}
-</p>
+@if(!empty($row['assignment_changes']))
+    <dl class="mt-1 space-y-0.5 text-xs leading-snug text-gray-600">
+        @foreach($row['assignment_changes'] as $change)
+            <div class="flex gap-1">
+                <dt class="shrink-0 font-medium text-gray-500">{{ $change['label'] }}</dt>
+                <dd class="min-w-0 break-words">
+                    <span>{{ $change['before'] ?? '-' }}</span>
+                    <span class="text-gray-400"> → </span>
+                    <strong class="font-semibold text-gray-900">{{ $change['after'] }}</strong>
+                </dd>
+            </div>
+        @endforeach
+    </dl>
+@endif
+
+@if(!empty($row['portal_changes']))
+    <dl class="mt-1 space-y-0.5 text-xs leading-snug text-gray-600">
+        @foreach($row['portal_changes'] as $change)
+            <div class="flex gap-1">
+                <dt class="shrink-0 font-medium text-gray-500">{{ $change['label'] }}</dt>
+                <dd class="min-w-0 break-words">
+                    <span>{{ $change['before'] ?? '-' }}</span>
+                    <span class="text-gray-400"> → </span>
+                    <strong class="font-semibold text-gray-900">{{ $change['after'] }}</strong>
+                </dd>
+            </div>
+        @endforeach
+    </dl>
+@endif
 
 @if(!empty($row['error_message']))
     <p class="mt-2 rounded bg-rose-50 px-2 py-1.5 text-xs leading-snug text-rose-900">

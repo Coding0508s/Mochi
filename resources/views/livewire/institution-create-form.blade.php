@@ -136,7 +136,7 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">담당 TR</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">담당 Coach</label>
                     <select wire:model="newTr"
                             class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">미지정</option>

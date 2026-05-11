@@ -14,6 +14,38 @@ class UpsertExternalInstitutionRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $current = $this->input('institution_name');
+        if (is_string($current) && trim($current) !== '') {
+            return;
+        }
+
+        foreach (['institutionName', 'account_name', 'accountName', 'name'] as $alt) {
+            $value = $this->input($alt);
+            if (is_string($value) && trim($value) !== '') {
+                $this->merge(['institution_name' => trim($value)]);
+
+                return;
+            }
+        }
+
+        $data = $this->input('data');
+        if (is_array($data)) {
+            foreach (['institution_name', 'institutionName', 'name'] as $nestedKey) {
+                if (! isset($data[$nestedKey]) || ! is_string($data[$nestedKey])) {
+                    continue;
+                }
+                $v = trim($data[$nestedKey]);
+                if ($v !== '') {
+                    $this->merge(['institution_name' => $v]);
+
+                    return;
+                }
+            }
+        }
+    }
+
     /**
      * @return array<string, array<int, string|ConditionalRules>>
      */
@@ -23,6 +55,7 @@ class UpsertExternalInstitutionRequest extends FormRequest
             'institution_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'english_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'portal_account_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'portal_campus_id' => ['sometimes', 'nullable', 'string', 'max:100'],
             'account_no' => ['sometimes', 'nullable', 'string', 'max:100'],
             'gs_no' => ['sometimes', 'nullable', 'string', 'max:100'],
             'director' => ['sometimes', 'nullable', 'string', 'max:255'],
