@@ -623,4 +623,196 @@ class PeopleEmployeePermissionsTest extends TestCase
 
         Notification::assertSentTo($createdUser, ResetPassword::class);
     }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // 비밀번호 재설정 링크 발송 (관리자 수동) 시나리오 검증
+    // ────────────────────────────────────────────────────────────────────────
+
+    public function test_admin_can_send_password_reset_link_to_active_linked_employee(): void
+    {
+        Notification::fake();
+
+        $linkedUser = User::factory()->create([
+            'employee_empno' => 'E001',
+            'email' => 'e001@example.com',
+            'is_active' => true,
+        ]);
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openSendResetModal', 'E001')
+            ->assertSet('showSendResetModal', true)
+            ->assertSet('resetTargetMode', 'send_only')
+            ->assertSet('resetTargetEmail', 'e001@example.com')
+            ->call('sendPasswordResetLink')
+            ->assertSet('showSendResetModal', false);
+
+        Notification::assertSentTo($linkedUser, ResetPassword::class);
+    }
+
+    public function test_admin_cannot_send_password_reset_link_when_linked_account_is_inactive(): void
+    {
+        Notification::fake();
+
+        $linkedUser = User::factory()->create([
+            'employee_empno' => 'E001',
+            'email' => 'e001@example.com',
+            'is_active' => false,
+        ]);
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openSendResetModal', 'E001')
+            ->assertSet('showSendResetModal', false);
+
+        Notification::assertNothingSentTo($linkedUser);
+    }
+
+    public function test_admin_cannot_send_password_reset_link_to_resigned_employee_without_account(): void
+    {
+        Notification::fake();
+
+        Employee::query()->where('EMPNO', 'E001')->update(['STATUS' => 0]);
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openSendResetModal', 'E001')
+            ->assertSet('showSendResetModal', false);
+
+        $this->assertDatabaseMissing('users', ['employee_empno' => 'E001']);
+    }
+
+    public function test_non_admin_cannot_send_password_reset_link(): void
+    {
+        Notification::fake();
+
+        $linkedUser = User::factory()->create([
+            'employee_empno' => 'E001',
+            'email' => 'e001@example.com',
+            'is_active' => true,
+        ]);
+
+        $regularUser = User::factory()->create(['is_admin' => false]);
+
+        $component = Livewire::actingAs($regularUser)
+            ->test(PeopleEmployeesList::class)
+            ->call('openSendResetModal', 'E001');
+
+        $this->assertNotTrue((bool) ($component->get('showSendResetModal') ?? false));
+        Notification::assertNothingSentTo($linkedUser);
+    }
+
+    public function test_admin_creates_minimal_account_and_sends_reset_link_for_active_employee_without_account(): void
+    {
+        Notification::fake();
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openSendResetModal', 'E001')
+            ->assertSet('showSendResetModal', true)
+            ->assertSet('resetTargetMode', 'create_and_send')
+            ->assertSet('resetTargetEmail', 'e001@example.com')
+            ->call('sendPasswordResetLink')
+            ->assertSet('showSendResetModal', false);
+
+        $createdUser = User::query()->where('employee_empno', 'E001')->first();
+        $this->assertNotNull($createdUser);
+        $this->assertSame('e001@example.com', $createdUser->email);
+        $this->assertTrue((bool) $createdUser->is_active);
+
+        Notification::assertSentTo($createdUser, ResetPassword::class);
+    }
+
+    public function test_auto_created_account_has_no_elevated_permissions(): void
+    {
+        Notification::fake();
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openSendResetModal', 'E001')
+            ->call('sendPasswordResetLink');
+
+        $createdUser = User::query()->where('employee_empno', 'E001')->first();
+        $this->assertNotNull($createdUser);
+        $this->assertFalse((bool) $createdUser->is_admin);
+        $this->assertFalse((bool) $createdUser->is_gs_brochure_admin);
+        $this->assertFalse((bool) $createdUser->can_manage_store_inventory);
+    }
+
+    public function test_admin_cannot_create_account_for_employee_with_empty_email(): void
+    {
+        Notification::fake();
+
+        Employee::query()->where('EMPNO', 'E001')->update(['EMAIL' => '']);
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openSendResetModal', 'E001')
+            ->assertSet('showSendResetModal', false);
+
+        $this->assertDatabaseMissing('users', ['employee_empno' => 'E001']);
+    }
+
+    public function test_admin_cannot_create_account_when_email_belongs_to_another_employee(): void
+    {
+        Notification::fake();
+
+        User::factory()->create([
+            'employee_empno' => 'E999',
+            'email' => 'e001@example.com',
+            'is_active' => true,
+        ]);
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openSendResetModal', 'E001')
+            ->assertSet('showSendResetModal', true)
+            ->assertSet('resetTargetMode', 'create_and_send')
+            ->call('sendPasswordResetLink')
+            ->assertSet('showSendResetModal', false);
+
+        $this->assertDatabaseMissing('users', [
+            'employee_empno' => 'E001',
+            'email' => 'e001@example.com',
+        ]);
+    }
+
+    public function test_send_reset_link_action_can_be_opened_from_edit_modal_shortcut(): void
+    {
+        Notification::fake();
+
+        $linkedUser = User::factory()->create([
+            'employee_empno' => 'E001',
+            'email' => 'e001@example.com',
+            'is_active' => true,
+        ]);
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openEditModal', 'E001')
+            ->assertSet('hasLinkedLoginAccount', true)
+            ->call('openSendResetModalFromEdit')
+            ->assertSet('showSendResetModal', true)
+            ->assertSet('resetTargetEmpNo', 'E001')
+            ->assertSet('resetTargetMode', 'send_only')
+            ->call('sendPasswordResetLink');
+
+        Notification::assertSentTo($linkedUser, ResetPassword::class);
+    }
 }

@@ -956,7 +956,7 @@ class PeopleEmployeesList extends Component
         if ($useAccountLink && $employeeEmpNo !== '') {
             $linkedByEmpNo = User::query()
                 ->where('employee_empno', $employeeEmpNo)
-                ->first(['id', 'is_active', 'is_admin', 'is_gs_brochure_admin', 'can_manage_store_inventory']);
+                ->first(['id', 'email', 'is_active', 'is_admin', 'is_gs_brochure_admin', 'can_manage_store_inventory']);
 
             if ($linkedByEmpNo) {
                 return $linkedByEmpNo;
@@ -975,7 +975,7 @@ class PeopleEmployeesList extends Component
 
         return User::query()
             ->whereRaw('LOWER(TRIM(COALESCE(email, \'\'))) = ?', [$normalizedEmail])
-            ->first(['id', 'is_active', 'is_admin', 'is_gs_brochure_admin', 'can_manage_store_inventory']);
+            ->first(['id', 'email', 'is_active', 'is_admin', 'is_gs_brochure_admin', 'can_manage_store_inventory']);
     }
 
     private function shouldActivateUserFromEmployeeStatus(?string $employeeStatus): bool
