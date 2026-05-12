@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -55,6 +56,17 @@ class PeopleEmployeesList extends Component
     public bool $showDeleteTeamModal = false;
 
     public string $deleteDeptNo = '';
+
+    public bool $showSendResetModal = false;
+
+    public string $resetTargetEmpNo = '';
+
+    public string $resetTargetName = '';
+
+    public string $resetTargetEmail = '';
+
+    /** 'send_only' (계정 있음 → 메일만) | 'create_and_send' (계정 없음 → 생성 후 메일) */
+    public string $resetTargetMode = 'send_only';
 
     public bool $showCreateEmployeeModal = false;
 
@@ -591,6 +603,210 @@ class PeopleEmployeesList extends Component
 
         $this->closeDeleteTeamModal();
         session()->flash('success', '팀이 삭제되었습니다.');
+    }
+
+    /**
+     * 비밀번호 재설정 메일 발송 확인 모달을 엽니다.
+     *
+     * 직원 상태(계정 유무·활성 여부·재직 여부)에 따라 4가지 동작 분기:
+     *  - 계정 있음 + 활성              → send_only 모드로 모달 표시
+     *  - 계정 있음 + 비활성            → 거부 (flash error)
+     *  - 계정 없음 + 직원 재직(STATUS=1) → create_and_send 모드로 모달 표시
+     *  - 계정 없음 + 직원 퇴사/비활성  → 거부 (flash error)
+     */
+    public function openSendResetModal(string $empNo): void
+    {
+        Gate::authorize('manageUserAccounts');
+
+        $employee = Employee::query()->where('EMPNO', $empNo)->first();
+        if (! $employee) {
+            session()->flash('error', '대상 직원을 찾을 수 없습니다.');
+
+            return;
+        }
+
+        $linkedUser = $this->resolveLinkedUser($employee);
+        $employeeIsActive = (int) ($employee->STATUS ?? -1) === 1;
+
+        if ($linkedUser !== null) {
+            if (! (bool) $linkedUser->is_active) {
+                session()->flash('error', '비활성 계정에는 비밀번호 재설정 메일을 보낼 수 없습니다. 먼저 계정을 활성화해 주세요.');
+
+                return;
+            }
+
+            $this->resetTargetMode = 'send_only';
+            $this->resetTargetEmail = (string) $linkedUser->email;
+        } else {
+            if (! $employeeIsActive) {
+                session()->flash('error', '재직 중이 아닌 직원에게는 로그인 계정을 만들 수 없습니다.');
+
+                return;
+            }
+
+            $employeeEmail = trim((string) ($employee->EMAIL ?? ''));
+            if ($employeeEmail === '') {
+                session()->flash('error', '직원 이메일이 비어 있어 계정을 만들 수 없습니다. 먼저 직원 정보를 수정해 주세요.');
+
+                return;
+            }
+
+            $this->resetTargetMode = 'create_and_send';
+            $this->resetTargetEmail = $employeeEmail;
+        }
+
+        $this->resetTargetEmpNo = (string) $employee->EMPNO;
+        $this->resetTargetName = (string) ($employee->KOREANAME ?? '');
+        $this->showSendResetModal = true;
+    }
+
+    public function closeSendResetModal(): void
+    {
+        $this->showSendResetModal = false;
+        $this->resetTargetEmpNo = '';
+        $this->resetTargetName = '';
+        $this->resetTargetEmail = '';
+        $this->resetTargetMode = 'send_only';
+    }
+
+    /**
+     * 확인 모달에서 [발송] 버튼을 누른 시점의 실제 처리.
+     *
+     * - send_only: 기존 계정에 메일만 발송
+     * - create_and_send: 최소 권한·활성 상태로 계정을 생성한 뒤 메일 발송
+     *
+     * 양쪽 모두 메일 발송 상태(success/throttled/invalid_user/exception)에 따라
+     * 사용자에게 보이는 flash 메시지를 분기하고, 모든 시도를 Log::info로 남깁니다.
+     */
+    public function sendPasswordResetLink(): void
+    {
+        Gate::authorize('manageUserAccounts');
+
+        $employee = Employee::query()->where('EMPNO', $this->resetTargetEmpNo)->first();
+        if (! $employee) {
+            session()->flash('error', '대상 직원을 찾을 수 없습니다.');
+            $this->closeSendResetModal();
+
+            return;
+        }
+
+        if ($this->resetTargetMode === 'create_and_send') {
+            try {
+                $this->createMinimalLoginAccountFor($employee);
+            } catch (ValidationException $e) {
+                $message = collect($e->errors())->flatten()->first() ?: '계정을 만들 수 없습니다.';
+                session()->flash('error', (string) $message);
+                $this->closeSendResetModal();
+
+                return;
+            }
+        }
+
+        $email = mb_strtolower(trim((string) $this->resetTargetEmail));
+        $status = $this->sendResetLink($email);
+
+        Log::info('[admin] password reset link send attempted', [
+            'admin_id' => auth()->id(),
+            'target_empno' => $this->resetTargetEmpNo,
+            'target_email' => $email,
+            'mode' => $this->resetTargetMode,
+            'status' => $status,
+        ]);
+
+        $this->closeSendResetModal();
+        $this->flashSendStatus($status);
+    }
+
+    /**
+     * 직원 정보 수정 모달의 "비밀번호 재설정 메일 보내기" 버튼에서 호출.
+     * 모달이 열려 있는 컨텍스트(editingEmpNo)를 사용해 확인 모달을 띄웁니다.
+     */
+    public function openSendResetModalFromEdit(): void
+    {
+        if ($this->editingEmpNo === '') {
+            return;
+        }
+
+        $this->openSendResetModal($this->editingEmpNo);
+    }
+
+    /**
+     * "계정 없음 + 재직" 직원에게 최소 권한으로 로그인 계정을 생성합니다.
+     * 권한은 모두 false, 활성은 true, 비밀번호는 임시 난수.
+     * 본인은 이후 메일 링크로 재설정합니다.
+     */
+    private function createMinimalLoginAccountFor(Employee $employee): void
+    {
+        $normalizedEmail = mb_strtolower(trim((string) ($employee->EMAIL ?? '')));
+        $empNo = trim((string) ($employee->EMPNO ?? ''));
+
+        if ($normalizedEmail === '' || $empNo === '') {
+            throw ValidationException::withMessages([
+                'resetTargetEmail' => ['직원 정보가 충분하지 않아 계정을 만들 수 없습니다.'],
+            ]);
+        }
+
+        DB::transaction(function () use ($normalizedEmail, $empNo, $employee): void {
+            $existingByEmail = User::query()
+                ->whereRaw('LOWER(TRIM(COALESCE(email, \'\'))) = ?', [$normalizedEmail])
+                ->lockForUpdate()
+                ->first();
+
+            if ($existingByEmail !== null) {
+                $existingEmpNo = trim((string) ($existingByEmail->employee_empno ?? ''));
+                if ($existingEmpNo !== '' && $existingEmpNo !== $empNo) {
+                    throw ValidationException::withMessages([
+                        'resetTargetEmail' => ['이미 다른 직원 계정에서 사용 중인 이메일입니다.'],
+                    ]);
+                }
+
+                // 매우 드물게 이메일은 같은데 empno 연결만 빠져 있던 케이스 → 연결만 채워서 재사용
+                $existingByEmail->forceFill([
+                    'employee_empno' => $empNo,
+                    'is_active' => true,
+                ])->save();
+
+                return;
+            }
+
+            User::query()->create([
+                'name' => trim((string) ($employee->KOREANAME ?? $normalizedEmail)),
+                'email' => $normalizedEmail,
+                'employee_empno' => $empNo,
+                'password' => Str::random(48),
+                'is_admin' => false,
+                'is_gs_brochure_admin' => false,
+                'can_manage_store_inventory' => false,
+                'is_active' => true,
+                'email_verified_at' => null,
+            ]);
+        });
+    }
+
+    /**
+     * Password 브로커 상태 코드를 사용자 친화적 메시지로 변환해 flash 처리.
+     */
+    private function flashSendStatus(string $status): void
+    {
+        if ($status === Password::RESET_LINK_SENT) {
+            session()->flash('success', '비밀번호 재설정 메일을 발송했습니다.');
+
+            return;
+        }
+
+        if ($status === Password::RESET_THROTTLED) {
+            session()->flash('error', '잠시 후 다시 시도해 주세요. (같은 이메일에 1분 이내 재발송은 제한됩니다.)');
+
+            return;
+        }
+
+        if ($status === Password::INVALID_USER) {
+            session()->flash('error', '해당 이메일을 가진 로그인 계정을 찾을 수 없습니다.');
+
+            return;
+        }
+
+        session()->flash('error', '메일 서버 인증 문제로 비밀번호 재설정 메일 발송에 실패했습니다. 메일 설정을 확인해 주세요.');
     }
 
     public function render()

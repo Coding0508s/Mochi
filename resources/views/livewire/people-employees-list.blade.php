@@ -122,6 +122,9 @@
                         <th class="px-3 py-2 text-left text-xs font-semibold">연락처</th>
                         <th class="px-3 py-2 text-left text-xs font-semibold">입사일</th>
                         <th class="px-3 py-2 text-center text-xs font-semibold">상태</th>
+                        @if($canManageUserAccounts)
+                            <th class="px-3 py-2 text-center text-xs font-semibold">계정</th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -146,10 +149,60 @@
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">-</span>
                                 @endif
                             </td>
+                            @if($canManageUserAccounts)
+                                {{-- 행 클릭(수정 모달 열기)과 충돌 방지를 위해 wire:click.stop 사용 --}}
+                                <td class="px-3 py-2 text-center">
+                                    @php
+                                        $linkedId = $emp->linked_user_id ?? null;
+                                        $linkedActive = $emp->linked_user_is_active ?? null;
+                                        $isEmployeeActive = (int) ($emp->STATUS ?? -1) === 1;
+                                        $employeeEmail = trim((string) ($emp->EMAIL ?? ''));
+                                    @endphp
+
+                                    @if($linkedId !== null && $linkedActive === true)
+                                        <button type="button"
+                                                wire:click.stop="openSendResetModal('{{ $emp->EMPNO }}')"
+                                                title="비밀번호 재설정 메일 보내기"
+                                                aria-label="비밀번호 재설정 메일 보내기"
+                                                class="inline-flex items-center justify-center w-7 h-7 rounded-md text-[#2b78c5] hover:bg-blue-50 cursor-pointer">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                            </svg>
+                                        </button>
+                                    @elseif($linkedId === null && $isEmployeeActive && $employeeEmail !== '')
+                                        <button type="button"
+                                                wire:click.stop="openSendResetModal('{{ $emp->EMPNO }}')"
+                                                title="계정 발급 + 비밀번호 설정 메일 보내기"
+                                                aria-label="계정 발급 + 비밀번호 설정 메일 보내기"
+                                                class="inline-flex items-center justify-center w-7 h-7 rounded-md text-emerald-600 hover:bg-emerald-50 cursor-pointer">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm4 8v-1a4 4 0 00-3-3.87M4 20v-1a4 4 0 013-3.87M19 8v6m3-3h-6"/>
+                                            </svg>
+                                        </button>
+                                    @elseif($linkedId !== null && $linkedActive === false)
+                                        <span title="비활성 계정 (활성 후 발송 가능)"
+                                              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">
+                                            비활성
+                                        </span>
+                                    @elseif($linkedId === null && ! $isEmployeeActive)
+                                        <span title="재직 중이 아닌 직원은 계정을 만들 수 없습니다"
+                                              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">
+                                            불가
+                                        </span>
+                                    @elseif($linkedId === null && $employeeEmail === '')
+                                        <span title="이메일이 비어 있어 계정을 만들 수 없습니다"
+                                              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700">
+                                            이메일 없음
+                                        </span>
+                                    @endif
+                                </td>
+                            @endif
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="px-4 py-16 text-center text-gray-400">
+                            <td colspan="{{ $canManageUserAccounts ? 10 : 9 }}" class="px-4 py-16 text-center text-gray-400">
                                 <p class="font-medium">직원 데이터가 없습니다</p>
                                 <p class="text-sm mt-1">검색/필터 조건을 변경해 보세요.</p>
                             </td>
@@ -421,6 +474,45 @@
                                         연결된 로그인 계정이 없어도 저장 시 현재 이메일로 계정을 자동 생성합니다.
                                     </p>
                                 @endif
+
+                                {{-- 비밀번호 재설정 메일 발송 영역: 4가지 상태별 분기 --}}
+                                <div class="pt-3 border-t border-gray-200">
+                                    @if($hasLinkedLoginAccount && $editUserIsActive)
+                                        <button type="button"
+                                                wire:click="openSendResetModalFromEdit"
+                                                class="inline-flex items-center gap-2 px-3 py-2 text-sm text-[#2b78c5] border border-[#2b78c5] rounded-lg hover:bg-blue-50 cursor-pointer">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                            </svg>
+                                            비밀번호 재설정 메일 보내기
+                                        </button>
+                                        <p class="mt-1.5 text-[11px] text-gray-500">
+                                            DB에 등록된 이메일로 발송됩니다. (수정 중인 이메일이 아닌 저장된 이메일)
+                                        </p>
+                                    @elseif($hasLinkedLoginAccount && ! $editUserIsActive)
+                                        <p class="text-[11px] text-amber-700">
+                                            비활성 계정에는 비밀번호 재설정 메일을 보낼 수 없습니다. 먼저 계정을 활성화한 뒤 발송해 주세요.
+                                        </p>
+                                    @elseif(! $hasLinkedLoginAccount && $editStatus === '1' && trim((string) $editEmail) !== '')
+                                        <button type="button"
+                                                wire:click="openSendResetModalFromEdit"
+                                                class="inline-flex items-center gap-2 px-3 py-2 text-sm text-emerald-700 border border-emerald-600 rounded-lg hover:bg-emerald-50 cursor-pointer">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm4 8v-1a4 4 0 00-3-3.87M4 20v-1a4 4 0 013-3.87M19 8v6m3-3h-6"/>
+                                            </svg>
+                                            계정 발급 + 비밀번호 설정 메일 보내기
+                                        </button>
+                                        <p class="mt-1.5 text-[11px] text-amber-700">
+                                            새 계정은 일반 권한으로 생성됩니다. 관리자/GS/재고 권한이 필요하면 발급 후 위 체크박스로 설정해 주세요.
+                                        </p>
+                                    @elseif(! $hasLinkedLoginAccount)
+                                        <p class="text-[11px] text-amber-700">
+                                            재직 중이 아니거나 이메일이 비어 있어 계정을 만들 수 없습니다.
+                                        </p>
+                                    @endif
+                                </div>
                             </div>
                         @endif
 
@@ -567,6 +659,80 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    @endif
+
+    @if($showSendResetModal)
+        <div class="mochi-modal-overlay" wire:key="password-reset-confirm-modal">
+            <div class="mochi-modal-shell max-w-lg">
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-lg font-semibold text-gray-800">
+                        @if($resetTargetMode === 'create_and_send')
+                            계정 발급 + 비밀번호 설정 메일 보내기
+                        @else
+                            비밀번호 재설정 메일 보내기
+                        @endif
+                    </h3>
+                    <button type="button"
+                            wire:click="closeSendResetModal"
+                            class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="px-6 py-5 space-y-4">
+                    @if($resetTargetMode === 'create_and_send')
+                        <p class="text-sm text-gray-700">
+                            다음 직원의 <strong class="text-emerald-700">로그인 계정을 새로 만들고</strong>
+                            비밀번호 설정 메일을 보냅니다.
+                        </p>
+                    @else
+                        <p class="text-sm text-gray-700">
+                            다음 직원에게 비밀번호 재설정 메일을 보냅니다.
+                        </p>
+                    @endif
+
+                    <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm space-y-1">
+                        <div>
+                            <span class="text-gray-500">이름</span>
+                            <span class="ml-2 font-medium text-gray-900">{{ $resetTargetName ?: '-' }}</span>
+                            <span class="ml-2 text-xs text-gray-400">(사번 {{ $resetTargetEmpNo }})</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">이메일</span>
+                            <span class="ml-2 font-medium text-gray-900">{{ $resetTargetEmail }}</span>
+                        </div>
+                    </div>
+
+                    @if($resetTargetMode === 'create_and_send')
+                        <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800 leading-snug">
+                            <strong>새 계정은 일반 권한(관리자·GS·재고 권한 모두 없음)으로 생성됩니다.</strong><br/>
+                            추가 권한이 필요하면 발급 후 직원 정보 수정 창에서 별도로 설정해 주세요.
+                        </div>
+                    @endif
+                </div>
+
+                <div class="px-6 pb-5 flex items-center justify-end gap-2">
+                    <button type="button"
+                            wire:click="closeSendResetModal"
+                            class="px-4 py-2 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 cursor-pointer">
+                        취소
+                    </button>
+                    <button type="button"
+                            wire:click="sendPasswordResetLink"
+                            wire:loading.attr="disabled"
+                            wire:target="sendPasswordResetLink"
+                            class="px-4 py-2 text-sm text-white {{ $resetTargetMode === 'create_and_send' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#2b78c5] hover:bg-[#256bb0]' }} rounded-lg cursor-pointer disabled:opacity-60">
+                        @if($resetTargetMode === 'create_and_send')
+                            계정 발급 + 발송
+                        @else
+                            발송
+                        @endif
+                    </button>
+                </div>
             </div>
         </div>
     @endif
