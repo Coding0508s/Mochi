@@ -633,6 +633,8 @@ class PeopleEmployeesList extends Component
             ->orderBy("employee.{$sortField}", $this->sortDirection)
             ->paginate(20);
 
+        $this->attachLinkedUserInfo($employees);
+
         $allCount = Employee::query()->count();
         $activeCount = Employee::query()->where('STATUS', 1)->count();
         $inactiveCount = Employee::query()->where('STATUS', 0)->count();
@@ -694,6 +696,40 @@ class PeopleEmployeesList extends Component
             ->distinct()
             ->orderBy('JOB')
             ->pluck('JOB');
+    }
+
+    /**
+     * 현재 페이지에 표시되는 직원 각각에 대해 연결된 로그인 계정 정보를
+     * 동적 속성으로 부착합니다. 페이지당 20명에 대해 단일 whereIn 쿼리
+     * 한 번만 실행하므로 N+1이 발생하지 않습니다.
+     *
+     * 매칭 기준: employee.EMPNO ↔ users.employee_empno (이메일 fallback은
+     * 보안상 목록 노출 결정에는 사용하지 않고, 발송 시점에 resolveLinkedUser
+     * 에서만 별도로 적용합니다.)
+     */
+    private function attachLinkedUserInfo(\Illuminate\Contracts\Pagination\LengthAwarePaginator $employees): void
+    {
+        $empNos = collect($employees->items())
+            ->pluck('EMPNO')
+            ->filter(fn ($v): bool => trim((string) $v) !== '')
+            ->map(fn ($v): string => trim((string) $v))
+            ->unique()
+            ->values()
+            ->all();
+
+        $linkedUsersByEmpNo = $empNos === []
+            ? collect()
+            : User::query()
+                ->whereIn('employee_empno', $empNos)
+                ->get(['id', 'employee_empno', 'is_active', 'email'])
+                ->keyBy(fn (User $user): string => trim((string) $user->employee_empno));
+
+        foreach ($employees->items() as $employee) {
+            $linked = $linkedUsersByEmpNo->get(trim((string) ($employee->EMPNO ?? '')));
+            $employee->linked_user_id = $linked?->id;
+            $employee->linked_user_is_active = $linked ? (bool) $linked->is_active : null;
+            $employee->linked_user_email = $linked?->email;
+        }
     }
 
     private function resolveLinkedUser(Employee $employee): ?User
