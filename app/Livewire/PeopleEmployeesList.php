@@ -366,7 +366,8 @@ class PeopleEmployeesList extends Component
         }
 
         if (is_string($newlyCreatedUserEmail) && $newlyCreatedUserEmail !== '') {
-            $resetLinkSentForNewUser = $this->sendResetLinkSafely($newlyCreatedUserEmail);
+            $status = $this->sendResetLink($newlyCreatedUserEmail);
+            $resetLinkSentForNewUser = $status === Password::RESET_LINK_SENT;
         }
 
         $this->closeEditModal();
@@ -488,7 +489,7 @@ class PeopleEmployeesList extends Component
             ]);
         });
 
-        $resetLinkSent = $this->sendResetLinkSafely($email);
+        $resetLinkSent = $this->sendResetLink($email) === Password::RESET_LINK_SENT;
 
         $this->closeCreateEmployeeModal();
         $this->resetPage();
@@ -730,16 +731,20 @@ class PeopleEmployeesList extends Component
         return (string) $employeeStatus !== '0';
     }
 
-    private function sendResetLinkSafely(string $email): bool
+    /**
+     * 비밀번호 재설정 링크 발송. Laravel Password 브로커의 상태 코드를 그대로 반환합니다.
+     *
+     * 정상 동작 시: Password::RESET_LINK_SENT / INVALID_USER / RESET_THROTTLED
+     * 메일 서버 등 외부 예외 발생 시: 'passwords.exception' (비표준, 명확한 분기를 위함)
+     */
+    private function sendResetLink(string $email): string
     {
         try {
-            $status = Password::sendResetLink(['email' => $email]);
-
-            return $status === Password::RESET_LINK_SENT;
+            return Password::sendResetLink(['email' => $email]);
         } catch (\Throwable $e) {
             report($e);
 
-            return false;
+            return 'passwords.exception';
         }
     }
 
