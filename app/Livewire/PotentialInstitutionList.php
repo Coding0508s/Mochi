@@ -575,7 +575,7 @@ class PotentialInstitutionList extends Component
 
     private function resetCreateForm(): void
     {
-        $this->newManager = (string) (auth()->user()?->name ?? '');
+        $this->newManager = (string) (auth()->user()?->nameForCoReports() ?? '');
         $this->newConsultingType = '';
         $this->newConnected = '';
         $this->newMeetingDate = '';

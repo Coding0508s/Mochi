@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\SupportCreateForm;
+use App\Mail\SupportReportStoredMail;
 use App\Models\CoNewTarget;
 use App\Models\Institution;
 use App\Models\User;
@@ -10,6 +11,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -172,6 +174,58 @@ class SupportCreateFormTest extends TestCase
             'TO_Account' => '기관 소통 본문',
             'TO_Depart' => '타부서 공유 본문',
         ]);
+    }
+
+    public function test_save_sends_mail_when_support_report_notify_addresses_configured(): void
+    {
+        Mail::fake();
+
+        config([
+            'support_report_mail.notify_addresses' => ['group@test.org', 'backup@test.org'],
+        ]);
+
+        Institution::query()->create([
+            'SKcode' => 'SK-MAIL-1',
+            'AccountName' => '메일 테스트 기관',
+        ]);
+
+        $user = User::factory()->create(['name' => '작성자', 'email' => 'author@example.com']);
+
+        Livewire::actingAs($user)
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-MAIL-1')
+            ->set('formToAccount', '기관 소통 본문')
+            ->set('formToDepart', '타부서 공유 본문')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        Mail::assertSent(SupportReportStoredMail::class, function (SupportReportStoredMail $mail): bool {
+            return $mail->hasTo('group@test.org')
+                && $mail->hasTo('backup@test.org');
+        });
+    }
+
+    public function test_save_does_not_send_mail_when_notify_addresses_empty(): void
+    {
+        Mail::fake();
+
+        config(['support_report_mail.notify_addresses' => []]);
+
+        Institution::query()->create([
+            'SKcode' => 'SK-NO-MAIL',
+            'AccountName' => '메일 없음',
+        ]);
+
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-NO-MAIL')
+            ->set('formToAccount', '내용')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        Mail::assertNothingSent();
     }
 
     public function test_save_mirrors_to_potential_detail_for_uncontracted_target(): void

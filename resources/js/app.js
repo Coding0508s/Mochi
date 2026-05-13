@@ -10,6 +10,10 @@ window.mochiSupportEnterTriangle = function (event) {
     if (!(el instanceof HTMLTextAreaElement) || el.disabled) {
         return;
     }
+    //Shift+Enter 시 줄바꿈. "▶ " 삽입안함
+    if(event.shiftKey){
+        return;
+    }
     event.preventDefault();
     const start = el.selectionStart;
     const end = el.selectionEnd;

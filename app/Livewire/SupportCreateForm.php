@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Mail\SupportReportStoredMail;
 use App\Models\CoNewTarget;
 use App\Models\CoNewTargetDetail;
 use App\Models\ContractDocument;
@@ -12,6 +13,8 @@ use App\Models\SupportRecord;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -247,6 +250,7 @@ class SupportCreateForm extends Component
         $originalFilename = null;
         $detectedMimeType = null;
         $detectedSize = null;
+        $supportRecord = null;
 
         try {
             if ($upload instanceof TemporaryUploadedFile) {
@@ -267,7 +271,7 @@ class SupportCreateForm extends Component
                 }
             }
 
-            DB::transaction(function () use ($upload, $storedPath, $originalFilename, $detectedMimeType, $detectedSize, $resolvedPotentialTargetId): void {
+            DB::transaction(function () use ($upload, $storedPath, $originalFilename, $detectedMimeType, $detectedSize, $resolvedPotentialTargetId, &$supportRecord): void {
                 $supportRecord = SupportRecord::query()->create([
                     'Year' => (int) date('Y', strtotime($this->formSupportDate)),
                     'SK_Code' => $this->formSkCode !== '' ? $this->formSkCode : null,
@@ -329,6 +333,23 @@ class SupportCreateForm extends Component
             }
 
             throw $e;
+        }
+
+        $notify = config('support_report_mail.notify_addresses', []);
+        if ($supportRecord instanceof SupportRecord && $notify !== []) {
+            try {
+                Mail::to($notify)->send(new SupportReportStoredMail($supportRecord, auth()->user()));
+            } catch (\Throwable $mailException) {
+                report($mailException);
+                Log::warning('기관 지원 보고서 알림 메일 발송 실패', [
+                    'exception' => $mailException->getMessage(),
+                    'notify' => $notify,
+                ]);
+                session()->flash(
+                    'warning',
+                    '지원 보고서는 저장되었지만, 알림 메일 발송에 실패했습니다. Gmail은 앱 비밀번호가 필요할 수 있습니다. `storage/logs/laravel.log`과 `.env`의 MAIL_* 설정을 확인해 주세요.',
+                );
+            }
         }
 
         $this->sfUpload = null;

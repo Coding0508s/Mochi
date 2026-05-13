@@ -240,6 +240,7 @@
                                         <option value="신규기관방문"></option>
                                         <option value="신규(24년)"></option>
                                         <option value="신규(25년)"></option>
+                                        <option value="신규(26년)"></option>
                                         <option value="해지방문"></option>
                                     </datalist>
                                     @error('newConsultingType') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror

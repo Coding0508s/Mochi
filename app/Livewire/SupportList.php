@@ -543,7 +543,10 @@ class SupportList extends Component
             ->ofInstitution($this->filterSkCode)
             ->keyword($this->search)
             ->with('institution')
-            ->orderBy('Support_Date', 'desc')
+            // 최근에 저장(작성)된 보고서가 위로 — NULL CreatedDate(구데이터)는 맨 뒤
+            ->orderByRaw('CreatedDate IS NULL ASC')
+            ->orderByDesc('CreatedDate')
+            ->orderByDesc('ID')
             ->paginate(20);
 
         // 필터 드롭다운용 데이터
