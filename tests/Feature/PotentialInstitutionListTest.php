@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\SyncOrigin;
 use App\Jobs\SyncInstitutionOutboundJob;
 use App\Livewire\PotentialInstitutionList;
+use App\Mail\PotentialMeetingStoredMail;
 use App\Models\AccountInformation;
 use App\Models\CoNewTarget;
 use App\Models\CoNewTargetDetail;
@@ -17,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
@@ -241,6 +243,46 @@ class PotentialInstitutionListTest extends TestCase
         $this->assertDatabaseMissing('S_Account_Information', [
             'Account_Name' => $accountName,
         ]);
+    }
+
+    public function test_save_new_target_meeting_mail_includes_student_counts(): void
+    {
+        Mail::fake();
+
+        config([
+            'support_report_mail.notify_addresses' => ['group@test.org'],
+        ]);
+
+        $accountName = 'QA 미팅 메일 인원 '.uniqid('', true);
+
+        Livewire::test(PotentialInstitutionList::class)
+            ->call('openCreateModal')
+            ->set('newAccountName', $accountName)
+            ->set('newType', '신규(25년)')
+            ->set('newConsultingType', '신규기관방문')
+            ->set('newMeetingDate', '2026-04-06')
+            ->set('newMeetingTime', '13:00')
+            ->set('newMeetingTimeEnd', '13:30')
+            ->set('newManager', 'James Kwak')
+            ->set('newDescription', '첫 미팅 메모')
+            ->set('newLS', '2')
+            ->set('newGSK', '3')
+            ->set('newGSE', '1')
+            ->call('saveNewTarget')
+            ->assertSet('showCreateModal', false)
+            ->assertHasNoErrors();
+
+        Mail::assertSent(PotentialMeetingStoredMail::class, function (PotentialMeetingStoredMail $mail) use ($accountName): bool {
+            return $mail->hasTo('group@test.org')
+                && $mail->meetingDetail->AccountName === $accountName
+                && $mail->meetingDetail->Description === '첫 미팅 메모'
+                && $mail->studentCounts === [
+                    'ls' => 2,
+                    'gs_k' => 3,
+                    'gs_e' => 1,
+                    'total' => 6,
+                ];
+        });
     }
 
     public function test_save_new_target_with_support_report_creates_support_record(): void

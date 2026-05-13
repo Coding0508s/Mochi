@@ -13,13 +13,13 @@
     @endif
 
     @if($saveError)
-        <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" data-mochi-flash-dismiss="3000" role="alert">
             {{ $saveError }}
         </div>
     @endif
 
     @if($saveSuccess)
-        <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700" data-mochi-flash-dismiss="3000" role="status">
             {{ $saveSuccess }}
         </div>
     @endif

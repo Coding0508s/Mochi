@@ -1,11 +1,11 @@
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 px-5 py-5">
     @if (session()->has('success'))
-        <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800" data-mochi-flash-dismiss="3000" role="status">
             {{ session('success') }}
         </div>
     @endif
     @if (session()->has('error'))
-        <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800" data-mochi-flash-dismiss="3000" role="status">
             {{ session('error') }}
         </div>
     @endif

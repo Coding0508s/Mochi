@@ -64,6 +64,11 @@ class ContactList extends Component
 
     public string $newDescription = '';  // 비고
 
+    /** GrapeSEED / LittleSEED Essentials 일자 (Y-m-d, 비우면 NULL) */
+    public string $newGrapeSeedEssentials = '';
+
+    public string $newLittleSeedEssentials = '';
+
     protected array $messages = [
         'newName.required' => '이름을 입력해 주세요.',
         'newEmail.required' => '이메일을 입력해 주세요.',
@@ -112,6 +117,8 @@ class ContactList extends Component
         $this->newSkCode = (string) ($teacher->SK_Code ?? '');
         $this->newSchoolName = (string) ($teacher->School_Name ?? '');
         $this->newDescription = (string) ($teacher->Description ?? '');
+        $this->newGrapeSeedEssentials = $teacher->GrapeSEEDEssentials?->format('Y-m-d') ?? '';
+        $this->newLittleSeedEssentials = $teacher->LittleSEEDEssentials?->format('Y-m-d') ?? '';
         $this->showModal = true;
     }
 
@@ -176,6 +183,18 @@ class ContactList extends Component
         $this->selectedContact = null;
     }
 
+    /** 상세(읽기) 모달에서 수정 폼으로 전환 */
+    public function openEditFromDetail(): void
+    {
+        if ($this->selectedContact === null || ! isset($this->selectedContact['id'])) {
+            return;
+        }
+
+        $id = (int) $this->selectedContact['id'];
+        $this->closeDetailModal();
+        $this->openEditModal($id);
+    }
+
     private function resetModal(): void
     {
         $this->newName = '';
@@ -189,6 +208,8 @@ class ContactList extends Component
         $this->newSchoolName = '';
         $this->newInstitutionKeyword = '';
         $this->newDescription = '';
+        $this->newGrapeSeedEssentials = '';
+        $this->newLittleSeedEssentials = '';
         $this->editingId = null;
         $this->resetValidation();
     }
@@ -277,10 +298,15 @@ class ContactList extends Component
             'newSkCode' => 'required',
             'newEmploymentStatus' => 'required|in:active,inactive',
             'newClassParticipation' => 'required|in:in,out',
+            'newGrapeSeedEssentials' => ['nullable', 'date'],
+            'newLittleSeedEssentials' => ['nullable', 'date'],
         ], $this->messages);
 
         $isActive = $this->newEmploymentStatus === 'active';
         $isClassIn = $this->newClassParticipation === 'in';
+
+        $grapeDate = trim($this->newGrapeSeedEssentials);
+        $littleDate = trim($this->newLittleSeedEssentials);
 
         $data = [
             'Name' => $this->newName,
@@ -292,6 +318,8 @@ class ContactList extends Component
             'Description' => $this->newDescription,
             'Status' => $isActive ? '활성화' : '비활성화',
             'ClassInOut' => $isClassIn,
+            'GrapeSEEDEssentials' => $grapeDate === '' ? null : $grapeDate,
+            'LittleSEEDEssentials' => $littleDate === '' ? null : $littleDate,
         ];
 
         if ($this->editingId) {

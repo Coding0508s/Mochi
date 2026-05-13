@@ -2,11 +2,15 @@
 
 namespace App\Actions;
 
+use App\Mail\PotentialMeetingStoredMail;
 use App\Models\CoNewTarget;
 use App\Models\CoNewTargetDetail;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class CreatePotentialMeetingDetail
 {
@@ -38,7 +42,7 @@ class CreatePotentialMeetingDetail
             : (filled($target->AccountManager) ? trim((string) $target->AccountManager) : '');
         $accountManager = $accountManager !== '' ? $accountManager : null;
 
-        return CoNewTargetDetail::query()->create([
+        $meetingDetail = CoNewTargetDetail::query()->create([
             'Year' => (int) $meetingDate->format('Y'),
             'AccountName' => (string) $target->AccountName,
             'AccountManager' => $accountManager,
@@ -49,5 +53,32 @@ class CreatePotentialMeetingDetail
             'ConsultingType' => trim((string) $payload['consulting_type']),
             'Possibility' => filled($payload['possibility'] ?? null) ? trim((string) $payload['possibility']) : null,
         ]);
+
+        $this->sendStoredMailAfterCommit($meetingDetail, $target);
+
+        return $meetingDetail;
+    }
+
+    private function sendStoredMailAfterCommit(CoNewTargetDetail $meetingDetail, CoNewTarget $target): void
+    {
+        $notify = config('support_report_mail.notify_addresses', []);
+        if ($notify === []) {
+            return;
+        }
+
+        $submittedBy = auth()->user();
+
+        DB::afterCommit(function () use ($meetingDetail, $notify, $submittedBy, $target): void {
+            try {
+                Mail::to($notify)->send(new PotentialMeetingStoredMail($meetingDetail, $submittedBy, $target));
+            } catch (\Throwable $mailException) {
+                report($mailException);
+                Log::warning('잠재기관 미팅 내역 알림 메일 발송 실패', [
+                    'exception' => $mailException->getMessage(),
+                    'notify' => $notify,
+                    'meeting_detail_id' => $meetingDetail->getKey(),
+                ]);
+            }
+        });
     }
 }

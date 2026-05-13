@@ -46,7 +46,7 @@
                     </p>
 
                     @if (session('status') === 'verification-link-sent')
-                        <p class="mt-2 font-medium text-sm text-green-600">
+                        <p class="mt-2 font-medium text-sm text-green-600" data-mochi-flash-dismiss="3000" role="status">
                             새 인증 링크를 이메일로 전송했습니다.
                         </p>
                     @endif
@@ -58,13 +58,7 @@
             <x-primary-button>저장</x-primary-button>
 
             @if (session('status') === 'profile-updated')
-                <p
-                    x-data="{ show: true }"
-                    x-show="show"
-                    x-transition
-                    x-init="setTimeout(() => show = false, 2000)"
-                    class="text-sm text-gray-600"
-                >저장되었습니다.</p>
+                <p class="text-sm text-gray-600" data-mochi-flash-dismiss="3000" role="status">저장되었습니다.</p>
             @endif
         </div>
     </form>

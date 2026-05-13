@@ -10,6 +10,7 @@ use App\Models\SupportRecord;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -154,10 +155,10 @@ class PotentialInstitutionViewTest extends TestCase
             'AccountName' => 'Year2025Row',
             'Type' => '신규',
             'Gubun' => '방문',
-            'LS' => 0,
-            'GS_K' => 0,
-            'GS_E' => 0,
-            'Total' => 0,
+            'LS' => 2,
+            'GS_K' => 3,
+            'GS_E' => 1,
+            'Total' => 6,
         ]);
 
         CoNewTarget::query()->create([
@@ -505,6 +506,50 @@ class PotentialInstitutionViewTest extends TestCase
             ->first();
         $this->assertNotNull($detail);
         $this->assertStringContainsString('추가 미팅', (string) $detail->Description);
+    }
+
+    public function test_meeting_form_does_not_send_mail_when_notify_addresses_empty(): void
+    {
+        Mail::fake();
+
+        config(['support_report_mail.notify_addresses' => []]);
+
+        $user = User::factory()->create();
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-10',
+            'AccountManager' => '담당A',
+            'AccountCode' => null,
+            'AccountName' => '메일 없음 미팅 기관',
+            'Address' => null,
+            'Director' => null,
+            'Phone' => null,
+            'Connected' => null,
+            'Type' => '신규',
+            'Gubun' => '방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'B',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionMeetingForm::class, ['coNewTargetId' => (int) $target->ID])
+            ->set('meetingDate', '2026-04-18')
+            ->set('consultingType', '재방문')
+            ->set('description', '메일 미발송 미팅 메모')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        Mail::assertNothingSent();
     }
 
     public function test_meeting_form_rejects_contracted_target(): void

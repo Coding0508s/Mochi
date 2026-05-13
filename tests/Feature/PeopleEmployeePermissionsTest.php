@@ -7,7 +7,7 @@ use App\Livewire\SetupEmployeeCreate;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
+use App\Notifications\CustomResetPassword;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
@@ -286,7 +286,7 @@ class PeopleEmployeePermissionsTest extends TestCase
 
         $newUser = User::query()->where('email', 'modal-new@example.com')->first();
         $this->assertNotNull($newUser);
-        Notification::assertSentTo($newUser, ResetPassword::class);
+        Notification::assertSentTo($newUser, CustomResetPassword::class);
     }
 
     public function test_admin_can_register_employee_via_setup(): void
@@ -317,7 +317,7 @@ class PeopleEmployeePermissionsTest extends TestCase
 
         $newUser = User::query()->where('email', 'new@example.com')->first();
         $this->assertNotNull($newUser);
-        Notification::assertSentTo($newUser, ResetPassword::class);
+        Notification::assertSentTo($newUser, CustomResetPassword::class);
     }
 
     public function test_register_employee_via_setup_always_creates_user_and_sends_reset_notification(): void
@@ -349,7 +349,7 @@ class PeopleEmployeePermissionsTest extends TestCase
         $this->assertNotNull($newUser);
         $this->assertFalse($newUser->is_admin);
 
-        Notification::assertSentTo($newUser, ResetPassword::class);
+        Notification::assertSentTo($newUser, CustomResetPassword::class);
     }
 
     public function test_register_employee_via_setup_can_assign_gs_brochure_admin_permission(): void
@@ -621,7 +621,7 @@ class PeopleEmployeePermissionsTest extends TestCase
         $this->assertSame('e001@example.com', $createdUser->email);
         $this->assertTrue((bool) $createdUser->is_gs_brochure_admin);
 
-        Notification::assertSentTo($createdUser, ResetPassword::class);
+        Notification::assertSentTo($createdUser, CustomResetPassword::class);
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -649,7 +649,7 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->call('sendPasswordResetLink')
             ->assertSet('showSendResetModal', false);
 
-        Notification::assertSentTo($linkedUser, ResetPassword::class);
+        Notification::assertSentTo($linkedUser, CustomResetPassword::class);
     }
 
     public function test_admin_cannot_send_password_reset_link_when_linked_account_is_inactive(): void
@@ -728,7 +728,7 @@ class PeopleEmployeePermissionsTest extends TestCase
         $this->assertSame('e001@example.com', $createdUser->email);
         $this->assertTrue((bool) $createdUser->is_active);
 
-        Notification::assertSentTo($createdUser, ResetPassword::class);
+        Notification::assertSentTo($createdUser, CustomResetPassword::class);
     }
 
     public function test_auto_created_account_has_no_elevated_permissions(): void
@@ -813,6 +813,6 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->assertSet('resetTargetMode', 'send_only')
             ->call('sendPasswordResetLink');
 
-        Notification::assertSentTo($linkedUser, ResetPassword::class);
+        Notification::assertSentTo($linkedUser, CustomResetPassword::class);
     }
 }

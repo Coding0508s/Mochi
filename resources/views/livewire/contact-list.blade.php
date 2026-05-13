@@ -1,6 +1,6 @@
 <div class="mochi-page">
     @if(session('success'))
-        <div class="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex items-center gap-2">
+        <div class="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex items-center gap-2" data-mochi-flash-dismiss="3000" role="status">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
             </svg>
@@ -97,7 +97,6 @@
                     <th class="px-3 py-2 text-left text-xs font-semibold">CO</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">주소</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">비고</th>
-                    <th class="px-3 py-2 text-center text-xs font-semibold">액션</th>
                 </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -150,22 +149,10 @@
                         <td class="px-3 py-2.5 text-gray-500 text-xs max-w-32 truncate" title="{{ $teacher->Description }}">
                             {{ $teacher->Description ?? '-' }}
                         </td>
-                        <td class="px-3 py-2.5 text-center">
-                            <div class="inline-flex items-center gap-1">
-                                <button wire:click.stop="openEditModal({{ $teacher->ID }})"
-                                        class="px-2 py-1 text-xs text-blue-600 border border-blue-200 rounded hover:bg-blue-50 transition-colors cursor-pointer">
-                                    수정
-                                </button>
-                                <button wire:click.stop="confirmDelete({{ $teacher->ID }})"
-                                        class="px-2 py-1 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors cursor-pointer">
-                                    삭제
-                                </button>
-                            </div>
-                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="16" class="px-4 py-16 text-center text-gray-400">
+                        <td colspan="15" class="px-4 py-16 text-center text-gray-400">
                             <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                       d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -281,6 +268,21 @@
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                                 <input type="text" wire:model="newPhone" placeholder="010-0000-0000"
                                        class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">GrapeSEED Essentials</label>
+                                <input type="date" wire:model="newGrapeSeedEssentials"
+                                       class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                                @error('newGrapeSeedEssentials') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">LittleSEED Essentials</label>
+                                <input type="date" wire:model="newLittleSeedEssentials"
+                                       class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                                @error('newLittleSeedEssentials') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                             </div>
                         </div>
 
@@ -467,12 +469,25 @@
                         </table>
                     </div>
                 </div>
+
+                <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-2">
+                    <button type="button"
+                            wire:click="closeDetailModal"
+                            class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+                        닫기
+                    </button>
+                    <button type="button"
+                            wire:click="openEditFromDetail"
+                            class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors cursor-pointer">
+                        수정
+                    </button>
+                </div>
             </div>
         </div>
     @endif
 
     <div wire:loading.delay
-         wire:target="save,delete,retire,openDetailModal,openEditModal,gotoPage,nextPage,previousPage"
+         wire:target="save,delete,retire,openDetailModal,openEditModal,openEditFromDetail,gotoPage,nextPage,previousPage"
          class="fixed bottom-6 right-6 z-50">
         <div class="bg-white rounded-xl px-4 py-3 shadow-lg border border-gray-200 flex items-center gap-2 text-sm text-gray-700">
             <svg class="animate-spin w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24">

@@ -1,6 +1,7 @@
 import './bootstrap';
 import { mountSpecialText } from './special-text';
 import { initMochiFloatingInputs } from './mochi-floating-input';
+import { initMochiFlashDismiss, registerMochiFlashDismissObserver } from './mochi-flash-dismiss';
 
 /**
  * 기관 지원 보고서 textarea: Enter 시 새 줄에 "▶ " 삽입 (Livewire input 동기화)
@@ -28,4 +29,6 @@ window.mochiSupportEnterTriangle = function (event) {
 document.addEventListener('DOMContentLoaded', () => {
     mountSpecialText();
     initMochiFloatingInputs();
+    initMochiFlashDismiss();
+    registerMochiFlashDismissObserver();
 });

@@ -1,6 +1,6 @@
 <div class="mochi-page space-y-4">
     @if(session('success'))
-        <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700" data-mochi-flash-dismiss="3000" role="status">
             {{ session('success') }}
         </div>
     @endif

@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Builder;
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -25,14 +25,14 @@ use Illuminate\Database\Eloquent\Builder;
  *   Teacher::active()->get()
  * ═══════════════════════════════════════════════════════════════
  *
- * @property int    $ID
- * @property string $SK_Code    소속 기관 코드 (Institution.SKcode 연결)
- * @property string $Name       교사 이름
- * @property string $Email      이메일
- * @property string $Phone      연락처
- * @property string $Position   직급
- * @property string $Status     상태 (재직/퇴직 등)
- * @property string $CO_Name    담당 CO 이름
+ * @property int $ID
+ * @property string $SK_Code 소속 기관 코드 (Institution.SKcode 연결)
+ * @property string $Name 교사 이름
+ * @property string $Email 이메일
+ * @property string $Phone 연락처
+ * @property string $Position 직급
+ * @property string $Status 상태 (재직/퇴직 등)
+ * @property string $CO_Name 담당 CO 이름
  */
 class Teacher extends Model
 {
@@ -41,6 +41,7 @@ class Teacher extends Model
     // 원본 SQL의 테이블 이름 그대로 사용합니다.
 
     protected $primaryKey = 'ID';
+
     public $timestamps = false;
 
     // ─── 대량 입력 허용 필드 ──────────────────────────────────────────
@@ -60,8 +61,8 @@ class Teacher extends Model
         'CS',
         'CO',
         'Created_Date',
-        // ※ 지원 날짜 관련 필드는 운영 중에만 업데이트하므로 여기서 제외합니다.
-        // 필요시 개발자에게 요청하면 추가 가능합니다.
+        'GrapeSEEDEssentials',
+        'LittleSEEDEssentials',
     ];
 
     // ─── 날짜/타입 자동 변환 ──────────────────────────────────────────
@@ -69,30 +70,30 @@ class Teacher extends Model
     {
         return [
             // 날짜 필드는 꺼내올 때 자동으로 날짜 객체가 됩니다.
-            'GrapeSEEDEssentials'        => 'datetime',
-            'LittleSEEDEssentials'       => 'datetime',
-            'Plan_2nd_Support_Date'      => 'datetime',
-            'Unit_21_'                   => 'datetime',
-            '_1st_Support_Date'          => 'datetime',
-            '_2nd_Support_Date'          => 'datetime',
-            '_3rd_Support_Date'          => 'datetime',
-            '_4th_Support_Date'          => 'datetime',
-            'Unit_31_'                   => 'datetime',
-            'LittleSEED_Pro_Tips_'       => 'datetime',
+            'GrapeSEEDEssentials' => 'datetime',
+            'LittleSEEDEssentials' => 'datetime',
+            'Plan_2nd_Support_Date' => 'datetime',
+            'Unit_21_' => 'datetime',
+            '_1st_Support_Date' => 'datetime',
+            '_2nd_Support_Date' => 'datetime',
+            '_3rd_Support_Date' => 'datetime',
+            '_4th_Support_Date' => 'datetime',
+            'Unit_31_' => 'datetime',
+            'LittleSEED_Pro_Tips_' => 'datetime',
             'GrapeSEED_Connect_Training' => 'datetime',
-            'Nexus_Training'             => 'datetime',
-            'LittleSEED_Support'         => 'datetime',
-            'LittleSEED_Release_Note'    => 'datetime',
-            'Created_Date'               => 'datetime',
-            'FGC_CreateDate'             => 'datetime',
-            'FGC_LastModifyDate'         => 'datetime',
-            'FGC_Rowversion'             => 'datetime',
+            'Nexus_Training' => 'datetime',
+            'LittleSEED_Support' => 'datetime',
+            'LittleSEED_Release_Note' => 'datetime',
+            'Created_Date' => 'datetime',
+            'FGC_CreateDate' => 'datetime',
+            'FGC_LastModifyDate' => 'datetime',
+            'FGC_Rowversion' => 'datetime',
 
             // true/false 값으로 자동 변환되는 필드들
             'Certi_Delivery_LS' => 'boolean',
-            'Certi_Delivery'    => 'boolean',
-            'ClassInOut'        => 'boolean',
-            'NewSenior'         => 'boolean',
+            'Certi_Delivery' => 'boolean',
+            'ClassInOut' => 'boolean',
+            'NewSenior' => 'boolean',
         ];
     }
 
@@ -142,9 +143,9 @@ class Teacher extends Model
         }
 
         $columnMap = [
-            'email'  => 'Email',
-            'name'   => 'Name',
-            'phone'  => 'Phone',
+            'email' => 'Email',
+            'name' => 'Name',
+            'phone' => 'Phone',
             'school' => 'School_Name',
         ];
 
