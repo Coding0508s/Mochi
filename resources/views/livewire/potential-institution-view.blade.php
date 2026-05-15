@@ -132,7 +132,7 @@
                                 <td class="px-3 py-2 text-center font-semibold text-gray-800">{{ $target->Total ?? 0 }}</td>
                                 @can('managePotentialInstitutions')
                                     <td class="px-3 py-2 text-center" onclick="event.stopPropagation()">
-                                        @if(!($target->IsContract ?? false))
+                                        @if(!($target->IsContract ?? false) && $target->isManagedBy(auth()->user()))
                                             <a href="{{ route('supports.create', ['potential_target_id' => $target->ID]) }}"
                                                class="text-xs font-medium text-blue-600 hover:text-blue-800 underline">작성</a>
                                         @else
@@ -302,7 +302,7 @@
                         @endif
                     @endcan
 
-                    @if(!($selectedTarget['is_contract'] ?? false))
+                    @if(!($selectedTarget['is_contract'] ?? false) && ($selectedTarget['can_manage'] ?? false))
                         @can('managePotentialInstitutions')
                             <livewire:potential-institution-meeting-form
                                 :co-new-target-id="$selectedTarget['id']"
@@ -360,7 +360,7 @@
                                     총 {{ count($detailSupportRecords) }}건
                                 </span>
                                 @can('managePotentialInstitutions')
-                                    @if(!($selectedTarget['is_contract'] ?? false))
+                                    @if(!($selectedTarget['is_contract'] ?? false) && ($selectedTarget['can_manage'] ?? false))
                                         <a href="{{ route('supports.create', ['potential_target_id' => $selectedTarget['id']]) }}"
                                            class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
                                             지원 보고서 작성
@@ -462,7 +462,7 @@
                     </div>
                 </div>
                 @can('managePotentialInstitutions')
-                    @if(!($selectedTarget['is_contract'] ?? false))
+                    @if(!($selectedTarget['is_contract'] ?? false) && ($selectedTarget['can_manage'] ?? false))
                         <div class="flex flex-col gap-2 border-t border-gray-200 px-6 py-4 bg-gray-50/80 sm:flex-row sm:items-center sm:justify-between">
                             @error('deleteMeeting')
                                 <p class="text-sm text-red-600">{{ $message }}</p>

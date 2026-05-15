@@ -54,6 +54,9 @@ class AppServiceProvider extends ServiceProvider
         /** 기관 지원 보고서(S_SupportInfo_Account) 삭제 — 관리자만 */
         Gate::define('deleteSupportRecords', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
 
+        /** 잠재기관 미팅/컨설팅 이력 삭제 — 관리자만 */
+        Gate::define('deletePotentialMeetingDetails', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
+
         /** 잠재기관(CoNewTarget) 삭제 — 관리자만 (미계약만 허용은 컴포넌트에서 추가 검증) */
         Gate::define('deletePotentialInstitutions', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
     }

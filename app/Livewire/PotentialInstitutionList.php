@@ -9,8 +9,10 @@ use App\Enums\SyncOrigin;
 use App\Jobs\SyncInstitutionOutboundJob;
 use App\Models\CoNewTarget;
 use App\Models\CoNewTargetDetail;
+use App\Models\Employee;
 use App\Models\SkCodeRequest;
 use App\Models\SupportRecord;
+use App\Support\ManagerNameNormalizer;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -190,6 +192,10 @@ class PotentialInstitutionList extends Component
     {
         $target = CoNewTarget::query()->findOrFail($id);
 
+        if (! $this->ensureTargetManageable($target)) {
+            return;
+        }
+
         $this->pendingContractId = $id;
         $this->pendingContractName = (string) ($target->AccountName ?? '');
         $this->contractSkCode = '';
@@ -207,6 +213,10 @@ class PotentialInstitutionList extends Component
     public function markContractComplete(int $id): void
     {
         $target = CoNewTarget::query()->findOrFail($id);
+
+        if (! $this->ensureTargetManageable($target)) {
+            return;
+        }
 
         if ($target->IsContract) {
             return;
@@ -245,6 +255,10 @@ class PotentialInstitutionList extends Component
         $contracted = $this->detailModalContract === '1';
         $target = CoNewTarget::query()->findOrFail($id);
 
+        if (! $this->ensureTargetManageable($target)) {
+            return;
+        }
+
         if ((bool) $target->IsContract === $contracted) {
             return;
         }
@@ -271,6 +285,12 @@ class PotentialInstitutionList extends Component
 
         $contracted = $this->pendingContractChange;
         $target = CoNewTarget::query()->findOrFail($id);
+
+        if (! $this->ensureTargetManageable($target)) {
+            $this->cancelContractChange();
+
+            return;
+        }
 
         if ((bool) $target->IsContract === $contracted) {
             $this->cancelContractChange();
@@ -309,6 +329,18 @@ class PotentialInstitutionList extends Component
         $this->showContractChangeConfirmModal = false;
         $this->pendingContractChange = null;
         $this->pendingContractChangeName = '';
+    }
+
+    private function ensureTargetManageable(CoNewTarget $target): bool
+    {
+        $user = auth()->user();
+        if ($user !== null && $target->isManagedBy($user)) {
+            return true;
+        }
+
+        $this->addError('authorization', '본인이 등록한 잠재기관만 관리할 수 있습니다.');
+
+        return false;
     }
 
     private function applyContractState(CoNewTarget $target, bool $contracted): void
@@ -415,14 +447,16 @@ class PotentialInstitutionList extends Component
     {
         $validated = $this->validate();
         $meetingDate = Carbon::parse($validated['newMeetingDate']);
+        $creatorId = auth()->id();
+        $hasCreatedByColumn = Schema::hasColumn('S_CO_NewTarget', 'created_by');
 
         try {
-            DB::transaction(function () use ($validated, $meetingDate): void {
+            DB::transaction(function () use ($validated, $meetingDate, $creatorId, $hasCreatedByColumn): void {
                 $ls = $this->toNonNegativeInt($validated['newLS'] ?? null);
                 $gsK = $this->toNonNegativeInt($validated['newGSK'] ?? null);
                 $gsE = $this->toNonNegativeInt($validated['newGSE'] ?? null);
 
-                $target = CoNewTarget::query()->create([
+                $targetPayload = [
                     'Year' => (int) $meetingDate->format('Y'),
                     'CreatedDate' => $meetingDate->format('Y-m-d'),
                     'AccountManager' => $validated['newManager'] ?: null,
@@ -447,7 +481,17 @@ class PotentialInstitutionList extends Component
                     'IsContract' => false,
                     'ContractedDate' => null,
                     'Possibility' => $validated['newPossibility'] ?: null,
-                ]);
+                ];
+
+                if ($hasCreatedByColumn) {
+                    $targetPayload['created_by'] = $creatorId;
+                }
+
+                $target = CoNewTarget::query()->create($targetPayload);
+
+                if ($hasCreatedByColumn) {
+                    $target->created_by = $creatorId;
+                }
 
                 app(CreatePotentialMeetingDetail::class)($target, [
                     'meeting_date' => $meetingDate->format('Y-m-d'),
@@ -465,7 +509,7 @@ class PotentialInstitutionList extends Component
                     $timeRaw = trim((string) ($validated['newSupportReportTime'] ?? ''));
                     $meetTimeSuffix = $timeRaw !== '' ? $timeRaw.':00' : '00:00:00';
 
-                    SupportRecord::query()->create([
+                    $supportPayload = [
                         'Year' => (int) $supportDate->format('Y'),
                         'SK_Code' => null,
                         'potential_target_id' => (int) $target->ID,
@@ -481,12 +525,24 @@ class PotentialInstitutionList extends Component
                         'Status' => ! empty($validated['newSupportReportCompleted']) ? '완료' : '진행중',
                         'CompletedDate' => ! empty($validated['newSupportReportCompleted']) ? now() : null,
                         'CreatedDate' => now(),
-                    ]);
+                    ];
+
+                    foreach (array_keys($supportPayload) as $column) {
+                        if (! Schema::hasColumn('S_SupportInfo_Account', $column)) {
+                            unset($supportPayload[$column]);
+                        }
+                    }
+
+                    SupportRecord::query()->create($supportPayload);
                 }
             });
         } catch (Throwable $e) {
             report($e);
-            $this->addError('createForm', '저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+            $message = app()->hasDebugModeEnabled()
+                ? '저장 중 오류가 발생했습니다: '.$e->getMessage()
+                : '저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
+
+            $this->addError('createForm', $message);
 
             return;
         }
@@ -829,7 +885,13 @@ class PotentialInstitutionList extends Component
         }
 
         if (filled($this->filterManager)) {
-            $query->where('AccountManager', $this->filterManager);
+            $normalizedManager = ManagerNameNormalizer::normalize($this->filterManager);
+            if ($normalizedManager !== '') {
+                $normalizedAccountManager = ManagerNameNormalizer::sqlColumnExpression('AccountManager');
+                $query->whereRaw("{$normalizedAccountManager} = ?", [$normalizedManager]);
+            } else {
+                $query->where('AccountManager', $this->filterManager);
+            }
         }
 
         if (filled($this->filterType)) {
@@ -904,12 +966,18 @@ class PotentialInstitutionList extends Component
             ->orderByDesc('Year')
             ->pluck('Year');
 
+        $masterManagerOptions = $this->managerMasterOptions();
+
         $managerList = CoNewTarget::query()
             ->whereNotNull('AccountManager')
             ->where('AccountManager', '!=', '')
             ->distinct()
-            ->orderBy('AccountManager')
-            ->pluck('AccountManager');
+            ->pluck('AccountManager')
+            ->map(fn (string $name): string => $this->alignManagerLabelToMasterOption($name, $masterManagerOptions))
+            ->filter(fn (string $name): bool => $name !== '')
+            ->unique()
+            ->sort()
+            ->values();
 
         $typeList = CoNewTarget::query()
             ->whereNotNull('Type')
@@ -954,5 +1022,64 @@ class PotentialInstitutionList extends Component
             'newCount' => $newCount,
             'terminatedCount' => $terminatedCount,
         ]);
+    }
+
+    /**
+     * 잠재기관 담당자 필터 옵션에 사용할 직원 마스터 이름 목록입니다.
+     *
+     * - employee 테이블이 있으면 STATUS=1 활성 직원의 영문명(없으면 한글명) 사용
+     * - 테이블이 없으면 빈 컬렉션 반환(레거시/테스트 환경 안전성)
+     *
+     * @return \Illuminate\Support\Collection<int, string>
+     */
+    private function managerMasterOptions(): \Illuminate\Support\Collection
+    {
+        if (! Schema::hasTable('employee')) {
+            return collect();
+        }
+
+        return Employee::query()
+            ->where('STATUS', 1)
+            ->get(['ENGLISHNAME', 'KOREANAME'])
+            ->map(function (Employee $employee): string {
+                $english = trim((string) ($employee->ENGLISHNAME ?? ''));
+                if ($english !== '') {
+                    return $english;
+                }
+
+                return trim((string) ($employee->KOREANAME ?? ''));
+            })
+            ->filter(fn (string $name): bool => $name !== '')
+            ->unique()
+            ->sort()
+            ->values();
+    }
+
+    /**
+     * 저장된 담당자 표기를 직원 마스터 옵션 표기로 정렬합니다.
+     *
+     * 매칭이 없으면 원본을 그대로 유지해 과거/예외 데이터를 보존합니다.
+     *
+     * @param  \Illuminate\Support\Collection<int, string>  $masterOptions
+     */
+    private function alignManagerLabelToMasterOption(?string $raw, \Illuminate\Support\Collection $masterOptions): string
+    {
+        $raw = trim((string) ($raw ?? ''));
+        if ($raw === '') {
+            return '';
+        }
+
+        $rawKey = ManagerNameNormalizer::normalize($raw);
+        if ($rawKey === '') {
+            return $raw;
+        }
+
+        foreach ($masterOptions as $option) {
+            if (ManagerNameNormalizer::normalize((string) $option) === $rawKey) {
+                return (string) $option;
+            }
+        }
+
+        return $raw;
     }
 }

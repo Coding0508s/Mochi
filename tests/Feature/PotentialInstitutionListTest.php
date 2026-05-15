@@ -46,6 +46,7 @@ class PotentialInstitutionListTest extends TestCase
         Schema::dropIfExists('S_SupportInfo_Account');
         Schema::dropIfExists('S_Account_Information');
         Schema::dropIfExists('S_AccountName');
+        Schema::dropIfExists('employee');
         Schema::dropIfExists('institution_visibility_overrides');
 
         Schema::create('S_AccountName', function (Blueprint $table): void {
@@ -78,6 +79,15 @@ class PotentialInstitutionListTest extends TestCase
             $table->string('Customer_Type', 255)->nullable();
             $table->string('Affiliate', 255)->nullable();
             $table->string('Address', 255)->nullable();
+        });
+
+        Schema::create('employee', function (Blueprint $table): void {
+            $table->string('EMPNO')->primary();
+            $table->string('WORKDEPT')->nullable();
+            $table->string('KOREANAME')->nullable();
+            $table->string('ENGLISHNAME')->nullable();
+            $table->string('EMAIL')->nullable();
+            $table->unsignedTinyInteger('STATUS')->default(1);
         });
 
         Schema::create('S_SupportInfo_Account', function (Blueprint $table): void {
@@ -124,6 +134,7 @@ class PotentialInstitutionListTest extends TestCase
             $table->boolean('IsContract')->default(false);
             $table->date('ContractedDate')->nullable();
             $table->string('Possibility', 20)->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
         });
 
         Schema::create('S_CO_NewTarget_Detail', function (Blueprint $table): void {
@@ -173,9 +184,11 @@ class PotentialInstitutionListTest extends TestCase
 
     public function test_save_new_target_does_not_issue_sk_before_contract(): void
     {
+        $user = User::factory()->create();
         $accountName = 'SK코드 생략 QA '.uniqid('', true);
 
-        Livewire::test(PotentialInstitutionList::class)
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionList::class)
             ->call('openCreateModal')
             ->set('newAccountName', $accountName)
             ->set('newType', '신규(25년)')
@@ -188,11 +201,40 @@ class PotentialInstitutionListTest extends TestCase
         $target = CoNewTarget::query()->where('AccountName', $accountName)->first();
         $this->assertNotNull($target);
         $this->assertNull($target->AccountCode);
+        $this->assertSame($user->id, (int) $target->created_by);
         $this->assertDatabaseMissing('S_AccountName', [
             'AccountName' => $accountName,
         ]);
         $this->assertDatabaseMissing('S_Account_Information', [
             'Account_Name' => $accountName,
+        ]);
+    }
+
+    public function test_save_new_target_allows_first_meeting_when_manager_differs_from_creator(): void
+    {
+        $user = User::factory()->create(['name' => '로그인 사용자']);
+        $accountName = '담당자 다른 신규 잠재기관 '.uniqid('', true);
+
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionList::class)
+            ->call('openCreateModal')
+            ->set('newAccountName', $accountName)
+            ->set('newType', '신규(25년)')
+            ->set('newConsultingType', '신규기관방문')
+            ->set('newMeetingDate', '2026-04-06')
+            ->set('newManager', '다른 담당자')
+            ->call('saveNewTarget')
+            ->assertSet('showCreateModal', false)
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_CO_NewTarget', [
+            'AccountName' => $accountName,
+            'AccountManager' => '다른 담당자',
+            'created_by' => $user->id,
+        ]);
+        $this->assertDatabaseHas('S_CO_NewTarget_Detail', [
+            'AccountName' => $accountName,
+            'AccountManager' => '다른 담당자',
         ]);
     }
 
@@ -376,6 +418,7 @@ class PotentialInstitutionListTest extends TestCase
             'IsContract' => false,
             'ContractedDate' => null,
             'Possibility' => null,
+            'created_by' => auth()->id(),
         ]);
 
         SupportRecord::query()->create([
@@ -510,6 +553,7 @@ class PotentialInstitutionListTest extends TestCase
             'IsContract' => false,
             'ContractedDate' => null,
             'Possibility' => null,
+            'created_by' => auth()->id(),
         ]);
 
         $leadSk = 'LEAD-'.$lead->ID;
@@ -554,6 +598,7 @@ class PotentialInstitutionListTest extends TestCase
         $row = CoNewTarget::query()->create([
             'Year' => 2026,
             'CreatedDate' => '2026-04-01',
+            'AccountManager' => 'Peter Kim',
             'AccountName' => $name,
             'Type' => '신규(25년)',
             'Gubun' => '신규기관방문',
@@ -569,6 +614,7 @@ class PotentialInstitutionListTest extends TestCase
             'IsContract' => false,
             'ContractedDate' => null,
             'Possibility' => 'B',
+            'created_by' => auth()->id(),
         ]);
 
         Livewire::test(PotentialInstitutionList::class)
@@ -586,6 +632,7 @@ class PotentialInstitutionListTest extends TestCase
         $this->assertDatabaseHas('S_Account_Information', [
             'SK_Code' => 'LEAD-'.$row->ID,
             'Account_Name' => $name,
+            'CO' => 'Peter Kim',
         ]);
         Queue::assertNothingPushed();
 
@@ -630,12 +677,84 @@ class PotentialInstitutionListTest extends TestCase
             'IsContract' => false,
             'ContractedDate' => null,
             'Possibility' => 'B',
+            'created_by' => auth()->id(),
         ]);
 
         Livewire::test(PotentialInstitutionList::class)
             ->call('markContractComplete', (int) $row->ID);
 
         $this->assertSame(1, Institution::query()->where('SKcode', $existingSk)->count());
+    }
+
+    public function test_non_creator_cannot_mark_contract_complete(): void
+    {
+        Queue::fake();
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $row = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountName' => '타인 등록 잠재기관 '.uniqid('', true),
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'B',
+            'created_by' => $owner->id,
+        ]);
+
+        Livewire::actingAs($other)
+            ->test(PotentialInstitutionList::class)
+            ->call('markContractComplete', (int) $row->ID)
+            ->assertHasErrors(['authorization']);
+
+        $row->refresh();
+        $this->assertFalse((bool) $row->IsContract);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_legacy_target_manager_can_mark_contract_complete_without_creator(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create(['name' => '기존 담당자']);
+        $row = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountManager' => '기존 담당자',
+            'AccountName' => '기존 데이터 잠재기관 '.uniqid('', true),
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'B',
+            'created_by' => null,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionList::class)
+            ->call('markContractComplete', (int) $row->ID)
+            ->assertHasNoErrors();
+
+        $row->refresh();
+        $this->assertTrue((bool) $row->IsContract);
     }
 
     public function test_recontract_preserves_existing_master_row_and_clears_termination(): void
@@ -682,6 +801,7 @@ class PotentialInstitutionListTest extends TestCase
             'IsContract' => false,
             'ContractedDate' => null,
             'Possibility' => 'B',
+            'created_by' => auth()->id(),
         ]);
 
         Livewire::test(PotentialInstitutionList::class)
@@ -748,6 +868,7 @@ class PotentialInstitutionListTest extends TestCase
             'IsContract' => false,
             'ContractedDate' => null,
             'Possibility' => 'B',
+            'created_by' => auth()->id(),
         ]);
 
         Livewire::test(PotentialInstitutionList::class)
@@ -782,6 +903,7 @@ class PotentialInstitutionListTest extends TestCase
             'IsContract' => false,
             'ContractedDate' => null,
             'Possibility' => null,
+            'created_by' => auth()->id(),
         ]);
 
         Livewire::test(PotentialInstitutionList::class)
@@ -882,6 +1004,163 @@ class PotentialInstitutionListTest extends TestCase
             ->assertDontSee($b);
     }
 
+    public function test_manager_filter_matches_dotted_hyphen_underscore_names(): void
+    {
+        $matchA = '담당자 표기A '.uniqid('', true);
+        $matchB = '담당자 표기B '.uniqid('', true);
+        $matchC = '담당자 표기C '.uniqid('', true);
+        $nonMatch = '담당자 비매칭 '.uniqid('', true);
+
+        CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountName' => $matchA,
+            'AccountManager' => 'Peter.Kim',
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'A',
+        ]);
+        CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-02',
+            'AccountName' => $matchB,
+            'AccountManager' => 'Peter-Kim',
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'A',
+        ]);
+        CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-03',
+            'AccountName' => $matchC,
+            'AccountManager' => 'Peter_Kim',
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'A',
+        ]);
+        CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-04',
+            'AccountName' => $nonMatch,
+            'AccountManager' => 'James.Kwak',
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'A',
+        ]);
+
+        Livewire::test(PotentialInstitutionList::class)
+            ->set('filterManager', 'Peter Kim')
+            ->assertSee($matchA)
+            ->assertSee($matchB)
+            ->assertSee($matchC)
+            ->assertDontSee($nonMatch);
+    }
+
+    public function test_manager_filter_options_align_to_employee_master_label(): void
+    {
+        DB::table('employee')->insert([
+            'EMPNO' => 'E-PETER',
+            'WORKDEPT' => 'A02',
+            'KOREANAME' => '김봉철',
+            'ENGLISHNAME' => 'Peter Kim',
+            'EMAIL' => 'peter.kim@grapeseed.com',
+            'STATUS' => 1,
+        ]);
+
+        CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountName' => '옵션정렬 A '.uniqid('', true),
+            'AccountManager' => 'Peter.Kim',
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'A',
+        ]);
+        CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-02',
+            'AccountName' => '옵션정렬 B '.uniqid('', true),
+            'AccountManager' => 'Peter_Kim',
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'A',
+        ]);
+
+        $html = Livewire::test(PotentialInstitutionList::class)
+            ->set('filterYear', '1999') // 목록 행 노출을 없애 옵션 텍스트만 검증
+            ->html();
+
+        $this->assertSame(1, substr_count($html, '<option value="Peter Kim">Peter Kim</option>'));
+        $this->assertStringNotContainsString('Peter.Kim', $html);
+        $this->assertStringNotContainsString('Peter_Kim', $html);
+    }
+
     public function test_filter_contract_possibility_letter(): void
     {
         $onlyA = 'PossA '.uniqid('', true);
@@ -923,6 +1202,7 @@ class PotentialInstitutionListTest extends TestCase
             'IsContract' => false,
             'ContractedDate' => null,
             'Possibility' => 'B',
+            'created_by' => auth()->id(),
         ]);
 
         Livewire::test(PotentialInstitutionList::class)
@@ -953,6 +1233,7 @@ class PotentialInstitutionListTest extends TestCase
             'IsContract' => false,
             'ContractedDate' => null,
             'Possibility' => null,
+            'created_by' => auth()->id(),
         ]);
 
         $id = (int) $row->ID;
@@ -1001,6 +1282,7 @@ class PotentialInstitutionListTest extends TestCase
             'IsContract' => true,
             'ContractedDate' => '2026-01-15',
             'Possibility' => null,
+            'created_by' => auth()->id(),
         ]);
 
         $id = (int) $row->ID;
@@ -1041,6 +1323,7 @@ class PotentialInstitutionListTest extends TestCase
             'IsContract' => true,
             'ContractedDate' => '2026-01-15',
             'Possibility' => null,
+            'created_by' => auth()->id(),
         ]);
 
         $row = CoNewTarget::query()->where('AccountCode', $sk)->firstOrFail();
@@ -1096,6 +1379,7 @@ class PotentialInstitutionListTest extends TestCase
             'IsContract' => false,
             'ContractedDate' => null,
             'Possibility' => null,
+            'created_by' => auth()->id(),
         ]);
 
         Livewire::test(PotentialInstitutionList::class)
@@ -1108,6 +1392,7 @@ class PotentialInstitutionListTest extends TestCase
 
     public function test_delete_meeting_detail_removes_record_and_refreshes_list(): void
     {
+        $admin = User::factory()->admin()->create();
         $accountName = '미팅삭제 QA '.uniqid('', true);
         $target = CoNewTarget::query()->create([
             'Year' => 2026,
@@ -1147,7 +1432,8 @@ class PotentialInstitutionListTest extends TestCase
             'Possibility' => 'A',
         ]);
 
-        $component = Livewire::test(PotentialInstitutionList::class)
+        $component = Livewire::actingAs($admin)
+            ->test(PotentialInstitutionList::class)
             ->call('openDetailModal', (int) $target->ID)
             ->call('openMeetingDetailModal', (int) $detail->ID)
             ->call('deleteMeetingDetail', (int) $detail->ID);
@@ -1161,6 +1447,7 @@ class PotentialInstitutionListTest extends TestCase
 
     public function test_delete_meeting_detail_rejects_contracted_target(): void
     {
+        $admin = User::factory()->admin()->create();
         $name = '계약건미팅삭제 '.uniqid('', true);
         $row = CoNewTarget::query()->create([
             'Year' => 2026,
@@ -1200,8 +1487,61 @@ class PotentialInstitutionListTest extends TestCase
             'Possibility' => null,
         ]);
 
-        Livewire::test(PotentialInstitutionList::class)
+        Livewire::actingAs($admin)
+            ->test(PotentialInstitutionList::class)
             ->call('openDetailModal', (int) $row->ID)
+            ->call('openMeetingDetailModal', (int) $detail->ID)
+            ->call('deleteMeetingDetail', (int) $detail->ID)
+            ->assertHasErrors(['deleteMeeting']);
+
+        $this->assertDatabaseHas('S_CO_NewTarget_Detail', ['ID' => $detail->ID]);
+    }
+
+    public function test_non_admin_cannot_delete_meeting_detail(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+        $accountName = '비관리자미팅삭제 '.uniqid('', true);
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-06',
+            'AccountManager' => 'Mgr',
+            'AccountCode' => null,
+            'AccountName' => $accountName,
+            'Address' => null,
+            'Director' => null,
+            'Phone' => null,
+            'Connected' => null,
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => null,
+        ]);
+
+        $detail = CoNewTargetDetail::query()->create([
+            'Year' => 2026,
+            'AccountName' => $accountName,
+            'AccountManager' => 'Mgr',
+            'MeetingDate' => '2026-04-10',
+            'MeetingTime' => '10:00',
+            'MeetingTime_End' => '11:00',
+            'Description' => '비관리자 삭제 시도',
+            'ConsultingType' => '전화',
+            'Possibility' => 'A',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionList::class)
+            ->call('openDetailModal', (int) $target->ID)
             ->call('openMeetingDetailModal', (int) $detail->ID)
             ->call('deleteMeetingDetail', (int) $detail->ID)
             ->assertHasErrors(['deleteMeeting']);
@@ -1211,6 +1551,7 @@ class PotentialInstitutionListTest extends TestCase
 
     public function test_delete_meeting_detail_scoped_to_target_account(): void
     {
+        $admin = User::factory()->admin()->create();
         $nameA = '스코프A '.uniqid('', true);
         $nameB = '스코프B '.uniqid('', true);
         $targetA = CoNewTarget::query()->create([
@@ -1275,7 +1616,8 @@ class PotentialInstitutionListTest extends TestCase
             'Possibility' => null,
         ]);
 
-        Livewire::test(PotentialInstitutionList::class)
+        Livewire::actingAs($admin)
+            ->test(PotentialInstitutionList::class)
             ->call('openDetailModal', (int) $targetA->ID)
             ->call('deleteMeetingDetail', (int) $detailB->ID)
             ->assertHasErrors(['deleteMeeting']);

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TeamSchedule extends Model
 {
@@ -19,6 +20,8 @@ class TeamSchedule extends Model
         'visibility',
         'status',
         'location',
+        'recurrence_rule',
+        'recurrence_parent_id',
         'created_by',
         'updated_by',
     ];
@@ -45,6 +48,16 @@ class TeamSchedule extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function recurrenceParent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'recurrence_parent_id');
+    }
+
+    public function recurrenceChildren(): HasMany
+    {
+        return $this->hasMany(self::class, 'recurrence_parent_id');
     }
 
     public function scopeForMonth(Builder $query, string $month): Builder

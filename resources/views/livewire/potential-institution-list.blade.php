@@ -5,6 +5,12 @@
         </div>
     @endif
 
+    @error('authorization')
+        <div class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm" data-mochi-flash-dismiss="4000" role="alert">
+            {{ $message }}
+        </div>
+    @enderror
+
     {{-- 상단 요약 영역 --}}
     <div class="mochi-summary-card">
         <div class="flex flex-wrap items-center gap-4 text-sm">
@@ -795,7 +801,7 @@
                         </div>
                     </div>
                 </div>
-                @can('managePotentialInstitutions')
+                @can('deletePotentialMeetingDetails')
                     @if(!($selectedTarget['is_contract'] ?? false))
                         <div class="flex flex-col gap-2 border-t border-gray-200 px-6 py-4 bg-gray-50/80 sm:flex-row sm:items-center sm:justify-between">
                             @error('deleteMeeting')

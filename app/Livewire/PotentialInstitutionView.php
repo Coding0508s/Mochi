@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Actions\DeletePotentialMeetingDetail;
 use App\Models\CoNewTarget;
 use App\Models\CoNewTargetDetail;
+use App\Models\SkCodeRequest;
 use App\Models\SupportRecord;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -226,6 +227,12 @@ class PotentialInstitutionView extends Component
                 }
                 $detailQuery->delete();
 
+                if (Schema::hasTable('sk_code_requests')) {
+                    SkCodeRequest::query()
+                        ->where('co_new_target_id', (int) $target->ID)
+                        ->delete();
+                }
+
                 $target->delete();
             });
         } catch (\Throwable $e) {
@@ -244,6 +251,8 @@ class PotentialInstitutionView extends Component
 
     private function loadDetailData(CoNewTarget $target): void
     {
+        $user = auth()->user();
+
         $this->selectedTarget = [
             'id' => $target->ID,
             'account_name' => $target->AccountName ?? '-',
@@ -261,6 +270,7 @@ class PotentialInstitutionView extends Component
             'gs_e' => $target->GS_E ?? 0,
             'total' => $target->Total ?? 0,
             'is_contract' => (bool) ($target->IsContract ?? false),
+            'can_manage' => $user !== null && $target->isManagedBy($user),
         ];
 
         $this->detailMeetings = CoNewTargetDetail::query()

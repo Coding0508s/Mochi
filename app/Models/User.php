@@ -32,7 +32,17 @@ class User extends Authenticatable
 
     public function isCoTeam(): bool
     {
-        return $this->team === 'CO';
+        return $this->normalizedTeamCode() === 'CO';
+    }
+
+    public function isCsTeam(): bool
+    {
+        return $this->normalizedTeamCode() === 'CS';
+    }
+
+    public function isCoachTeam(): bool
+    {
+        return in_array($this->normalizedTeamCode(), ['COACH', 'TR', 'TRAINING'], true);
     }
 
     public function hasFullAccess(): bool
@@ -118,6 +128,12 @@ class User extends Authenticatable
             'is_gs_brochure_admin' => 'boolean',
             'can_manage_store_inventory' => 'boolean',
             'is_active' => 'boolean',
+            'last_inbound_seen_at' => 'datetime',
         ];
+    }
+
+    private function normalizedTeamCode(): string
+    {
+        return mb_strtoupper(trim((string) $this->team));
     }
 }

@@ -11,6 +11,7 @@ use App\Models\Institution;
 use App\Models\SkCodeRequest;
 use App\Models\SupportRecord;
 use App\Models\Teacher;
+use App\Support\ManagerNameNormalizer;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -148,6 +149,22 @@ class InstitutionList extends Component
             ->withMax('supportRecords', 'Support_Date')
             ->findOrFail($id);
 
+        // 저장된 담당자명 표기(예: "Peter.Kim")가 직원 마스터의 옵션 표기(예: "Peter Kim")와
+        // 다를 수 있어, select 옵션과 매칭되지 않으면 모달에 "미지정"으로 보이는 문제가 있었다.
+        // 같은 사람으로 식별되는 경우 모달 진입 시점에 옵션 표기로 정렬해서 보여준다.
+        $aliasedCo = $this->alignManagerLabelToMasterOption(
+            $institution->accountInfo?->CO,
+            $this->managerOptionsForDept(self::DEPT_CO),
+        );
+        $aliasedTr = $this->alignManagerLabelToMasterOption(
+            $institution->accountInfo?->TR,
+            $this->managerOptionsForDept(self::DEPT_TR),
+        );
+        $aliasedCs = $this->alignManagerLabelToMasterOption(
+            $institution->accountInfo?->CS,
+            $this->managerOptionsForDept(self::DEPT_CS),
+        );
+
         $this->selectedInstitution = [
             'id' => $institution->ID,
             'skcode' => $institution->SKcode,
@@ -161,9 +178,9 @@ class InstitutionList extends Component
             'phone' => $institution->Phone,
             'account_tel' => $institution->AccountTel,
             'address' => $institution->Address,
-            'co' => $institution->accountInfo?->CO,
-            'tr' => $institution->accountInfo?->TR,
-            'cs' => $institution->accountInfo?->CS,
+            'co' => $aliasedCo !== '' ? $aliasedCo : null,
+            'tr' => $aliasedTr !== '' ? $aliasedTr : null,
+            'cs' => $aliasedCs !== '' ? $aliasedCs : null,
             'customer_type' => $institution->accountInfo?->Customer_Type,
             'gs_no' => ($resolvedGs = $institution->resolvedGsNumber()) !== '' ? $resolvedGs : null,
             'teacher_count' => $institution->teachers_count,
@@ -174,9 +191,9 @@ class InstitutionList extends Component
         $this->isEditingDetail = false;
         $this->editCustomerType = (string) ($institution->accountInfo?->Customer_Type ?? '');
         $this->editGsNo = $institution->resolvedGsNumber();
-        $this->editDetailCo = (string) ($institution->accountInfo?->CO ?? '');
-        $this->editDetailTr = (string) ($institution->accountInfo?->TR ?? '');
-        $this->editDetailCs = (string) ($institution->accountInfo?->CS ?? '');
+        $this->editDetailCo = $aliasedCo;
+        $this->editDetailTr = $aliasedTr;
+        $this->editDetailCs = $aliasedCs;
         $this->editDetailSkCode = (string) ($institution->SKcode ?? '');
         $this->editDetailInstitutionName = (string) ($institution->AccountName ?? '');
         $this->editDetailEnglishName = (string) ($institution->EnglishName ?? '');
@@ -469,9 +486,18 @@ class InstitutionList extends Component
         $this->editingInstitutionId = $institution->ID;
         $this->editSkCode = (string) ($institution->SKcode ?? '');
         $this->editInstitutionName = (string) ($institution->AccountName ?? '');
-        $this->editCo = (string) ($institution->accountInfo?->CO ?? '');
-        $this->editTr = (string) ($institution->accountInfo?->TR ?? '');
-        $this->editCs = (string) ($institution->accountInfo?->CS ?? '');
+        $this->editCo = $this->alignManagerLabelToMasterOption(
+            $institution->accountInfo?->CO,
+            $this->managerOptionsForDept(self::DEPT_CO),
+        );
+        $this->editTr = $this->alignManagerLabelToMasterOption(
+            $institution->accountInfo?->TR,
+            $this->managerOptionsForDept(self::DEPT_TR),
+        );
+        $this->editCs = $this->alignManagerLabelToMasterOption(
+            $institution->accountInfo?->CS,
+            $this->managerOptionsForDept(self::DEPT_CS),
+        );
         $this->showManagerModal = true;
     }
 
@@ -802,10 +828,12 @@ class InstitutionList extends Component
             return;
         }
 
-        $query->whereHas('accountInfo', function (Builder $sub) use ($coAliases): void {
-            $sub->where(function (Builder $coQuery) use ($coAliases): void {
+        $sqlNormalizedCo = ManagerNameNormalizer::sqlColumnExpression('CO');
+
+        $query->whereHas('accountInfo', function (Builder $sub) use ($coAliases, $sqlNormalizedCo): void {
+            $sub->where(function (Builder $coQuery) use ($coAliases, $sqlNormalizedCo): void {
                 foreach ($coAliases as $alias) {
-                    $coQuery->orWhereRaw("REPLACE(LOWER(COALESCE(CO, '')), ' ', '') = ?", [$alias]);
+                    $coQuery->orWhereRaw("{$sqlNormalizedCo} = ?", [$alias]);
                 }
             });
         });
@@ -851,15 +879,45 @@ class InstitutionList extends Component
         }
 
         return $aliases
-            ->map(function (string $value): string {
-                $lower = mb_strtolower(trim($value));
-                $normalized = preg_replace('/\s+/u', '', $lower);
-
-                return is_string($normalized) ? $normalized : $lower;
-            })
+            ->map(fn (string $value): string => $this->normalizeManagerAlias($value))
             ->filter(fn (string $value): bool => $value !== '')
             ->unique()
             ->values()
             ->all();
+    }
+
+    private function normalizeManagerAlias(string $value): string
+    {
+        return ManagerNameNormalizer::normalize($value);
+    }
+
+    /**
+     * 저장된 담당자명 표기를 직원 마스터 옵션과 같은 표기로 정렬합니다.
+     *
+     * - 정규화 키(공백/점 무시)가 같은 옵션을 찾으면 그 표기로 치환합니다.
+     * - 옵션 목록에 매칭이 없으면 원본 값을 그대로 둡니다(퇴사자/타부서/예외 케이스 보존).
+     * - 사용자가 모달에서 저장을 누를 때 비로소 DB에 마스터 표기로 정리됩니다.
+     *
+     * @param  \Illuminate\Support\Collection<int, string>  $options
+     */
+    private function alignManagerLabelToMasterOption(?string $raw, \Illuminate\Support\Collection $options): string
+    {
+        $raw = trim((string) ($raw ?? ''));
+        if ($raw === '') {
+            return '';
+        }
+
+        $rawKey = ManagerNameNormalizer::normalize($raw);
+        if ($rawKey === '') {
+            return $raw;
+        }
+
+        foreach ($options as $option) {
+            if (ManagerNameNormalizer::normalize((string) $option) === $rawKey) {
+                return (string) $option;
+            }
+        }
+
+        return $raw;
     }
 }

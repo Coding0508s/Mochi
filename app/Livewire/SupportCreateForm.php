@@ -104,6 +104,11 @@ class SupportCreateForm extends Component
 
             return;
         }
+        if (! $this->canManagePotentialTarget($potential)) {
+            session()->flash('warning', '본인이 등록한 잠재기관만 관리할 수 있습니다.');
+
+            return;
+        }
 
         $this->formPotentialTargetId = (int) $potential->ID;
         $this->formSkCode = trim((string) ($potential->AccountCode ?? ''));
@@ -195,6 +200,9 @@ class SupportCreateForm extends Component
             : null;
         if ($potential === null && $trimmedSkCode !== '') {
             $potential = $this->findPotentialBySkCode($trimmedSkCode);
+        }
+        if ($potential !== null && ! $this->canManagePotentialTarget($potential)) {
+            return;
         }
 
         if (! $inst && ! $isPotential && $potential === null) {
@@ -525,6 +533,14 @@ class SupportCreateForm extends Component
         return collect(
             CoNewTarget::query()
                 ->where('IsContract', false)
+                ->where(function ($query): void {
+                    $user = auth()->user();
+                    if ($user?->hasFullAccess()) {
+                        return;
+                    }
+
+                    $query->where('created_by', $user?->id);
+                })
                 ->where(function ($query) use ($normalizedKeyword): void {
                     $query->whereRaw("REPLACE(AccountName, ' ', '') like ?", ["%{$normalizedKeyword}%"])
                         ->orWhereRaw("REPLACE(IFNULL(AccountCode,''), ' ', '') like ?", ["%{$normalizedKeyword}%"]);
@@ -557,9 +573,20 @@ class SupportCreateForm extends Component
         $target = CoNewTarget::query()
             ->whereKey($this->formPotentialTargetId)
             ->where('IsContract', false)
-            ->first(['ID']);
+            ->first();
 
-        return $target?->ID ? (int) $target->ID : null;
+        if (! $target || ! $this->canManagePotentialTarget($target)) {
+            return null;
+        }
+
+        return (int) $target->ID;
+    }
+
+    private function canManagePotentialTarget(CoNewTarget $target): bool
+    {
+        $user = auth()->user();
+
+        return $user !== null && $target->isManagedBy($user);
     }
 
     private function buildSfUploadFileName(string $originalFilename, string $accountName): string

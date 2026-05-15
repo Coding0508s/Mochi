@@ -31,6 +31,11 @@ class CreatePotentialMeetingDetail
     {
         Gate::authorize('managePotentialInstitutions');
 
+        $user = auth()->user();
+        if ($user === null || ! $target->isManagedBy($user)) {
+            throw new AuthorizationException('본인이 등록한 잠재기관만 관리할 수 있습니다.');
+        }
+
         if ($target->IsContract) {
             throw new AuthorizationException('계약 완료된 잠재기관에는 미팅을 추가할 수 없습니다.');
         }

@@ -19,6 +19,7 @@
         || request()->is('store/*')
         || request()->is('co/*')
         || request()->is('schedules*');
+    $activeTeamMenu = request()->query('team_menu');
 @endphp
 
 {{-- Alpine.js: 사이드바 아코디언(열고 닫기) 에 사용 --}}
@@ -26,7 +27,9 @@
      x-data="{
          openPeople: {{ request()->routeIs('people.*') ? 'true' : 'false' }},
          openTeams: true,
-         openCO: {{ $isCoTeamRoute ? 'true' : 'false' }},
+        openCS: {{ $isCoTeamRoute && ($activeTeamMenu === 'cs' || ($activeTeamMenu === null && auth()->user()?->isCsTeam())) ? 'true' : 'false' }},
+        openCoach: {{ $isCoTeamRoute && ($activeTeamMenu === 'coach' || ($activeTeamMenu === null && auth()->user()?->isCoachTeam())) ? 'true' : 'false' }},
+        openCO: {{ $isCoTeamRoute && ($activeTeamMenu === 'co' || ($activeTeamMenu === null && ! auth()->user()?->isCsTeam() && ! auth()->user()?->isCoachTeam())) ? 'true' : 'false' }},
          openReview: false,
          openGoal: false,
          openSetup: {{ request()->routeIs('setup.*') ? 'true' : 'false' }},
@@ -190,7 +193,8 @@
             <div class="sidebar-group">
                 <button type="button"
                         @click="openTeams = !openTeams"
-                        class="sidebar-item sidebar-focusable {{ $isCoTeamRoute ? 'sidebar-item-active' : 'sidebar-item-default' }}">
+                        class="sidebar-item sidebar-focusable"
+                        :class="(openTeams && (openCS || openCoach || openCO)) ? 'sidebar-item-active' : 'sidebar-item-default'">
                     <span class="sidebar-item-lead">
                         @include('partials.sidebar-menu-icon', ['name' => 'user-group'])
                         <span class="font-medium">Teams</span>
@@ -205,36 +209,117 @@
                 <div x-show="openTeams" class="sidebar-sublist">
 
                     @if(! auth()->user()?->isCoTeam())
-                        {{-- CS Team --}}
-                        <button type="button" class="sidebar-subitem sidebar-focusable flex w-full items-start justify-between gap-1 text-left">
-                            <span class="min-w-0 flex-1 break-words text-left">CS Team</span>
-                            <svg class="h-3 w-3 shrink-0 text-[#98a2b3]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
-                            </svg>
-                        </button>
+                        @php
+                            $isCsTeamUser = (bool) auth()->user()?->isCsTeam();
+                            $isCoachTeamUser = (bool) auth()->user()?->isCoachTeam();
+                            $isKnownNonCoTeamUser = $isCsTeamUser || $isCoachTeamUser;
 
-                        {{-- Admin --}}
-                        <button type="button" class="sidebar-subitem sidebar-focusable flex w-full items-start justify-between gap-1 text-left">
-                            <span class="min-w-0 flex-1 break-words text-left">Admin</span>
-                            <svg class="h-3 w-3 shrink-0 text-[#98a2b3]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
-                            </svg>
-                        </button>
+                            // 팀별 노출 규칙:
+                            // - CS 계정: CS Team만
+                            // - Coach 계정: Coach Team만
+                            // - 관리자/기타 계정: 기존처럼 양쪽 팀 메뉴 노출
+                            $showCsTeamMenu = $canSeeManagementMenus || $isCsTeamUser || ! $isKnownNonCoTeamUser;
+                            $showCoachTeamMenu = $canSeeManagementMenus || $isCoachTeamUser || ! $isKnownNonCoTeamUser;
+                            $showAdminTeamMenu = $canSeeManagementMenus || ! $isKnownNonCoTeamUser;
 
-                        {{-- Coach Team --}}
-                        <button type="button" class="sidebar-subitem sidebar-focusable flex w-full items-start justify-between gap-1 text-left">
-                            <span class="min-w-0 flex-1 break-words text-left">Coach Team</span>
-                            <svg class="h-3 w-3 shrink-0 text-[#98a2b3]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
-                            </svg>
-                        </button>
+                            $sharedTeamMenus = [
+                                ['label' => '기관리스트', 'path' => '/institutions', 'route' => 'institutions', 'icon' => 'building'],
+                                ['label' => '교직원 연락처보기', 'path' => '/contacts', 'route' => 'contacts', 'icon' => 'phone'],
+                                ['label' => '기관지원보고서', 'path' => '/supports', 'route' => 'supports', 'icon' => 'document'],
+                                ['label' => '일정 관리', 'path' => route('schedules.index'), 'route' => '', 'routeIs' => 'schedules.index', 'icon' => 'calendar'],
+                            ];
+                        @endphp
+
+                        @if($showCsTeamMenu)
+                            {{-- CS Team --}}
+                            <div>
+                                <button type="button"
+                                        @click="openCS = !openCS; if (openCS) { openCoach = false; openCO = false }"
+                                        class="sidebar-item sidebar-focusable"
+                                        :class="openCS ? 'sidebar-item-active' : 'sidebar-item-default'">
+                                    <span class="sidebar-item-lead min-w-0 flex-1 break-words text-left">
+                                        @include('partials.sidebar-menu-icon', ['name' => 'phone'])
+                                        <span>CS Team</span>
+                                    </span>
+                                    <svg class="h-3 w-3 shrink-0 text-[#98a2b3] transition-transform duration-200"
+                                         :class="openCS ? 'rotate-90' : ''"
+                                         fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+                                    </svg>
+                                </button>
+
+                                <div x-show="openCS" class="sidebar-sublist">
+                                    @foreach($sharedTeamMenus as $menu)
+                                        <a href="{{ $menu['path'] }}{{ str_contains($menu['path'], '?') ? '&' : '?' }}team_menu=cs"
+                                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable
+                                                  {{ (! empty($menu['routeIs'] ?? null) && request()->routeIs($menu['routeIs']))
+                                                     ? 'sidebar-subitem-active'
+                                                     : ((! empty($menu['route'] ?? null) && request()->is($menu['route'].'*'))
+                                                         ? 'sidebar-subitem-active'
+                                                         : '') }}">
+                                            @include('partials.sidebar-menu-icon', ['name' => $menu['icon'], 'small' => true])
+                                            <span class="sidebar-subitem-label">{{ $menu['label'] }}</span>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
+                        @if($showAdminTeamMenu)
+                            {{-- Admin --}}
+                            <button type="button" class="sidebar-item sidebar-focusable sidebar-item-default">
+                                <span class="sidebar-item-lead min-w-0 flex-1 break-words text-left">
+                                    @include('partials.sidebar-menu-icon', ['name' => 'cog'])
+                                    <span>Admin</span>
+                                </span>
+                                <svg class="h-3 w-3 shrink-0 text-[#98a2b3]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+                                </svg>
+                            </button>
+                        @endif
+
+                        @if($showCoachTeamMenu)
+                            {{-- Coach Team --}}
+                            <div>
+                                <button type="button"
+                                        @click="openCoach = !openCoach; if (openCoach) { openCS = false; openCO = false }"
+                                        class="sidebar-item sidebar-focusable"
+                                        :class="openCoach ? 'sidebar-item-active' : 'sidebar-item-default'">
+                                    <span class="sidebar-item-lead min-w-0 flex-1 break-words text-left">
+                                        @include('partials.sidebar-menu-icon', ['name' => 'users'])
+                                        <span>Coach Team</span>
+                                    </span>
+                                    <svg class="h-3 w-3 shrink-0 text-[#98a2b3] transition-transform duration-200"
+                                         :class="openCoach ? 'rotate-90' : ''"
+                                         fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+                                    </svg>
+                                </button>
+
+                                <div x-show="openCoach" class="sidebar-sublist">
+                                    @foreach($sharedTeamMenus as $menu)
+                                        <a href="{{ $menu['path'] }}{{ str_contains($menu['path'], '?') ? '&' : '?' }}team_menu=coach"
+                                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable
+                                                  {{ (! empty($menu['routeIs'] ?? null) && request()->routeIs($menu['routeIs']))
+                                                     ? 'sidebar-subitem-active'
+                                                     : ((! empty($menu['route'] ?? null) && request()->is($menu['route'].'*'))
+                                                         ? 'sidebar-subitem-active'
+                                                         : '') }}">
+                                            @include('partials.sidebar-menu-icon', ['name' => $menu['icon'], 'small' => true])
+                                            <span class="sidebar-subitem-label">{{ $menu['label'] }}</span>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                     @endif
 
                     {{-- CO Team (하위 메뉴 포함) --}}
                     <div>
                         <button type="button"
-                                @click="openCO = !openCO; if (openCO) { openSetup = false }"
-                                class="sidebar-item sidebar-focusable {{ $isCoTeamRoute ? 'sidebar-item-active' : 'sidebar-item-default' }}">
+                                @click="openCO = !openCO; if (openCO) { openSetup = false; openCS = false; openCoach = false }"
+                                class="sidebar-item sidebar-focusable"
+                                :class="openCO ? 'sidebar-item-active' : 'sidebar-item-default'">
                             <span class="sidebar-item-lead">
                                 @include('partials.sidebar-menu-icon', ['name' => 'briefcase'])
                                 <span>CO Team</span>
@@ -252,23 +337,23 @@
                             @php
                                 $coMenus = [
                                     // ['label' => '전체기관리스트', 'href' => '/institutions', 'route' => 'institutions', 'icon' => 'building'],
-                                    ['label' => '기관리스트',     'href' => '/institutions', 'route' => 'institutions', 'icon' => 'building'],
-                                    ['label' => '교직원 연락처보기', 'href' => '/contacts',     'route' => 'contacts',     'icon' => 'phone'],
-                                    ['label' => '기관지원보고서', 'href' => '/supports',     'route' => 'supports',     'icon' => 'document'],
-                                    ['label' => '일정 관리', 'href' => route('schedules.index'), 'route' => '', 'routeIs' => 'schedules.index', 'icon' => 'calendar'],
-                                    ['label' => '잠재기관 등록하기', 'href' => route('potential-institutions.index'), 'route' => '', 'routeIs' => 'potential-institutions.index', 'icon' => 'calendar'],
-                                    ['label' => '잠재기관 목록보기',   'href' => route('potential-institutions.view'), 'route' => '', 'routeIs' => 'potential-institutions.view', 'icon' => 'eye'],
-                                    ['label' => 'GS Brochure', 'href' => route('co.gs-brochure'), 'route' => '', 'routeIs' => 'co.gs-brochure*', 'icon' => 'document'],
-                                    ['label' => 'Store 재고',  'href' => route('store.inventory.index'), 'route' => '', 'routeIs' => 'store.inventory.index', 'icon' => 'cart'],
-                                    ['label' => 'Store판매내역',  'href' => route('store.sales.index'), 'route' => '', 'routeIs' => 'store.sales.index', 'icon' => 'cart'],
-                                    ['label' => 'Salesforce파일', 'href' => route('salesforce-files.index'), 'route' => '', 'routeIs' => 'salesforce-files.index', 'icon' => 'server'],
+                                    ['label' => '기관리스트',     'path' => '/institutions', 'route' => 'institutions', 'icon' => 'building'],
+                                    ['label' => '교직원 연락처보기', 'path' => '/contacts',     'route' => 'contacts',     'icon' => 'phone'],
+                                    ['label' => '기관지원보고서', 'path' => '/supports',     'route' => 'supports',     'icon' => 'document'],
+                                    ['label' => '일정 관리', 'path' => route('schedules.index'), 'route' => '', 'routeIs' => 'schedules.index', 'icon' => 'calendar'],
+                                    ['label' => '잠재기관 등록하기', 'path' => route('potential-institutions.index'), 'route' => '', 'routeIs' => 'potential-institutions.index', 'icon' => 'calendar'],
+                                    ['label' => '잠재기관 목록보기',   'path' => route('potential-institutions.view'), 'route' => '', 'routeIs' => 'potential-institutions.view', 'icon' => 'eye'],
+                                    ['label' => 'GS Brochure', 'path' => route('co.gs-brochure'), 'route' => '', 'routeIs' => 'co.gs-brochure*', 'icon' => 'document'],
+                                    ['label' => 'Store 재고',  'path' => route('store.inventory.index'), 'route' => '', 'routeIs' => 'store.inventory.index', 'icon' => 'cart'],
+                                    ['label' => 'Store판매내역',  'path' => route('store.sales.index'), 'route' => '', 'routeIs' => 'store.sales.index', 'icon' => 'cart'],
+                                    ['label' => 'Salesforce파일', 'path' => route('salesforce-files.index'), 'route' => '', 'routeIs' => 'salesforce-files.index', 'icon' => 'server'],
                                     //['label' => '계약물건',       'href' => '#',             'route' => '',             'icon' => 'clipboard'],
                                     //['label' => '평가기관리스트', 'href' => '#',             'route' => '',             'icon' => 'chart'],
                                 ];
                             @endphp
 
                             @foreach($coMenus as $menu)
-                                <a href="{{ $menu['href'] }}"
+                                <a href="{{ $menu['path'] }}{{ str_contains($menu['path'], '?') ? '&' : '?' }}team_menu=co"
                                    @if(! empty($menu['blank'] ?? false))
                                        target="_blank" rel="noopener noreferrer"
                                    @endif

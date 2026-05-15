@@ -29,7 +29,7 @@
             <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
             <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
         </svg>
-        @if(auth()->user()->hasFullAccess() && $unreadCount > 0)
+        @if($unreadCount > 0)
             <span class="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold leading-none text-white">
                 {{ $unreadCount > 99 ? '99+' : $unreadCount }}
             </span>
@@ -48,33 +48,26 @@
                 <div class="mt-0.5 text-xs leading-snug text-gray-500">
                     E-Ordering에서 보낸 기관 정보가 등록되면 여기에 표시됩니다.
                 </div>
-                @unless(auth()->user()->hasFullAccess())
-                    <div class="mt-1 text-xs font-medium text-gray-600">
-                        최근 24시간 수신 {{ $recent24hCount }}건 · 목록만 조회 가능
-                    </div>
-                @endunless
             </div>
-            @if(auth()->user()->hasFullAccess())
-                <div class="flex shrink-0 items-center gap-2">
+            <div class="flex shrink-0 items-center gap-2">
+                <button
+                    type="button"
+                    wire:click="markAllAsRead"
+                    class="text-xs font-medium text-[#2b78c5] hover:underline"
+                >
+                    모두 읽음
+                </button>
+                @if(count($recentRows) > 0)
                     <button
                         type="button"
-                        wire:click="markAllAsRead"
-                        class="text-xs font-medium text-[#2b78c5] hover:underline"
+                        wire:click="deleteAllLogs"
+                        wire:confirm="알림 목록을 모두 삭제할까요? 되돌릴 수 없습니다."
+                        class="text-xs font-medium text-gray-400 hover:text-red-500 hover:underline"
                     >
-                        모두 읽음
+                        전체 삭제
                     </button>
-                    @if(count($recentRows) > 0)
-                        <button
-                            type="button"
-                            wire:click="deleteAllLogs"
-                            wire:confirm="알림 목록을 모두 삭제할까요? 되돌릴 수 없습니다."
-                            class="text-xs font-medium text-gray-400 hover:text-red-500 hover:underline"
-                        >
-                            전체 삭제
-                        </button>
-                    @endif
-                </div>
-            @endif
+                @endif
+            </div>
         </div>
 
         <div class="max-h-80 overflow-y-auto">
@@ -84,37 +77,28 @@
                         ? route('potential-institutions.view')
                         : route('institutions.index');
                 @endphp
-                @if(auth()->user()->hasFullAccess())
-                    <div
-                        wire:key="inbound-row-admin-{{ $row['id'] }}"
-                        class="group relative border-b border-gray-50 {{ ($row['is_unread'] ?? false) ? 'bg-sky-50/80' : '' }}"
-                    >
-                        <a
-                            href="{{ $href }}"
-                            class="block px-3 py-2.5 pr-8 text-left transition hover:bg-gray-50"
-                        >
-                            @include('livewire.partials.inbound-notification-row-body', ['row' => $row])
-                        </a>
-                        <button
-                            type="button"
-                            wire:click.stop="deleteLog({{ $row['id'] }})"
-                            title="이 알림 삭제"
-                            class="absolute right-2 top-2.5 hidden rounded p-0.5 text-gray-300 hover:bg-red-50 hover:text-red-400 group-hover:flex"
-                            aria-label="알림 삭제"
-                        >
-                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                            </svg>
-                        </button>
-                    </div>
-                @else
-                    <div
-                        wire:key="inbound-row-view-{{ $row['id'] }}"
-                        class="border-b border-gray-50 px-3 py-2.5 text-left"
+                <div
+                    wire:key="inbound-row-{{ $row['id'] }}"
+                    class="group relative border-b border-gray-50 {{ ($row['is_unread'] ?? false) ? 'bg-sky-50/80' : '' }}"
+                >
+                    <a
+                        href="{{ $href }}"
+                        class="block px-3 py-2.5 pr-8 text-left transition hover:bg-gray-50"
                     >
                         @include('livewire.partials.inbound-notification-row-body', ['row' => $row])
-                    </div>
-                @endif
+                    </a>
+                    <button
+                        type="button"
+                        wire:click.stop="deleteLog({{ $row['id'] }})"
+                        title="이 알림 삭제"
+                        class="absolute right-2 top-2.5 hidden rounded p-0.5 text-gray-300 hover:bg-red-50 hover:text-red-400 group-hover:flex"
+                        aria-label="알림 삭제"
+                    >
+                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
             @empty
                 <p class="px-3 py-6 text-center text-sm text-gray-500">E-Ordering에서 보낸 기관 정보가 없습니다.</p>
             @endforelse

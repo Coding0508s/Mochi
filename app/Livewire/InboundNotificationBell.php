@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\ExternalAssignmentInboundLog;
+use App\Models\InboundNotificationDismissal;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -10,8 +11,6 @@ use Livewire\Component;
 class InboundNotificationBell extends Component
 {
     public int $unreadCount = 0;
-
-    public int $recent24hCount = 0;
 
     /**
      * @var array<int, array{
@@ -50,30 +49,30 @@ class InboundNotificationBell extends Component
 
         $user = auth()->user();
 
-        $this->recent24hCount = ExternalAssignmentInboundLog::query()
-            ->where('received_at', '>=', now()->subDay())
-            ->count();
-
         $lastSeen = $user->last_inbound_seen_at;
 
-        if ($user->hasFullAccess()) {
-            $unreadQuery = ExternalAssignmentInboundLog::query();
-            if ($lastSeen !== null) {
-                $unreadQuery->where('received_at', '>', $lastSeen);
-            }
-            $this->unreadCount = $unreadQuery->count();
-        } else {
-            $this->unreadCount = 0;
+        // 사용자별 "내 화면에서 숨김"한 로그 id 목록. 카운트와 목록 양쪽에 같은 필터를 적용해
+        // 다른 사용자에는 영향을 주지 않으면서 본인 알림만 비웁니다.
+        $dismissedIds = InboundNotificationDismissal::query()
+            ->where('user_id', $user->id)
+            ->pluck('log_id')
+            ->all();
+
+        $unreadQuery = ExternalAssignmentInboundLog::query()
+            ->when($dismissedIds !== [], fn ($q) => $q->whereNotIn('id', $dismissedIds));
+        if ($lastSeen !== null) {
+            $unreadQuery->where('received_at', '>', $lastSeen);
         }
+        $this->unreadCount = $unreadQuery->count();
 
         $rows = ExternalAssignmentInboundLog::query()
+            ->when($dismissedIds !== [], fn ($q) => $q->whereNotIn('id', $dismissedIds))
             ->orderByDesc('received_at')
             ->limit(10)
             ->get();
 
         $this->recentRows = $rows->map(function (ExternalAssignmentInboundLog $row) use ($user, $lastSeen): array {
-            $isUnread = $user->hasFullAccess()
-                && ($lastSeen === null || ($row->received_at !== null && $row->received_at->greaterThan($lastSeen)));
+            $isUnread = $lastSeen === null || ($row->received_at !== null && $row->received_at->greaterThan($lastSeen));
 
             $raw = is_array($row->raw_body) ? $row->raw_body : [];
             $institutionName = $this->resolveInboundInstitutionName($raw);
@@ -140,7 +139,7 @@ class InboundNotificationBell extends Component
     public function markAllAsRead(): void
     {
         $user = auth()->user();
-        if (! $user?->hasFullAccess()) {
+        if (! $user) {
             return;
         }
 
@@ -152,22 +151,50 @@ class InboundNotificationBell extends Component
 
     public function deleteLog(int $id): void
     {
-        if (! auth()->user()?->hasFullAccess()) {
+        $user = auth()->user();
+        if (! $user) {
             return;
         }
 
-        ExternalAssignmentInboundLog::query()->whereKey($id)->delete();
+        // 실제 로그는 보존하고, 현재 사용자에게만 안 보이도록 dismiss 흔적만 남깁니다.
+        InboundNotificationDismissal::query()->updateOrCreate(
+            ['user_id' => $user->id, 'log_id' => $id],
+            ['dismissed_at' => now()],
+        );
 
         $this->loadCounters();
     }
 
     public function deleteAllLogs(): void
     {
-        if (! auth()->user()?->hasFullAccess()) {
+        $user = auth()->user();
+        if (! $user) {
             return;
         }
 
-        ExternalAssignmentInboundLog::query()->delete();
+        // 현재 사용자에게 보이는(=아직 dismiss 안 한) 로그를 일괄 dismiss 처리합니다.
+        $alreadyDismissedIds = InboundNotificationDismissal::query()
+            ->where('user_id', $user->id)
+            ->pluck('log_id')
+            ->all();
+
+        $visibleLogIds = ExternalAssignmentInboundLog::query()
+            ->when($alreadyDismissedIds !== [], fn ($q) => $q->whereNotIn('id', $alreadyDismissedIds))
+            ->pluck('id')
+            ->all();
+
+        if ($visibleLogIds !== []) {
+            $now = now();
+            $rows = array_map(fn (int $logId): array => [
+                'user_id' => $user->id,
+                'log_id' => $logId,
+                'dismissed_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ], array_map('intval', $visibleLogIds));
+
+            InboundNotificationDismissal::query()->insert($rows);
+        }
 
         $this->loadCounters();
     }

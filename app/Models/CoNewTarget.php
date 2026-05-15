@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Support\ManagerNameNormalizer;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CoNewTarget extends Model
 {
@@ -35,6 +37,7 @@ class CoNewTarget extends Model
         'IsContract',
         'ContractedDate',
         'Possibility',
+        'created_by',
     ];
 
     protected function casts(): array
@@ -44,6 +47,28 @@ class CoNewTarget extends Model
             'ContractedDate' => 'datetime',
             'IsContract' => 'boolean',
         ];
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function isManagedBy(User $user): bool
+    {
+        if ($user->hasFullAccess()) {
+            return true;
+        }
+
+        if ((int) $this->created_by > 0) {
+            return (int) $this->created_by === (int) $user->id;
+        }
+
+        // 표기 차이(공백/점)로 같은 사람이 어긋나지 않도록 InstitutionList와 같은 정규화 키로 비교.
+        $managerKey = ManagerNameNormalizer::normalize((string) $this->AccountManager);
+        $userKey = ManagerNameNormalizer::normalize((string) $user->name);
+
+        return $managerKey !== '' && $userKey !== '' && $managerKey === $userKey;
     }
 
     public function scopeKeyword(Builder $query, ?string $keyword): Builder

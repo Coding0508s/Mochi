@@ -85,6 +85,7 @@ class SupportCreateFormTest extends TestCase
             $table->boolean('IsContract')->default(false);
             $table->date('ContractedDate')->nullable();
             $table->string('Possibility', 20)->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
         });
 
         Schema::create('S_CO_NewTarget_Detail', function (Blueprint $table): void {
@@ -235,15 +236,16 @@ class SupportCreateFormTest extends TestCase
             'AccountName' => '잠재 기관',
         ]);
 
+        $user = User::factory()->create(['name' => '테스터']);
+
         CoNewTarget::query()->create([
             'AccountCode' => 'SK-POT-1',
             'AccountName' => '잠재 기관',
             'AccountManager' => 'CO 담당자',
             'IsContract' => false,
             'Possibility' => 'B',
+            'created_by' => $user->id,
         ]);
-
-        $user = User::factory()->create(['name' => '테스터']);
 
         Livewire::actingAs($user)
             ->test(SupportCreateForm::class)
@@ -298,15 +300,16 @@ class SupportCreateFormTest extends TestCase
 
     public function test_save_for_uncontracted_potential_without_sk_records_potential_target_id(): void
     {
+        $user = User::factory()->create(['name' => '테스터']);
+
         $potential = CoNewTarget::query()->create([
             'AccountCode' => null,
             'AccountName' => '무SK 잠재 기관',
             'AccountManager' => '잠재 담당자',
             'IsContract' => false,
             'Possibility' => 'C',
+            'created_by' => $user->id,
         ]);
-
-        $user = User::factory()->create(['name' => '테스터']);
 
         Livewire::actingAs($user)
             ->test(SupportCreateForm::class)
@@ -336,18 +339,40 @@ class SupportCreateFormTest extends TestCase
         ]);
     }
 
+    public function test_non_creator_cannot_select_uncontracted_potential_target(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create(['name' => '다른 사용자']);
+        $potential = CoNewTarget::query()->create([
+            'AccountCode' => null,
+            'AccountName' => '타인 잠재 기관',
+            'AccountManager' => '잠재 담당자',
+            'IsContract' => false,
+            'Possibility' => 'C',
+            'created_by' => $owner->id,
+        ]);
+
+        Livewire::actingAs($other)
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', '', true, (int) $potential->ID)
+            ->assertSet('formPotentialTargetId', null)
+            ->assertSet('formIsPotential', false);
+    }
+
     public function test_save_rejects_sf_upload_for_uncontracted_potential_without_sk(): void
     {
+        $user = User::factory()->create(['name' => '테스터']);
+
         $potential = CoNewTarget::query()->create([
             'AccountCode' => null,
             'AccountName' => '무SK 파일제한 기관',
             'AccountManager' => '잠재 담당자',
             'IsContract' => false,
             'Possibility' => 'B',
+            'created_by' => $user->id,
         ]);
 
         Storage::fake('local');
-        $user = User::factory()->create(['name' => '테스터']);
         $upload = UploadedFile::fake()->create('무sk-업로드.pdf', 100, 'application/pdf');
 
         Livewire::actingAs($user)
@@ -457,6 +482,7 @@ class SupportCreateFormTest extends TestCase
             'Total' => 0,
             'IsContract' => false,
             'Possibility' => 'C',
+            'created_by' => $user->id,
         ]);
 
         Livewire::actingAs($user)

@@ -18,9 +18,11 @@ class TeamSchedulePolicy
             return true;
         }
 
+        $userWorkdept = $user->employee?->WORKDEPT;
+
         return $teamSchedule->visibility === 'team'
-            && filled($user->team)
-            && $teamSchedule->user?->team === $user->team;
+            && filled($userWorkdept)
+            && $teamSchedule->user?->employee?->WORKDEPT === $userWorkdept;
     }
 
     public function create(User $user): bool

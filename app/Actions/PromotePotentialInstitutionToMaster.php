@@ -47,6 +47,7 @@ class PromotePotentialInstitutionToMaster
             [
                 'Account_Name' => $name !== '' ? $name : null,
                 'Address' => $this->normalizeStringOrNull($target->Address),
+                'CO' => $this->normalizeStringOrNull($target->AccountManager),
             ]
         ));
         $accountInfo->Customer_Type = $this->stripTerminationFromCustomerType(

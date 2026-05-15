@@ -18,6 +18,11 @@ class DeletePotentialMeetingDetail
     {
         Gate::authorize('managePotentialInstitutions');
 
+        $user = auth()->user();
+        if ($user === null || ! $target->isManagedBy($user)) {
+            throw new AuthorizationException('본인이 등록한 잠재기관만 관리할 수 있습니다.');
+        }
+
         if ($target->IsContract) {
             throw new AuthorizationException('계약 완료된 잠재기관의 미팅/컨설팅 이력은 삭제할 수 없습니다.');
         }

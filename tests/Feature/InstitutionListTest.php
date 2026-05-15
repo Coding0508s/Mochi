@@ -214,6 +214,158 @@ class InstitutionListTest extends TestCase
             ->assertDontSee('비담당 기관');
     }
 
+    public function test_co_team_user_sees_institution_when_co_uses_dotted_english_name(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-CO-DOTTED-1',
+            'AccountName' => '점 표기 담당 기관',
+        ]);
+        Institution::query()->create([
+            'SKcode' => 'SK-CO-DOTTED-2',
+            'AccountName' => '다른 점 표기 기관',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            [
+                'SK_Code' => 'SK-CO-DOTTED-1',
+                'Account_Name' => '점 표기 담당 기관',
+                'CO' => 'Peter.Kim',
+            ],
+            [
+                'SK_Code' => 'SK-CO-DOTTED-2',
+                'Account_Name' => '다른 점 표기 기관',
+                'CO' => 'James.Kwak',
+            ],
+        ]);
+
+        DB::table('employee')->insert([
+            'EMPNO' => 'E-PETER',
+            'WORKDEPT' => 'A02',
+            'KOREANAME' => '김봉철',
+            'ENGLISHNAME' => 'Peter Kim',
+            'EMAIL' => 'peter.kim@grapeseed.com',
+            'STATUS' => 1,
+        ]);
+
+        $coUser = User::factory()->create([
+            'name' => '김봉철',
+            'email' => 'peter.kim@grapeseed.com',
+            'team' => 'CO',
+            'is_admin' => false,
+        ]);
+
+        $this->actingAs($coUser)
+            ->get(route('institutions.index'))
+            ->assertOk()
+            ->assertSee('점 표기 담당 기관')
+            ->assertDontSee('다른 점 표기 기관');
+    }
+
+    public function test_detail_modal_aligns_dotted_co_to_master_option_label(): void
+    {
+        // DB에는 점 표기로 저장되어 있어도, 직원 마스터에 같은 사람이 공백 표기로 등록되어
+        // 있다면 상세 모달 진입 시점에 옵션 표기로 정렬돼야 "미지정"으로 표시되지 않는다.
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-ALIGN-1',
+            'AccountName' => '정렬 대상 기관',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-ALIGN-1',
+            'Account_Name' => '정렬 대상 기관',
+            'CO' => 'Peter.Kim',
+            'TR' => 'Rami.Lee',
+            'CS' => 'Bella.Joo',
+        ]);
+
+        DB::table('employee')->insert([
+            ['EMPNO' => 'E-PETER', 'WORKDEPT' => 'A02', 'KOREANAME' => '김봉철', 'ENGLISHNAME' => 'Peter Kim', 'STATUS' => 1],
+            ['EMPNO' => 'E-RAMI', 'WORKDEPT' => 'A05', 'KOREANAME' => '이라미', 'ENGLISHNAME' => 'Rami Lee', 'STATUS' => 1],
+            ['EMPNO' => 'E-BELLA', 'WORKDEPT' => 'A03', 'KOREANAME' => '주벨라', 'ENGLISHNAME' => 'Bella Joo', 'STATUS' => 1],
+        ]);
+
+        $admin = User::factory()->create([
+            'name' => 'Admin',
+            'email' => 'admin.align@grapeseed.com',
+            'team' => 'CO',
+            'is_admin' => true,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->assertSet('editDetailCo', 'Peter Kim')
+            ->assertSet('editDetailTr', 'Rami Lee')
+            ->assertSet('editDetailCs', 'Bella Joo')
+            ->assertSet('selectedInstitution.co', 'Peter Kim')
+            ->assertSet('selectedInstitution.tr', 'Rami Lee')
+            ->assertSet('selectedInstitution.cs', 'Bella Joo');
+    }
+
+    public function test_manager_modal_aligns_dotted_names_to_master_option_label(): void
+    {
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-ALIGN-2',
+            'AccountName' => '담당자 모달 정렬 기관',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-ALIGN-2',
+            'Account_Name' => '담당자 모달 정렬 기관',
+            'CO' => 'Peter.Kim',
+            'TR' => 'Rami.Lee',
+            'CS' => 'Bella.Joo',
+        ]);
+
+        DB::table('employee')->insert([
+            ['EMPNO' => 'E-PETER2', 'WORKDEPT' => 'A02', 'KOREANAME' => '김봉철', 'ENGLISHNAME' => 'Peter Kim', 'STATUS' => 1],
+            ['EMPNO' => 'E-RAMI2', 'WORKDEPT' => 'A05', 'KOREANAME' => '이라미', 'ENGLISHNAME' => 'Rami Lee', 'STATUS' => 1],
+            ['EMPNO' => 'E-BELLA2', 'WORKDEPT' => 'A03', 'KOREANAME' => '주벨라', 'ENGLISHNAME' => 'Bella Joo', 'STATUS' => 1],
+        ]);
+
+        $admin = User::factory()->create([
+            'name' => 'Admin 2',
+            'email' => 'admin.align2@grapeseed.com',
+            'team' => 'CO',
+            'is_admin' => true,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(InstitutionList::class)
+            ->call('openManagerModal', $institution->ID)
+            ->assertSet('editCo', 'Peter Kim')
+            ->assertSet('editTr', 'Rami Lee')
+            ->assertSet('editCs', 'Bella Joo');
+    }
+
+    public function test_detail_modal_keeps_raw_value_when_master_has_no_match(): void
+    {
+        // 직원 마스터에 매칭이 없으면(퇴사자/타부서 등) 원본 표기를 그대로 보여줘야 한다.
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-ALIGN-3',
+            'AccountName' => '매칭 없음 기관',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-ALIGN-3',
+            'Account_Name' => '매칭 없음 기관',
+            'CO' => 'Ghost.Person',
+        ]);
+
+        $admin = User::factory()->create([
+            'name' => 'Admin 3',
+            'email' => 'admin.align3@grapeseed.com',
+            'team' => 'CO',
+            'is_admin' => true,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->assertSet('editDetailCo', 'Ghost.Person')
+            ->assertSet('selectedInstitution.co', 'Ghost.Person');
+    }
+
     public function test_admin_in_co_team_can_see_all_institutions(): void
     {
         Institution::query()->create([

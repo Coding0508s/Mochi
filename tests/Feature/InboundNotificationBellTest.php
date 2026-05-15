@@ -1,0 +1,127 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Livewire\InboundNotificationBell;
+use App\Models\ExternalAssignmentInboundLog;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+use Tests\TestCase;
+
+class InboundNotificationBellTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_regular_user_sees_unread_inbound_notification_badge(): void
+    {
+        $user = User::factory()->create([
+            'is_admin' => false,
+        ]);
+
+        ExternalAssignmentInboundLog::query()->create([
+            'sk_code' => 'SK1234',
+            'co' => 'Peter.Kim',
+            'tr' => 'Rami.Lee',
+            'cs' => 'Bella.Joo',
+            'raw_body' => [
+                'source' => 'sk_code_request',
+                'institution_name' => 'TEA',
+            ],
+            'status' => 'applied',
+            'received_at' => now(),
+            'applied_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InboundNotificationBell::class)
+            ->assertSet('unreadCount', 1)
+            ->assertSee('1')
+            ->assertSee('TEA 기관 정보가 반영되었습니다.');
+    }
+
+    public function test_regular_user_can_mark_inbound_notifications_as_read(): void
+    {
+        $user = User::factory()->create([
+            'is_admin' => false,
+        ]);
+
+        $this->createInboundLog('SK-READ-1', '읽음 테스트 기관');
+
+        Livewire::actingAs($user)
+            ->test(InboundNotificationBell::class)
+            ->assertSet('unreadCount', 1)
+            ->call('markAllAsRead')
+            ->assertSet('unreadCount', 0);
+
+        $this->assertNotNull($user->fresh()->last_inbound_seen_at);
+    }
+
+    public function test_regular_user_can_dismiss_inbound_notifications_individually(): void
+    {
+        $user = User::factory()->create([
+            'is_admin' => false,
+        ]);
+
+        $first = $this->createInboundLog('SK-DELETE-1', '개별 삭제 기관');
+        $this->createInboundLog('SK-DELETE-2', '남는 기관');
+
+        Livewire::actingAs($user)
+            ->test(InboundNotificationBell::class)
+            ->call('deleteLog', $first->id)
+            ->assertSet('unreadCount', 1)
+            ->assertDontSee('개별 삭제 기관')
+            ->assertSee('남는 기관');
+
+        // 실제 로그는 보존되고 사용자별 dismiss 테이블에만 흔적이 남아야 합니다.
+        $this->assertDatabaseHas('external_assignment_inbound_logs', [
+            'id' => $first->id,
+        ]);
+        $this->assertDatabaseHas('inbound_notification_dismissals', [
+            'user_id' => $user->id,
+            'log_id' => $first->id,
+        ]);
+    }
+
+    public function test_regular_user_dismiss_all_only_hides_own_view(): void
+    {
+        $alice = User::factory()->create(['is_admin' => false]);
+        $bob = User::factory()->create(['is_admin' => false]);
+
+        $this->createInboundLog('SK-ALL-1', '공동 알림 1');
+        $this->createInboundLog('SK-ALL-2', '공동 알림 2');
+
+        Livewire::actingAs($alice)
+            ->test(InboundNotificationBell::class)
+            ->call('deleteAllLogs')
+            ->assertSet('unreadCount', 0)
+            ->assertDontSee('공동 알림 1')
+            ->assertDontSee('공동 알림 2');
+
+        // 다른 사용자(Bob)는 동일한 알림을 그대로 봐야 합니다.
+        Livewire::actingAs($bob)
+            ->test(InboundNotificationBell::class)
+            ->assertSet('unreadCount', 2)
+            ->assertSee('공동 알림 1')
+            ->assertSee('공동 알림 2');
+
+        $this->assertDatabaseCount('external_assignment_inbound_logs', 2);
+    }
+
+    private function createInboundLog(string $skCode, string $institutionName): ExternalAssignmentInboundLog
+    {
+        return ExternalAssignmentInboundLog::query()->create([
+            'sk_code' => $skCode,
+            'co' => 'Peter.Kim',
+            'tr' => 'Rami.Lee',
+            'cs' => 'Bella.Joo',
+            'raw_body' => [
+                'source' => 'sk_code_request',
+                'institution_name' => $institutionName,
+            ],
+            'status' => 'applied',
+            'received_at' => now(),
+            'applied_at' => now(),
+        ]);
+    }
+}
