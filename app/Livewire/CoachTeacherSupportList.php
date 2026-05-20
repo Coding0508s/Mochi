@@ -172,6 +172,7 @@ class CoachTeacherSupportList extends Component
 
         $institution = Institution::query()
             ->whereIn('SKcode', $candidateSkCodes)
+            ->with('accountInfo')
             ->first();
 
         if (! $institution) {
@@ -182,7 +183,7 @@ class CoachTeacherSupportList extends Component
 
         $this->institutionInfo = [
             'sk_code' => $normalizedSkCode,
-            'name' => $institution->AccountName,
+            'name' => $institution->resolvedAccountName(),
             'address' => $institution->Address ?? '',
             'co' => $accountInfo?->CO ?? '',
             'tr' => $accountInfo?->TR ?? '',
@@ -302,7 +303,7 @@ class CoachTeacherSupportList extends Component
             'class_in_out' => (bool) $teacher->ClassInOut,
             'description' => $teacher->Description,
             'sk_code' => SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
-            'school_name' => $teacher->School_Name ?? $institution?->AccountName,
+            'school_name' => $this->institutionDisplayName($institution, $teacher->School_Name),
             'gs_essentials' => $teacher->GrapeSEEDEssentials?->format('Y-m-d'),
             'ls_essentials' => $teacher->LittleSEEDEssentials?->format('Y-m-d'),
             'tr' => $accountInfo?->TR ?? '',
@@ -701,7 +702,7 @@ class CoachTeacherSupportList extends Component
         $this->demoLessonForm = $this->defaultDemoLessonForm(
             skCode: SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
             coachName: $coachName,
-            institutionName: (string) ($teacher->School_Name ?? $institution?->AccountName ?? ''),
+            institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
         $this->showDemoLessonModal = true;
@@ -818,7 +819,7 @@ class CoachTeacherSupportList extends Component
         $this->lvaFrForm = $this->defaultLvaFrForm(
             skCode: SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
             coachName: $coachName,
-            institutionName: (string) ($teacher->School_Name ?? $institution?->AccountName ?? ''),
+            institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
         $this->showLvaFrModal = true;
@@ -937,7 +938,7 @@ class CoachTeacherSupportList extends Component
         $this->lvaFbForm = $this->defaultLvaFbForm(
             skCode: SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
             coachName: $coachName,
-            institutionName: (string) ($teacher->School_Name ?? $institution?->AccountName ?? ''),
+            institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
         $this->showLvaFbModal = true;
@@ -1056,7 +1057,7 @@ class CoachTeacherSupportList extends Component
         $this->lsOnsiteLvaForm = $this->defaultLsOnsiteLvaForm(
             skCode: SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
             coachName: $coachName,
-            institutionName: (string) ($teacher->School_Name ?? $institution?->AccountName ?? ''),
+            institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
         $this->showLsOnsiteLvaModal = true;
@@ -1177,7 +1178,7 @@ class CoachTeacherSupportList extends Component
         $this->littleseedConForm = $this->defaultLittleseedConForm(
             skCode: SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
             coachName: $coachName,
-            institutionName: (string) ($teacher->School_Name ?? $institution?->AccountName ?? ''),
+            institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
         $this->showLittleseedConModal = true;
@@ -1291,7 +1292,7 @@ class CoachTeacherSupportList extends Component
         $this->openClassForm = $this->defaultOpenClassForm(
             skCode: SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
             coachName: $coachName,
-            institutionName: (string) ($teacher->School_Name ?? $institution?->AccountName ?? ''),
+            institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
         $this->showOpenClassModal = true;
@@ -1407,7 +1408,7 @@ class CoachTeacherSupportList extends Component
         $this->unit21PlusForm = $this->defaultUnit21PlusForm(
             skCode: SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
             coachName: $coachName,
-            institutionName: (string) ($teacher->School_Name ?? $institution?->AccountName ?? ''),
+            institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
         $this->showUnit21PlusModal = true;
@@ -1526,7 +1527,7 @@ class CoachTeacherSupportList extends Component
         $this->unit31PlusForm = $this->defaultUnit31PlusForm(
             skCode: SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
             coachName: $coachName,
-            institutionName: (string) ($teacher->School_Name ?? $institution?->AccountName ?? ''),
+            institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
         $this->showUnit31PlusModal = true;
@@ -1645,7 +1646,7 @@ class CoachTeacherSupportList extends Component
         $this->proConForm = $this->defaultProConForm(
             skCode: SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
             coachName: $coachName,
-            institutionName: (string) ($teacher->School_Name ?? $institution?->AccountName ?? ''),
+            institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
         $this->showProConModal = true;
@@ -1759,7 +1760,7 @@ class CoachTeacherSupportList extends Component
         $this->onsiteForm = $this->defaultOnsiteForm(
             skCode: SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
             coachName: $coachName,
-            institutionName: (string) ($teacher->School_Name ?? $institution?->AccountName ?? ''),
+            institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
         $this->showOnsiteModal = true;
@@ -1951,7 +1952,8 @@ class CoachTeacherSupportList extends Component
             ->tap(fn (Builder $q) => $this->applyMonthFilter($q))
             ->with(CoachTeacherScope::eagerLoads())
             ->leftJoin('S_AccountName', 'Teachers.SK_Code', '=', 'S_AccountName.SKcode')
-            ->orderByRaw('COALESCE(S_AccountName.AccountName, Teachers.School_Name) ASC')
+            ->leftJoin('S_Account_Information', 'Teachers.SK_Code', '=', 'S_Account_Information.SK_Code')
+            ->orderByRaw('COALESCE(NULLIF(S_Account_Information.Account_Name, ""), NULLIF(S_AccountName.AccountName, ""), Teachers.School_Name) ASC')
             ->orderBy('Teachers.SK_Code')
             ->orderBy('Teachers.Name')
             ->select('Teachers.*')
@@ -1987,9 +1989,9 @@ class CoachTeacherSupportList extends Component
         if (filled($this->search)) {
             $term = '%'.preg_replace('/\s+/u', '', $this->search).'%';
             $query->where(function (Builder $q) use ($term): void {
-                $q->whereRaw("REPLACE(Name, ' ', '') LIKE ?", [$term])
-                    ->orWhereRaw("REPLACE(School_Name, ' ', '') LIKE ?", [$term])
-                    ->orWhere('SK_Code', 'LIKE', $term);
+                $q->whereRaw("REPLACE(Teachers.Name, ' ', '') LIKE ?", [$term])
+                    ->orWhereRaw("REPLACE(Teachers.School_Name, ' ', '') LIKE ?", [$term])
+                    ->orWhere('Teachers.SK_Code', 'LIKE', $term);
             });
         }
 
@@ -2067,6 +2069,16 @@ class CoachTeacherSupportList extends Component
                     ->whereMonth($cols['plan_2nd'], $month);
             });
         });
+    }
+
+    private function institutionDisplayName(?Institution $institution, ?string $schoolName = null): string
+    {
+        $fromInstitution = trim($institution?->resolvedAccountName() ?? '');
+        if ($fromInstitution !== '') {
+            return $fromInstitution;
+        }
+
+        return trim((string) ($schoolName ?? ''));
     }
 
     private function canEditTeacher(Teacher $teacher): bool

@@ -139,7 +139,14 @@ class UpsertInstitutionFromExternal
             return;
         }
 
-        $name = $institution->AccountName;
+        $name = trim((string) ($institution->AccountName ?? ''));
+        $currentAccountName = AccountInformation::query()
+            ->where('SK_Code', $sk)
+            ->value('Account_Name');
+        if (filled($currentAccountName)) {
+            $name = trim((string) $currentAccountName);
+        }
+
         if (array_key_exists('institution_name', $patch)) {
             $fromPatch = $this->normalizeStringOrNull($patch['institution_name']);
             if ($fromPatch !== null) {
@@ -187,7 +194,13 @@ class UpsertInstitutionFromExternal
         }
 
         $gs = $this->normalizeStringOrNull($patch['gs_no']);
-        $name = $institution->AccountName;
+        $name = trim((string) ($institution->AccountName ?? ''));
+        $resolvedName = AccountInformation::query()
+            ->where('SK_Code', $sk)
+            ->value('Account_Name');
+        if (filled($resolvedName)) {
+            $name = trim((string) $resolvedName);
+        }
 
         GsNumber::query()->updateOrCreate(
             ['SKCode' => $sk],

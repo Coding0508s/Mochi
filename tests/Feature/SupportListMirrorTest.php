@@ -31,12 +31,25 @@ class SupportListMirrorTest extends TestCase
         Schema::dropIfExists('S_CO_NewTarget_Detail');
         Schema::dropIfExists('S_CO_NewTarget');
         Schema::dropIfExists('S_SupportInfo_Account');
+        Schema::dropIfExists('S_Account_Information');
         Schema::dropIfExists('S_AccountName');
 
         Schema::create('S_AccountName', function (Blueprint $table): void {
             $table->increments('ID');
             $table->string('SKcode', 100)->unique();
             $table->string('AccountName', 255);
+        });
+
+        Schema::create('S_Account_Information', function (Blueprint $table): void {
+            $table->increments('ID');
+            $table->string('SK_Code', 100);
+            $table->string('Account_Name', 255)->nullable();
+            $table->string('TR', 255)->nullable();
+            $table->string('CS', 255)->nullable();
+            $table->string('CO', 255)->nullable();
+            $table->string('Customer_Type', 255)->nullable();
+            $table->string('Affiliate', 255)->nullable();
+            $table->string('Address', 255)->nullable();
         });
 
         Schema::create('S_SupportInfo_Account', function (Blueprint $table): void {
@@ -148,6 +161,28 @@ class SupportListMirrorTest extends TestCase
             'Possibility' => 'A',
             'Description' => '수정된 소통 내용',
         ]);
+    }
+
+    public function test_select_institution_uses_account_information_name_first(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-SSOT-SUPPORT-1',
+            'AccountName' => '레거시 지원기관명',
+        ]);
+
+        \DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-SSOT-SUPPORT-1',
+            'Account_Name' => '마스터 지원기관명',
+        ]);
+
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(SupportList::class)
+            ->call('selectInstitution', 'SK-SSOT-SUPPORT-1')
+            ->assertSet('formSkCode', 'SK-SSOT-SUPPORT-1')
+            ->assertSet('formAccountName', '마스터 지원기관명')
+            ->assertSet('formInstitutionKeyword', '마스터 지원기관명');
     }
 
     public function test_edit_save_does_not_mirror_for_contracted_target(): void

@@ -172,7 +172,7 @@
                                 <button type="button"
                                         class="text-blue-700 underline text-center hover:text-blue-900 cursor-pointer"
                                         wire:click.stop="openInstitutionModal('{{ $teacher->SK_Code }}')">
-                                    {{ $teacher->institution?->AccountName ?? $teacher->School_Name }}
+                                    {{ $teacher->institution?->resolvedAccountName() ?: $teacher->School_Name }}
                                 </button>
                             </td>
                         @endif

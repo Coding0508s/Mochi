@@ -105,7 +105,9 @@ class ContactList extends Component
 
     public function openEditModal(int $id): void
     {
-        $teacher = Teacher::findOrFail($id);
+        $teacher = Teacher::query()
+            ->with('institution.accountInfo')
+            ->findOrFail($id);
 
         $this->editingId = $teacher->ID;
         $this->newName = (string) ($teacher->Name ?? '');
@@ -116,7 +118,8 @@ class ContactList extends Component
         $this->newEmploymentStatus = $this->normalizeStatusForForm($teacher->Status);
         $this->newClassParticipation = (bool) ($teacher->ClassInOut ?? false) ? 'in' : 'out';
         $this->newSkCode = (string) ($teacher->SK_Code ?? '');
-        $this->newSchoolName = (string) ($teacher->School_Name ?? '');
+        $this->newSchoolName = $teacher->institution?->resolvedAccountName()
+            ?: (string) ($teacher->School_Name ?? '');
         $this->newDescription = (string) ($teacher->Description ?? '');
         $this->newGrapeSeedEssentials = $teacher->GrapeSEEDEssentials?->format('Y-m-d') ?? '';
         $this->newLittleSeedEssentials = $teacher->LittleSEEDEssentials?->format('Y-m-d') ?? '';
@@ -229,16 +232,20 @@ class ContactList extends Component
         }
 
         $inst = Institution::query()
+            ->with('accountInfo')
             ->whereNotNull('SKcode')
             ->where(function ($q) use ($keyword): void {
                 $q->where('AccountName', $keyword)
-                    ->orWhere('SKcode', $keyword);
+                    ->orWhere('SKcode', $keyword)
+                    ->orWhereHas('accountInfo', function ($info) use ($keyword): void {
+                        $info->where('Account_Name', $keyword);
+                    });
             })
             ->first();
 
         if ($inst) {
             $this->newSkCode = (string) $inst->SKcode;
-            $this->newSchoolName = (string) ($inst->AccountName ?? '');
+            $this->newSchoolName = $inst->resolvedAccountName();
             $this->newInstitutionKeyword = '';
             $this->resetErrorBag('newSkCode');
         }
@@ -251,13 +258,16 @@ class ContactList extends Component
             return;
         }
 
-        $inst = Institution::query()->where('SKcode', $trimmed)->first();
+        $inst = Institution::query()
+            ->with('accountInfo')
+            ->where('SKcode', $trimmed)
+            ->first();
         if (! $inst) {
             return;
         }
 
         $this->newSkCode = (string) $inst->SKcode;
-        $this->newSchoolName = (string) ($inst->AccountName ?? '');
+        $this->newSchoolName = $inst->resolvedAccountName();
         $this->newInstitutionKeyword = '';
         $this->resetErrorBag('newSkCode');
     }
@@ -426,14 +436,12 @@ class ContactList extends Component
 
         $teacherInstitutionSuggestions = collect();
         if ($this->showModal && blank($this->newSkCode)) {
-            $normalizedKeyword = preg_replace('/\s+/u', '', trim($this->newInstitutionKeyword)) ?? '';
-            if ($normalizedKeyword !== '') {
+            $keyword = trim($this->newInstitutionKeyword);
+            if ($keyword !== '') {
                 $teacherInstitutionSuggestions = Institution::query()
+                    ->with('accountInfo')
                     ->whereNotNull('SKcode')
-                    ->where(function ($query) use ($normalizedKeyword): void {
-                        $query->whereRaw("REPLACE(IFNULL(AccountName,''), ' ', '') like ?", ["%{$normalizedKeyword}%"])
-                            ->orWhereRaw("REPLACE(IFNULL(SKcode,''), ' ', '') like ?", ["%{$normalizedKeyword}%"]);
-                    })
+                    ->search($keyword)
                     ->orderBy('AccountName')
                     ->limit(15)
                     ->get(['SKcode', 'AccountName']);

@@ -117,7 +117,8 @@ final class CoachTeacherScope
         $hiddenSkCodes = self::hiddenInstitutionSkCodes();
 
         if ($hiddenSkCodes !== []) {
-            $query->whereNotIn('SK_Code', $hiddenSkCodes);
+            $table = $query->getModel()->getTable();
+            $query->whereNotIn("{$table}.SK_Code", $hiddenSkCodes);
         }
     }
 

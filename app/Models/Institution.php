@@ -129,6 +129,19 @@ class Institution extends Model
     }
 
     /**
+     * 목록·모달 표시용 기관명: S_Account_Information.Account_Name 우선, 없으면 S_AccountName.AccountName.
+     */
+    public function resolvedAccountName(): string
+    {
+        $fromInfo = trim((string) ($this->accountInfo?->Account_Name ?? ''));
+        if ($fromInfo !== '') {
+            return $fromInfo;
+        }
+
+        return trim((string) ($this->AccountName ?? ''));
+    }
+
+    /**
      * 이 기관에 속한 교사(연락처) 목록
      *
      * 사용 예:
@@ -182,7 +195,14 @@ class Institution extends Model
             $q->whereRaw("REPLACE(AccountName, ' ', '') like ?", ["%{$normalizedKeyword}%"])
                 ->orWhereRaw("REPLACE(SKcode, ' ', '') like ?", ["%{$normalizedKeyword}%"])
                 ->orWhereRaw("REPLACE(Director, ' ', '') like ?", ["%{$normalizedKeyword}%"])
-                ->orWhereRaw("REPLACE(Address, ' ', '') like ?", ["%{$normalizedKeyword}%"]);
+                ->orWhereRaw("REPLACE(Address, ' ', '') like ?", ["%{$normalizedKeyword}%"])
+                ->orWhereHas('accountInfo', function (Builder $info) use ($normalizedKeyword): void {
+                    $info->where(function (Builder $sub) use ($normalizedKeyword): void {
+                        foreach (['CO', 'TR', 'CS', 'Account_Name', 'Customer_Type', 'Affiliate', 'Address'] as $column) {
+                            $sub->orWhereRaw("REPLACE({$column}, ' ', '') like ?", ["%{$normalizedKeyword}%"]);
+                        }
+                    });
+                });
         });
     }
 

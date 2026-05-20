@@ -137,8 +137,11 @@ class SupportList extends Component
             return;
         }
 
-        $inst = Institution::query()->where('SKcode', $value)->first();
-        $this->contractAccountName = $inst?->AccountName ?? '';
+        $inst = Institution::query()
+            ->with('accountInfo')
+            ->where('SKcode', $value)
+            ->first();
+        $this->contractAccountName = $inst?->resolvedAccountName() ?? '';
     }
 
     public function selectContractDocument(int $id): void
@@ -376,8 +379,11 @@ class SupportList extends Component
 
             return;
         }
-        $inst = Institution::where('SKcode', $value)->first();
-        $this->formAccountName = $inst?->AccountName ?? '';
+        $inst = Institution::query()
+            ->with('accountInfo')
+            ->where('SKcode', $value)
+            ->first();
+        $this->formAccountName = $inst?->resolvedAccountName() ?? '';
     }
 
     // ─── 기관명 입력 시 검색/선택 상태 동기화 ───────────────────────
@@ -395,13 +401,20 @@ class SupportList extends Component
 
         // 기관명을 정확히 입력한 경우 자동 선택 처리
         $inst = Institution::query()
-            ->where('AccountName', $keyword)
-            ->orWhere('SKcode', $keyword)
+            ->with('accountInfo')
+            ->where(function ($query) use ($keyword): void {
+                $query->where('AccountName', $keyword)
+                    ->orWhere('SKcode', $keyword)
+                    ->orWhereHas('accountInfo', function ($info) use ($keyword): void {
+                        $info->where('Account_Name', $keyword);
+                    });
+            })
             ->first();
 
         if ($inst) {
             $this->formSkCode = (string) $inst->SKcode;
-            $this->formAccountName = (string) $inst->AccountName;
+            $this->formAccountName = $inst->resolvedAccountName();
+            $this->formInstitutionKeyword = $inst->resolvedAccountName();
 
             return;
         }
@@ -415,6 +428,7 @@ class SupportList extends Component
     public function selectInstitution(string $skCode): void
     {
         $inst = Institution::query()
+            ->with('accountInfo')
             ->where('SKcode', $skCode)
             ->first();
 
@@ -423,8 +437,8 @@ class SupportList extends Component
         }
 
         $this->formSkCode = (string) $inst->SKcode;
-        $this->formAccountName = (string) $inst->AccountName;
-        $this->formInstitutionKeyword = (string) $inst->AccountName;
+        $this->formAccountName = $inst->resolvedAccountName();
+        $this->formInstitutionKeyword = $inst->resolvedAccountName();
     }
 
     // ─── 이벤트로 모달 열기 (tr onclick에서 호출) ─────────────────
@@ -564,28 +578,25 @@ class SupportList extends Component
             ->pluck('TR_Name');
 
         $institutions = Institution::query()
+            ->with('accountInfo')
             ->whereNotNull('SKcode')
             ->orderBy('AccountName')
             ->get(['SKcode', 'AccountName']);
 
-        $institutionSuggestions = Institution::query()
-            ->where(function ($query) {
-                $keyword = trim($this->formInstitutionKeyword);
-                $normalizedKeyword = preg_replace('/\s+/u', '', $keyword) ?? '';
-
-                if ($normalizedKeyword === '') {
-                    // 검색어가 없으면 결과 없음(모달이 깔끔해짐)
-                    $query->whereRaw('1 = 0');
-
-                    return;
-                }
-
-                $query->whereRaw("REPLACE(AccountName, ' ', '') like ?", ["%{$normalizedKeyword}%"])
-                    ->orWhereRaw("REPLACE(SKcode, ' ', '') like ?", ["%{$normalizedKeyword}%"]);
-            })
-            ->orderBy('AccountName')
-            ->limit(8)
-            ->get(['SKcode', 'AccountName']);
+        $keyword = trim($this->formInstitutionKeyword);
+        $institutionSuggestions = collect();
+        if ($keyword !== '' && blank($this->formSkCode)) {
+            $institutionSuggestions = Institution::query()
+                ->with('accountInfo')
+                ->search($keyword)
+                ->orderBy('AccountName')
+                ->limit(8)
+                ->get(['SKcode', 'AccountName'])
+                ->map(fn (Institution $inst): object => (object) [
+                    'SKcode' => (string) $inst->SKcode,
+                    'AccountName' => $inst->resolvedAccountName(),
+                ]);
+        }
 
         $contractDocumentRows = $this->showContractModal && filled($this->contractSkCode)
             ? ContractDocument::query()

@@ -147,7 +147,7 @@ class InstitutionList extends Component
     public function openDetailModal(int $id): void
     {
         $institution = Institution::query()
-            ->tap(fn (Builder $query) => $this->applyCoTeamInstitutionScope($query))
+            ->tap(fn (Builder $query) => $this->applyTeamInstitutionScope($query))
             ->with($this->institutionEagerLoads())
             ->withCount('teachers')
             ->withCount('supportRecords')
@@ -173,7 +173,7 @@ class InstitutionList extends Component
         $this->selectedInstitution = [
             'id' => $institution->ID,
             'skcode' => $institution->SKcode,
-            'name' => $institution->AccountName,
+            'name' => $institution->resolvedAccountName(),
             'english_name' => $institution->EnglishName,
             'portal_name' => $institution->PortalAccountName,
             'portal_campus_id' => $institution->PortalCampusID,
@@ -200,7 +200,7 @@ class InstitutionList extends Component
         $this->editDetailTr = $aliasedTr;
         $this->editDetailCs = $aliasedCs;
         $this->editDetailSkCode = (string) ($institution->SKcode ?? '');
-        $this->editDetailInstitutionName = (string) ($institution->AccountName ?? '');
+        $this->editDetailInstitutionName = $institution->resolvedAccountName();
         $this->editDetailEnglishName = (string) ($institution->EnglishName ?? '');
         $this->editDetailPortalName = (string) ($institution->PortalAccountName ?? '');
         $this->editDetailPortalCampusId = (string) ($institution->PortalCampusID ?? '');
@@ -463,7 +463,7 @@ class InstitutionList extends Component
         }
 
         return Institution::query()
-            ->tap(fn (Builder $query) => $this->applyCoTeamInstitutionScope($query))
+            ->tap(fn (Builder $query) => $this->applyTeamInstitutionScope($query))
             ->whereKey($institutionId)
             ->exists();
     }
@@ -539,7 +539,7 @@ class InstitutionList extends Component
 
         $this->editingInstitutionId = $institution->ID;
         $this->editSkCode = (string) ($institution->SKcode ?? '');
-        $this->editInstitutionName = (string) ($institution->AccountName ?? '');
+        $this->editInstitutionName = $institution->resolvedAccountName();
         $this->editCo = $this->alignManagerLabelToMasterOption(
             $institution->accountInfo?->CO,
             $this->managerOptionsForDept(self::DEPT_CO),
@@ -600,33 +600,49 @@ class InstitutionList extends Component
             'editInstitutionName.required' => '기관명이 필요합니다.',
         ]);
 
-        AccountInformation::query()->updateOrCreate(
-            ['SK_Code' => $this->editSkCode],
-            [
-                'Account_Name' => $this->editInstitutionName,
-                'CO' => $co,
-                'TR' => $tr,
-                'CS' => $cs,
-            ]
-        );
+        $accountName = trim($this->editInstitutionName);
 
-        $this->reverseSyncToSkCodeRequest($this->editSkCode, [
-            'institution_name' => $this->editInstitutionName,
-            'co' => $co,
-            'tr' => $tr,
-            'cs' => $cs,
-        ]);
+        DB::transaction(function () use ($accountName, $co, $tr, $cs): void {
+            Institution::query()
+                ->where('SKcode', $this->editSkCode)
+                ->update(['AccountName' => $accountName]);
 
-        DB::afterCommit(function (): void {
-            SyncInstitutionOutboundJob::dispatchIf(
-                (bool) config('services.institution_outbound.enabled'),
-                $this->editSkCode,
-                SyncOrigin::Local
+            AccountInformation::query()->updateOrCreate(
+                ['SK_Code' => $this->editSkCode],
+                [
+                    'Account_Name' => $accountName,
+                    'CO' => $co,
+                    'TR' => $tr,
+                    'CS' => $cs,
+                ]
             );
+
+            if (Schema::hasTable('S_GSNumber')) {
+                GsNumber::query()->updateOrCreate(
+                    ['SKCode' => $this->editSkCode],
+                    ['AccountName' => $accountName !== '' ? $accountName : null],
+                );
+            }
+
+            $this->reverseSyncToSkCodeRequest($this->editSkCode, [
+                'institution_name' => $accountName,
+                'co' => $co,
+                'tr' => $tr,
+                'cs' => $cs,
+            ]);
+
+            DB::afterCommit(function (): void {
+                SyncInstitutionOutboundJob::dispatchIf(
+                    (bool) config('services.institution_outbound.enabled'),
+                    $this->editSkCode,
+                    SyncOrigin::Local
+                );
+            });
         });
 
         // 상세 모달 열려 있으면 즉시 표시값도 갱신
         if ($this->selectedInstitution && $this->selectedInstitution['skcode'] === $this->editSkCode) {
+            $this->selectedInstitution['name'] = $accountName;
             $this->selectedInstitution['co'] = $co;
             $this->selectedInstitution['tr'] = $tr;
             $this->selectedInstitution['cs'] = $cs;
@@ -642,70 +658,74 @@ class InstitutionList extends Component
         $hiddenInstitutionSkCodes = $this->hiddenInstitutionSkCodes();
 
         // 상단 요약 카드용 집계
+        $managerColumn = $this->currentUserManagerColumn();
+
         $allInstitutionCount = Institution::query()
-            ->tap(fn (Builder $query) => $this->applyCoTeamInstitutionScope($query))
+            ->tap(fn (Builder $query) => $this->applyTeamInstitutionScope($query))
             ->tap(fn (Builder $query) => $this->applyStatusFilter($query))
             ->when($hiddenInstitutionSkCodes !== [], function ($query) use ($hiddenInstitutionSkCodes): void {
                 $query->whereNotIn('SKcode', $hiddenInstitutionSkCodes);
             })
             ->count();
 
+        $assignmentColumn = $managerColumn ?? 'CO';
+
         $assignedCoCount = Institution::query()
-            ->tap(fn (Builder $query) => $this->applyCoTeamInstitutionScope($query))
+            ->tap(fn (Builder $query) => $this->applyTeamInstitutionScope($query))
             ->tap(fn (Builder $query) => $this->applyStatusFilter($query))
             ->when($hiddenInstitutionSkCodes !== [], function ($query) use ($hiddenInstitutionSkCodes): void {
                 $query->whereNotIn('SKcode', $hiddenInstitutionSkCodes);
             })
-            ->whereHas('accountInfo', function ($q) {
-                $q->whereNotNull('CO')
-                    ->where('CO', '!=', '');
+            ->whereHas('accountInfo', function (Builder $q) use ($assignmentColumn): void {
+                $this->applyManagerAssignedConstraint($q, $assignmentColumn);
             })
             ->count();
 
         $myAssignedCoCount = Institution::query()
-            ->tap(fn (Builder $query) => $this->applyCoTeamInstitutionScope($query))
+            ->tap(fn (Builder $query) => $this->applyTeamInstitutionScope($query))
             ->tap(fn (Builder $query) => $this->applyStatusFilter($query))
             ->when($hiddenInstitutionSkCodes !== [], function ($query) use ($hiddenInstitutionSkCodes): void {
                 $query->whereNotIn('SKcode', $hiddenInstitutionSkCodes);
             })
-            ->tap(fn (Builder $query) => $this->applyCurrentUserAliasScope($query))
+            ->tap(fn (Builder $query) => $this->applyCurrentUserManagerScope($query))
             ->count();
 
         $unassignedCoCount = max(0, $allInstitutionCount - $assignedCoCount);
 
         $institutions = Institution::query()
-            ->tap(fn (Builder $query) => $this->applyCoTeamInstitutionScope($query))
+            ->tap(fn (Builder $query) => $this->applyTeamInstitutionScope($query))
             ->tap(fn (Builder $query) => $this->applyStatusFilter($query))
             ->search($this->search)
             // Institution 모델에 정의한 search 스코프 사용
-            // 기관명, SKcode, 원장명, 주소에서 검색어를 찾습니다.
+            // S_AccountName + S_Account_Information(CO/TR/CS 등)에서 검색합니다.
             ->when($hiddenInstitutionSkCodes !== [], function ($query) use ($hiddenInstitutionSkCodes): void {
                 $query->whereNotIn('SKcode', $hiddenInstitutionSkCodes);
             })
 
             ->with($this->institutionEagerLoads())
             // 담당자(CO/TR/CS) 및 S_GSNumber (테이블 있을 때만, N+1 방지)
+            ->select('S_AccountName.*')
+            ->tap(fn (Builder $query) => $this->applyInstitutionSort($query))
 
-            ->when($this->assignmentFilter === 'assigned', function ($query) {
-                $query->whereHas('accountInfo', function ($q) {
-                    $q->whereNotNull('CO')->where('CO', '!=', '');
+            ->when($this->assignmentFilter === 'assigned', function (Builder $query) use ($assignmentColumn): void {
+                $query->whereHas('accountInfo', function (Builder $sub) use ($assignmentColumn): void {
+                    $this->applyManagerAssignedConstraint($sub, $assignmentColumn);
                 });
             })
-            ->when($this->assignmentFilter === 'unassigned', function ($query) {
-                $query->whereDoesntHave('accountInfo', function ($q) {
-                    $q->whereNotNull('CO')->where('CO', '!=', '');
+            ->when($this->assignmentFilter === 'unassigned', function (Builder $query) use ($assignmentColumn): void {
+                $query->whereDoesntHave('accountInfo', function (Builder $sub) use ($assignmentColumn): void {
+                    $this->applyManagerAssignedConstraint($sub, $assignmentColumn);
                 });
             })
             ->when($this->assignmentFilter === 'my_assigned', function (Builder $query): void {
-                $this->applyCurrentUserAliasScope($query);
+                $this->applyCurrentUserManagerScope($query);
             })
-            ->orderBy($this->sortField, $this->sortDirection)
             ->paginate(20);
         // 한 페이지에 20개씩 표시합니다.
 
         // 기관 구분 목록 (필터 드롭다운용)
         $gubunList = Institution::query()
-            ->tap(fn (Builder $query) => $this->applyCoTeamInstitutionScope($query))
+            ->tap(fn (Builder $query) => $this->applyTeamInstitutionScope($query))
             ->tap(fn (Builder $query) => $this->applyStatusFilter($query))
             ->when($hiddenInstitutionSkCodes !== [], function ($query) use ($hiddenInstitutionSkCodes): void {
                 $query->whereNotIn('SKcode', $hiddenInstitutionSkCodes);
@@ -1015,50 +1035,114 @@ class InstitutionList extends Component
         });
     }
 
-    private function applyCoTeamInstitutionScope(Builder $query): void
+    private function applyTeamInstitutionScope(Builder $query): void
     {
         if (! $this->shouldScopeToAssignedInstitutions()) {
             return;
         }
 
-        $this->applyCurrentUserAliasScope($query);
+        $this->applyCurrentUserManagerScope($query);
     }
 
-    private function applyCurrentUserAliasScope(Builder $query): void
+    private function applyCurrentUserManagerScope(Builder $query): void
     {
-        $coAliases = $this->resolveCurrentUserCoAliases();
-        if ($coAliases === []) {
-            // 사용자 식별 키가 없으면 전체 노출을 막습니다.
+        $aliases = $this->resolveCurrentUserManagerAliases();
+        if ($aliases === []) {
             $query->whereRaw('1 = 0');
 
             return;
         }
 
-        $sqlNormalizedCo = ManagerNameNormalizer::sqlColumnExpression('CO');
+        $column = $this->currentUserManagerColumn();
+        if ($column === null) {
+            $query->whereHas('accountInfo', function (Builder $sub) use ($aliases): void {
+                $sub->where(function (Builder $inner) use ($aliases): void {
+                    foreach (['CO', 'TR', 'CS'] as $managerColumn) {
+                        $sql = ManagerNameNormalizer::sqlColumnExpression($managerColumn);
+                        $inner->orWhere(function (Builder $columnQuery) use ($aliases, $sql): void {
+                            foreach ($aliases as $alias) {
+                                $columnQuery->orWhereRaw("{$sql} = ?", [$alias]);
+                            }
+                        });
+                    }
+                });
+            });
 
-        $query->whereHas('accountInfo', function (Builder $sub) use ($coAliases, $sqlNormalizedCo): void {
-            $sub->where(function (Builder $coQuery) use ($coAliases, $sqlNormalizedCo): void {
-                foreach ($coAliases as $alias) {
-                    $coQuery->orWhereRaw("{$sqlNormalizedCo} = ?", [$alias]);
+            return;
+        }
+
+        $sqlNormalized = ManagerNameNormalizer::sqlColumnExpression($column);
+
+        $query->whereHas('accountInfo', function (Builder $sub) use ($aliases, $sqlNormalized): void {
+            $sub->where(function (Builder $managerQuery) use ($aliases, $sqlNormalized): void {
+                foreach ($aliases as $alias) {
+                    $managerQuery->orWhereRaw("{$sqlNormalized} = ?", [$alias]);
                 }
             });
         });
     }
 
+    private function applyManagerAssignedConstraint(Builder $query, string $column): void
+    {
+        $query->whereNotNull($column)
+            ->where($column, '!=', '');
+    }
+
+    private function applyInstitutionSort(Builder $query): void
+    {
+        $direction = $this->sortDirection === 'desc' ? 'desc' : 'asc';
+
+        if ($this->sortField === 'AccountName') {
+            $query->leftJoin('S_Account_Information', 'S_AccountName.SKcode', '=', 'S_Account_Information.SK_Code')
+                ->orderByRaw(
+                    "COALESCE(NULLIF(S_Account_Information.Account_Name, ''), S_AccountName.AccountName) {$direction}"
+                )
+                ->orderBy('S_AccountName.SKcode');
+
+            return;
+        }
+
+        $sortableFields = ['SKcode', 'GSno', 'Gubun', 'Director', 'Phone', 'AccountTel'];
+        $field = in_array($this->sortField, $sortableFields, true) ? $this->sortField : 'SKcode';
+        $query->orderBy("S_AccountName.{$field}", $direction);
+    }
+
     private function shouldScopeToAssignedInstitutions(): bool
     {
         $user = auth()->user();
-        if (! $user) {
+        if (! $user || $user->hasFullAccess()) {
             return false;
         }
 
-        return $user->isCoTeam() && ! $user->hasFullAccess();
+        return $user->isCoTeam() || $user->isCoachTeam() || $user->isCsTeam();
+    }
+
+    private function currentUserManagerColumn(): ?string
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return null;
+        }
+
+        if ($user->isCoTeam()) {
+            return 'CO';
+        }
+
+        if ($user->isCoachTeam()) {
+            return 'TR';
+        }
+
+        if ($user->isCsTeam()) {
+            return 'CS';
+        }
+
+        return null;
     }
 
     /**
      * @return array<int, string>
      */
-    private function resolveCurrentUserCoAliases(): array
+    private function resolveCurrentUserManagerAliases(): array
     {
         $user = auth()->user();
         if (! $user) {

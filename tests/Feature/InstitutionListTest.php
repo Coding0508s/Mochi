@@ -662,6 +662,176 @@ class InstitutionListTest extends TestCase
             ->assertSee('DM 비담당 기관');
     }
 
+    public function test_list_displays_s_account_information_account_name_over_legacy_account_name(): void
+    {
+        $user = User::factory()->create();
+
+        Institution::query()->create([
+            'SKcode' => 'SK-NAME-PRIORITY',
+            'AccountName' => '레거시 FLS 이름',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-NAME-PRIORITY',
+            'Account_Name' => '마스터 기관명',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->assertSee('마스터 기관명')
+            ->assertDontSee('레거시 FLS 이름');
+    }
+
+    public function test_detail_modal_prefills_edit_name_with_resolved_account_name(): void
+    {
+        $user = User::factory()->admin()->create();
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-DETAIL-NAME-1',
+            'AccountName' => '레거시 상세 기관명',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-DETAIL-NAME-1',
+            'Account_Name' => '마스터 상세 기관명',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->assertSet('selectedInstitution.name', '마스터 상세 기관명')
+            ->assertSet('editDetailInstitutionName', '마스터 상세 기관명');
+    }
+
+    public function test_save_managers_syncs_account_name_to_account_name_and_gs_number_tables(): void
+    {
+        $user = User::factory()->admin()->create();
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-MANAGER-NAME-1',
+            'AccountName' => '레거시 담당자 모달 기관명',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-MANAGER-NAME-1',
+            'Account_Name' => '마스터 담당자 모달 기관명',
+            'CO' => 'Old CO',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openManagerModal', $institution->ID)
+            ->set('editCo', 'New CO')
+            ->call('saveManagers')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_AccountName', [
+            'SKcode' => 'SK-MANAGER-NAME-1',
+            'AccountName' => '마스터 담당자 모달 기관명',
+        ]);
+        $this->assertDatabaseHas('S_Account_Information', [
+            'SK_Code' => 'SK-MANAGER-NAME-1',
+            'Account_Name' => '마스터 담당자 모달 기관명',
+            'CO' => 'New CO',
+        ]);
+        $this->assertDatabaseHas('S_GSNumber', [
+            'SKCode' => 'SK-MANAGER-NAME-1',
+            'AccountName' => '마스터 담당자 모달 기관명',
+        ]);
+    }
+
+    public function test_sorting_by_account_name_uses_account_information_name_first(): void
+    {
+        $user = User::factory()->create();
+
+        Institution::query()->create([
+            'SKcode' => 'SK-SORT-NAME-1',
+            'AccountName' => 'Z 레거시 기관',
+        ]);
+        Institution::query()->create([
+            'SKcode' => 'SK-SORT-NAME-2',
+            'AccountName' => 'A 레거시 기관',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            [
+                'SK_Code' => 'SK-SORT-NAME-1',
+                'Account_Name' => 'A 마스터 기관',
+            ],
+            [
+                'SK_Code' => 'SK-SORT-NAME-2',
+                'Account_Name' => 'Z 마스터 기관',
+            ],
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->set('sortField', 'AccountName')
+            ->set('sortDirection', 'asc');
+
+        $institutions = $component->viewData('institutions');
+        $this->assertSame('SK-SORT-NAME-1', $institutions->first()->SKcode);
+        $this->assertSame('SK-SORT-NAME-2', $institutions->last()->SKcode);
+    }
+
+    public function test_search_matches_s_account_information_assignees(): void
+    {
+        $user = User::factory()->create();
+
+        Institution::query()->create([
+            'SKcode' => 'SK-SEARCH-TR',
+            'AccountName' => '검색용 기관',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-SEARCH-TR',
+            'Account_Name' => '검색용 기관',
+            'TR' => 'Jeanie Park',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->set('search', 'Jeanie')
+            ->assertSee('검색용 기관');
+    }
+
+    public function test_coach_team_user_only_sees_tr_assigned_institutions_from_account_information(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-TR-MINE',
+            'AccountName' => '내 TR 기관',
+        ]);
+        Institution::query()->create([
+            'SKcode' => 'SK-TR-OTHER',
+            'AccountName' => '타 TR 기관',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            [
+                'SK_Code' => 'SK-TR-MINE',
+                'Account_Name' => '내 TR 기관',
+                'TR' => 'Jeanie Park',
+            ],
+            [
+                'SK_Code' => 'SK-TR-OTHER',
+                'Account_Name' => '타 TR 기관',
+                'TR' => 'Peter Kim',
+            ],
+        ]);
+
+        $coach = User::factory()->create([
+            'name' => 'Jeanie Park',
+            'email' => 'jeanie.park@grapeseed.com',
+            'team' => 'TR',
+            'is_admin' => false,
+        ]);
+
+        Livewire::actingAs($coach)
+            ->test(InstitutionList::class)
+            ->assertSee('내 TR 기관')
+            ->assertDontSee('타 TR 기관');
+    }
+
     public function test_user_can_filter_only_my_assigned_institutions(): void
     {
         Institution::query()->create([

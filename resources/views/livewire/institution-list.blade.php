@@ -66,7 +66,7 @@
                 </svg>
                 <input type="text"
                        wire:model.live.debounce.300ms="search"
-                       placeholder="기관명, SK코드, 원장명, 주소 검색"
+                       placeholder="기관명, SK코드, 원장명, 주소, CO·Coach·CS 검색"
                        class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
         </div>
@@ -130,7 +130,7 @@
                             </span>
                         </td>
                         <td class="px-3 py-2 font-medium text-gray-900">
-                            {{ $inst->AccountName ?? '-' }}
+                            {{ $inst->resolvedAccountName() ?: '-' }}
                             @if($inst->EnglishName)
                                 <span class="block text-xs text-gray-400">{{ $inst->EnglishName }}</span>
                             @endif

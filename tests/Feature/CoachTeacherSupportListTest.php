@@ -892,6 +892,34 @@ class CoachTeacherSupportListTest extends TestCase
         $this->assertContains('교사 지원 On-Site', $types);
     }
 
+    public function test_teacher_list_and_institution_modal_prefer_s_account_information_account_name(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        \DB::table('S_AccountName')->insert([
+            'SKcode' => 'SK-NAME-PRIORITY',
+            'AccountName' => '레거시 FLS 이름',
+        ]);
+        \DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-NAME-PRIORITY',
+            'Account_Name' => '마스터 기관명',
+            'TR' => 'Coach A',
+        ]);
+        $this->createTeacher('SK-NAME-PRIORITY', '김교사', [
+            'School_Name' => '교사 테이블 학교명',
+            'Plan_1st_Support_Date' => "{$year}-03-01",
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->assertSee('마스터 기관명')
+            ->assertDontSee('레거시 FLS 이름')
+            ->assertDontSee('교사 테이블 학교명')
+            ->call('openInstitutionModal', 'SK-NAME-PRIORITY')
+            ->assertSet('institutionInfo.name', '마스터 기관명');
+    }
+
     public function test_institution_modal_loads_contacts_for_sk_code(): void
     {
         $admin = $this->createAdminUser();

@@ -54,7 +54,7 @@ class SyncInstitutionOutboundJob implements ShouldQueue
             ->acceptJson()
             ->timeout(10)
             ->put(rtrim($baseUrl, '/').'/internal/institutions/'.rawurlencode($this->sk), [
-                'institution_name' => $institution->AccountName,
+                'institution_name' => $institution->resolvedAccountName(),
                 'co' => $institution->accountInfo?->CO,
                 'tr' => $institution->accountInfo?->TR,
                 'cs' => $institution->accountInfo?->CS,

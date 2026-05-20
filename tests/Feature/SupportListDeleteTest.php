@@ -25,12 +25,25 @@ class SupportListDeleteTest extends TestCase
     private function createMinimalSupportListTables(): void
     {
         Schema::dropIfExists('S_SupportInfo_Account');
+        Schema::dropIfExists('S_Account_Information');
         Schema::dropIfExists('S_AccountName');
 
         Schema::create('S_AccountName', function (Blueprint $table): void {
             $table->increments('ID');
             $table->string('SKcode', 100)->unique();
             $table->string('AccountName', 255);
+        });
+
+        Schema::create('S_Account_Information', function (Blueprint $table): void {
+            $table->increments('ID');
+            $table->string('SK_Code', 100);
+            $table->string('Account_Name', 255)->nullable();
+            $table->string('TR', 255)->nullable();
+            $table->string('CS', 255)->nullable();
+            $table->string('CO', 255)->nullable();
+            $table->string('Customer_Type', 255)->nullable();
+            $table->string('Affiliate', 255)->nullable();
+            $table->string('Address', 255)->nullable();
         });
 
         Schema::create('S_SupportInfo_Account', function (Blueprint $table): void {

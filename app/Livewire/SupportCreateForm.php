@@ -129,7 +129,10 @@ class SupportCreateForm extends Component
 
     private function applyInstitutionSkPrefill(string $skCode): void
     {
-        $institution = Institution::query()->where('SKcode', $skCode)->first();
+        $institution = Institution::query()
+            ->with('accountInfo')
+            ->where('SKcode', $skCode)
+            ->first();
         if ($institution === null) {
             session()->flash('warning', '기관을 찾을 수 없습니다. SK코드를 확인해 주세요.');
 
@@ -144,7 +147,7 @@ class SupportCreateForm extends Component
         }
 
         $this->formSkCode = (string) $institution->SKcode;
-        $this->formAccountName = (string) ($institution->AccountName ?? '');
+        $this->formAccountName = $institution->resolvedAccountName();
         $this->formInstitutionKeyword = $this->formAccountName;
         $this->formPotentialTargetId = null;
         $this->formIsPotential = false;
@@ -509,6 +512,7 @@ class SupportCreateForm extends Component
         // 배열로 합치려면 일반 Support\Collection으로 바꾼 뒤 merge 한다.
         $institutionSuggestions = collect(
             Institution::query()
+                ->with('accountInfo')
                 ->where(function ($query) use ($normalizedKeyword): void {
                     if ($normalizedKeyword === '') {
                         $query->whereRaw('1 = 0');
@@ -521,10 +525,10 @@ class SupportCreateForm extends Component
                 })
                 ->orderBy('AccountName')
                 ->limit(8)
-                ->get(['SKcode', 'AccountName'])
+                ->get()
         )->map(fn (Institution $inst): array => [
             'SKcode' => (string) $inst->SKcode,
-            'AccountName' => (string) $inst->AccountName,
+            'AccountName' => $inst->resolvedAccountName(),
             'is_potential' => false,
             'potential_target_id' => null,
             'dedupe_key' => 'sk:'.(string) $inst->SKcode,

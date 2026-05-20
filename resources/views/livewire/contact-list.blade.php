@@ -219,7 +219,7 @@
                                             <button type="button"
                                                     wire:click="selectTeacherInstitution({{ json_encode($inst->SKcode) }})"
                                                     class="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors cursor-pointer">
-                                                <span class="font-medium text-gray-900">{{ $inst->AccountName }}</span>
+                                                <span class="font-medium text-gray-900">{{ $inst->resolvedAccountName() }}</span>
                                                 <span class="ml-2 text-xs text-gray-500 tabular-nums">({{ $inst->SKcode }})</span>
                                             </button>
                                         @endforeach
