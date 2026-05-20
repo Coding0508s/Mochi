@@ -18,6 +18,7 @@
         || request()->is('salesforce-files*')
         || request()->is('store/*')
         || request()->is('co/*')
+        || request()->is('coach/*')
         || request()->is('schedules*');
     $activeTeamMenu = request()->query('team_menu');
 @endphp
@@ -302,6 +303,12 @@
                                               {{ request()->routeIs('coach.teacher-support.*') ? 'sidebar-subitem-active' : '' }}">
                                         @include('partials.sidebar-menu-icon', ['name' => 'users', 'small' => true])
                                         <span class="sidebar-subitem-label">교사 지원 현황</span>
+                                    </a>
+                                    <a href="/coach/retired-teachers?team_menu=coach"
+                                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable
+                                              {{ request()->routeIs('coach.retired-teachers.*') ? 'sidebar-subitem-active' : '' }}">
+                                        @include('partials.sidebar-menu-icon', ['name' => 'users', 'small' => true])
+                                        <span class="sidebar-subitem-label">퇴직교사 리스트</span>
                                     </a>
                                     @foreach($sharedTeamMenus as $menu)
                                         <a href="{{ $menu['path'] }}{{ str_contains($menu['path'], '?') ? '&' : '?' }}team_menu=coach"

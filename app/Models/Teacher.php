@@ -22,7 +22,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *   // 이 교사가 속한 기관 정보 가져오기
  *   $teacher->institution->AccountName
  *
- *   // 재직 중인 교사만
+ *   // 수업에 참여 중인 교사만
  *   Teacher::active()->get()
  * ═══════════════════════════════════════════════════════════════
  *
@@ -177,7 +177,7 @@ class Teacher extends Model
     }
 
     /**
-     * 재직 중인 교사만 조회
+     * 수업에 참여 중인 교사만 조회
      *
      * 사용 예:
      *   Teacher::active()->get()
@@ -185,7 +185,20 @@ class Teacher extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('ClassInOut', true);
-        // ClassInOut 이 true(= 1)이면 재직 중입니다.
+        // ClassInOut 이 true(= 1)이면 수업 참여 중입니다.
+    }
+
+    public function isRetired(): bool
+    {
+        return trim((string) $this->Status) === '퇴직';
+    }
+
+    public function scopeExcludeRetired(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q): void {
+            $q->whereNull('Status')
+                ->orWhere('Status', '!=', '퇴직');
+        });
     }
 
     /**

@@ -104,6 +104,10 @@ Route::middleware(['auth'])->group(function () {
         return view('pages.coach.teacher-support.index');
     })->name('coach.teacher-support.index');
 
+    Route::get('/coach/retired-teachers', function () {
+        return view('pages.coach.retired-teachers.index');
+    })->name('coach.retired-teachers.index');
+
     Route::get('/co/gs-brochure/main', function () {
         return view('pages.co.gs-brochure-main');
     })->name('co.gs-brochure.main');

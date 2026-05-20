@@ -43,6 +43,7 @@ class CoachTeacherSupportListTest extends TestCase
         Schema::dropIfExists('teacher_lva_fr_support_reports');
         Schema::dropIfExists('teacher_demo_lesson_support_reports');
         Schema::dropIfExists('S_SupportInfo_Account');
+        Schema::dropIfExists('S_RetirementList');
         Schema::dropIfExists('institution_visibility_overrides');
         Schema::dropIfExists('Teachers');
         Schema::dropIfExists('S_Account_Information');
@@ -104,6 +105,24 @@ class CoachTeacherSupportListTest extends TestCase
             $table->increments('id');
             $table->string('sk_code', 100);
             $table->timestamp('hidden_at')->nullable();
+        });
+
+        Schema::create('S_RetirementList', function ($table): void {
+            $table->bigIncrements('ID');
+            $table->unsignedBigInteger('TearcherID')->nullable();
+            $table->string('Name', 190)->nullable();
+            $table->string('SK_Code', 190)->nullable();
+            $table->string('Account_Name', 190)->nullable();
+            $table->string('TR_Name', 190)->nullable();
+            $table->dateTime('RetirementDate')->nullable();
+            $table->boolean('RecommendYN')->nullable();
+            $table->string('RecommendDescription', 190)->nullable();
+            $table->string('Description', 190)->nullable();
+            $table->string('Status', 190)->nullable();
+            $table->string('FGC_Creator', 190)->nullable();
+            $table->dateTime('FGC_CreateDate')->nullable();
+            $table->string('FGC_LastModifier', 190)->nullable();
+            $table->dateTime('FGC_LastModifyDate')->nullable();
         });
 
         Schema::create('S_Support_NewTeacher', function ($table): void {
@@ -690,19 +709,109 @@ class CoachTeacherSupportListTest extends TestCase
             ->assertDontSee('박선생');
     }
 
-    public function test_inactive_teachers_not_shown(): void
+    public function test_class_out_teachers_shown_by_default(): void
     {
         $admin = $this->createAdminUser();
         $year = now()->year;
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
-        $this->createTeacher('SK001', '재직교사', ['ClassInOut' => true, 'Plan_1st_Support_Date' => "{$year}-03-01"]);
-        $this->createTeacher('SK001', '퇴직교사', ['ClassInOut' => false, 'Plan_1st_Support_Date' => "{$year}-03-01"]);
+        $this->createTeacher('SK001', '수업참여교사', ['ClassInOut' => true, 'Plan_1st_Support_Date' => "{$year}-03-01"]);
+        $this->createTeacher('SK001', '수업미참여교사', ['ClassInOut' => false, 'Plan_1st_Support_Date' => "{$year}-03-01"]);
 
         Livewire::actingAs($admin)
             ->test(CoachTeacherSupportList::class)
-            ->assertSee('재직교사')
-            ->assertDontSee('퇴직교사');
+            ->assertSee('수업참여교사')
+            ->assertSee('수업미참여교사');
+    }
+
+    public function test_retired_teacher_hidden_regardless_of_class_in_out(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '수업참여교사', ['ClassInOut' => true, 'Plan_1st_Support_Date' => "{$year}-03-01"]);
+        $this->createTeacher('SK001', '퇴직이지만참여', [
+            'Status' => '퇴직',
+            'ClassInOut' => true,
+            'Plan_1st_Support_Date' => "{$year}-03-01",
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->assertSee('수업참여교사')
+            ->assertDontSee('퇴직이지만참여')
+            ->set('search', '퇴직이지만참여')
+            ->assertDontSee('퇴직이지만참여');
+    }
+
+    public function test_show_all_teachers_includes_retired(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '수업참여교사', ['ClassInOut' => true, 'Plan_1st_Support_Date' => "{$year}-03-01"]);
+        $this->createTeacher('SK001', '수업미참여교사', ['ClassInOut' => false, 'Plan_1st_Support_Date' => "{$year}-03-01"]);
+        $this->createTeacher('SK001', '퇴직교사', [
+            'Status' => '퇴직',
+            'ClassInOut' => false,
+            'Plan_1st_Support_Date' => "{$year}-03-01",
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->assertSee('수업참여교사')
+            ->assertSee('수업미참여교사')
+            ->assertDontSee('퇴직교사')
+            ->set('showAllTeachers', true)
+            ->assertSee('퇴직교사');
+    }
+
+    public function test_retired_teacher_position_badge_uses_red_background(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '퇴직교사', [
+            'Status' => '퇴직',
+            'Position' => '교사',
+            'Plan_1st_Support_Date' => "{$year}-03-01",
+        ]);
+
+        $component = Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->set('showAllTeachers', true);
+
+        $this->assertStringContainsString('bg-red-100 text-red-800', $component->html());
+    }
+
+    public function test_kpis_follow_teacher_list_visibility_filter(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '수업참여완료', [
+            'ClassInOut' => true,
+            '_1st_Support_Date' => "{$year}-03-01",
+        ]);
+        $this->createTeacher('SK001', '수업미참여완료', [
+            'ClassInOut' => false,
+            '_1st_Support_Date' => "{$year}-03-01",
+        ]);
+        $this->createTeacher('SK001', '퇴직완료', [
+            'Status' => '퇴직',
+            'ClassInOut' => true,
+            '_1st_Support_Date' => "{$year}-03-01",
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->assertViewHas('kpis', fn (array $kpis): bool => $kpis['first_round'] === 2)
+            ->set('showAllTeachers', true)
+            ->assertViewHas('kpis', fn (array $kpis): bool => $kpis['first_round'] === 3);
     }
 
     public function test_page_loads_for_unauthenticated_user(): void
@@ -769,6 +878,31 @@ class CoachTeacherSupportListTest extends TestCase
         $cols = config('coach_teacher_support.columns');
         $this->assertSame("{$year}-03-15", $teacher->{$cols['completed_1st']}->format('Y-m-d'));
         $this->assertSame('방문', $teacher->{$cols['type_1st']});
+    }
+
+    public function test_retired_teacher_modals_blocked_until_inactive_filter_enabled(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $id = $this->createTeacher('SK001', '퇴직대상', [
+            'Status' => '퇴직',
+            'ClassInOut' => true,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openEditModal', $id)
+            ->assertSet('showEditModal', false)
+            ->call('openTeacherModal', $id)
+            ->assertSet('showTeacherModal', false)
+            ->call('openDemoLessonModal', $id)
+            ->assertSet('showDemoLessonModal', false)
+            ->set('showAllTeachers', true)
+            ->call('openTeacherModal', $id)
+            ->assertSet('showTeacherModal', true)
+            ->call('openEditModal', $id)
+            ->assertSet('showEditModal', true);
     }
 
     public function test_coach_cannot_edit_outside_tr_scope(): void
@@ -952,6 +1086,39 @@ class CoachTeacherSupportListTest extends TestCase
         $this->assertSame('Open-Class', $kim['last_support_type']);
     }
 
+    public function test_institution_modal_contacts_follow_teacher_list_visibility_filter(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '재직연락처');
+        $this->createTeacher('SK001', '퇴직연락처', [
+            'Status' => '퇴직',
+            'ClassInOut' => true,
+        ]);
+
+        $component = Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class);
+
+        $contacts = $component
+            ->call('openInstitutionModal', 'SK001')
+            ->get('institutionContacts');
+
+        $this->assertCount(1, $contacts);
+        $this->assertSame('재직연락처', $contacts[0]['name']);
+
+        $contactsWithRetired = $component
+            ->set('showAllTeachers', true)
+            ->call('openInstitutionModal', 'SK001')
+            ->get('institutionContacts');
+
+        $this->assertCount(2, $contactsWithRetired);
+        $this->assertSame(
+            ['재직연락처', '퇴직연락처'],
+            collect($contactsWithRetired)->pluck('name')->sort()->values()->all(),
+        );
+    }
+
     public function test_teacher_support_history_row_opens_detail_modal(): void
     {
         $admin = $this->createAdminUser();
@@ -1053,6 +1220,16 @@ class CoachTeacherSupportListTest extends TestCase
 
         $teacher = Teacher::find($id);
         $this->assertFalse($teacher->ClassInOut);
+        $this->assertSame('퇴직', $teacher->Status);
+
+        $this->assertDatabaseHas('S_RetirementList', [
+            'TearcherID' => $id,
+            'Status' => '퇴직',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->assertDontSee('퇴직대상');
     }
 
     public function test_coach_cannot_edit_teacher_outside_scope(): void

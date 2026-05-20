@@ -583,6 +583,105 @@
         background: #eef5ff;
     }
 
+    /* 교사 지원 현황: SK_Code·기관명 고정열 (가로 스크롤 시 겹침 방지) */
+    .coach-teacher-support-table {
+        --coach-support-sk-width: 5.75rem;
+        --coach-support-inst-width: 13rem;
+        --coach-support-row-border: #e8ecf1;
+        --coach-support-zone-divider: rgba(207, 214, 223, 0.9);
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .coach-teacher-support-table thead th {
+        border: 0;
+        border-bottom: 1px solid #cfd6df;
+    }
+
+    .coach-teacher-support-table tbody td {
+        border: 0;
+        border-bottom: 1px solid var(--coach-support-row-border);
+    }
+
+    .coach-teacher-support-table .coach-support-col-sk {
+        width: var(--coach-support-sk-width);
+    }
+
+    .coach-teacher-support-table .coach-support-col-institution {
+        width: var(--coach-support-inst-width);
+        min-width: var(--coach-support-inst-width);
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-sk {
+        position: sticky;
+        left: 0;
+        z-index: 20;
+        width: var(--coach-support-sk-width);
+        min-width: var(--coach-support-sk-width);
+        max-width: var(--coach-support-sk-width);
+        background-color: #ffffff;
+        background-clip: padding-box;
+        border-right: 1px solid var(--coach-support-row-border);
+        box-shadow: 2px 0 4px -1px rgba(15, 23, 42, 0.08);
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-sk--head {
+        z-index: 30;
+        background-color: #e8e6d9;
+        border-right: 1px solid #d5dcd6;
+    }
+
+    .coach-teacher-support-table .coach-support-sk-code {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        line-height: 1.35;
+        vertical-align: middle;
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-inst {
+        position: sticky;
+        left: var(--coach-support-sk-width);
+        z-index: 21;
+        width: var(--coach-support-inst-width);
+        min-width: var(--coach-support-inst-width);
+        max-width: var(--coach-support-inst-width);
+        background-color: #ffffff;
+        background-clip: padding-box;
+        border-right: none;
+        box-shadow:
+            inset -1px 0 0 var(--coach-support-zone-divider),
+            6px 0 12px -8px rgba(15, 23, 42, 0.07);
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-inst--head {
+        z-index: 31;
+        background-color: #e8e6d9;
+        border-right: none;
+        box-shadow: inset -1px 0 0 #d5dcd6;
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-inst .coach-support-inst-link {
+        display: block;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* rowspan 그룹열(SK·기관명)은 행 hover 제외 — 해당 교사 열만 강조 */
+    .coach-teacher-support-table .mochi-table-row-hover:hover {
+        background-color: transparent;
+    }
+
+    .coach-teacher-support-table .mochi-table-row-hover:hover > td:not(.coach-support-sticky-sk):not(.coach-support-sticky-inst) {
+        background-color: #eef5ff;
+    }
+
+    .coach-teacher-support-table .mochi-table-row-hover:hover > td.bg-green-50 {
+        background-color: #e3f0ea;
+    }
+
     .mochi-calendar-card {
         overflow: hidden;
         border: 1px solid #d9dee7;
@@ -774,6 +873,16 @@
 
     .mochi-toggle-btn--active {
         background: #2b78c5;
+        color: #ffffff;
+    }
+
+    .mochi-toggle-btn--active-success {
+        background: #16a34a;
+        color: #ffffff;
+    }
+
+    .mochi-toggle-btn--active-danger {
+        background: #dc2626;
         color: #ffffff;
     }
 

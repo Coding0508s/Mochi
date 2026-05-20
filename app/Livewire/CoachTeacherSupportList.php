@@ -212,7 +212,11 @@ class CoachTeacherSupportList extends Component
 
         try {
             $this->teacherSupportHistory = app(TeacherSupportHistoryAggregator::class)
-                ->forInstitution($candidateSkCodes, limit: 10);
+                ->forInstitution(
+                    $candidateSkCodes,
+                    limit: 10,
+                    includeRetiredTeachers: $this->showAllTeachers,
+                );
         } catch (\Throwable $e) {
             \Log::debug('[InstitutionModal] teacherSupportHistory error: '.$e->getMessage());
             $this->teacherSupportHistory = [];
@@ -240,7 +244,7 @@ class CoachTeacherSupportList extends Component
 
             $this->institutionContacts = Teacher::query()
                 ->whereIn('SK_Code', $candidateSkCodes)
-                ->where('ClassInOut', true)
+                ->tap(fn (Builder $query) => $this->applyTeacherListVisibilityFilter($query))
                 ->orderBy('Name')
                 ->get($selectColumns)
                 ->map(fn (Teacher $teacher) => $this->mapInstitutionContact($teacher, $cols))
@@ -272,13 +276,8 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
-        $user = auth()->user();
-        if (! $user?->hasFullAccess()) {
-            $scopedQuery = Teacher::query()->where('ID', $teacherId);
-            CoachTeacherScope::apply($scopedQuery, $user);
-            if (! $scopedQuery->exists()) {
-                return;
-            }
+        if (! $this->canViewTeacher($teacherId)) {
+            return;
         }
 
         $institution = $teacher->institution;
@@ -532,14 +531,30 @@ class CoachTeacherSupportList extends Component
             return false;
         }
 
+        $scopedQuery = Teacher::query()
+            ->where('ID', $teacherId);
+        $this->applyTeacherListVisibilityFilter($scopedQuery);
+
         if ($user->hasFullAccess()) {
-            return true;
+            return $scopedQuery->exists();
         }
 
-        $scopedQuery = Teacher::query()->where('ID', $teacherId);
         CoachTeacherScope::apply($scopedQuery, $user);
 
         return $scopedQuery->exists();
+    }
+
+    private function findVisibleTeacherForSupportModal(int $teacherId): ?Teacher
+    {
+        $teacher = Teacher::query()
+            ->with(['institution.accountInfo'])
+            ->find($teacherId);
+
+        if (! $teacher || ! $this->canViewTeacher($teacherId)) {
+            return null;
+        }
+
+        return $teacher;
     }
 
     /**
@@ -666,21 +681,9 @@ class CoachTeacherSupportList extends Component
 
     public function openDemoLessonModal(int $teacherId): void
     {
-        $teacher = Teacher::query()
-            ->with(['institution.accountInfo'])
-            ->find($teacherId);
-
+        $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
-        }
-
-        $user = auth()->user();
-        if (! $user?->hasFullAccess()) {
-            $scopedQuery = Teacher::query()->where('ID', $teacherId);
-            CoachTeacherScope::apply($scopedQuery, $user);
-            if (! $scopedQuery->exists()) {
-                return;
-            }
         }
 
         $institution = $teacher->institution;
@@ -695,6 +698,7 @@ class CoachTeacherSupportList extends Component
         }
 
         $accountInfo = $institution?->accountInfo;
+        $user = auth()->user();
         $coachName = $accountInfo?->TR ?? ($user?->nameForCoReports() ?? '');
 
         $this->demoLessonTeacherId = $teacherId;
@@ -783,21 +787,9 @@ class CoachTeacherSupportList extends Component
 
     public function openLvaFrModal(int $teacherId): void
     {
-        $teacher = Teacher::query()
-            ->with(['institution.accountInfo'])
-            ->find($teacherId);
-
+        $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
-        }
-
-        $user = auth()->user();
-        if (! $user?->hasFullAccess()) {
-            $scopedQuery = Teacher::query()->where('ID', $teacherId);
-            CoachTeacherScope::apply($scopedQuery, $user);
-            if (! $scopedQuery->exists()) {
-                return;
-            }
         }
 
         $institution = $teacher->institution;
@@ -812,6 +804,7 @@ class CoachTeacherSupportList extends Component
         }
 
         $accountInfo = $institution?->accountInfo;
+        $user = auth()->user();
         $coachName = $accountInfo?->TR ?? ($user?->nameForCoReports() ?? '');
 
         $this->lvaFrTeacherId = $teacherId;
@@ -902,21 +895,9 @@ class CoachTeacherSupportList extends Component
 
     public function openLvaFbModal(int $teacherId): void
     {
-        $teacher = Teacher::query()
-            ->with(['institution.accountInfo'])
-            ->find($teacherId);
-
+        $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
-        }
-
-        $user = auth()->user();
-        if (! $user?->hasFullAccess()) {
-            $scopedQuery = Teacher::query()->where('ID', $teacherId);
-            CoachTeacherScope::apply($scopedQuery, $user);
-            if (! $scopedQuery->exists()) {
-                return;
-            }
         }
 
         $institution = $teacher->institution;
@@ -931,6 +912,7 @@ class CoachTeacherSupportList extends Component
         }
 
         $accountInfo = $institution?->accountInfo;
+        $user = auth()->user();
         $coachName = $accountInfo?->TR ?? ($user?->nameForCoReports() ?? '');
 
         $this->lvaFbTeacherId = $teacherId;
@@ -1021,21 +1003,9 @@ class CoachTeacherSupportList extends Component
 
     public function openLsOnsiteLvaModal(int $teacherId): void
     {
-        $teacher = Teacher::query()
-            ->with(['institution.accountInfo'])
-            ->find($teacherId);
-
+        $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
-        }
-
-        $user = auth()->user();
-        if (! $user?->hasFullAccess()) {
-            $scopedQuery = Teacher::query()->where('ID', $teacherId);
-            CoachTeacherScope::apply($scopedQuery, $user);
-            if (! $scopedQuery->exists()) {
-                return;
-            }
         }
 
         $institution = $teacher->institution;
@@ -1050,6 +1020,7 @@ class CoachTeacherSupportList extends Component
         }
 
         $accountInfo = $institution?->accountInfo;
+        $user = auth()->user();
         $coachName = $accountInfo?->TR ?? ($user?->nameForCoReports() ?? '');
 
         $this->lsOnsiteLvaTeacherId = $teacherId;
@@ -1142,21 +1113,9 @@ class CoachTeacherSupportList extends Component
 
     public function openLittleseedConModal(int $teacherId): void
     {
-        $teacher = Teacher::query()
-            ->with(['institution.accountInfo'])
-            ->find($teacherId);
-
+        $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
-        }
-
-        $user = auth()->user();
-        if (! $user?->hasFullAccess()) {
-            $scopedQuery = Teacher::query()->where('ID', $teacherId);
-            CoachTeacherScope::apply($scopedQuery, $user);
-            if (! $scopedQuery->exists()) {
-                return;
-            }
         }
 
         $institution = $teacher->institution;
@@ -1171,6 +1130,7 @@ class CoachTeacherSupportList extends Component
         }
 
         $accountInfo = $institution?->accountInfo;
+        $user = auth()->user();
         $coachName = $accountInfo?->TR ?? ($user?->nameForCoReports() ?? '');
 
         $this->littleseedConTeacherId = $teacherId;
@@ -1256,21 +1216,9 @@ class CoachTeacherSupportList extends Component
 
     public function openOpenClassModal(int $teacherId): void
     {
-        $teacher = Teacher::query()
-            ->with(['institution.accountInfo'])
-            ->find($teacherId);
-
+        $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
-        }
-
-        $user = auth()->user();
-        if (! $user?->hasFullAccess()) {
-            $scopedQuery = Teacher::query()->where('ID', $teacherId);
-            CoachTeacherScope::apply($scopedQuery, $user);
-            if (! $scopedQuery->exists()) {
-                return;
-            }
         }
 
         $institution = $teacher->institution;
@@ -1285,6 +1233,7 @@ class CoachTeacherSupportList extends Component
         }
 
         $accountInfo = $institution?->accountInfo;
+        $user = auth()->user();
         $coachName = $accountInfo?->TR ?? ($user?->nameForCoReports() ?? '');
 
         $this->openClassTeacherId = $teacherId;
@@ -1372,21 +1321,9 @@ class CoachTeacherSupportList extends Component
 
     public function openUnit21PlusModal(int $teacherId): void
     {
-        $teacher = Teacher::query()
-            ->with(['institution.accountInfo'])
-            ->find($teacherId);
-
+        $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
-        }
-
-        $user = auth()->user();
-        if (! $user?->hasFullAccess()) {
-            $scopedQuery = Teacher::query()->where('ID', $teacherId);
-            CoachTeacherScope::apply($scopedQuery, $user);
-            if (! $scopedQuery->exists()) {
-                return;
-            }
         }
 
         $institution = $teacher->institution;
@@ -1401,6 +1338,7 @@ class CoachTeacherSupportList extends Component
         }
 
         $accountInfo = $institution?->accountInfo;
+        $user = auth()->user();
         $coachName = $accountInfo?->TR ?? ($user?->nameForCoReports() ?? '');
 
         $this->unit21PlusTeacherId = $teacherId;
@@ -1491,21 +1429,9 @@ class CoachTeacherSupportList extends Component
 
     public function openUnit31PlusModal(int $teacherId): void
     {
-        $teacher = Teacher::query()
-            ->with(['institution.accountInfo'])
-            ->find($teacherId);
-
+        $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
-        }
-
-        $user = auth()->user();
-        if (! $user?->hasFullAccess()) {
-            $scopedQuery = Teacher::query()->where('ID', $teacherId);
-            CoachTeacherScope::apply($scopedQuery, $user);
-            if (! $scopedQuery->exists()) {
-                return;
-            }
         }
 
         $institution = $teacher->institution;
@@ -1520,6 +1446,7 @@ class CoachTeacherSupportList extends Component
         }
 
         $accountInfo = $institution?->accountInfo;
+        $user = auth()->user();
         $coachName = $accountInfo?->TR ?? ($user?->nameForCoReports() ?? '');
 
         $this->unit31PlusTeacherId = $teacherId;
@@ -1610,21 +1537,9 @@ class CoachTeacherSupportList extends Component
 
     public function openProConModal(int $teacherId): void
     {
-        $teacher = Teacher::query()
-            ->with(['institution.accountInfo'])
-            ->find($teacherId);
-
+        $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
-        }
-
-        $user = auth()->user();
-        if (! $user?->hasFullAccess()) {
-            $scopedQuery = Teacher::query()->where('ID', $teacherId);
-            CoachTeacherScope::apply($scopedQuery, $user);
-            if (! $scopedQuery->exists()) {
-                return;
-            }
         }
 
         $institution = $teacher->institution;
@@ -1639,6 +1554,7 @@ class CoachTeacherSupportList extends Component
         }
 
         $accountInfo = $institution?->accountInfo;
+        $user = auth()->user();
         $coachName = $accountInfo?->TR ?? ($user?->nameForCoReports() ?? '');
 
         $this->proConTeacherId = $teacherId;
@@ -1724,21 +1640,9 @@ class CoachTeacherSupportList extends Component
 
     public function openOnsiteModal(int $teacherId): void
     {
-        $teacher = Teacher::query()
-            ->with(['institution.accountInfo'])
-            ->find($teacherId);
-
+        $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
-        }
-
-        $user = auth()->user();
-        if (! $user?->hasFullAccess()) {
-            $scopedQuery = Teacher::query()->where('ID', $teacherId);
-            CoachTeacherScope::apply($scopedQuery, $user);
-            if (! $scopedQuery->exists()) {
-                return;
-            }
         }
 
         $institution = $teacher->institution;
@@ -1753,6 +1657,7 @@ class CoachTeacherSupportList extends Component
         }
 
         $accountInfo = $institution?->accountInfo;
+        $user = auth()->user();
         $coachName = $accountInfo?->TR ?? ($user?->nameForCoReports() ?? '');
 
         $this->onsiteTeacherId = $teacherId;
@@ -1881,10 +1786,38 @@ class CoachTeacherSupportList extends Component
         $this->resetPage();
     }
 
+    public function clearSearch(): void
+    {
+        $this->search = '';
+        $this->resetPage();
+    }
+
+    public function clearRoundFilter(): void
+    {
+        $this->filterRound = '';
+        $this->resetPage();
+    }
+
+    public function clearMonthFilter(): void
+    {
+        $this->filterMonth = '';
+        $this->resetPage();
+    }
+
+    public function clearKpiFilter(): void
+    {
+        $this->kpiFilter = '';
+        $this->resetPage();
+    }
+
     public function openEditModal(int $id): void
     {
         $teacher = Teacher::find($id);
         if (! $teacher) {
+            return;
+        }
+
+        if (! $this->canViewTeacher($id)) {
             return;
         }
 
@@ -1979,10 +1912,7 @@ class CoachTeacherSupportList extends Component
     private function buildBaseQuery(): Builder
     {
         $query = Teacher::query();
-
-        if (! $this->showAllTeachers) {
-            $query->where('ClassInOut', true);
-        }
+        $this->applyTeacherListVisibilityFilter($query);
 
         CoachTeacherScope::apply($query);
 
@@ -1996,6 +1926,20 @@ class CoachTeacherSupportList extends Component
         }
 
         return $query;
+    }
+
+    /**
+     * 기본: 퇴직 제외(수업 미참여 포함). showAllTeachers 시 퇴직 교사도 포함.
+     *
+     * @param  Builder<Teacher>  $query
+     */
+    private function applyTeacherListVisibilityFilter(Builder $query): void
+    {
+        if ($this->showAllTeachers) {
+            return;
+        }
+
+        $query->excludeRetired();
     }
 
     private function applyKpiFilter(Builder $query): void
@@ -2088,7 +2032,9 @@ class CoachTeacherSupportList extends Component
             return false;
         }
 
-        $scopedQuery = Teacher::query()->where('ID', $teacher->ID);
+        $scopedQuery = Teacher::query()
+            ->where('ID', $teacher->ID);
+        $this->applyTeacherListVisibilityFilter($scopedQuery);
         CoachTeacherScope::apply($scopedQuery, $user);
 
         return $scopedQuery->exists();

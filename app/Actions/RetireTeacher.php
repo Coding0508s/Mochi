@@ -5,7 +5,9 @@ namespace App\Actions;
 use App\Models\Teacher;
 use App\Models\User;
 use App\Support\CoachTeacherScope;
+use App\Support\RetirementListWriter;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\DB;
 
 class RetireTeacher
 {
@@ -15,12 +17,18 @@ class RetireTeacher
 
         $this->authorize($teacher, $user);
 
-        $teacher->update([
-            'ClassInOut' => false,
-            'Status' => '퇴직',
-        ]);
+        return DB::transaction(function () use ($teacher, $user): Teacher {
+            $teacher->update([
+                'ClassInOut' => false,
+                'Status' => '퇴직',
+            ]);
 
-        return $teacher->refresh();
+            $teacher->refresh();
+
+            app(RetirementListWriter::class)->recordFromTeacher($teacher, $user);
+
+            return $teacher;
+        });
     }
 
     private function authorize(Teacher $teacher, User $user): void

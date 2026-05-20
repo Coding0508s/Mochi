@@ -7,31 +7,44 @@
 
     {{-- Summary --}}
     <div class="mochi-summary-card">
-        <div class="flex flex-wrap items-center gap-4 text-sm">
+        @php
+            $kpiToggleLabels = [
+                'first_round' => '1차 대상',
+                'second_round' => '2차 대상',
+                'completed' => '지원 완료',
+                'unsupported' => '미지원',
+            ];
+        @endphp
+
+        <div class="flex flex-wrap items-center gap-3 text-sm">
             <h2 class="text-base font-semibold text-[#2b78c5]">교사 지원 현황</h2>
             <span class="text-gray-300">|</span>
-            <button wire:click="setKpiFilter('first_round')"
-                    class="text-gray-600 hover:text-blue-700 transition-colors cursor-pointer
-                           {{ $kpiFilter === 'first_round' ? 'font-semibold text-blue-700' : '' }}">
-                1차 지원 <span class="font-semibold text-blue-600">{{ $kpis['first_round'] }}</span>
-            </button>
-            <button wire:click="setKpiFilter('second_round')"
-                    class="text-gray-600 hover:text-blue-700 transition-colors cursor-pointer
-                           {{ $kpiFilter === 'second_round' ? 'font-semibold text-blue-700' : '' }}">
-                2차 지원 <span class="font-semibold text-blue-600">{{ $kpis['second_round'] }}</span>
-            </button>
-            <button wire:click="setKpiFilter('completed')"
-                    class="text-gray-600 hover:text-blue-700 transition-colors cursor-pointer
-                           {{ $kpiFilter === 'completed' ? 'font-semibold text-green-700' : '' }}">
-                지원 완료 <span class="font-semibold text-green-600">{{ $kpis['completed'] }}</span>
-            </button>
-            <button wire:click="setKpiFilter('unsupported')"
-                    class="text-gray-600 hover:text-blue-700 transition-colors cursor-pointer
-                           {{ $kpiFilter === 'unsupported' ? 'font-semibold text-red-700' : '' }}">
-                미지원 <span class="font-semibold text-red-500">{{ $kpis['unsupported'] }}</span>
-            </button>
-            <div class="ml-auto flex items-center gap-3">
-                <span class="text-gray-500">{{ $filterYear }}년</span>
+            <div class="mochi-toggle-group">
+                @foreach($kpiToggleLabels as $kpiKey => $kpiLabel)
+                    <button type="button"
+                            wire:click="setKpiFilter('{{ $kpiKey }}')"
+                            aria-pressed="{{ $kpiFilter === $kpiKey ? 'true' : 'false' }}"
+                            class="mochi-toggle-btn
+                                {{ $kpiFilter === $kpiKey
+                                    ? ($kpiKey === 'completed'
+                                        ? 'mochi-toggle-btn--active-success'
+                                        : ($kpiKey === 'unsupported'
+                                            ? 'mochi-toggle-btn--active-danger'
+                                            : 'mochi-toggle-btn--active'))
+                                    : '' }}">
+                        {{ $kpiLabel }}
+                        <span class="font-semibold">{{ $kpis[$kpiKey] ?? 0 }}</span>
+                    </button>
+                @endforeach
+            </div>
+
+            <div class="ml-auto flex flex-wrap items-center gap-2">
+                <select wire:model.live="filterYear"
+                        class="py-1.5 px-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    @for($y = now()->year; $y >= now()->year - 3; $y--)
+                        <option value="{{ $y }}">{{ $y }}년</option>
+                    @endfor
+                </select>
                 <a href="{{ route('supports.index') }}"
                    class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600">
                     기관지원보고서
@@ -42,27 +55,47 @@
 
     {{-- Filter --}}
     <div class="mochi-filter-card">
-        <div class="flex flex-wrap items-center gap-3">
-            <select wire:model.live="filterYear"
-                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                @for($y = now()->year; $y >= now()->year - 3; $y--)
-                    <option value="{{ $y }}">{{ $y }}년</option>
-                @endfor
-            </select>
+        @php
+            $activeFilterChips = [];
 
-            <div class="flex items-center gap-1 text-sm">
-                <button wire:click="$set('filterRound', '')"
-                        class="px-3 py-1.5 rounded-lg {{ $filterRound === '' ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-100' }}">
-                    전체
-                </button>
-                <button wire:click="$set('filterRound', '1')"
-                        class="px-3 py-1.5 rounded-lg {{ $filterRound === '1' ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-100' }}">
-                    1차
-                </button>
-                <button wire:click="$set('filterRound', '2')"
-                        class="px-3 py-1.5 rounded-lg {{ $filterRound === '2' ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-100' }}">
-                    2차
-                </button>
+            if ($kpiFilter) {
+                $activeFilterChips[] = ['label' => '상태: '.($kpiToggleLabels[$kpiFilter] ?? $kpiFilter), 'action' => 'clearKpiFilter'];
+            }
+
+            if ($filterRound) {
+                $activeFilterChips[] = ['label' => '차수: '.$filterRound.'차', 'action' => 'clearRoundFilter'];
+            }
+
+            if ($filterMonth) {
+                $activeFilterChips[] = ['label' => '계획월: '.$filterMonth.'월', 'action' => 'clearMonthFilter'];
+            }
+
+            if ($search) {
+                $activeFilterChips[] = ['label' => '검색어 적용', 'action' => 'clearSearch'];
+            }
+
+            if ($showAllTeachers) {
+                $activeFilterChips[] = ['label' => '퇴직 포함', 'action' => null];
+            }
+        @endphp
+
+        <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-2 text-sm">
+                <span class="text-gray-500">계획 차수</span>
+                <div class="mochi-toggle-group">
+                    <button type="button" wire:click="$set('filterRound', '')"
+                            class="mochi-toggle-btn {{ $filterRound === '' ? 'mochi-toggle-btn--active' : '' }}">
+                        전체
+                    </button>
+                    <button type="button" wire:click="$set('filterRound', '1')"
+                            class="mochi-toggle-btn {{ $filterRound === '1' ? 'mochi-toggle-btn--active' : '' }}">
+                        1차
+                    </button>
+                    <button type="button" wire:click="$set('filterRound', '2')"
+                            class="mochi-toggle-btn {{ $filterRound === '2' ? 'mochi-toggle-btn--active' : '' }}">
+                        2차
+                    </button>
+                </div>
             </div>
 
             <select wire:model.live="filterMonth"
@@ -92,44 +125,95 @@
                        class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
 
-            <label class="flex items-center gap-2 text-sm text-gray-600 ml-auto">
-                <input type="checkbox" wire:model.live="showAllTeachers" {{ $showAllTeachers ? 'checked' : '' }}
-                       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                퇴직 포함
-            </label>
+            <div class="ml-auto flex flex-wrap items-center gap-3">
+                <div class="flex items-center gap-2 text-sm">
+                    <span class="text-gray-500">퇴직</span>
+                    <div class="mochi-toggle-group">
+                        <button type="button" wire:click="$set('showAllTeachers', false)"
+                                class="mochi-toggle-btn {{ ! $showAllTeachers ? 'mochi-toggle-btn--active' : '' }}">
+                            제외
+                        </button>
+                        <button type="button" wire:click="$set('showAllTeachers', true)"
+                                class="mochi-toggle-btn {{ $showAllTeachers ? 'mochi-toggle-btn--active' : '' }}">
+                            포함
+                        </button>
+                    </div>
+                </div>
 
-            <label class="flex items-center gap-2 text-sm text-gray-600">
-                <input type="checkbox" wire:click="$toggle('showExtendedColumns')" {{ $showExtendedColumns ? 'checked' : '' }}
-                       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                확장 컬럼
-            </label>
+                <div class="flex items-center gap-2 text-sm">
+                    <span class="text-gray-500">컬럼</span>
+                    <div class="mochi-toggle-group">
+                        <button type="button" wire:click="$set('showExtendedColumns', false)"
+                                class="mochi-toggle-btn {{ ! $showExtendedColumns ? 'mochi-toggle-btn--active' : '' }}">
+                            기본
+                        </button>
+                        <button type="button" wire:click="$set('showExtendedColumns', true)"
+                                class="mochi-toggle-btn {{ $showExtendedColumns ? 'mochi-toggle-btn--active' : '' }}">
+                            확장
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
+
+        @if($activeFilterChips !== [])
+            <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 text-xs">
+                <span class="text-gray-400">적용 필터</span>
+                @foreach($activeFilterChips as $chip)
+                    <span class="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 font-medium text-blue-700">
+                        {{ $chip['label'] }}
+                        @if($chip['action'])
+                            <button type="button"
+                                    wire:click="{{ $chip['action'] }}"
+                                    class="ml-0.5 text-blue-400 hover:text-blue-700"
+                                    aria-label="{{ $chip['label'] }} 필터 해제">
+                                ×
+                            </button>
+                        @endif
+                    </span>
+                @endforeach
+            </div>
+        @endif
     </div>
 
     {{-- Table --}}
-    <div class="mochi-table-card">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm whitespace-nowrap border-collapse">
+    <div class="mochi-table-card relative">
+        <div wire:loading.flex wire:target="search,filterYear,filterRound,filterMonth,kpiFilter,showAllTeachers,showExtendedColumns,setKpiFilter,resetFilters,clearSearch,clearRoundFilter,clearMonthFilter,clearKpiFilter"
+             class="absolute inset-0 z-20 hidden items-center justify-center bg-white/70 backdrop-blur-[1px]">
+            <div class="flex items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-2 text-sm font-medium text-blue-700 shadow-sm">
+                <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                </svg>
+                목록을 불러오는 중
+            </div>
+        </div>
+        <div class="overflow-x-auto isolate">
+            <table class="coach-teacher-support-table w-full text-sm whitespace-nowrap">
+                <colgroup>
+                    <col class="coach-support-col-sk">
+                    <col class="coach-support-col-institution">
+                </colgroup>
                 <thead class="mochi-table-head">
                 <tr class="text-gray-700">
-                    <th class="px-3 py-2 text-center sticky left-0 bg-[#e8e6d9] z-10 border border-gray-300">SK_Code</th>
-                    <th class="px-3 py-2 text-center sticky left-[90px] bg-[#e8e6d9] z-10 border border-gray-300">기관명</th>
-                    <th class="px-3 py-2 text-left border border-gray-300">직급</th>
-                    <th class="px-3 py-2 text-left border border-gray-300">이름</th>
-                    <th class="px-3 py-2 text-left border border-gray-300">1차 지원<br>계획일자</th>
-                    <th class="px-3 py-2 text-left border border-gray-300">1차 지원<br>계획타입</th>
-                    <th class="px-3 py-2 text-left border border-gray-300">2차 지원<br>계획일자</th>
-                    <th class="px-3 py-2 text-left border border-gray-300">2차 지원<br>계획타입</th>
-                    <th class="px-3 py-2 text-center border border-gray-300 w-[50px]"></th>
-                    <th class="px-3 py-2 text-left border border-gray-300">1차 지원<br>완료일</th>
-                    <th class="px-3 py-2 text-left border border-gray-300">1차 완료<br>타입</th>
-                    <th class="px-3 py-2 text-left border border-gray-300">2차 지원<br>완료일</th>
-                    <th class="px-3 py-2 text-left border border-gray-300">2차 완료<br>타입</th>
+                    <th class="coach-support-sticky-sk coach-support-sticky-sk--head coach-support-sk-code px-3 py-2 text-center">SK_Code</th>
+                    <th class="coach-support-sticky-inst coach-support-sticky-inst--head px-3 py-2 text-center">기관명</th>
+                    <th class="px-3 py-2 text-left">직급</th>
+                    <th class="px-3 py-2 text-left">이름</th>
+                    <th class="px-3 py-2 text-left">1차 지원<br>계획일자</th>
+                    <th class="px-3 py-2 text-left">1차 지원<br>계획타입</th>
+                    <th class="px-3 py-2 text-left">2차 지원<br>계획일자</th>
+                    <th class="px-3 py-2 text-left">2차 지원<br>계획타입</th>
+                    <th class="px-3 py-2 text-center w-[50px]"></th>
+                    <th class="px-3 py-2 text-left">1차 지원<br>완료일</th>
+                    <th class="px-3 py-2 text-left">1차 완료<br>타입</th>
+                    <th class="px-3 py-2 text-left">2차 지원<br>완료일</th>
+                    <th class="px-3 py-2 text-left">2차 완료<br>타입</th>
                     @if($showExtendedColumns)
-                        <th class="px-3 py-2 text-left border border-gray-300">3차 완료</th>
-                        <th class="px-3 py-2 text-left border border-gray-300">4차 완료</th>
-                        <th class="px-3 py-2 text-left border border-gray-300">GS Essentials</th>
-                        <th class="px-3 py-2 text-left border border-gray-300">LS Essentials</th>
+                        <th class="px-3 py-2 text-left">3차 완료</th>
+                        <th class="px-3 py-2 text-left">4차 완료</th>
+                        <th class="px-3 py-2 text-left">GS Essentials</th>
+                        <th class="px-3 py-2 text-left">LS Essentials</th>
                     @endif
                 </tr>
                 </thead>
@@ -160,60 +244,60 @@
                         $span = $rowspans[$idx] ?? 0;
                     @endphp
                     <tr wire:key="teacher-{{ $teacher->ID }}"
-                        wire:click="openEditModal({{ $teacher->ID }})"
-                        class="mochi-table-row-hover cursor-pointer border border-gray-200 {{ $idx % 2 === 0 ? '' : '' }}">
+                        class="mochi-table-row-hover">
                         @if($isFirstInGroup)
-                            <td class="px-3 py-2 sticky left-0 bg-white z-10 border border-gray-200 align-middle text-center font-mono text-xs text-purple-700"
+                            <td class="coach-support-sticky-sk coach-support-sk-code px-3 py-2 align-middle text-center font-mono text-xs text-purple-700"
                                 rowspan="{{ $span }}">
                                 {{ ltrim((string) $teacher->SK_Code, '*') }}
                             </td>
-                            <td class="px-3 py-2 sticky left-[90px] bg-white z-10 border border-gray-200 align-middle text-center"
+                            <td class="coach-support-sticky-inst px-3 py-2 align-middle text-center"
                                 rowspan="{{ $span }}">
                                 <button type="button"
-                                        class="text-blue-700 underline text-center hover:text-blue-900 cursor-pointer"
+                                        class="coach-support-inst-link text-blue-700 underline text-center hover:text-blue-900 cursor-pointer"
                                         wire:click.stop="openInstitutionModal('{{ $teacher->SK_Code }}')">
                                     {{ $teacher->institution?->resolvedAccountName() ?: $teacher->School_Name }}
                                 </button>
                             </td>
                         @endif
-                        <td class="px-3 py-2 border border-gray-200">
+                        <td class="px-3 py-2">
                             @if($teacher->Position)
                                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
-                                    {{ $teacher->Position === '원장' ? 'bg-yellow-100 text-yellow-800' :
-                                       ($teacher->Position === '교수부장' ? 'bg-purple-100 text-purple-700' :
-                                       ($teacher->Position === '부원장' ? 'bg-pink-100 text-pink-700' :
-                                       'bg-green-100 text-green-700')) }}">
+                                    {{ $teacher->isRetired() ? 'bg-red-100 text-red-800' : 'text-gray-700' }}">
                                     {{ $teacher->Position }}
                                 </span>
                             @endif
                         </td>
-                        <td class="px-3 py-2 border border-gray-200">
+                        <td class="px-3 py-2">
                             <button type="button"
                                     class="text-blue-700 underline text-left hover:text-blue-900 cursor-pointer"
                                     wire:click.stop="openTeacherModal({{ $teacher->ID }})">
-                                {{ $teacher->Name }}
+                                    {{ $teacher->Name }}
+                                </button>
+                        </td>
+                        <td class="px-3 py-2">{{ \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_1st']}) }}</td>
+                        <td class="px-3 py-2">{{ $teacher->{$cols['plan_type_1st']} }}</td>
+                        <td class="px-3 py-2">{{ \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_2nd']}) }}</td>
+                        <td class="px-3 py-2">{{ $teacher->{$cols['plan_type_2nd']} }}</td>
+                        <td class="px-3 py-2 text-center">
+                            <button type="button"
+                                    wire:click="openEditModal({{ $teacher->ID }})"
+                                    class="inline-flex items-center rounded border border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                                일정 수정
                             </button>
                         </td>
-                        <td class="px-3 py-2 border border-gray-200">{{ \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_1st']}) }}</td>
-                        <td class="px-3 py-2 border border-gray-200">{{ $teacher->{$cols['plan_type_1st']} }}</td>
-                        <td class="px-3 py-2 border border-gray-200">{{ \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_2nd']}) }}</td>
-                        <td class="px-3 py-2 border border-gray-200">{{ $teacher->{$cols['plan_type_2nd']} }}</td>
-                        <td class="px-3 py-2 border border-gray-200 text-center">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-700 cursor-pointer hover:bg-gray-300">Edit</span>
-                        </td>
-                        <td class="px-3 py-2 border border-gray-200 {{ $teacher->{$cols['completed_1st']} ? 'bg-green-50' : '' }}">
+                        <td class="px-3 py-2 {{ $teacher->{$cols['completed_1st']} ? 'bg-green-50' : '' }}">
                             {{ $teacher->{$cols['completed_1st']}?->format('Y-m-d') }}
                         </td>
-                        <td class="px-3 py-2 border border-gray-200">{{ $teacher->{$cols['type_1st']} }}</td>
-                        <td class="px-3 py-2 border border-gray-200 {{ $teacher->{$cols['completed_2nd']} ? 'bg-green-50' : '' }}">
+                        <td class="px-3 py-2">{{ $teacher->{$cols['type_1st']} }}</td>
+                        <td class="px-3 py-2 {{ $teacher->{$cols['completed_2nd']} ? 'bg-green-50' : '' }}">
                             {{ $teacher->{$cols['completed_2nd']}?->format('Y-m-d') }}
                         </td>
-                        <td class="px-3 py-2 border border-gray-200">{{ $teacher->{$cols['type_2nd']} }}</td>
+                        <td class="px-3 py-2">{{ $teacher->{$cols['type_2nd']} }}</td>
                         @if($showExtendedColumns)
-                            <td class="px-3 py-2 border border-gray-200">{{ $teacher->{$cols['completed_3rd']}?->format('Y-m-d') }}</td>
-                            <td class="px-3 py-2 border border-gray-200">{{ $teacher->{$cols['completed_4th']}?->format('Y-m-d') }}</td>
-                            <td class="px-3 py-2 border border-gray-200">{{ $teacher->{$cols['essentials_gs']}?->format('Y-m-d') }}</td>
-                            <td class="px-3 py-2 border border-gray-200">{{ $teacher->{$cols['essentials_ls']}?->format('Y-m-d') }}</td>
+                            <td class="px-3 py-2">{{ $teacher->{$cols['completed_3rd']}?->format('Y-m-d') }}</td>
+                            <td class="px-3 py-2">{{ $teacher->{$cols['completed_4th']}?->format('Y-m-d') }}</td>
+                            <td class="px-3 py-2">{{ $teacher->{$cols['essentials_gs']}?->format('Y-m-d') }}</td>
+                            <td class="px-3 py-2">{{ $teacher->{$cols['essentials_ls']}?->format('Y-m-d') }}</td>
                         @endif
                     </tr>
                 @empty
@@ -287,7 +371,7 @@
                         <h4 class="text-sm font-semibold text-gray-700 mb-2">기관 지원 내역:(완료처리)</h4>
                         <div class="overflow-x-auto border border-gray-200 rounded">
                             <table class="w-full text-xs whitespace-nowrap">
-                                <thead class="bg-yellow-100">
+                                <thead class="mochi-table-head text-gray-700">
                                 <tr>
                                     <th class="px-2 py-1.5 text-left border-b">ID</th>
                                     <th class="px-2 py-1.5 text-left border-b">코치명</th>
@@ -320,7 +404,7 @@
                         <h4 class="text-sm font-semibold text-gray-700 mb-2">교사 지원 내역:</h4>
                         <div class="overflow-x-auto border border-gray-200 rounded">
                             <table class="w-full text-xs whitespace-nowrap">
-                                <thead class="bg-yellow-100">
+                                <thead class="mochi-table-head text-gray-700">
                                 <tr>
                                     <th class="px-2 py-1.5 text-left border-b">ID</th>
                                     <th class="px-2 py-1.5 text-left border-b">코치명</th>
@@ -356,7 +440,7 @@
                         <h4 class="text-sm font-semibold text-gray-700 mb-2">Contacts:</h4>
                         <div class="overflow-x-auto border border-gray-200 rounded">
                             <table class="w-full text-xs whitespace-nowrap">
-                                <thead class="bg-red-100">
+                                <thead class="mochi-table-head text-gray-700">
                                 <tr>
                                     <th class="px-2 py-1.5 text-left border-b">ID</th>
                                     <th class="px-2 py-1.5 text-left border-b">이름</th>
@@ -705,7 +789,7 @@
                         <h4 class="text-sm font-semibold text-gray-700 mb-2">지원 내역</h4>
                         <div class="overflow-x-auto border border-gray-200 rounded">
                             <table class="w-full text-xs whitespace-nowrap">
-                                <thead class="bg-yellow-100">
+                                <thead class="mochi-table-head text-gray-700">
                                 <tr>
                                     <th class="px-2 py-1.5 text-left border-b">ID</th>
                                     <th class="px-2 py-1.5 text-left border-b">코치명</th>

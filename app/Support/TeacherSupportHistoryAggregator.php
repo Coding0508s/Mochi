@@ -34,7 +34,7 @@ class TeacherSupportHistoryAggregator
      * @param  list<string>  $candidateSkCodes
      * @return list<array{id: int|string, coach: string, teacher: string, date: string, status: string, type: string, sort_at: int}>
      */
-    public function forInstitution(array $candidateSkCodes, int $limit = 10): array
+    public function forInstitution(array $candidateSkCodes, int $limit = 10, bool $includeRetiredTeachers = false): array
     {
         if ($candidateSkCodes === []) {
             return [];
@@ -49,7 +49,10 @@ class TeacherSupportHistoryAggregator
 
         $teacherIds = Teacher::query()
             ->whereIn('SK_Code', $candidateSkCodes)
-            ->where('ClassInOut', true)
+            ->when(
+                ! $includeRetiredTeachers,
+                fn ($query) => $query->excludeRetired(),
+            )
             ->pluck('ID');
 
         foreach ($teacherIds as $teacherId) {
