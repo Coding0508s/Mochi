@@ -184,6 +184,75 @@ class TeamScheduleCalendarTest extends TestCase
             ->assertDontSee('직원 행 없는 팀 일정');
     }
 
+    public function test_team_view_without_workdept_keeps_own_schedules_visible_only(): void
+    {
+        $viewer = User::factory()->create([
+            'name' => 'No Dept Viewer',
+            'team' => 'CO',
+            'employee_empno' => 'EMP-NO-DEPT',
+            'is_active' => true,
+        ]);
+
+        $other = User::factory()->create([
+            'name' => 'Other Dept Owner',
+            'team' => 'CO',
+            'employee_empno' => 'EMP-OTHER-DEPT',
+            'is_active' => true,
+        ]);
+
+        $this->insertEmployee('EMP-NO-DEPT', $viewer->email, null);
+        $this->insertEmployee('EMP-OTHER-DEPT', $other->email, 'DEPT-A');
+
+        TeamSchedule::query()->create([
+            'user_id' => $viewer->id,
+            'title' => '내 부서 미지정 팀 일정',
+            'starts_at' => now()->startOfMonth()->addDays(2),
+            'visibility' => 'team',
+            'status' => 'planned',
+            'type' => 'etc',
+        ]);
+
+        TeamSchedule::query()->create([
+            'user_id' => $other->id,
+            'title' => '다른 사람 팀 일정',
+            'starts_at' => now()->startOfMonth()->addDays(3),
+            'visibility' => 'team',
+            'status' => 'planned',
+            'type' => 'etc',
+        ]);
+
+        Livewire::actingAs($viewer)
+            ->test(TeamScheduleCalendar::class)
+            ->set('viewMode', 'team')
+            ->assertSee('내 부서 미지정 팀 일정')
+            ->assertDontSee('다른 사람 팀 일정');
+    }
+
+    public function test_team_users_empty_when_viewer_has_no_workdept(): void
+    {
+        $viewer = User::factory()->create([
+            'name' => 'No Dept Viewer',
+            'team' => 'CO',
+            'employee_empno' => 'EMP-NO-DEPT',
+            'is_active' => true,
+        ]);
+
+        $otherNullDeptUser = User::factory()->create([
+            'name' => 'Also No Dept User',
+            'team' => 'CO',
+            'employee_empno' => 'EMP-ALSO-NO-DEPT',
+            'is_active' => true,
+        ]);
+
+        $this->insertEmployee('EMP-NO-DEPT', $viewer->email, null);
+        $this->insertEmployee('EMP-ALSO-NO-DEPT', $otherNullDeptUser->email, null);
+
+        Livewire::actingAs($viewer)
+            ->test(TeamScheduleCalendar::class)
+            ->set('viewMode', 'team')
+            ->assertDontSee('Also No Dept User');
+    }
+
     public function test_day_modal_shows_all_schedules_for_date(): void
     {
         $user = User::factory()->create(['is_active' => true]);
@@ -370,7 +439,7 @@ class TeamScheduleCalendarTest extends TestCase
         });
     }
 
-    private function insertEmployee(string $empNo, string $email, string $workdept = 'CO'): void
+    private function insertEmployee(string $empNo, string $email, ?string $workdept = 'CO'): void
     {
         DB::table('employee')->insert([
             'EMPNO' => $empNo,

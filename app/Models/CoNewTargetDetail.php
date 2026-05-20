@@ -8,7 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 class CoNewTargetDetail extends Model
 {
     protected $table = 'S_CO_NewTarget_Detail';
+
     protected $primaryKey = 'ID';
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -39,4 +41,3 @@ class CoNewTargetDetail extends Model
         return $query->where('AccountName', $accountName);
     }
 }
-

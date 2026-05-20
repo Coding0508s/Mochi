@@ -685,7 +685,7 @@ class PotentialInstitutionViewTest extends TestCase
             'Year' => 2026,
             'AccountName' => '삭제테스트기관',
             'AccountManager' => '삭제테스트담당',
-            'MeetingDate' => '2026-04-12',
+            'MeetingDate' => '2026-04-12 00:00:00',
             'ConsultingType' => '콜',
         ]);
 
@@ -813,6 +813,191 @@ class PotentialInstitutionViewTest extends TestCase
             'ID' => $target->ID,
             'AccountName' => '비관리자 삭제 시도',
         ]);
+    }
+
+    public function test_detail_edit_mode_shows_computed_total_while_editing(): void
+    {
+        $user = User::factory()->admin()->create();
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-10',
+            'AccountManager' => $user->name,
+            'AccountName' => '합계미리보기',
+            'Type' => '신규(24년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'IsContract' => false,
+            'created_by' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionView::class)
+            ->call('openTargetDetail', (int) $target->ID)
+            ->call('enterDetailEditMode')
+            ->set('editLS', '11')
+            ->set('editGSK', '22')
+            ->set('editGSE', '33')
+            ->assertSee('66');
+    }
+
+    public function test_detail_edit_saves_uncontracted_master_fields(): void
+    {
+        $user = User::factory()->admin()->create();
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-10',
+            'AccountManager' => $user->name,
+            'AccountName' => '편집전기관',
+            'Type' => '신규(24년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 1,
+            'GS_K' => 1,
+            'GS_E' => 1,
+            'Total' => 3,
+            'IsContract' => false,
+            'Possibility' => 'B',
+            'created_by' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionView::class)
+            ->call('openTargetDetail', (int) $target->ID)
+            ->call('enterDetailEditMode')
+            ->assertSet('detailEditMode', true)
+            ->set('editAccountName', '편집후기관')
+            ->set('editType', '신규(25년)')
+            ->set('editGubun', '해지방문')
+            ->set('editLS', '2')
+            ->set('editGSK', '3')
+            ->set('editGSE', '4')
+            ->call('saveDetailEdit')
+            ->assertHasNoErrors()
+            ->assertSet('detailEditMode', false)
+            ->assertSet('selectedTarget.account_name', '편집후기관');
+
+        $target->refresh();
+        $this->assertSame('편집후기관', $target->AccountName);
+        $this->assertSame(9, (int) $target->Total);
+    }
+
+    public function test_contracted_target_cannot_enter_detail_edit_mode(): void
+    {
+        $user = User::factory()->admin()->create();
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-10',
+            'AccountName' => '계약기관',
+            'Type' => '신규(24년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'IsContract' => true,
+            'created_by' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionView::class)
+            ->call('openTargetDetail', (int) $target->ID)
+            ->call('enterDetailEditMode')
+            ->assertSet('detailEditMode', false);
+    }
+
+    public function test_meeting_detail_edit_updates_meeting_record(): void
+    {
+        $user = User::factory()->admin()->create();
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-10',
+            'AccountManager' => $user->name,
+            'AccountName' => '미팅수정기관',
+            'Type' => '신규(24년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'IsContract' => false,
+            'created_by' => $user->id,
+        ]);
+
+        $detail = CoNewTargetDetail::query()->create([
+            'Year' => 2026,
+            'AccountName' => '미팅수정기관',
+            'AccountManager' => $user->name,
+            'MeetingDate' => '2026-04-10',
+            'MeetingTime' => '10:00',
+            'MeetingTime_End' => '11:00',
+            'Description' => '수정 전 내용',
+            'ConsultingType' => '전화',
+            'Possibility' => 'B',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionView::class)
+            ->call('openTargetDetail', (int) $target->ID)
+            ->call('openMeetingDetailModal', (int) $detail->ID)
+            ->call('enterMeetingDetailEditMode')
+            ->assertSet('meetingDetailEditMode', true)
+            ->set('editMeetingDate', '2026-04-12')
+            ->set('editMeetingTime', '14:00')
+            ->set('editMeetingTimeEnd', '15:00')
+            ->set('editConsultingType', '방문')
+            ->set('editPossibility', 'A')
+            ->set('editDescription', '수정 후 내용')
+            ->call('saveMeetingDetailEdit')
+            ->assertHasNoErrors()
+            ->assertSet('meetingDetailEditMode', false)
+            ->assertSet('selectedMeeting.consulting_type', '방문')
+            ->assertSet('selectedMeeting.description', '수정 후 내용');
+
+        $this->assertDatabaseHas('S_CO_NewTarget_Detail', [
+            'ID' => $detail->ID,
+            'MeetingDate' => '2026-04-12 00:00:00',
+            'MeetingTime' => '14:00',
+            'MeetingTime_End' => '15:00',
+            'ConsultingType' => '방문',
+            'Possibility' => 'A',
+            'Description' => '수정 후 내용',
+        ]);
+    }
+
+    public function test_contracted_target_cannot_enter_meeting_detail_edit_mode(): void
+    {
+        $user = User::factory()->admin()->create();
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-10',
+            'AccountManager' => $user->name,
+            'AccountName' => '계약미팅기관',
+            'Type' => '신규(24년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'IsContract' => true,
+            'created_by' => $user->id,
+        ]);
+
+        $detail = CoNewTargetDetail::query()->create([
+            'Year' => 2026,
+            'AccountName' => '계약미팅기관',
+            'AccountManager' => $user->name,
+            'MeetingDate' => '2026-04-10',
+            'ConsultingType' => '전화',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionView::class)
+            ->call('openTargetDetail', (int) $target->ID)
+            ->call('openMeetingDetailModal', (int) $detail->ID)
+            ->call('enterMeetingDetailEditMode')
+            ->assertSet('meetingDetailEditMode', false);
     }
 
     private function createSkCodeRequest(int $targetId, string $tempSkCode): void

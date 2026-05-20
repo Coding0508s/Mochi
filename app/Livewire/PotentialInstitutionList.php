@@ -7,24 +7,32 @@ use App\Actions\DeletePotentialMeetingDetail;
 use App\Actions\PromotePotentialInstitutionToMaster;
 use App\Enums\SyncOrigin;
 use App\Jobs\SyncInstitutionOutboundJob;
+use App\Livewire\Concerns\ManagesPotentialInstitutionDetailEdit;
+use App\Livewire\Concerns\ManagesPotentialMeetingDetailEdit;
 use App\Models\CoNewTarget;
 use App\Models\CoNewTargetDetail;
 use App\Models\Employee;
 use App\Models\SkCodeRequest;
 use App\Models\SupportRecord;
+use App\Models\User;
 use App\Support\ManagerNameNormalizer;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Throwable;
 
 class PotentialInstitutionList extends Component
 {
+    use ManagesPotentialInstitutionDetailEdit;
+    use ManagesPotentialMeetingDetailEdit;
     use WithPagination;
 
     public string $search = '';
@@ -503,7 +511,8 @@ class PotentialInstitutionList extends Component
                     'account_manager' => $validated['newManager'] ?: null,
                 ]);
 
-                if (! empty($validated['newIncludeSupportReport'])
+                if (config('potential_institutions.show_support_report_ui')
+                    && ! empty($validated['newIncludeSupportReport'])
                     && Schema::hasColumn('S_SupportInfo_Account', 'potential_target_id')) {
                     $supportDate = Carbon::parse($validated['newSupportReportDate']);
                     $timeRaw = trim((string) ($validated['newSupportReportTime'] ?? ''));
@@ -663,18 +672,28 @@ class PotentialInstitutionList extends Component
         $this->newSupportReportTrName = (string) (auth()->user()?->nameForCoReports() ?? '');
     }
 
-    private function toNonNegativeInt(mixed $value): int
+    protected function toNonNegativeInt(mixed $value): int
     {
         $intValue = (int) $value;
 
         return max(0, $intValue);
     }
 
+    protected function reloadDetailModalAfterTargetUpdate(CoNewTarget $target): void
+    {
+        $this->openDetailModal((int) $target->ID);
+    }
+
     // 행 클릭 시 상세 모달 오픈
     public function openDetailModal(int $id): void
     {
+        $this->resetDetailEditState();
+        $this->resetMeetingDetailEditState();
+
         $target = CoNewTarget::query()
             ->findOrFail($id);
+
+        $user = auth()->user();
 
         $meetingCount = CoNewTargetDetail::query()
             ->ofAccount((string) ($target->AccountName ?? ''))
@@ -700,7 +719,7 @@ class PotentialInstitutionList extends Component
             'ls' => $target->LS,
             'gs_k' => $target->GS_K,
             'gs_e' => $target->GS_E,
-            'total' => $target->Total,
+            'total' => $target->studentTotal(),
             'approaching' => $target->Approaching,
             'presenting' => $target->Presenting,
             'consulting' => $target->Consulting,
@@ -709,6 +728,7 @@ class PotentialInstitutionList extends Component
             'is_contract' => (bool) ($target->IsContract ?? false),
             'contracted_date' => $target->ContractedDate?->format('Y-m-d') ?? '-',
             'meeting_count' => $meetingCount,
+            'can_manage' => $user !== null && $target->isManagedBy($user),
         ];
 
         $this->detailMeetings = CoNewTargetDetail::query()
@@ -773,6 +793,7 @@ class PotentialInstitutionList extends Component
             ->toArray();
 
         $this->detailModalContract = ($target->IsContract ?? false) ? '1' : '0';
+        $this->detailModalSkCode = trim((string) ($target->AccountCode ?? ''));
 
         $this->showDetailModal = true;
     }
@@ -785,6 +806,8 @@ class PotentialInstitutionList extends Component
         $this->detailSupportRecords = [];
         $this->detailModalContract = '0';
         $this->detailModalSkCode = '';
+        $this->resetDetailEditState();
+        $this->resetMeetingDetailEditState();
         $this->showMeetingDetailModal = false;
         $this->selectedMeeting = null;
         $this->showSupportDetailModal = false;
@@ -807,6 +830,8 @@ class PotentialInstitutionList extends Component
 
     public function openMeetingDetailModal(int $meetingId): void
     {
+        $this->resetMeetingDetailEditState();
+
         $meeting = collect($this->detailMeetings)->firstWhere('id', $meetingId);
 
         if (! $meeting) {
@@ -819,8 +844,23 @@ class PotentialInstitutionList extends Component
 
     public function closeMeetingDetailModal(): void
     {
+        $this->resetMeetingDetailEditState();
         $this->showMeetingDetailModal = false;
         $this->selectedMeeting = null;
+    }
+
+    #[On('potential-meeting-saved')]
+    public function refreshDetailAfterMeeting(int $targetId): void
+    {
+        if (! $this->showDetailModal) {
+            return;
+        }
+
+        if ((int) ($this->selectedTarget['id'] ?? 0) !== $targetId) {
+            return;
+        }
+
+        $this->openDetailModal($targetId);
     }
 
     public function deleteMeetingDetail(int $detailId): void
@@ -855,6 +895,28 @@ class PotentialInstitutionList extends Component
         $this->closeMeetingDetailModal();
         $this->openDetailModal($targetId);
         session()->flash('success', '미팅/컨설팅 이력을 삭제했습니다.');
+    }
+
+    protected function reloadMeetingDetailAfterUpdate(CoNewTargetDetail $detail): void
+    {
+        if ($this->selectedTarget === null) {
+            return;
+        }
+
+        $targetId = (int) ($this->selectedTarget['id'] ?? 0);
+        if ($targetId <= 0) {
+            return;
+        }
+
+        $this->openDetailModal($targetId);
+
+        $updatedMeeting = collect($this->detailMeetings)->firstWhere('id', (int) $detail->ID);
+        if (! $updatedMeeting) {
+            return;
+        }
+
+        $this->selectedMeeting = $updatedMeeting;
+        $this->showMeetingDetailModal = true;
     }
 
     public function openSupportDetailModal(int $supportRecordId): void
@@ -946,6 +1008,8 @@ class PotentialInstitutionList extends Component
             });
         }
 
+        $this->applyManageableTargetScope($query);
+
         $totalCount = (clone $query)->count();
 
         $targets = $query
@@ -960,7 +1024,7 @@ class PotentialInstitutionList extends Component
             ->pluck('cnt', 'AccountName')
             ->toArray();
 
-        $yearList = CoNewTarget::query()
+        $yearList = $this->manageableTargetQuery()
             ->whereNotNull('Year')
             ->distinct()
             ->orderByDesc('Year')
@@ -968,7 +1032,7 @@ class PotentialInstitutionList extends Component
 
         $masterManagerOptions = $this->managerMasterOptions();
 
-        $managerList = CoNewTarget::query()
+        $managerList = $this->manageableTargetQuery()
             ->whereNotNull('AccountManager')
             ->where('AccountManager', '!=', '')
             ->distinct()
@@ -979,30 +1043,30 @@ class PotentialInstitutionList extends Component
             ->sort()
             ->values();
 
-        $typeList = CoNewTarget::query()
+        $typeList = $this->manageableTargetQuery()
             ->whereNotNull('Type')
             ->where('Type', '!=', '')
             ->distinct()
             ->orderBy('Type')
             ->pluck('Type');
 
-        $introductionPathList = CoNewTarget::query()
+        $introductionPathList = $this->manageableTargetQuery()
             ->whereNotNull('Connected')
             ->where('Connected', '!=', '')
             ->distinct()
             ->orderBy('Connected')
             ->pluck('Connected');
 
-        $allCount = CoNewTarget::query()->count();
+        $allCount = $this->manageableTargetQuery()->count();
 
-        $newCount = CoNewTarget::query()
+        $newCount = $this->manageableTargetQuery()
             ->where(function ($q) {
                 $q->where('Type', 'like', '%신규%')
                     ->orWhere('Gubun', 'like', '%신규%');
             })
             ->count();
 
-        $terminatedCount = CoNewTarget::query()
+        $terminatedCount = $this->manageableTargetQuery()
             ->where(function ($q) {
                 $q->where('Type', 'like', '%해지%')
                     ->orWhere('Gubun', 'like', '%해지%')
@@ -1024,15 +1088,53 @@ class PotentialInstitutionList extends Component
         ]);
     }
 
+    private function applyManageableTargetScope(Builder $query): void
+    {
+        $userId = auth()->id();
+        $user = $userId ? User::query()->find($userId) : null;
+
+        if (! $user) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        if ($user->hasFullAccess()) {
+            return;
+        }
+
+        $normalizedUserName = ManagerNameNormalizer::normalize($user->nameForCoReports());
+        $normalizedAccountManager = ManagerNameNormalizer::sqlColumnExpression('AccountManager');
+
+        $query->where(function (Builder $scope) use ($user, $normalizedUserName, $normalizedAccountManager): void {
+            $scope->where('created_by', $user->id);
+
+            if ($normalizedUserName !== '') {
+                $scope->orWhere(function (Builder $legacyScope) use ($normalizedUserName, $normalizedAccountManager): void {
+                    $legacyScope->whereNull('created_by')
+                        ->whereRaw("{$normalizedAccountManager} = ?", [$normalizedUserName]);
+                });
+            }
+        });
+    }
+
+    private function manageableTargetQuery(): Builder
+    {
+        $query = CoNewTarget::query();
+        $this->applyManageableTargetScope($query);
+
+        return $query;
+    }
+
     /**
      * 잠재기관 담당자 필터 옵션에 사용할 직원 마스터 이름 목록입니다.
      *
      * - employee 테이블이 있으면 STATUS=1 활성 직원의 영문명(없으면 한글명) 사용
      * - 테이블이 없으면 빈 컬렉션 반환(레거시/테스트 환경 안전성)
      *
-     * @return \Illuminate\Support\Collection<int, string>
+     * @return Collection<int, string>
      */
-    private function managerMasterOptions(): \Illuminate\Support\Collection
+    private function managerMasterOptions(): Collection
     {
         if (! Schema::hasTable('employee')) {
             return collect();
@@ -1060,9 +1162,9 @@ class PotentialInstitutionList extends Component
      *
      * 매칭이 없으면 원본을 그대로 유지해 과거/예외 데이터를 보존합니다.
      *
-     * @param  \Illuminate\Support\Collection<int, string>  $masterOptions
+     * @param  Collection<int, string>  $masterOptions
      */
-    private function alignManagerLabelToMasterOption(?string $raw, \Illuminate\Support\Collection $masterOptions): string
+    private function alignManagerLabelToMasterOption(?string $raw, Collection $masterOptions): string
     {
         $raw = trim((string) ($raw ?? ''));
         if ($raw === '') {

@@ -76,7 +76,7 @@ class PotentialMeetingStoredMail extends Mailable
             'ls' => $this->nullableInt($target?->LS),
             'gs_k' => $this->nullableInt($target?->GS_K),
             'gs_e' => $this->nullableInt($target?->GS_E),
-            'total' => $this->nullableInt($target?->Total),
+            'total' => $target !== null ? $target->studentTotal() : null,
         ];
     }
 

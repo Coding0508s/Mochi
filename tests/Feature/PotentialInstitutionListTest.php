@@ -33,7 +33,7 @@ class PotentialInstitutionListTest extends TestCase
         parent::setUp();
         Config::set('services.institution_outbound.enabled', false);
         $this->createLegacyPotentialInstitutionTables();
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->create(['is_admin' => true]));
     }
 
     /**
@@ -329,6 +329,8 @@ class PotentialInstitutionListTest extends TestCase
 
     public function test_save_new_target_with_support_report_creates_support_record(): void
     {
+        config(['potential_institutions.show_support_report_ui' => true]);
+
         $user = User::factory()->create(['name' => '보고서작성자']);
         $accountName = 'QA 지원보고서 동시등록 '.uniqid('', true);
 
@@ -372,6 +374,8 @@ class PotentialInstitutionListTest extends TestCase
 
     public function test_save_new_target_with_support_report_requires_support_fields(): void
     {
+        config(['potential_institutions.show_support_report_ui' => true]);
+
         Livewire::test(PotentialInstitutionList::class)
             ->call('openCreateModal')
             ->set('newAccountName', '검증 실패 케이스')
@@ -503,7 +507,7 @@ class PotentialInstitutionListTest extends TestCase
             'Year' => 2026,
             'AccountName' => $accountName,
             'AccountManager' => 'Peter Kim',
-            'MeetingDate' => '2026-04-06',
+            'MeetingDate' => '2026-04-06 00:00:00',
             'MeetingTime' => '10:30',
             'MeetingTime_End' => null,
             'Description' => '상세에서 볼 미팅 본문',
@@ -955,6 +959,7 @@ class PotentialInstitutionListTest extends TestCase
 
     public function test_filter_introduction_path_limits_list(): void
     {
+        $user = auth()->user();
         $a = '필터A '.uniqid('', true);
         $b = '필터B '.uniqid('', true);
         CoNewTarget::query()->create([
@@ -976,6 +981,7 @@ class PotentialInstitutionListTest extends TestCase
             'IsContract' => false,
             'ContractedDate' => null,
             'Possibility' => 'A',
+            'created_by' => $user?->id,
         ]);
         CoNewTarget::query()->create([
             'Year' => 2026,
@@ -996,6 +1002,7 @@ class PotentialInstitutionListTest extends TestCase
             'IsContract' => false,
             'ContractedDate' => null,
             'Possibility' => 'A',
+            'created_by' => $user?->id,
         ]);
 
         Livewire::test(PotentialInstitutionList::class)
@@ -1004,8 +1011,157 @@ class PotentialInstitutionListTest extends TestCase
             ->assertDontSee($b);
     }
 
+    public function test_regular_user_list_is_scoped_to_own_potential_targets(): void
+    {
+        $owner = User::factory()->create([
+            'name' => 'Peter Kim',
+            'email' => 'peter.kim@example.test',
+            'is_admin' => false,
+            'is_gs_brochure_admin' => false,
+            'can_manage_store_inventory' => false,
+        ]);
+        $other = User::factory()->create([
+            'name' => 'Unrelated Owner',
+            'email' => 'other@example.test',
+            'is_admin' => false,
+        ]);
+
+        $own = '내 잠재기관 '.uniqid('', true);
+        $legacyOwn = '레거시 담당 잠재기관 '.uniqid('', true);
+        $others = '타인 잠재기관 '.uniqid('', true);
+
+        CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountName' => $own,
+            'AccountManager' => 'Random Manager',
+            'Connected' => '내 소개경로',
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'A',
+            'created_by' => $owner->id,
+        ]);
+        CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-02',
+            'AccountName' => $legacyOwn,
+            'AccountManager' => 'Peter.Kim',
+            'Connected' => '레거시 소개경로',
+            'Type' => '해지',
+            'Gubun' => '해지상담',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'B',
+            'created_by' => null,
+        ]);
+        CoNewTarget::query()->create([
+            'Year' => 2025,
+            'CreatedDate' => '2025-04-01',
+            'AccountName' => $others,
+            'AccountManager' => 'Unrelated Manager',
+            'Connected' => '타인 소개경로',
+            'Type' => '외부유입',
+            'Gubun' => '외부유입방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'C',
+            'created_by' => $other->id,
+        ]);
+
+        $this->be($owner);
+
+        $component = Livewire::actingAs($owner)
+            ->test(PotentialInstitutionList::class)
+            ->assertSee($own)
+            ->assertSee($legacyOwn);
+
+        $visibleTargetNames = collect($component->viewData('targets')->items())
+            ->pluck('AccountName')
+            ->all();
+
+        $this->assertContains($own, $visibleTargetNames);
+        $this->assertContains($legacyOwn, $visibleTargetNames);
+        $this->assertNotContains($others, $visibleTargetNames);
+
+        $this->assertNotContains('타인 소개경로', $component->viewData('introductionPathList')->all());
+        $this->assertNotContains('외부유입', $component->viewData('typeList')->all());
+        $this->assertNotContains('Unrelated Manager', $component->viewData('managerList')->all());
+    }
+
+    public function test_admin_potential_target_list_keeps_full_visibility(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $other = User::factory()->create();
+
+        $targetName = '관리자 전체조회 '.uniqid('', true);
+
+        CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountName' => $targetName,
+            'AccountManager' => 'Other Manager',
+            'Connected' => '관리자 소개경로',
+            'Type' => '외부유입',
+            'Gubun' => '외부유입방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'C',
+            'created_by' => $other->id,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(PotentialInstitutionList::class)
+            ->assertSee($targetName)
+            ->assertSee('관리자 소개경로')
+            ->assertSee('외부유입');
+    }
+
     public function test_manager_filter_matches_dotted_hyphen_underscore_names(): void
     {
+        $user = User::factory()->create([
+            'name' => 'Peter Kim',
+            'is_admin' => false,
+        ]);
+        $this->be($user);
+
         $matchA = '담당자 표기A '.uniqid('', true);
         $matchB = '담당자 표기B '.uniqid('', true);
         $matchC = '담당자 표기C '.uniqid('', true);
@@ -1102,6 +1258,13 @@ class PotentialInstitutionListTest extends TestCase
 
     public function test_manager_filter_options_align_to_employee_master_label(): void
     {
+        $user = User::factory()->create([
+            'name' => 'Peter Kim',
+            'email' => 'peter.kim@grapeseed.com',
+            'is_admin' => false,
+        ]);
+        $this->be($user);
+
         DB::table('employee')->insert([
             'EMPNO' => 'E-PETER',
             'WORKDEPT' => 'A02',
@@ -1623,5 +1786,129 @@ class PotentialInstitutionListTest extends TestCase
             ->assertHasErrors(['deleteMeeting']);
 
         $this->assertDatabaseHas('S_CO_NewTarget_Detail', ['ID' => $detailB->ID]);
+    }
+
+    public function test_detail_edit_saves_uncontracted_master_fields(): void
+    {
+        $name = '목록편집 QA '.uniqid('', true);
+        $row = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountManager' => auth()->user()?->name,
+            'AccountName' => $name,
+            'Type' => '신규(24년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 1,
+            'GS_K' => 1,
+            'GS_E' => 1,
+            'Total' => 3,
+            'IsContract' => false,
+            'created_by' => auth()->id(),
+        ]);
+
+        Livewire::test(PotentialInstitutionList::class)
+            ->call('openDetailModal', (int) $row->ID)
+            ->call('enterDetailEditMode')
+            ->assertSet('detailEditMode', true)
+            ->set('editAccountName', $name.'-수정')
+            ->set('editType', '신규(25년)')
+            ->set('editGubun', '해지방문')
+            ->set('editLS', '0')
+            ->set('editGSK', '0')
+            ->set('editGSE', '0')
+            ->call('saveDetailEdit')
+            ->assertHasNoErrors()
+            ->assertSet('detailEditMode', false)
+            ->assertSet('selectedTarget.account_name', $name.'-수정');
+
+        $row->refresh();
+        $this->assertSame($name.'-수정', $row->AccountName);
+        $this->assertSame(0, (int) $row->Total);
+    }
+
+    public function test_meeting_detail_edit_updates_meeting_record(): void
+    {
+        $name = '목록미팅수정 QA '.uniqid('', true);
+        $manager = auth()->user()?->name ?? '관리자';
+
+        $row = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountManager' => $manager,
+            'AccountName' => $name,
+            'Type' => '신규(24년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'IsContract' => false,
+            'created_by' => auth()->id(),
+        ]);
+
+        $detail = CoNewTargetDetail::query()->create([
+            'Year' => 2026,
+            'AccountName' => $name,
+            'AccountManager' => $manager,
+            'MeetingDate' => '2026-04-05',
+            'MeetingTime' => '09:00',
+            'MeetingTime_End' => '10:00',
+            'Description' => '목록 수정 전',
+            'ConsultingType' => '전화',
+            'Possibility' => 'B',
+        ]);
+
+        Livewire::test(PotentialInstitutionList::class)
+            ->call('openDetailModal', (int) $row->ID)
+            ->call('openMeetingDetailModal', (int) $detail->ID)
+            ->call('enterMeetingDetailEditMode')
+            ->assertSet('meetingDetailEditMode', true)
+            ->set('editMeetingDate', '2026-04-06')
+            ->set('editMeetingTime', '13:00')
+            ->set('editMeetingTimeEnd', '14:00')
+            ->set('editConsultingType', '방문')
+            ->set('editPossibility', 'A')
+            ->set('editDescription', '목록 수정 후')
+            ->call('saveMeetingDetailEdit')
+            ->assertHasNoErrors()
+            ->assertSet('meetingDetailEditMode', false)
+            ->assertSet('selectedMeeting.consulting_type', '방문')
+            ->assertSet('selectedMeeting.description', '목록 수정 후');
+
+        $this->assertDatabaseHas('S_CO_NewTarget_Detail', [
+            'ID' => $detail->ID,
+            'MeetingDate' => '2026-04-06 00:00:00',
+            'MeetingTime' => '13:00',
+            'MeetingTime_End' => '14:00',
+            'ConsultingType' => '방문',
+            'Possibility' => 'A',
+            'Description' => '목록 수정 후',
+        ]);
+    }
+
+    public function test_list_displays_computed_student_total_when_stored_total_is_zero(): void
+    {
+        $user = User::factory()->admin()->create();
+        $name = '레거시합계 QA '.uniqid('', true);
+
+        CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountManager' => $user->name,
+            'AccountName' => $name,
+            'Type' => '신규(24년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 11,
+            'GS_K' => 22,
+            'GS_E' => 33,
+            'Total' => 0,
+            'IsContract' => false,
+            'created_by' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionList::class)
+            ->assertSee($name)
+            ->assertSee('66');
     }
 }

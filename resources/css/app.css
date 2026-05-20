@@ -811,11 +811,20 @@
 
     .mochi-modal-shell {
         width: 100%;
+        max-height: 95vh;
+        min-height: 0;
         border-radius: 18px;
         background: #ffffff;
         border: 1px solid #d9dee7;
         box-shadow: 0 18px 42px rgba(15, 23, 42, 0.22);
         overflow: hidden;
+    }
+
+    .mochi-modal-body-scroll {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .mochi-btn-primary {

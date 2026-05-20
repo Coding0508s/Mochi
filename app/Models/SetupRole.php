@@ -24,4 +24,3 @@ class SetupRole extends Model
         ];
     }
 }
-

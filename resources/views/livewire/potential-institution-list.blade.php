@@ -165,7 +165,7 @@
                             <td class="px-1.5 py-2 text-center tabular-nums">{{ $target->LS ?? 0 }}</td>
                             <td class="px-0.5 py-2 text-center tabular-nums">{{ $target->GS_K ?? 0 }}</td>
                             <td class="px-0.5 py-2 text-center tabular-nums">{{ $target->GS_E ?? 0 }}</td>
-                            <td class="px-1.5 py-2 text-center font-semibold text-gray-800 tabular-nums">{{ $target->Total ?? 0 }}</td>
+                            <td class="px-1.5 py-2 text-center font-semibold text-gray-800 tabular-nums">{{ $target->studentTotal() }}</td>
                             <td class="min-w-0 px-1.5 py-2 truncate" title="{{ $connected }}">{{ filled($target->Connected) ? $target->Connected : '-' }}</td>
                             <td class="px-1 py-2 text-center">
                                 @if($target->IsContract)
@@ -316,11 +316,13 @@
 
                             <div class="space-y-2">
                                 <p class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-                                    신규 등록 단계에서는 SK코드를 발급하지 않습니다. 기관리스트 정식 등록은 「기관 등록」 메뉴에서 별도로 진행합니다.
+                                     SK코드는 계약 완료시 생성됩니다.
                                 </p>
-                                <p class="text-xs text-gray-600">
-                                    이 모달 아래쪽(미팅내용 다음)에 <span class="font-medium text-gray-800">기관 지원 보고서(선택)</span> 항목이 있습니다. 「같이 등록」을 켜면 저장과 동시에 보고서 한 건이 생성됩니다.
-                                </p>
+                                @if(config('potential_institutions.show_support_report_ui'))
+                                    <p class="text-xs text-gray-600">
+                                        이 모달 아래쪽(미팅내용 다음)에 <span class="font-medium text-gray-800">기관 지원 보고서(선택)</span> 항목이 있습니다. 「같이 등록」을 켜면 저장과 동시에 보고서 한 건이 생성됩니다.
+                                    </p>
+                                @endif
                             </div>
                         </section>
 
@@ -357,6 +359,7 @@
                             @error('newDescription') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </section>
 
+                        @if(config('potential_institutions.show_support_report_ui'))
                         <section class="space-y-4 border-t border-gray-200 pt-5">
                             <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                                 <h3 class="text-base font-semibold text-gray-900">기관 지원 보고서 <span class="text-sm font-normal text-gray-500">(선택)</span></h3>
@@ -420,6 +423,7 @@
                                 </label>
                             @endif
                         </section>
+                        @endif
 
                         <section class="space-y-4 border-t border-gray-200 pt-5">
                             <h3 class="text-base font-semibold text-gray-900">고객관리(횟수)</h3>
@@ -499,67 +503,45 @@
                 </div>
 
                 <div class="px-6 py-5 text-sm flex-1 overflow-y-auto">
-                    <div class="border border-gray-200 rounded-lg overflow-hidden mb-4">
-                        <table class="w-full text-sm">
-                            <tbody class="divide-y divide-gray-100">
-                                <tr>
-                                    <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당자</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['account_manager'] ?? '-' }}</td>
-                                    <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">일자</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['created_date'] ?? '-' }}</td>
-                                </tr>
-                                <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">신규구분</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['type'] ?? '-' }}</td>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">컨설팅타입</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['gubun'] ?? '-' }}</td>
-                                </tr>
-                                <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">기관명</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['account_name'] ?? '-' }}</td>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">코드</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['account_code'] ?? '-' }}</td>
-                                </tr>
-                                <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">LS / GS(유) / GS(초)</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">
-                                        {{ $selectedTarget['ls'] ?? 0 }} / {{ $selectedTarget['gs_k'] ?? 0 }} / {{ $selectedTarget['gs_e'] ?? 0 }}
-                                    </td>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">합계</th>
-                                    <td class="px-3 py-2 font-semibold text-gray-900">{{ $selectedTarget['total'] ?? 0 }}</td>
-                                </tr>
-                                <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">미팅횟수</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['meeting_count'] ?? 0 }}</td>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">계약여부</th>
-                                    <td class="px-3 py-2" wire:click.stop>
-                                        <select wire:model="detailModalContract"
-                                                wire:change="requestContractChange"
-                                                class="w-full max-w-[11rem] py-1.5 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                            <option value="0">미계약</option>
-                                            <option value="1">계약</option>
-                                        </select>
-                                    </td>
-                                </tr>
-                                @if(!($selectedTarget['is_contract'] ?? false))
-                                <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">SK CODE</th>
-                                    <td colspan="3" class="px-3 py-2" wire:click.stop>
-                                        <input type="text"
-                                               wire:model.defer="detailModalSkCode"
-                                               placeholder="계약 처리 시 부여할 SK CODE (비우면 자동발급)"
-                                               class="w-full max-w-xs py-1.5 px-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                                        <p class="mt-1 text-xs text-gray-400">비워두면 LEAD-xxx 임시 코드가 발급됩니다.</p>
-                                    </td>
-                                </tr>
-                                @endif
-                                <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">주소</th>
-                                    <td colspan="3" class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['address'] ?? '-' }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <x-potential-institution.detail-summary
+                        :selected-target="$selectedTarget"
+                        :detail-edit-mode="$detailEditMode"
+                        :show-meeting-count="true"
+                        :contract-editable-separately="true"
+                        :edit-l-s="$editLS"
+                        :edit-g-s-k="$editGSK"
+                        :edit-g-s-e="$editGSE"
+                    />
+
+                    @if (! $detailEditMode)
+                        <div class="border border-gray-200 rounded-lg overflow-hidden mb-4">
+                            <table class="w-full text-sm">
+                                <tbody class="divide-y divide-gray-100">
+                                    <tr>
+                                        <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">계약여부</th>
+                                        <td class="px-3 py-2" wire:click.stop @if($selectedTarget['is_contract'] ?? false) colspan="3" @endif>
+                                            <select wire:model="detailModalContract"
+                                                    wire:change="requestContractChange"
+                                                    class="w-full max-w-[11rem] py-1.5 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                <option value="0">미계약</option>
+                                                <option value="1">계약</option>
+                                            </select>
+                                        </td>
+                                        @if(!($selectedTarget['is_contract'] ?? false))
+                                        <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">SK CODE</th>
+                                        <td class="px-3 py-2" wire:click.stop>
+                                            <input type="text"
+                                                   wire:model.defer="detailModalSkCode"
+                                                   placeholder="계약 처리 시 임시 SK CODE (자동발급)"
+                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                            <p class="mt-1 text-xs text-gray-400"> LEAD-xxx 임시 코드가 발급됩니다.</p>
+                                        </td>
+                                        @endif
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
 
                     @if(!($selectedTarget['is_contract'] ?? false))
                         @can('managePotentialInstitutions')
@@ -619,6 +601,7 @@
                         </div>
                     </div>
 
+                    @if(config('potential_institutions.show_support_report_ui'))
                     <div class="mt-4">
                         <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
                             <h3 class="text-base font-bold text-[#1f4f8f]">기관지원보고서 이력</h3>
@@ -683,13 +666,14 @@
                             </div>
                         </div>
                     </div>
+                    @endif
                 </div>
             </div>
         </div>
     @endif
 
     {{-- 기관지원보고서 상세 모달 --}}
-    @if($showSupportDetailModal && $selectedSupportRecord)
+    @if(config('potential_institutions.show_support_report_ui') && $showSupportDetailModal && $selectedSupportRecord)
         <div class="mochi-modal-overlay z-[60]" wire:click.self="closeSupportDetailModal">
             <div class="mochi-modal-shell max-w-3xl h-[70vh] max-h-[70vh] flex flex-col" wire:click.stop>
                 <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white">
@@ -749,78 +733,13 @@
     @endif
 
     {{-- 미팅/컨설팅 상세 모달 --}}
-    @if($showMeetingDetailModal && $selectedMeeting)
-        <div class="mochi-modal-overlay z-[60]" wire:click.self="closeMeetingDetailModal">
-            <div class="mochi-modal-shell max-w-3xl h-[70vh] max-h-[70vh] flex flex-col" wire:click.stop>
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white">
-                    <div>
-                        <h3 class="text-base font-semibold text-gray-900">미팅/컨설팅 상세</h3>
-                        <p class="text-xs text-gray-500 mt-0.5">
-                            {{ $selectedMeeting['account_name'] ?? '-' }} · {{ $selectedMeeting['meeting_date'] ?? '-' }}
-                        </p>
-                    </div>
-                    <button wire:click="closeMeetingDetailModal" class="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <div class="px-6 py-5 flex-1 overflow-y-auto">
-                    <div class="border border-gray-200 rounded-lg overflow-hidden mb-4">
-                        <table class="w-full text-sm">
-                            <tbody class="divide-y divide-gray-100">
-                                <tr>
-                                    <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">기관명</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedMeeting['account_name'] ?? '-' }}</td>
-                                    <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당자</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedMeeting['account_manager'] ?? '-' }}</td>
-                                </tr>
-                                <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">일자</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedMeeting['meeting_date'] ?? '-' }}</td>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">시간</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">
-                                        {{ $selectedMeeting['meeting_time'] ?? '-' }} ~ {{ $selectedMeeting['meeting_time_end'] ?? '-' }}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">컨설팅타입</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedMeeting['consulting_type'] ?? '-' }}</td>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">가능성</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedMeeting['possibility'] ?? '-' }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div>
-                        <h4 class="text-sm font-semibold text-gray-700 mb-2">미팅내용</h4>
-                        <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 leading-6 whitespace-pre-wrap break-words">
-                            {{ $selectedMeeting['description'] ?? '-' }}
-                        </div>
-                    </div>
-                </div>
-                @can('deletePotentialMeetingDetails')
-                    @if(!($selectedTarget['is_contract'] ?? false))
-                        <div class="flex flex-col gap-2 border-t border-gray-200 px-6 py-4 bg-gray-50/80 sm:flex-row sm:items-center sm:justify-between">
-                            @error('deleteMeeting')
-                                <p class="text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                            <div class="flex justify-end sm:ml-auto">
-                                <button type="button"
-                                        wire:click="deleteMeetingDetail({{ $selectedMeeting['id'] }})"
-                                        wire:confirm="이 미팅/컨설팅 이력을 삭제할까요? 되돌릴 수 없습니다."
-                                        class="inline-flex items-center rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 shadow-sm hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 cursor-pointer">
-                                    삭제
-                                </button>
-                            </div>
-                        </div>
-                    @endif
-                @endcan
-            </div>
-        </div>
-    @endif
+    <x-potential-institution.meeting-detail-modal
+        :show="$showMeetingDetailModal"
+        :selected-meeting="$selectedMeeting"
+        :selected-target="$selectedTarget"
+        :meeting-detail-edit-mode="$meetingDetailEditMode"
+        delete-policy="admin"
+    />
 
     {{-- 상세 모달 계약 변경 확인 모달 --}}
     @if($showContractChangeConfirmModal)
@@ -896,8 +815,8 @@
                                placeholder="예: ABC-001 — 비워두면 자동 발급"
                                class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400" />
                         <p class="mt-1.5 text-xs text-gray-500">
-                            비워두면 임시 코드(LEAD-xxx)가 자동 발급되고,
-                            외부 플랫폼에서 확정 SK를 입력하면 5분 이내 자동 치환됩니다.
+                            임시 코드(LEAD-xxx)가 자동 발급되고,
+                            E-ordering에서 확정 SK를 입력하면 5분 이내 자동 입력됩니다.
                         </p>
                     </div>
                 </div>

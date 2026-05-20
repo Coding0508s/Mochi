@@ -328,7 +328,7 @@ class TeamScheduleCalendar extends Component
     private function visibleSchedules(): Builder
     {
         $user = auth()->user();
-        $userWorkdept = $user?->employee?->WORKDEPT;
+        $userWorkdept = $this->currentUserWorkdept();
 
         return TeamSchedule::query()
             ->with('user')
@@ -337,6 +337,12 @@ class TeamScheduleCalendar extends Component
                 $query->where('user_id', $user?->id);
             })
             ->when($this->viewMode === 'team', function (Builder $query) use ($user, $userWorkdept): void {
+                if ($userWorkdept === null) {
+                    $query->where('user_id', $user?->id);
+
+                    return;
+                }
+
                 $query->where(function (Builder $visibleQuery) use ($user, $userWorkdept): void {
                     $visibleQuery->where('user_id', $user?->id)
                         ->orWhere(function (Builder $teamQuery) use ($userWorkdept): void {
@@ -444,8 +450,11 @@ class TeamScheduleCalendar extends Component
 
     private function teamUsers()
     {
-        $user = auth()->user();
-        $userWorkdept = $user?->employee?->WORKDEPT;
+        $userWorkdept = $this->currentUserWorkdept();
+
+        if ($userWorkdept === null) {
+            return User::query()->whereRaw('0 = 1')->get(['id', 'name', 'email', 'team']);
+        }
 
         return User::query()
             ->where('is_active', true)
@@ -455,6 +464,13 @@ class TeamScheduleCalendar extends Component
             })
             ->orderBy('name')
             ->get(['id', 'name', 'email', 'team']);
+    }
+
+    private function currentUserWorkdept(): ?string
+    {
+        $workdept = auth()->user()?->employee?->WORKDEPT;
+
+        return filled($workdept) ? (string) $workdept : null;
     }
 
     private function resetForm(): void

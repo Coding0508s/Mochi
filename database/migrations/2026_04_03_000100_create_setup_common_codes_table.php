@@ -27,4 +27,3 @@ return new class extends Migration
         Schema::dropIfExists('setup_common_codes');
     }
 };
-

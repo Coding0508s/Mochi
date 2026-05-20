@@ -33,12 +33,20 @@ class SupportCreateFormTest extends TestCase
         Schema::dropIfExists('S_CO_NewTarget_Detail');
         Schema::dropIfExists('S_CO_NewTarget');
         Schema::dropIfExists('S_SupportInfo_Account');
+        Schema::dropIfExists('S_Account_Information');
         Schema::dropIfExists('S_AccountName');
 
         Schema::create('S_AccountName', function (Blueprint $table): void {
             $table->increments('ID');
             $table->string('SKcode', 100)->unique();
             $table->string('AccountName', 255);
+        });
+
+        Schema::create('S_Account_Information', function (Blueprint $table): void {
+            $table->increments('ID');
+            $table->string('SK_Code', 100);
+            $table->string('Account_Name', 255)->nullable();
+            $table->string('Customer_Type', 255)->nullable();
         });
 
         Schema::create('S_SupportInfo_Account', function (Blueprint $table): void {
@@ -231,6 +239,8 @@ class SupportCreateFormTest extends TestCase
 
     public function test_save_mirrors_to_potential_detail_for_uncontracted_target(): void
     {
+        config(['potential_institutions.show_support_report_ui' => true]);
+
         Institution::query()->create([
             'SKcode' => 'SK-POT-1',
             'AccountName' => '잠재 기관',
@@ -300,6 +310,8 @@ class SupportCreateFormTest extends TestCase
 
     public function test_save_for_uncontracted_potential_without_sk_records_potential_target_id(): void
     {
+        config(['potential_institutions.show_support_report_ui' => true]);
+
         $user = User::factory()->create(['name' => '테스터']);
 
         $potential = CoNewTarget::query()->create([
@@ -361,6 +373,8 @@ class SupportCreateFormTest extends TestCase
 
     public function test_save_rejects_sf_upload_for_uncontracted_potential_without_sk(): void
     {
+        config(['potential_institutions.show_support_report_ui' => true]);
+
         $user = User::factory()->create(['name' => '테스터']);
 
         $potential = CoNewTarget::query()->create([
@@ -465,8 +479,69 @@ class SupportCreateFormTest extends TestCase
         $this->assertNotNull($sfFile);
     }
 
+    public function test_mount_prefills_institution_sk_code_from_query(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-PREFILL',
+            'AccountName' => '프리필 운영기관',
+        ]);
+
+        Livewire::actingAs(User::factory()->create())
+            ->withQueryParams(['sk_code' => 'SK-PREFILL', 'return' => 'institutions'])
+            ->test(SupportCreateForm::class)
+            ->assertSet('formSkCode', 'SK-PREFILL')
+            ->assertSet('formAccountName', '프리필 운영기관')
+            ->assertSet('formIsPotential', false)
+            ->assertSet('afterSaveRouteName', 'institutions.index');
+    }
+
+    public function test_mount_does_not_prefill_terminated_institution_sk_code(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-TERM',
+            'AccountName' => '해지 기관',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-TERM',
+            'Account_Name' => '해지 기관',
+            'Customer_Type' => '해지',
+        ]);
+
+        Livewire::actingAs(User::factory()->create())
+            ->withQueryParams(['sk_code' => 'SK-TERM'])
+            ->test(SupportCreateForm::class)
+            ->assertSet('formSkCode', '')
+            ->assertSet('formAccountName', '');
+    }
+
+    public function test_save_redirects_to_institution_list_when_return_is_institutions(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-RETURN',
+            'AccountName' => '복귀 테스트',
+        ]);
+
+        Livewire::actingAs(User::factory()->create())
+            ->withQueryParams(['sk_code' => 'SK-RETURN', 'return' => 'institutions'])
+            ->test(SupportCreateForm::class)
+            ->set('formSupportDate', '2026-05-18')
+            ->set('formSupportTime', '10:30')
+            ->set('formSupportType', '전화')
+            ->set('formToAccount', '소통 내용')
+            ->call('save')
+            ->assertRedirect(route('institutions.index'));
+
+        $this->assertDatabaseHas('S_SupportInfo_Account', [
+            'SK_Code' => 'SK-RETURN',
+            'Account_Name' => '복귀 테스트',
+        ]);
+    }
+
     public function test_mount_prefills_potential_target_from_parameter(): void
     {
+        config(['potential_institutions.show_support_report_ui' => true]);
+
         $user = User::factory()->create();
         $target = CoNewTarget::query()->create([
             'Year' => 2026,

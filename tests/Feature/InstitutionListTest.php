@@ -6,6 +6,7 @@ use App\Jobs\SyncInstitutionOutboundJob;
 use App\Livewire\InstitutionList;
 use App\Models\GsNumber;
 use App\Models\Institution;
+use App\Models\SupportRecord;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -85,9 +86,20 @@ class InstitutionListTest extends TestCase
 
         Schema::create('S_SupportInfo_Account', function (Blueprint $table): void {
             $table->increments('ID');
-            $table->string('SK_Code', 100)->nullable();
-            $table->dateTime('Support_Date')->nullable();
             $table->integer('Year')->nullable();
+            $table->string('SK_Code', 100)->nullable();
+            $table->string('Account_Name', 255)->nullable();
+            $table->string('TR_Name', 255)->nullable();
+            $table->string('Support_Date', 50)->nullable();
+            $table->string('Meet_Time', 50)->nullable();
+            $table->string('Support_Type', 100)->nullable();
+            $table->string('Target', 255)->nullable();
+            $table->text('Issue')->nullable();
+            $table->text('TO_Account')->nullable();
+            $table->text('TO_Depart')->nullable();
+            $table->text('Others')->nullable();
+            $table->string('Status', 50)->nullable();
+            $table->timestamp('CompletedDate')->nullable();
         });
 
         Schema::create('employee', function (Blueprint $table): void {
@@ -125,6 +137,252 @@ class InstitutionListTest extends TestCase
             $table->timestamp('applied_at')->nullable();
             $table->timestamps();
         });
+    }
+
+    public function test_detail_modal_shows_support_report_create_link_for_active_institution(): void
+    {
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-REPORT-LINK',
+            'AccountName' => '지원보고서 링크 기관',
+        ]);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->assertSee('지원보고서 작성')
+            ->assertSee(route('supports.create', ['sk_code' => 'SK-REPORT-LINK', 'return' => 'institutions'], false));
+    }
+
+    public function test_detail_modal_hides_support_report_create_link_for_terminated_institution(): void
+    {
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-TERM-LINK',
+            'AccountName' => '해지 링크 기관',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-TERM-LINK',
+            'Account_Name' => '해지 링크 기관',
+            'Customer_Type' => 'GTS 16 Conversion 해지',
+        ]);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->assertSee('해지 기관은 신규 지원보고서 작성이 제한됩니다')
+            ->assertDontSee(route('supports.create', ['sk_code' => 'SK-TERM-LINK', 'return' => 'institutions'], false));
+    }
+
+    public function test_author_can_edit_support_detail_from_institution_modal(): void
+    {
+        $user = User::factory()->create(['name' => '지원작성자', 'is_admin' => false]);
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-SUP-EDIT',
+            'AccountName' => '지원 수정 기관',
+        ]);
+
+        $record = SupportRecord::query()->create([
+            'Year' => 2026,
+            'SK_Code' => 'SK-SUP-EDIT',
+            'Account_Name' => '지원 수정 기관',
+            'TR_Name' => '지원작성자',
+            'Support_Date' => '2026-04-10',
+            'Meet_Time' => '09:00:00',
+            'Support_Type' => '방문',
+            'Target' => '원장',
+            'Issue' => '기존 이슈',
+            'TO_Account' => '기존 소통',
+            'TO_Depart' => '기존 본사',
+            'Others' => '기존 기타',
+            'Status' => '진행중',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->call('openSupportDetailModal', (int) $record->ID)
+            ->assertSet('selectedSupportRecord.support_time', '09:00')
+            ->assertSee('지원 내역 보기 모드')
+            ->call('enterSupportDetailEditMode')
+            ->assertSet('editSupportTime', '09:00')
+            ->set('editSupportDate', '2026-05-01')
+            ->set('editSupportTime', '14:00')
+            ->set('editSupportType', '전화')
+            ->set('editTarget', '교사')
+            ->set('editIssue', '수정 이슈')
+            ->set('editToAccount', '수정 소통')
+            ->set('editToDepart', '수정 본사')
+            ->set('editOthers', '수정 기타')
+            ->set('editCompleted', true)
+            ->call('saveSupportDetailEdit')
+            ->assertHasNoErrors();
+
+        $record->refresh();
+        $this->assertSame('전화', $record->Support_Type);
+        $this->assertSame('수정 이슈', $record->Issue);
+        $this->assertSame('완료', $record->Status);
+        $this->assertNotNull($record->CompletedDate);
+    }
+
+    public function test_non_author_cannot_save_support_detail_edit(): void
+    {
+        $author = User::factory()->create(['name' => '작성자A', 'is_admin' => false]);
+        $other = User::factory()->create(['name' => '타인B', 'is_admin' => false]);
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-SUP-DENY',
+            'AccountName' => '권한 테스트',
+        ]);
+
+        $record = SupportRecord::query()->create([
+            'Year' => 2026,
+            'SK_Code' => 'SK-SUP-DENY',
+            'Account_Name' => '권한 테스트',
+            'TR_Name' => '작성자A',
+            'Support_Date' => '2026-04-10',
+            'Meet_Time' => '10:00:00',
+            'Support_Type' => '방문',
+        ]);
+
+        Livewire::actingAs($other)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->call('openSupportDetailModal', (int) $record->ID)
+            ->assertDontSee('지원 내역 보기 모드')
+            ->set('editSupportDate', '2026-05-01')
+            ->set('editSupportTime', '11:00')
+            ->set('editSupportType', '전화')
+            ->call('saveSupportDetailEdit')
+            ->assertHasErrors('supportDetailEdit');
+    }
+
+    public function test_admin_can_delete_support_detail_from_institution_modal(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-SUP-DEL',
+            'AccountName' => '삭제 테스트',
+        ]);
+
+        $record = SupportRecord::query()->create([
+            'Year' => 2026,
+            'SK_Code' => 'SK-SUP-DEL',
+            'Account_Name' => '삭제 테스트',
+            'TR_Name' => '관리자',
+            'Support_Date' => '2026-04-10',
+            'Support_Type' => '방문',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->call('openSupportDetailModal', (int) $record->ID)
+            ->call('deleteSupportDetail');
+
+        $this->assertDatabaseMissing('S_SupportInfo_Account', [
+            'ID' => $record->ID,
+        ]);
+    }
+
+    public function test_terminated_institution_hides_support_detail_edit_toggle(): void
+    {
+        $user = User::factory()->create(['name' => '지원작성자', 'is_admin' => false]);
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-SUP-TERM',
+            'AccountName' => '해지 지원 기관',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-SUP-TERM',
+            'Account_Name' => '해지 지원 기관',
+            'Customer_Type' => 'GTS 16 Conversion 해지',
+        ]);
+
+        $record = SupportRecord::query()->create([
+            'Year' => 2026,
+            'SK_Code' => 'SK-SUP-TERM',
+            'Account_Name' => '해지 지원 기관',
+            'TR_Name' => '지원작성자',
+            'Support_Date' => '2026-04-10',
+            'Support_Type' => '방문',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->call('openSupportDetailModal', (int) $record->ID)
+            ->assertDontSee('지원 내역 보기 모드')
+            ->assertSee('해지 기관의 지원 내역은 수정·삭제할 수 없습니다');
+    }
+
+    public function test_co_team_user_can_update_only_co_field_in_detail_modal(): void
+    {
+        $this->insertEmployee('E-CO-EDIT', 'A02', 'Peter Kim', 1);
+        $this->insertEmployee('E-CO-OTHER', 'A02', 'Rami Lee', 1);
+
+        $user = User::factory()->create([
+            'name' => 'Peter Kim',
+            'email' => 'peter@example.com',
+            'employee_empno' => 'E-CO-EDIT',
+            'team' => 'CO',
+            'is_admin' => false,
+        ]);
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-CO-ONLY',
+            'AccountName' => 'CO 팀 수정 테스트',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-CO-ONLY',
+            'Account_Name' => 'CO 팀 수정 테스트',
+            'CO' => 'Peter Kim',
+            'TR' => 'Keep TR',
+            'CS' => 'Keep CS',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->call('startDetailEdit')
+            ->set('editDetailCo', 'Rami Lee')
+            ->set('editDetailTr', 'Hacked TR')
+            ->set('editDetailInstitutionName', 'Hacked Name')
+            ->call('saveDetailFields')
+            ->assertHasNoErrors()
+            ->assertSet('showDetailModal', false);
+
+        $this->assertDatabaseHas('S_Account_Information', [
+            'SK_Code' => 'SK-CO-ONLY',
+            'CO' => 'Rami Lee',
+            'TR' => 'Keep TR',
+            'CS' => 'Keep CS',
+        ]);
+        $this->assertDatabaseHas('S_AccountName', [
+            'ID' => $institution->ID,
+            'AccountName' => 'CO 팀 수정 테스트',
+        ]);
+    }
+
+    public function test_user_without_team_cannot_save_institution_detail(): void
+    {
+        $user = User::factory()->create([
+            'team' => '',
+            'is_admin' => false,
+        ]);
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-NO-TEAM',
+            'AccountName' => '팀 없음',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->assertDontSee('wire:click="startDetailEdit"', false)
+            ->call('startDetailEdit')
+            ->set('editDetailCo', 'Should Fail')
+            ->call('saveDetailFields')
+            ->assertHasErrors('detailEdit');
     }
 
     public function test_index_renders_and_has_no_inline_register_button(): void
@@ -466,7 +724,7 @@ class InstitutionListTest extends TestCase
 
     public function test_save_detail_syncs_s_gs_number(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         $institution = Institution::query()->create([
             'SKcode' => 'SK-GS-SAVE-1',
@@ -501,7 +759,7 @@ class InstitutionListTest extends TestCase
 
     public function test_save_detail_updates_master_and_account_information(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         $institution = Institution::query()->create([
             'SKcode' => 'SK-FULL-1',
@@ -545,7 +803,7 @@ class InstitutionListTest extends TestCase
 
     public function test_save_detail_fields_reverse_syncs_completed_sk_code_request(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $appliedAt = now()->subMinutes(5);
 
         $institution = Institution::query()->create([
@@ -611,7 +869,7 @@ class InstitutionListTest extends TestCase
 
     public function test_save_managers_reverse_syncs_completed_sk_code_request(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $appliedAt = now()->subMinutes(5);
 
         $institution = Institution::query()->create([
@@ -658,7 +916,7 @@ class InstitutionListTest extends TestCase
     public function test_save_managers_queues_outbound_when_enabled(): void
     {
         Config::set('services.institution_outbound.enabled', true);
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         $institution = Institution::query()->create([
             'SKcode' => 'SK-MANAGER-SYNC-1',
@@ -682,7 +940,7 @@ class InstitutionListTest extends TestCase
     public function test_save_detail_fields_queues_outbound_when_enabled(): void
     {
         Config::set('services.institution_outbound.enabled', true);
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         $institution = Institution::query()->create([
             'SKcode' => 'SK-DETAIL-SYNC-1',
@@ -706,7 +964,7 @@ class InstitutionListTest extends TestCase
 
     public function test_save_detail_sk_rename_cascades_sk_code_on_support_records(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         $institution = Institution::query()->create([
             'SKcode' => 'SK-OLD-X',

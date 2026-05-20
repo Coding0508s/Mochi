@@ -1,7 +1,9 @@
 <div class="rounded-lg border border-gray-200 bg-gray-50/80 p-4 space-y-3">
-    <p class="text-xs text-gray-600 leading-relaxed">
-        지원 보고서를 별도 화면에서 저장하면 미팅 이력에 자동으로 한 줄 더 생길 수 있습니다. 중복 입력에 유의해 주세요.
-    </p>
+    @if(config('potential_institutions.show_support_report_ui'))
+        <p class="text-xs text-gray-600 leading-relaxed">
+            지원 보고서를 별도 화면에서 저장하면 미팅 이력에 자동으로 한 줄 더 생길 수 있습니다. 중복 입력에 유의해 주세요.
+        </p>
+    @endif
     @error('meetingForm')
         <p class="text-sm text-red-600">{{ $message }}</p>
     @enderror

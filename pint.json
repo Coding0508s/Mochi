@@ -1,0 +1,8 @@
+{
+    "exclude": [
+        "GSBrochure",
+        "vendor",
+        "storage",
+        "bootstrap/cache"
+    ]
+}

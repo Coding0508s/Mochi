@@ -59,6 +59,9 @@ class SupportCreateForm extends Component
     /** @var TemporaryUploadedFile|null */
     public $sfUpload = null;
 
+    /** 저장 후 이동할 라우트 이름 (supports.index | institutions.index) */
+    public string $afterSaveRouteName = 'supports.index';
+
     protected array $rules = [
         'formSkCode' => ['nullable', 'required_without:formPotentialTargetId'],
         'formPotentialTargetId' => ['nullable', 'integer', 'required_without:formSkCode'],
@@ -92,8 +95,69 @@ class SupportCreateForm extends Component
 
         $prefillId = $potentialTargetId ?? request()->integer('potential_target_id');
         if ($prefillId > 0) {
+            if (! config('potential_institutions.show_support_report_ui')) {
+                session()->flash('warning', '잠재기관에서는 기관 지원 보고서 작성 기능을 사용하지 않습니다.');
+
+                $this->redirect(route('potential-institutions.index'), navigate: true);
+
+                return;
+            }
+
             $this->applyPotentialTargetPrefill($prefillId);
+
+            return;
         }
+
+        $prefillSkCode = trim((string) request()->query('sk_code', ''));
+        if ($prefillSkCode !== '') {
+            $this->afterSaveRouteName = $this->resolveAfterSaveRouteName(
+                (string) request()->query('return', '')
+            );
+            $this->applyInstitutionSkPrefill($prefillSkCode);
+        }
+
+        $prefillTeacherName = trim((string) request()->query('teacher_name', ''));
+        if ($prefillTeacherName !== '') {
+            $this->formTarget = $prefillTeacherName;
+        }
+
+        $prefillSupportType = trim((string) request()->query('support_type', ''));
+        if ($prefillSupportType !== '') {
+            $this->formSupportType = $prefillSupportType;
+        }
+    }
+
+    private function applyInstitutionSkPrefill(string $skCode): void
+    {
+        $institution = Institution::query()->where('SKcode', $skCode)->first();
+        if ($institution === null) {
+            session()->flash('warning', '기관을 찾을 수 없습니다. SK코드를 확인해 주세요.');
+
+            return;
+        }
+
+        $customerType = (string) ($institution->accountInfo?->Customer_Type ?? '');
+        if (str_contains($customerType, '해지')) {
+            session()->flash('warning', '해지된 기관입니다. 신규 지원보고서 작성이 제한됩니다.');
+
+            return;
+        }
+
+        $this->formSkCode = (string) $institution->SKcode;
+        $this->formAccountName = (string) ($institution->AccountName ?? '');
+        $this->formInstitutionKeyword = $this->formAccountName;
+        $this->formPotentialTargetId = null;
+        $this->formIsPotential = false;
+        $this->formPossibility = '';
+        $this->applyDefaultCommunicationTemplatesIfEmpty();
+    }
+
+    private function resolveAfterSaveRouteName(string $return): string
+    {
+        return match ($return) {
+            'institutions' => 'institutions.index',
+            default => 'supports.index',
+        };
     }
 
     private function applyPotentialTargetPrefill(int $id): void
@@ -205,6 +269,12 @@ class SupportCreateForm extends Component
             return;
         }
 
+        if (($isPotential || $potential !== null) && ! config('potential_institutions.show_support_report_ui')) {
+            session()->flash('warning', '잠재기관에서는 기관 지원 보고서 작성 기능을 사용하지 않습니다.');
+
+            return;
+        }
+
         if (! $inst && ! $isPotential && $potential === null) {
             return;
         }
@@ -245,6 +315,12 @@ class SupportCreateForm extends Component
     public function save(): void
     {
         $this->validate();
+
+        if ($this->formPotentialTargetId !== null && ! config('potential_institutions.show_support_report_ui')) {
+            $this->addError('formSkCode', '잠재기관에서는 기관 지원 보고서 작성 기능을 사용하지 않습니다.');
+
+            return;
+        }
 
         $upload = $this->sfUpload;
         if ($upload instanceof TemporaryUploadedFile && blank($this->formSkCode)) {
@@ -362,7 +438,7 @@ class SupportCreateForm extends Component
 
         $this->sfUpload = null;
         session()->flash('success', '지원 보고서가 저장되었습니다.');
-        $this->redirectRoute('supports.index', navigate: true);
+        $this->redirectRoute($this->afterSaveRouteName, navigate: true);
     }
 
     public function clearSfUpload(): void

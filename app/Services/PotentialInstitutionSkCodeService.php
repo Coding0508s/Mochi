@@ -76,7 +76,7 @@ final class PotentialInstitutionSkCodeService
         }
 
         if ($oldCount > 1) {
-                throw new InvalidArgumentException('등록 대상 기관 SK가 기관 목록에 중복되어 있습니다. 데이터 정리 후 다시 시도하세요.');
+            throw new InvalidArgumentException('등록 대상 기관 SK가 기관 목록에 중복되어 있습니다. 데이터 정리 후 다시 시도하세요.');
         }
 
         if (Institution::query()->where('SKcode', $newSk)->exists()) {

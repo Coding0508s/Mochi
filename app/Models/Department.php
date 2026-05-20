@@ -28,4 +28,3 @@ class Department extends Model
         'FGC_Creator',
     ];
 }
-

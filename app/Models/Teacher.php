@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\LegacyDateTimeCast;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -63,16 +64,37 @@ class Teacher extends Model
         'Created_Date',
         'GrapeSEEDEssentials',
         'LittleSEEDEssentials',
+        'Plan_1st_Support_Date',
+        'Plan_2nd_Support_Date',
+        'Plan_1st_Support_Type',
+        'Plan_2nd_Support_Type',
+        '_1st_Support_Date',
+        '_2nd_Support_Date',
+        '_3rd_Support_Date',
+        '_4th_Support_Date',
+        '_1st_Support_Type',
+        '_2nd_Support_Type',
+        '_3rd_Support_Type',
+        '_4th_Support_Type',
+        'Unit_21_',
+        'Unit_31_',
+        'GrapeSEED_Connect_Training',
+        'Nexus_Training',
+        'Certi_Delivery',
+        'Certi_Delivery_LS',
+        'LittleSEED_Support',
+        'LittleSEED_Pro_Tips_',
+        'LittleSEED_Release_Note',
     ];
 
     // ─── 날짜/타입 자동 변환 ──────────────────────────────────────────
     protected function casts(): array
     {
         return [
-            // 날짜 필드는 꺼내올 때 자동으로 날짜 객체가 됩니다.
             'GrapeSEEDEssentials' => 'datetime',
             'LittleSEEDEssentials' => 'datetime',
-            'Plan_2nd_Support_Date' => 'datetime',
+            'Plan_1st_Support_Date' => LegacyDateTimeCast::class,
+            'Plan_2nd_Support_Date' => LegacyDateTimeCast::class,
             'Unit_21_' => 'datetime',
             '_1st_Support_Date' => 'datetime',
             '_2nd_Support_Date' => 'datetime',
@@ -89,7 +111,6 @@ class Teacher extends Model
             'FGC_LastModifyDate' => 'datetime',
             'FGC_Rowversion' => 'datetime',
 
-            // true/false 값으로 자동 변환되는 필드들
             'Certi_Delivery_LS' => 'boolean',
             'Certi_Delivery' => 'boolean',
             'ClassInOut' => 'boolean',

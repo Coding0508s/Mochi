@@ -297,6 +297,12 @@
                                 </button>
 
                                 <div x-show="openCoach" class="sidebar-sublist">
+                                    <a href="/coach/teacher-support?team_menu=coach"
+                                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable
+                                              {{ request()->routeIs('coach.teacher-support.*') ? 'sidebar-subitem-active' : '' }}">
+                                        @include('partials.sidebar-menu-icon', ['name' => 'users', 'small' => true])
+                                        <span class="sidebar-subitem-label">교사 지원 현황</span>
+                                    </a>
                                     @foreach($sharedTeamMenus as $menu)
                                         <a href="{{ $menu['path'] }}{{ str_contains($menu['path'], '?') ? '&' : '?' }}team_menu=coach"
                                            class="sidebar-subitem sidebar-subitem-row sidebar-focusable

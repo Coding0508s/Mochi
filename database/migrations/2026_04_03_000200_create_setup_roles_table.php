@@ -24,4 +24,3 @@ return new class extends Migration
         Schema::dropIfExists('setup_roles');
     }
 };
-

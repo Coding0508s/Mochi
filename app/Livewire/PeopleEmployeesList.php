@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\User;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
@@ -923,7 +924,7 @@ class PeopleEmployeesList extends Component
      * 보안상 목록 노출 결정에는 사용하지 않고, 발송 시점에 resolveLinkedUser
      * 에서만 별도로 적용합니다.)
      */
-    private function attachLinkedUserInfo(\Illuminate\Contracts\Pagination\LengthAwarePaginator $employees): void
+    private function attachLinkedUserInfo(LengthAwarePaginator $employees): void
     {
         $empNos = collect($employees->items())
             ->pluck('EMPNO')

@@ -71,7 +71,7 @@ class InboundNotificationBell extends Component
             ->limit(10)
             ->get();
 
-        $this->recentRows = $rows->map(function (ExternalAssignmentInboundLog $row) use ($user, $lastSeen): array {
+        $this->recentRows = $rows->map(function (ExternalAssignmentInboundLog $row) use ($lastSeen): array {
             $isUnread = $lastSeen === null || ($row->received_at !== null && $row->received_at->greaterThan($lastSeen));
 
             $raw = is_array($row->raw_body) ? $row->raw_body : [];

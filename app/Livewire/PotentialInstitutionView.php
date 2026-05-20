@@ -3,6 +3,8 @@
 namespace App\Livewire;
 
 use App\Actions\DeletePotentialMeetingDetail;
+use App\Livewire\Concerns\ManagesPotentialInstitutionDetailEdit;
+use App\Livewire\Concerns\ManagesPotentialMeetingDetailEdit;
 use App\Models\CoNewTarget;
 use App\Models\CoNewTargetDetail;
 use App\Models\SkCodeRequest;
@@ -20,6 +22,8 @@ use Livewire\WithPagination;
 
 class PotentialInstitutionView extends Component
 {
+    use ManagesPotentialInstitutionDetailEdit;
+    use ManagesPotentialMeetingDetailEdit;
     use WithPagination;
 
     public string $yearMonth = '';
@@ -142,10 +146,14 @@ class PotentialInstitutionView extends Component
         $this->detailSupportRecords = [];
         $this->showMeetingDetailModal = false;
         $this->selectedMeeting = null;
+        $this->resetDetailEditState();
+        $this->resetMeetingDetailEditState();
     }
 
     public function openMeetingDetailModal(int $meetingId): void
     {
+        $this->resetMeetingDetailEditState();
+
         $meeting = collect($this->detailMeetings)->firstWhere('id', $meetingId);
 
         if (! $meeting) {
@@ -158,6 +166,7 @@ class PotentialInstitutionView extends Component
 
     public function closeMeetingDetailModal(): void
     {
+        $this->resetMeetingDetailEditState();
         $this->showMeetingDetailModal = false;
         $this->selectedMeeting = null;
     }
@@ -249,9 +258,48 @@ class PotentialInstitutionView extends Component
         session()->flash('success', '잠재기관을 삭제했습니다.');
     }
 
+    protected function reloadDetailModalAfterTargetUpdate(CoNewTarget $target): void
+    {
+        $this->loadDetailData($target);
+    }
+
+    protected function reloadMeetingDetailAfterUpdate(CoNewTargetDetail $detail): void
+    {
+        if ($this->selectedTarget === null) {
+            return;
+        }
+
+        $targetId = (int) ($this->selectedTarget['id'] ?? 0);
+        if ($targetId <= 0) {
+            return;
+        }
+
+        $target = CoNewTarget::query()->find($targetId);
+        if (! $target) {
+            return;
+        }
+
+        $this->loadDetailData($target);
+
+        $updatedMeeting = collect($this->detailMeetings)->firstWhere('id', (int) $detail->ID);
+        if (! $updatedMeeting) {
+            return;
+        }
+
+        $this->selectedMeeting = $updatedMeeting;
+        $this->showMeetingDetailModal = true;
+    }
+
+    protected function toNonNegativeInt(mixed $value): int
+    {
+        return max(0, (int) $value);
+    }
+
     private function loadDetailData(CoNewTarget $target): void
     {
         $user = auth()->user();
+        $this->resetDetailEditState();
+        $this->resetMeetingDetailEditState();
 
         $this->selectedTarget = [
             'id' => $target->ID,
@@ -262,13 +310,14 @@ class PotentialInstitutionView extends Component
             'type' => $target->Type ?? '-',
             'gubun' => $target->Gubun ?? '-',
             'possibility' => $target->Possibility ?? '-',
+            'connected' => $target->Connected ?? '-',
             'director' => $target->Director ?? '-',
             'phone' => $target->Phone ?? '-',
             'address' => $target->Address ?? '-',
             'ls' => $target->LS ?? 0,
             'gs_k' => $target->GS_K ?? 0,
             'gs_e' => $target->GS_E ?? 0,
-            'total' => $target->Total ?? 0,
+            'total' => $target->studentTotal(),
             'is_contract' => (bool) ($target->IsContract ?? false),
             'can_manage' => $user !== null && $target->isManagedBy($user),
         ];

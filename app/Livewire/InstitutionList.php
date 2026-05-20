@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Enums\SyncOrigin;
 use App\Jobs\SyncInstitutionOutboundJob;
+use App\Livewire\Concerns\ManagesInstitutionSupportDetailEdit;
 use App\Models\AccountInformation;
 use App\Models\Employee;
 use App\Models\GsNumber;
@@ -13,6 +14,7 @@ use App\Models\SupportRecord;
 use App\Models\Teacher;
 use App\Support\ManagerNameNormalizer;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
@@ -21,13 +23,16 @@ use Livewire\WithPagination;
 
 class InstitutionList extends Component
 {
+    use ManagesInstitutionSupportDetailEdit;
     use WithPagination;
     // WithPagination: "다음 페이지", "이전 페이지" 기능을 자동으로 제공합니다.
 
     // ─── 담당자 드롭다운 부서 매핑 ─────────────────────────────────
     // 상세 모달의 CO / Coach / CS 드롭다운은 아래 부서(WORKDEPT) 활성 직원만 후보로 노출합니다.
     private const DEPT_CO = 'A02'; // Consulting Team
+
     private const DEPT_TR = 'A05'; // Training Team (Coach)
+
     private const DEPT_CS = 'A03'; // Customer Support Team
 
     // ─── 검색/필터 상태 ────────────────────────────────────────────
@@ -222,7 +227,7 @@ class InstitutionList extends Component
                 return [
                     'id' => $record->ID,
                     'support_date' => $record->Support_Date?->format('Y-m-d') ?? '-',
-                    'support_time' => $record->Meet_Time ? substr((string) $record->Meet_Time, 0, 5) : '-',
+                    'support_time' => $this->formatSupportMeetTime($record->Meet_Time),
                     'tr_name' => $record->TR_Name ?? '-',
                     'support_type' => $record->Support_Type ?? '-',
                     'target' => $record->Target ?? '-',
@@ -320,12 +325,20 @@ class InstitutionList extends Component
             return;
         }
 
+        if (! $this->canEditInstitutionDetail()) {
+            $this->addError('detailEdit', '기관 상세 정보를 수정할 권한이 없습니다.');
+
+            return;
+        }
+
         $institutionId = (int) ($this->selectedInstitution['id'] ?? 0);
         $originalSk = trim((string) ($this->selectedInstitution['skcode'] ?? ''));
 
         if ($institutionId <= 0 || $originalSk === '') {
             return;
         }
+
+        $this->applyInstitutionDetailEditFieldLocks();
 
         $this->validate([
             'editDetailSkCode' => [
@@ -433,9 +446,26 @@ class InstitutionList extends Component
             });
         });
 
-        $this->openDetailModal($institutionId);
+        if ($this->institutionDetailModalIsVisible($institutionId)) {
+            $this->openDetailModal($institutionId);
+        } else {
+            $this->closeDetailModal();
+        }
+
         $this->resetValidation();
         session()->flash('success', '기관 상세 정보가 저장되었습니다.');
+    }
+
+    private function institutionDetailModalIsVisible(int $institutionId): bool
+    {
+        if ($institutionId <= 0) {
+            return false;
+        }
+
+        return Institution::query()
+            ->tap(fn (Builder $query) => $this->applyCoTeamInstitutionScope($query))
+            ->whereKey($institutionId)
+            ->exists();
     }
 
     // ─── 지원/소통 이력 상세 모달 ─────────────────────────────────────
@@ -451,10 +481,41 @@ class InstitutionList extends Component
             ->where('SK_Code', $skCode)
             ->firstOrFail();
 
-        $this->selectedSupportRecord = [
+        $this->selectedSupportRecord = $this->mapSupportRecordToDetailArray($record);
+        $this->supportDetailEditMode = false;
+        $this->resetSupportDetailEditForm();
+        $this->showSupportDetailModal = true;
+    }
+
+    public function closeSupportDetailModal(): void
+    {
+        $this->showSupportDetailModal = false;
+        $this->selectedSupportRecord = null;
+        $this->resetSupportDetailEditState();
+    }
+
+    protected function reloadSupportDetailAfterUpdate(SupportRecord $record): void
+    {
+        $institutionId = (int) ($this->selectedInstitution['id'] ?? 0);
+        if ($institutionId <= 0) {
+            $this->selectedSupportRecord = $this->mapSupportRecordToDetailArray($record);
+
+            return;
+        }
+
+        $this->openDetailModal($institutionId);
+        $this->openSupportDetailModal((int) $record->ID);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function mapSupportRecordToDetailArray(SupportRecord $record): array
+    {
+        return [
             'id' => $record->ID,
             'support_date' => $record->Support_Date?->format('Y-m-d') ?? '-',
-            'support_time' => $record->Meet_Time ? substr((string) $record->Meet_Time, 0, 5) : '-',
+            'support_time' => $this->formatSupportMeetTime($record->Meet_Time),
             'tr_name' => $record->TR_Name ?? '-',
             'support_type' => $record->Support_Type ?? '-',
             'target' => $record->Target ?? '-',
@@ -465,15 +526,8 @@ class InstitutionList extends Component
             'status' => $record->CompletedDate ? '완료' : '진행중',
             'created_date' => $record->CreatedDate?->format('Y-m-d H:i') ?? '-',
             'completed_date' => $record->CompletedDate?->format('Y-m-d H:i') ?? '-',
+            'can_edit' => $this->resolveSupportRecordCanEdit($record),
         ];
-
-        $this->showSupportDetailModal = true;
-    }
-
-    public function closeSupportDetailModal(): void
-    {
-        $this->showSupportDetailModal = false;
-        $this->selectedSupportRecord = null;
     }
 
     // ─── 담당자 변경 모달 열기/닫기/저장 ─────────────────────────────
@@ -515,6 +569,26 @@ class InstitutionList extends Component
 
     public function saveManagers(): void
     {
+        if (! $this->canEditInstitutionDetail()) {
+            $this->addError('managerEdit', '담당자 정보를 수정할 권한이 없습니다.');
+
+            return;
+        }
+
+        $existing = AccountInformation::query()
+            ->where('SK_Code', $this->editSkCode)
+            ->first();
+
+        $co = $this->canEditInstitutionDetailCo()
+            ? trim($this->editCo) ?: null
+            : ($existing?->CO);
+        $tr = $this->canEditInstitutionDetailTr()
+            ? trim($this->editTr) ?: null
+            : ($existing?->TR);
+        $cs = $this->canEditInstitutionDetailCs()
+            ? trim($this->editCs) ?: null
+            : ($existing?->CS);
+
         $this->validate([
             'editSkCode' => 'required',
             'editInstitutionName' => 'required|string|max:255',
@@ -530,17 +604,17 @@ class InstitutionList extends Component
             ['SK_Code' => $this->editSkCode],
             [
                 'Account_Name' => $this->editInstitutionName,
-                'CO' => trim($this->editCo) ?: null,
-                'TR' => trim($this->editTr) ?: null,
-                'CS' => trim($this->editCs) ?: null,
+                'CO' => $co,
+                'TR' => $tr,
+                'CS' => $cs,
             ]
         );
 
         $this->reverseSyncToSkCodeRequest($this->editSkCode, [
             'institution_name' => $this->editInstitutionName,
-            'co' => trim($this->editCo) ?: null,
-            'tr' => trim($this->editTr) ?: null,
-            'cs' => trim($this->editCs) ?: null,
+            'co' => $co,
+            'tr' => $tr,
+            'cs' => $cs,
         ]);
 
         DB::afterCommit(function (): void {
@@ -553,9 +627,9 @@ class InstitutionList extends Component
 
         // 상세 모달 열려 있으면 즉시 표시값도 갱신
         if ($this->selectedInstitution && $this->selectedInstitution['skcode'] === $this->editSkCode) {
-            $this->selectedInstitution['co'] = trim($this->editCo) ?: null;
-            $this->selectedInstitution['tr'] = trim($this->editTr) ?: null;
-            $this->selectedInstitution['cs'] = trim($this->editCs) ?: null;
+            $this->selectedInstitution['co'] = $co;
+            $this->selectedInstitution['tr'] = $tr;
+            $this->selectedInstitution['cs'] = $cs;
         }
 
         session()->flash('success', '담당자 정보가 저장되었습니다.');
@@ -669,7 +743,139 @@ class InstitutionList extends Component
             'trManagerOptions' => $trManagerOptions,
             'csManagerOptions' => $csManagerOptions,
             'customerTypeOptions' => $customerTypeOptions,
+            'canEditDetailCore' => $this->canEditInstitutionDetailCore(),
+            'canEditDetailCo' => $this->canEditInstitutionDetailCo(),
+            'canEditDetailTr' => $this->canEditInstitutionDetailTr(),
+            'canEditDetailCs' => $this->canEditInstitutionDetailCs(),
+            'canEditInstitutionDetail' => $this->canEditInstitutionDetail(),
         ]);
+    }
+
+    public function canEditInstitutionDetail(): bool
+    {
+        return $this->canEditInstitutionDetailCore()
+            || $this->canEditInstitutionDetailCo()
+            || $this->canEditInstitutionDetailTr()
+            || $this->canEditInstitutionDetailCs();
+    }
+
+    public function canEditInstitutionDetailCore(): bool
+    {
+        return (bool) auth()->user()?->hasFullAccess();
+    }
+
+    public function canEditInstitutionDetailCo(): bool
+    {
+        if ($this->canEditInstitutionDetailCore()) {
+            return true;
+        }
+
+        return $this->resolveCurrentUserManagerDept() === self::DEPT_CO;
+    }
+
+    public function canEditInstitutionDetailTr(): bool
+    {
+        if ($this->canEditInstitutionDetailCore()) {
+            return true;
+        }
+
+        return $this->resolveCurrentUserManagerDept() === self::DEPT_TR;
+    }
+
+    public function canEditInstitutionDetailCs(): bool
+    {
+        if ($this->canEditInstitutionDetailCore()) {
+            return true;
+        }
+
+        return $this->resolveCurrentUserManagerDept() === self::DEPT_CS;
+    }
+
+    protected function applyInstitutionDetailEditFieldLocks(): void
+    {
+        if (! $this->selectedInstitution) {
+            return;
+        }
+
+        if (! $this->canEditInstitutionDetailCore()) {
+            $this->editDetailSkCode = (string) ($this->selectedInstitution['skcode'] ?? '');
+            $this->editDetailInstitutionName = (string) ($this->selectedInstitution['name'] ?? '');
+            $this->editDetailEnglishName = (string) ($this->selectedInstitution['english_name'] ?? '');
+            $this->editDetailPortalName = (string) ($this->selectedInstitution['portal_name'] ?? '');
+            $this->editDetailPortalCampusId = (string) ($this->selectedInstitution['portal_campus_id'] ?? '');
+            $this->editDetailAccountNo = (string) ($this->selectedInstitution['account_no'] ?? '');
+            $this->editDetailGubun = (string) ($this->selectedInstitution['gubun'] ?? '');
+            $this->editDetailDirector = (string) ($this->selectedInstitution['director'] ?? '');
+            $this->editDetailPhone = (string) ($this->selectedInstitution['phone'] ?? '');
+            $this->editDetailAccountTel = (string) ($this->selectedInstitution['account_tel'] ?? '');
+            $this->editDetailAddress = (string) ($this->selectedInstitution['address'] ?? '');
+            $this->editCustomerType = (string) ($this->selectedInstitution['customer_type'] ?? '');
+            $this->editGsNo = (string) ($this->selectedInstitution['gs_no'] ?? '');
+        }
+
+        if (! $this->canEditInstitutionDetailCo()) {
+            $this->editDetailCo = (string) ($this->selectedInstitution['co'] ?? '');
+        }
+
+        if (! $this->canEditInstitutionDetailTr()) {
+            $this->editDetailTr = (string) ($this->selectedInstitution['tr'] ?? '');
+        }
+
+        if (! $this->canEditInstitutionDetailCs()) {
+            $this->editDetailCs = (string) ($this->selectedInstitution['cs'] ?? '');
+        }
+    }
+
+    private function formatSupportMeetTime(mixed $meetTime): string
+    {
+        if ($meetTime === null) {
+            return '-';
+        }
+
+        if ($meetTime instanceof \DateTimeInterface) {
+            return $meetTime->format('H:i');
+        }
+
+        $stringValue = trim((string) $meetTime);
+        if ($stringValue === '') {
+            return '-';
+        }
+
+        if (preg_match('/([01]\d|2[0-3]):([0-5]\d)/', $stringValue, $matches)) {
+            return $matches[0];
+        }
+
+        return '-';
+    }
+
+    private function resolveCurrentUserManagerDept(): ?string
+    {
+        $user = auth()->user();
+        if ($user === null) {
+            return null;
+        }
+
+        $workdept = $user->employee?->WORKDEPT;
+        if (filled($workdept)) {
+            $dept = (string) $workdept;
+            if (in_array($dept, [self::DEPT_CO, self::DEPT_TR, self::DEPT_CS], true)) {
+                return $dept;
+            }
+        }
+
+        if ($user->isCoTeam()) {
+            return self::DEPT_CO;
+        }
+
+        if ($user->isCoachTeam()) {
+            return self::DEPT_TR;
+        }
+
+        if ($user->isCsTeam()) {
+            return self::DEPT_CS;
+        }
+
+        return null;
     }
 
     /**
@@ -692,9 +898,9 @@ class InstitutionList extends Component
      * - ENGLISHNAME 우선, 비어 있으면 KOREANAME 으로 대체 (현장에서 입력값이 영문 기준이라 ENGLISHNAME 우선)
      * - 중복 제거 + 알파벳 정렬
      *
-     * @return \Illuminate\Support\Collection<int, string>
+     * @return Collection<int, string>
      */
-    private function managerOptionsForDept(string $deptNo): \Illuminate\Support\Collection
+    private function managerOptionsForDept(string $deptNo): Collection
     {
         if (! Schema::hasTable('employee')) {
             return collect();
@@ -898,9 +1104,9 @@ class InstitutionList extends Component
      * - 옵션 목록에 매칭이 없으면 원본 값을 그대로 둡니다(퇴사자/타부서/예외 케이스 보존).
      * - 사용자가 모달에서 저장을 누를 때 비로소 DB에 마스터 표기로 정리됩니다.
      *
-     * @param  \Illuminate\Support\Collection<int, string>  $options
+     * @param  Collection<int, string>  $options
      */
-    private function alignManagerLabelToMasterOption(?string $raw, \Illuminate\Support\Collection $options): string
+    private function alignManagerLabelToMasterOption(?string $raw, Collection $options): string
     {
         $raw = trim((string) ($raw ?? ''));
         if ($raw === '') {

@@ -2,8 +2,8 @@
 
 namespace App\GsBrochure\Http\Controllers\Api;
 
-use App\GsBrochure\Models\BrochureRequest;
 use App\GsBrochure\Models\Brochure;
+use App\GsBrochure\Models\BrochureRequest;
 use App\GsBrochure\Models\Institution;
 use App\GsBrochure\Models\Invoice;
 use App\GsBrochure\Models\RequestItem;
@@ -149,6 +149,7 @@ class RequestController extends Controller
                         $brochure->name,
                         $available
                     );
+
                     continue;
                 }
                 if ($available < $required) {

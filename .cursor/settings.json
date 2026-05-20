@@ -1,0 +1,13 @@
+{
+  "plugins": {
+    "coding-tutor": {
+      "enabled": true
+    },
+    "harness": {
+      "enabled": true
+    },
+    "superpowers": {
+      "enabled": true
+    }
+  }
+}

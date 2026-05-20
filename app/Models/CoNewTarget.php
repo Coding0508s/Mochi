@@ -10,7 +10,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class CoNewTarget extends Model
 {
     protected $table = 'S_CO_NewTarget';
+
     protected $primaryKey = 'ID';
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -71,6 +73,13 @@ class CoNewTarget extends Model
         return $managerKey !== '' && $userKey !== '' && $managerKey === $userKey;
     }
 
+    public function studentTotal(): int
+    {
+        return max(0, (int) ($this->LS ?? 0))
+            + max(0, (int) ($this->GS_K ?? 0))
+            + max(0, (int) ($this->GS_E ?? 0));
+    }
+
     public function scopeKeyword(Builder $query, ?string $keyword): Builder
     {
         if (blank($keyword)) {
@@ -90,4 +99,3 @@ class CoNewTarget extends Model
         });
     }
 }
-

@@ -109,9 +109,11 @@
                             <th class="px-3 py-2 text-center text-xs font-semibold">GS(유)</th>
                             <th class="px-3 py-2 text-center text-xs font-semibold">GS(초)</th>
                             <th class="px-3 py-2 text-center text-xs font-semibold">합계</th>
-                            @can('managePotentialInstitutions')
-                                <th class="px-3 py-2 text-center text-xs font-semibold">지원보고서</th>
-                            @endcan
+                            @if(config('potential_institutions.show_support_report_ui'))
+                                @can('managePotentialInstitutions')
+                                    <th class="px-3 py-2 text-center text-xs font-semibold">지원보고서</th>
+                                @endcan
+                            @endif
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
@@ -129,21 +131,23 @@
                                 <td class="px-3 py-2 text-center text-gray-700">{{ $target->LS ?? 0 }}</td>
                                 <td class="px-3 py-2 text-center text-gray-700">{{ $target->GS_K ?? 0 }}</td>
                                 <td class="px-3 py-2 text-center text-gray-700">{{ $target->GS_E ?? 0 }}</td>
-                                <td class="px-3 py-2 text-center font-semibold text-gray-800">{{ $target->Total ?? 0 }}</td>
-                                @can('managePotentialInstitutions')
-                                    <td class="px-3 py-2 text-center" onclick="event.stopPropagation()">
-                                        @if(!($target->IsContract ?? false) && $target->isManagedBy(auth()->user()))
-                                            <a href="{{ route('supports.create', ['potential_target_id' => $target->ID]) }}"
-                                               class="text-xs font-medium text-blue-600 hover:text-blue-800 underline">작성</a>
-                                        @else
-                                            <span class="text-xs text-gray-400">-</span>
-                                        @endif
-                                    </td>
-                                @endcan
+                                <td class="px-3 py-2 text-center font-semibold text-gray-800">{{ $target->studentTotal() }}</td>
+                                @if(config('potential_institutions.show_support_report_ui'))
+                                    @can('managePotentialInstitutions')
+                                        <td class="px-3 py-2 text-center" onclick="event.stopPropagation()">
+                                            @if(!($target->IsContract ?? false) && $target->isManagedBy(auth()->user()))
+                                                <a href="{{ route('supports.create', ['potential_target_id' => $target->ID]) }}"
+                                                   class="text-xs font-medium text-blue-600 hover:text-blue-800 underline">작성</a>
+                                            @else
+                                                <span class="text-xs text-gray-400">-</span>
+                                            @endif
+                                        </td>
+                                    @endcan
+                                @endif
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ \Illuminate\Support\Facades\Gate::allows('managePotentialInstitutions') ? 12 : 11 }}" class="px-4 py-16 text-center text-gray-400">
+                                <td colspan="{{ (config('potential_institutions.show_support_report_ui') && \Illuminate\Support\Facades\Gate::allows('managePotentialInstitutions')) ? 12 : 11 }}" class="px-4 py-16 text-center text-gray-400">
                                     <p class="font-medium">해당 월에 등록된 잠재기관이 없습니다</p>
                                     <p class="text-sm mt-1">연·월 또는 검색어를 바꿔 보세요.</p>
                                 </td>
@@ -239,46 +243,13 @@
                 </div>
 
                 <div class="px-6 py-5 text-sm flex-1 overflow-y-auto space-y-4">
-                    <div class="border border-gray-200 rounded-lg overflow-hidden">
-                        <table class="w-full text-sm">
-                            <tbody class="divide-y divide-gray-100">
-                                <tr>
-                                    <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">코드</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['account_code'] }}</td>
-                                    <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당자</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['account_manager'] }}</td>
-                                </tr>
-                                <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">등록일</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['created_date'] }}</td>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">계약여부</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['is_contract'] ? '계약' : '미계약' }}</td>
-                                </tr>
-                                <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">신규구분</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['type'] }}</td>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">컨설팅타입</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['gubun'] }}</td>
-                                </tr>
-                                <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">원장</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['director'] }}</td>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">연락처</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['phone'] }}</td>
-                                </tr>
-                                <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">LS / GS(유) / GS(초)</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['ls'] }} / {{ $selectedTarget['gs_k'] }} / {{ $selectedTarget['gs_e'] }}</td>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">합계</th>
-                                    <td class="px-3 py-2 font-semibold text-gray-900">{{ $selectedTarget['total'] }}</td>
-                                </tr>
-                                <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">주소</th>
-                                    <td colspan="3" class="px-3 py-2 font-medium text-gray-900">{{ $selectedTarget['address'] }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <x-potential-institution.detail-summary
+                        :selected-target="$selectedTarget"
+                        :detail-edit-mode="$detailEditMode"
+                        :edit-l-s="$editLS"
+                        :edit-g-s-k="$editGSK"
+                        :edit-g-s-e="$editGSE"
+                    />
 
                     @error('deleteTarget')
                         <p class="text-sm text-red-600">{{ $message }}</p>
@@ -352,6 +323,7 @@
                         </div>
                     </div>
 
+                    @if(config('potential_institutions.show_support_report_ui'))
                     <div>
                         <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
                             <h4 class="text-sm font-bold text-[#1f4f8f]">기관지원보고서 이력</h4>
@@ -403,82 +375,18 @@
                             </div>
                         </div>
                     </div>
+                    @endif
                 </div>
             </div>
         </div>
     @endif
 
     {{-- 미팅/컨설팅 상세 모달 (행 클릭 시 전문) --}}
-    @if($showMeetingDetailModal && $selectedMeeting)
-        <div class="mochi-modal-overlay z-[60]" wire:click.self="closeMeetingDetailModal">
-            <div class="mochi-modal-shell max-w-3xl h-[70vh] max-h-[70vh] flex flex-col" wire:click.stop>
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white">
-                    <div>
-                        <h3 class="text-base font-semibold text-gray-900">미팅/컨설팅 상세</h3>
-                        <p class="text-xs text-gray-500 mt-0.5">
-                            {{ $selectedMeeting['account_name'] ?? '-' }} · {{ $selectedMeeting['meeting_date'] ?? '-' }}
-                        </p>
-                    </div>
-                    <button type="button" wire:click="closeMeetingDetailModal" class="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <div class="px-6 py-5 flex-1 overflow-y-auto">
-                    <div class="border border-gray-200 rounded-lg overflow-hidden mb-4">
-                        <table class="w-full text-sm">
-                            <tbody class="divide-y divide-gray-100">
-                                <tr>
-                                    <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">기관명</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedMeeting['account_name'] ?? '-' }}</td>
-                                    <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당자</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedMeeting['account_manager'] ?? '-' }}</td>
-                                </tr>
-                                <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">일자</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedMeeting['meeting_date'] ?? '-' }}</td>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">시간</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">
-                                        {{ $selectedMeeting['meeting_time'] ?? '-' }} ~ {{ $selectedMeeting['meeting_time_end'] ?? '-' }}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">유형</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedMeeting['consulting_type'] ?? '-' }}</td>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">가능성</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedMeeting['possibility'] ?? '-' }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div>
-                        <h4 class="text-sm font-semibold text-gray-700 mb-2">미팅내용</h4>
-                        <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 leading-6 whitespace-pre-wrap break-words">
-                            {{ $selectedMeeting['description'] ?? '-' }}
-                        </div>
-                    </div>
-                </div>
-                @can('managePotentialInstitutions')
-                    @if(!($selectedTarget['is_contract'] ?? false) && ($selectedTarget['can_manage'] ?? false))
-                        <div class="flex flex-col gap-2 border-t border-gray-200 px-6 py-4 bg-gray-50/80 sm:flex-row sm:items-center sm:justify-between">
-                            @error('deleteMeeting')
-                                <p class="text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                            <div class="flex justify-end sm:ml-auto">
-                                <button type="button"
-                                        wire:click="deleteMeetingDetail({{ $selectedMeeting['id'] }})"
-                                        wire:confirm="이 미팅/컨설팅 이력을 삭제할까요? 되돌릴 수 없습니다."
-                                        class="inline-flex items-center rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 shadow-sm hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 cursor-pointer">
-                                    삭제
-                                </button>
-                            </div>
-                        </div>
-                    @endif
-                @endcan
-            </div>
-        </div>
-    @endif
+    <x-potential-institution.meeting-detail-modal
+        :show="$showMeetingDetailModal"
+        :selected-meeting="$selectedMeeting"
+        :selected-target="$selectedTarget"
+        :meeting-detail-edit-mode="$meetingDetailEditMode"
+        delete-policy="admin"
+    />
 </div>

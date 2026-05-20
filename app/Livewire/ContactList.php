@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Institution;
 use App\Models\Teacher;
+use App\Support\SkCodeNormalizer;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -144,7 +145,7 @@ class ContactList extends Component
 
         // 일부 데이터는 SK_Code 앞에 '*'가 붙어 관계 매칭이 실패할 수 있어 보정 조회를 수행합니다.
         if (! $institution) {
-            $normalizedSkCode = $this->normalizeSkCode($teacher->SK_Code);
+            $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
             if ($normalizedSkCode) {
                 $institution = Institution::query()
                     ->with('accountInfo')
@@ -390,7 +391,7 @@ class ContactList extends Component
         $teacherRows = $teachers->getCollection();
         $normalizedSkCodes = $teacherRows
             ->filter(fn (Teacher $teacher) => ! $teacher->institution)
-            ->map(fn (Teacher $teacher) => $this->normalizeSkCode($teacher->SK_Code))
+            ->map(fn (Teacher $teacher) => SkCodeNormalizer::normalize($teacher->SK_Code))
             ->filter()
             ->unique()
             ->values();
@@ -407,7 +408,7 @@ class ContactList extends Component
                     return;
                 }
 
-                $normalizedSkCode = $this->normalizeSkCode($teacher->SK_Code);
+                $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
                 if (! $normalizedSkCode) {
                     return;
                 }
@@ -455,17 +456,6 @@ class ContactList extends Component
         }
 
         return $value->format('Y-m-d');
-    }
-
-    private function normalizeSkCode(?string $skCode): ?string
-    {
-        if (blank($skCode)) {
-            return null;
-        }
-
-        $normalized = ltrim(trim((string) $skCode), '*');
-
-        return $normalized !== '' ? $normalized : null;
     }
 
     private function normalizeStatusForForm(?string $status): string

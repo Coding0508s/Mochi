@@ -1,5 +1,5 @@
 ---
-description: Git 워크플로 / PR 분할 규칙. 새 작업 시작·커밋·푸시·PR 생성 시 적용한다. 큰 일괄 커밋을 막고 의미 단위로 분리된 PR을 만드는 것이 목적.
+description: 
 alwaysApply: true
 ---
 
