@@ -1018,8 +1018,7 @@
     /*
      * 사이드바 liquid-glass — 밝은 면용: 검정 inset 대신 흰 하이라이트 + 아주 연한 모키 블루만 사용
      */
-    .sidebar-item::before,
-    .sidebar-subitem::before {
+    .sidebar-item::before {
         content: '';
         position: absolute;
         inset: 0;
@@ -1040,8 +1039,7 @@
             0 0 18px rgba(135, 188, 240, 0.14);
     }
 
-    .sidebar-item::after,
-    .sidebar-subitem::after {
+    .sidebar-item::after {
         content: '';
         position: absolute;
         inset: 0;
@@ -1119,6 +1117,7 @@
     .sidebar-subitem {
         position: relative;
         isolation: isolate;
+        overflow: hidden;
         display: block;
         min-height: 32px;
         padding: 6px 8px;
@@ -1131,8 +1130,7 @@
         transition:
             background-color 0.16s ease,
             color 0.16s ease,
-            box-shadow 0.25s ease,
-            transform 0.3s ease;
+            box-shadow 0.25s ease;
     }
 
     .sidebar-subitem.sidebar-subitem-row {
@@ -1164,49 +1162,59 @@
         z-index: 2;
     }
 
+    .sidebar-sublist > .sidebar-subitem {
+        z-index: 1;
+    }
+
     .sidebar-subitem:hover,
     .sidebar-subitem:focus-visible {
-        background: rgba(252, 253, 255, 0.82);
+        z-index: 2;
+        background: #eef4fc;
         color: #344054;
-        box-shadow:
-            0 2px 12px rgba(43, 120, 197, 0.09),
-            0 0 0 1px rgba(43, 120, 197, 0.1);
-        transform: scale(1.01);
-    }
-
-    .sidebar-subitem:hover::before,
-    .sidebar-subitem:focus-visible::before {
-        opacity: 1;
-    }
-
-    .sidebar-subitem:hover::after,
-    .sidebar-subitem:focus-visible::after {
-        opacity: 0.68;
+        box-shadow: none;
     }
 
     .sidebar-subitem-active {
         background: #d9e7f7;
+        color: #2b78c5;
+        font-weight: 600;
+        box-shadow: inset 3px 0 0 #2b78c5;
+    }
+
+    /* Teams 하위 CS/Coach/CO 펼침 버튼 — 현재 페이지(active)와 동일 배경 쓰지 않음 */
+    .sidebar-sublist > .sidebar-item.sidebar-team-toggle {
+        min-height: 32px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        font-size: 13px;
+        line-height: 20px;
+    }
+
+    .sidebar-sublist > .sidebar-item.sidebar-team-toggle::before,
+    .sidebar-sublist > .sidebar-item.sidebar-team-toggle::after {
+        display: none;
+    }
+
+    .sidebar-sublist > .sidebar-item.sidebar-team-toggle:hover,
+    .sidebar-sublist > .sidebar-item.sidebar-team-toggle:focus-visible {
+        background: #f2f4f7;
+        box-shadow: none;
+        transform: none;
+    }
+
+    .sidebar-sublist > .sidebar-item.sidebar-team-toggle.sidebar-team-toggle-open {
+        background: transparent;
         color: #344054;
+        font-weight: 600;
+        box-shadow: none;
+        transform: none;
     }
 
     .sidebar-subitem-active:hover,
     .sidebar-subitem-active:focus-visible {
-        background: rgba(226, 238, 252, 0.78);
+        background: #dce8f6;
         color: #344054;
-        box-shadow:
-            0 2px 12px rgba(43, 120, 197, 0.12),
-            0 0 0 1px rgba(43, 120, 197, 0.16);
-        transform: scale(1.01);
-    }
-
-    .sidebar-subitem-active:hover::before,
-    .sidebar-subitem-active:focus-visible::before {
-        opacity: 1;
-    }
-
-    .sidebar-subitem-active:hover::after,
-    .sidebar-subitem-active:focus-visible::after {
-        opacity: 0.62;
+        box-shadow: none;
     }
 
     .sidebar-divider {

@@ -54,7 +54,7 @@ class ContactList extends Component
 
     public string $newEmploymentStatus = 'active'; // 계정상태: active|inactive
 
-    public string $newClassParticipation = 'in';   // 수업참여: in|out
+    public string $newClassParticipation = '';   // 수업참여: ''(미지정)|in|out
 
     public string $newSkCode = '';  // 선택한 기관의 SKcode
 
@@ -116,7 +116,7 @@ class ContactList extends Component
         $this->originalEmail = (string) ($teacher->Email ?? '');
         $this->newPosition = (string) ($teacher->Position ?? '');
         $this->newEmploymentStatus = $this->normalizeStatusForForm($teacher->Status);
-        $this->newClassParticipation = (bool) ($teacher->ClassInOut ?? false) ? 'in' : 'out';
+        $this->newClassParticipation = $this->classParticipationFromTeacher($teacher);
         $this->newSkCode = (string) ($teacher->SK_Code ?? '');
         $this->newSchoolName = $teacher->institution?->resolvedAccountName()
             ?: (string) ($teacher->School_Name ?? '');
@@ -207,7 +207,7 @@ class ContactList extends Component
         $this->originalEmail = '';
         $this->newPosition = '';
         $this->newEmploymentStatus = 'active';
-        $this->newClassParticipation = 'in';
+        $this->newClassParticipation = '';
         $this->newSkCode = '';
         $this->newSchoolName = '';
         $this->newInstitutionKeyword = '';
@@ -308,14 +308,12 @@ class ContactList extends Component
             'newPhone' => 'nullable|string|max:190',
             'newSkCode' => 'required',
             'newEmploymentStatus' => 'required|in:active,inactive',
-            'newClassParticipation' => 'required|in:in,out',
+            'newClassParticipation' => ['nullable', Rule::in(['', 'in', 'out'])],
             'newGrapeSeedEssentials' => ['nullable', 'date'],
             'newLittleSeedEssentials' => ['nullable', 'date'],
         ], $this->messages);
 
         $isActive = $this->newEmploymentStatus === 'active';
-        $isClassIn = $this->newClassParticipation === 'in';
-
         $grapeDate = trim($this->newGrapeSeedEssentials);
         $littleDate = trim($this->newLittleSeedEssentials);
 
@@ -328,7 +326,7 @@ class ContactList extends Component
             'School_Name' => $this->newSchoolName,
             'Description' => $this->newDescription,
             'Status' => $isActive ? '활성화' : '비활성화',
-            'ClassInOut' => $isClassIn,
+            'ClassInOut' => $this->classInOutFromParticipation($this->newClassParticipation),
             'GrapeSEEDEssentials' => $grapeDate === '' ? null : $grapeDate,
             'LittleSEEDEssentials' => $littleDate === '' ? null : $littleDate,
         ];
@@ -432,7 +430,7 @@ class ContactList extends Component
 
         $totalCount = Teacher::query()->count();
         $activeCount = Teacher::query()->where('ClassInOut', true)->count();
-        $inactiveCount = max(0, $totalCount - $activeCount);
+        $inactiveCount = Teacher::query()->where('ClassInOut', false)->count();
 
         $teacherInstitutionSuggestions = collect();
         if ($this->showModal && blank($this->newSkCode)) {
@@ -473,5 +471,29 @@ class ContactList extends Component
         return in_array($normalized, ['inactive', '비활성', '비활성화', '퇴직'], true)
             ? 'inactive'
             : 'active';
+    }
+
+    private function classParticipationFromTeacher(Teacher $teacher): string
+    {
+        if (! array_key_exists('ClassInOut', $teacher->getAttributes())) {
+            return '';
+        }
+
+        $raw = $teacher->getAttributes()['ClassInOut'];
+
+        if ($raw === null) {
+            return '';
+        }
+
+        return filter_var($raw, FILTER_VALIDATE_BOOLEAN) ? 'in' : 'out';
+    }
+
+    private function classInOutFromParticipation(string $participation): ?bool
+    {
+        return match ($participation) {
+            'in' => true,
+            'out' => false,
+            default => null,
+        };
     }
 }

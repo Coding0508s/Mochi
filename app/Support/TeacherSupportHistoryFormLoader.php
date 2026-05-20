@@ -15,6 +15,10 @@ class TeacherSupportHistoryFormLoader
      */
     public function load(string $detailKey, ?int $expectedTeacherId = null, ?string $expectedSkCode = null): ?array
     {
+        if (preg_match('/^account:(\d+)$/', $detailKey, $accountMatch)) {
+            return $this->loadAccount((int) $accountMatch[1], $expectedTeacherId, $expectedSkCode);
+        }
+
         $parts = explode(':', $detailKey, 3);
         if (count($parts) !== 3) {
             return null;
@@ -29,7 +33,6 @@ class TeacherSupportHistoryFormLoader
         return match ($source) {
             'legacy' => $this->loadLegacy($tableOrType, $recordId, $expectedTeacherId, $expectedSkCode),
             'mochi' => $this->loadMochi($tableOrType, $recordId, $expectedTeacherId),
-            'account' => $this->loadAccount($recordId, $expectedTeacherId, $expectedSkCode),
             default => null,
         };
     }

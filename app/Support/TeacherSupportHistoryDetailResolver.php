@@ -15,6 +15,10 @@ class TeacherSupportHistoryDetailResolver
      */
     public function resolve(string $detailKey, ?int $expectedTeacherId = null, ?string $expectedSkCode = null): ?array
     {
+        if (preg_match('/^account:(\d+)$/', $detailKey, $accountMatch)) {
+            return $this->resolveAccount((int) $accountMatch[1], $expectedTeacherId, $expectedSkCode);
+        }
+
         $parts = explode(':', $detailKey, 3);
         if (count($parts) !== 3) {
             return null;
@@ -28,7 +32,6 @@ class TeacherSupportHistoryDetailResolver
 
         return match ($source) {
             'legacy' => $this->resolveLegacy($tableOrType, $recordId, $expectedTeacherId, $expectedSkCode),
-            'account' => $this->resolveAccount($recordId, $expectedTeacherId, $expectedSkCode),
             'mochi' => $this->resolveMochi($tableOrType, $recordId, $expectedTeacherId),
             default => null,
         };

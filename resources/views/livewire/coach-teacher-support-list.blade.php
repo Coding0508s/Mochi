@@ -383,10 +383,17 @@
                                 </thead>
                                 <tbody>
                                 @forelse($institutionSupportHistory as $record)
-                                    <tr class="border-b border-gray-100 hover:bg-gray-50">
+                                    <tr @class([
+                                        'border-b border-gray-100',
+                                        'hover:bg-blue-50 cursor-pointer' => !empty($record['detail_key']),
+                                        'hover:bg-gray-50' => empty($record['detail_key']),
+                                    ])
+                                        @if(!empty($record['detail_key']))
+                                            wire:click.stop="openTeacherSupportHistoryDetail('{{ $record['detail_key'] }}', {{ $record['teacher_id'] ?? 'null' }})"
+                                        @endif>
                                         <td class="px-2 py-1.5">{{ $record['id'] }}</td>
                                         <td class="px-2 py-1.5">{{ $record['coach'] }}</td>
-                                        <td class="px-2 py-1.5 text-blue-600 underline">{{ $record['date'] }}</td>
+                                        <td class="px-2 py-1.5 @if(!empty($record['detail_key'])) text-blue-600 underline @endif">{{ $record['date'] }}</td>
                                         <td class="px-2 py-1.5">{{ $record['type'] }}</td>
                                         <td class="px-2 py-1.5">{{ $record['issue'] }}</td>
                                         <td class="px-2 py-1.5">{{ $record['status'] }}</td>
@@ -416,9 +423,13 @@
                                 </thead>
                                 <tbody>
                                 @forelse($teacherSupportHistory as $record)
-                                    <tr class="border-b border-gray-100 hover:bg-blue-50 cursor-pointer"
+                                    <tr @class([
+                                        'border-b border-gray-100',
+                                        'hover:bg-blue-50 cursor-pointer' => !empty($record['detail_key']),
+                                        'hover:bg-gray-50' => empty($record['detail_key']),
+                                    ])
                                         @if(!empty($record['detail_key']))
-                                            wire:click="openTeacherSupportHistoryDetail('{{ $record['detail_key'] }}', {{ $record['teacher_id'] ?? 'null' }})"
+                                            wire:click.stop="openTeacherSupportHistoryDetail('{{ $record['detail_key'] }}', {{ $record['teacher_id'] ?? 'null' }})"
                                         @endif>
                                         <td class="px-2 py-1.5">{{ $record['id'] }}</td>
                                         <td class="px-2 py-1.5">{{ $record['coach'] }}</td>
@@ -801,9 +812,13 @@
                                 </thead>
                                 <tbody>
                                 @forelse($teacherDetailHistory as $record)
-                                    <tr class="border-b border-gray-100 hover:bg-blue-50 cursor-pointer"
+                                    <tr @class([
+                                        'border-b border-gray-100',
+                                        'hover:bg-blue-50 cursor-pointer' => !empty($record['detail_key']),
+                                        'hover:bg-gray-50' => empty($record['detail_key']),
+                                    ])
                                         @if(!empty($record['detail_key']))
-                                            wire:click="openTeacherSupportHistoryDetail('{{ $record['detail_key'] }}', {{ $record['teacher_id'] ?? $teacherDetailInfo['id'] }})"
+                                            wire:click.stop="openTeacherSupportHistoryDetail('{{ $record['detail_key'] }}', {{ $record['teacher_id'] ?? $teacherDetailInfo['id'] }})"
                                         @endif>
                                         <td class="px-2 py-1.5">{{ $record['id'] }}</td>
                                         <td class="px-2 py-1.5">{{ $record['coach'] }}</td>

@@ -31,6 +31,11 @@ class TeacherSupportHistoryAggregator
     }
 
     /**
+     * 기관 모달의 "교사 지원 내역" 집계.
+     *
+     * 레거시 Mochi 동작과 동일하게 교사 지원 소스(레거시 + MOCHI)만 포함하고,
+     * 기관 지원 소스(S_SupportInfo_Account)는 포함하지 않는다.
+     *
      * @param  list<string>  $candidateSkCodes
      * @return list<array{id: int|string, coach: string, teacher: string, date: string, status: string, type: string, sort_at: int}>
      */
@@ -44,7 +49,6 @@ class TeacherSupportHistoryAggregator
 
         foreach ($candidateSkCodes as $skCode) {
             $records = $records->merge($this->fromLegacyTables(skCode: $skCode));
-            $records = $records->merge($this->fromSupportInfoAccount(skCode: $skCode));
         }
 
         $teacherIds = Teacher::query()

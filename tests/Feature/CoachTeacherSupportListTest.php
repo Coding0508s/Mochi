@@ -1148,6 +1148,125 @@ class CoachTeacherSupportListTest extends TestCase
             ->assertSet('demoLessonForm.coach_name', 'Selly Kim');
     }
 
+    public function test_institution_support_history_row_opens_detail_modal(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+
+        \Illuminate\Support\Facades\DB::table('S_SupportInfo_Account')->insert([
+            'SK_Code' => 'SK001',
+            'Account_Name' => '기관A',
+            'TR_Name' => 'James Kwak',
+            'Support_Date' => '2026-02-25 00:00:00',
+            'Support_Type' => '대면',
+            'Issue' => '설명회',
+            'Status' => '완료',
+            'CompletedDate' => now(),
+        ]);
+
+        $supportId = (int) \Illuminate\Support\Facades\DB::table('S_SupportInfo_Account')->max('ID');
+
+        $component = Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openInstitutionModal', 'SK001');
+
+        $history = $component->get('institutionSupportHistory');
+        $this->assertCount(1, $history);
+        $this->assertSame('account:'.$supportId, $history[0]['detail_key']);
+
+        $component
+            ->call('openTeacherSupportHistoryDetail', 'account:'.$supportId, null)
+            ->assertSet('showTeacherSupportHistoryDetailModal', true)
+            ->assertSet('selectedTeacherSupportHistoryDetail.title', '대면');
+
+        $fields = collect($component->get('selectedTeacherSupportHistoryDetail')['sections'][0]['fields']);
+        $this->assertSame('설명회', $fields->firstWhere('label', '기관이슈')['value']);
+        $this->assertSame('James Kwak', $fields->firstWhere('label', '담당자(Coach)')['value']);
+    }
+
+    public function test_institution_modal_teacher_support_history_row_opens_detail_modal(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createTeacher('SK001', '류영이 원장');
+
+        \Illuminate\Support\Facades\DB::table('S_Support_OnSite')->insert([
+            'TR_Name' => 'James Kwak',
+            'SK_Code' => 'SK001',
+            'Teacher' => '류영이 원장',
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2026-02-25 00:00:00',
+            'Status' => '완료',
+        ]);
+
+        $supportId = (int) \Illuminate\Support\Facades\DB::table('S_Support_OnSite')->max('ID');
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openInstitutionModal', 'SK001')
+            ->call('openTeacherSupportHistoryDetail', 'legacy:S_Support_OnSite:'.$supportId, $teacherId)
+            ->assertSet('supportReportViewMode', true)
+            ->assertSet('showOnsiteModal', true)
+            ->assertSet('onsiteForm.coach_name', 'James Kwak');
+    }
+
+    public function test_institution_modal_teacher_support_history_excludes_account_records(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '류영이 원장');
+
+        \Illuminate\Support\Facades\DB::table('S_SupportInfo_Account')->insert([
+            'SK_Code' => 'SK001',
+            'Account_Name' => '기관A',
+            'TR_Name' => 'James Kwak',
+            'Target' => '류영이 원장',
+            'Support_Date' => '2026-02-25 00:00:00',
+            'Support_Type' => '대면',
+            'Issue' => '설명회',
+            'Status' => '완료',
+            'CompletedDate' => now(),
+        ]);
+
+        $component = Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openInstitutionModal', 'SK001');
+
+        $this->assertCount(1, $component->get('institutionSupportHistory'));
+        $this->assertSame([], $component->get('teacherSupportHistory'));
+    }
+
+    public function test_institution_modal_teacher_support_history_includes_legacy_onsite(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createTeacher('SK001', '류영이 원장');
+
+        \Illuminate\Support\Facades\DB::table('S_Support_OnSite')->insert([
+            'TR_Name' => 'Levi Kim',
+            'SK_Code' => 'SK001',
+            'Teacher' => '류영이 원장',
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2024-04-15 00:00:00',
+            'Status' => '완료',
+        ]);
+
+        $history = Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openInstitutionModal', 'SK001')
+            ->get('teacherSupportHistory');
+
+        $this->assertCount(1, $history);
+        $this->assertSame('Levi Kim', $history[0]['coach']);
+        $this->assertSame('류영이 원장', $history[0]['teacher']);
+        $this->assertSame('교사 지원 On-Site', $history[0]['type']);
+        $this->assertStringStartsWith('legacy:S_Support_OnSite:', (string) $history[0]['detail_key']);
+    }
+
     public function test_teacher_name_click_does_not_open_edit_modal(): void
     {
         $admin = $this->createAdminUser();

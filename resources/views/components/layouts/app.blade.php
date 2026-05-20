@@ -209,6 +209,20 @@
 
                 <div x-show="openTeams" class="sidebar-sublist">
 
+                    @php
+                        $isSidebarMenuActive = static function (array $menu): bool {
+                            if (! empty($menu['routeIs'] ?? null)) {
+                                return request()->routeIs($menu['routeIs']);
+                            }
+
+                            if (! empty($menu['route'] ?? null)) {
+                                return request()->routeIs($menu['route'].'.*');
+                            }
+
+                            return false;
+                        };
+                    @endphp
+
                     @if(! auth()->user()?->isCoTeam())
                         @php
                             $isCsTeamUser = (bool) auth()->user()?->isCsTeam();
@@ -236,8 +250,9 @@
                             <div>
                                 <button type="button"
                                         @click="openCS = !openCS; if (openCS) { openCoach = false; openCO = false }"
-                                        class="sidebar-item sidebar-focusable"
-                                        :class="openCS ? 'sidebar-item-active' : 'sidebar-item-default'">
+                                        class="sidebar-item sidebar-team-toggle sidebar-focusable"
+                                        :class="openCS ? 'sidebar-team-toggle-open' : ''"
+                                        :aria-expanded="openCS ? 'true' : 'false'">
                                     <span class="sidebar-item-lead min-w-0 flex-1 break-words text-left">
                                         @include('partials.sidebar-menu-icon', ['name' => 'phone'])
                                         <span>CS Team</span>
@@ -252,12 +267,8 @@
                                 <div x-show="openCS" class="sidebar-sublist">
                                     @foreach($sharedTeamMenus as $menu)
                                         <a href="{{ $menu['path'] }}{{ str_contains($menu['path'], '?') ? '&' : '?' }}team_menu=cs"
-                                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                                                  {{ (! empty($menu['routeIs'] ?? null) && request()->routeIs($menu['routeIs']))
-                                                     ? 'sidebar-subitem-active'
-                                                     : ((! empty($menu['route'] ?? null) && request()->is($menu['route'].'*'))
-                                                         ? 'sidebar-subitem-active'
-                                                         : '') }}">
+                                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ $isSidebarMenuActive($menu) ? 'sidebar-subitem-active' : '' }}"
+                                           @if($isSidebarMenuActive($menu)) aria-current="page" @endif>
                                             @include('partials.sidebar-menu-icon', ['name' => $menu['icon'], 'small' => true])
                                             <span class="sidebar-subitem-label">{{ $menu['label'] }}</span>
                                         </a>
@@ -284,8 +295,9 @@
                             <div>
                                 <button type="button"
                                         @click="openCoach = !openCoach; if (openCoach) { openCS = false; openCO = false }"
-                                        class="sidebar-item sidebar-focusable"
-                                        :class="openCoach ? 'sidebar-item-active' : 'sidebar-item-default'">
+                                        class="sidebar-item sidebar-team-toggle sidebar-focusable"
+                                        :class="openCoach ? 'sidebar-team-toggle-open' : ''"
+                                        :aria-expanded="openCoach ? 'true' : 'false'">
                                     <span class="sidebar-item-lead min-w-0 flex-1 break-words text-left">
                                         @include('partials.sidebar-menu-icon', ['name' => 'users'])
                                         <span>Coach Team</span>
@@ -299,25 +311,21 @@
 
                                 <div x-show="openCoach" class="sidebar-sublist">
                                     <a href="/coach/teacher-support?team_menu=coach"
-                                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                                              {{ request()->routeIs('coach.teacher-support.*') ? 'sidebar-subitem-active' : '' }}">
+                                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ request()->routeIs('coach.teacher-support.*') ? 'sidebar-subitem-active' : '' }}"
+                                       @if(request()->routeIs('coach.teacher-support.*')) aria-current="page" @endif>
                                         @include('partials.sidebar-menu-icon', ['name' => 'users', 'small' => true])
                                         <span class="sidebar-subitem-label">교사 지원 현황</span>
                                     </a>
                                     <a href="/coach/retired-teachers?team_menu=coach"
-                                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                                              {{ request()->routeIs('coach.retired-teachers.*') ? 'sidebar-subitem-active' : '' }}">
+                                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ request()->routeIs('coach.retired-teachers.*') ? 'sidebar-subitem-active' : '' }}"
+                                       @if(request()->routeIs('coach.retired-teachers.*')) aria-current="page" @endif>
                                         @include('partials.sidebar-menu-icon', ['name' => 'users', 'small' => true])
                                         <span class="sidebar-subitem-label">퇴직교사 리스트</span>
                                     </a>
                                     @foreach($sharedTeamMenus as $menu)
                                         <a href="{{ $menu['path'] }}{{ str_contains($menu['path'], '?') ? '&' : '?' }}team_menu=coach"
-                                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                                                  {{ (! empty($menu['routeIs'] ?? null) && request()->routeIs($menu['routeIs']))
-                                                     ? 'sidebar-subitem-active'
-                                                     : ((! empty($menu['route'] ?? null) && request()->is($menu['route'].'*'))
-                                                         ? 'sidebar-subitem-active'
-                                                         : '') }}">
+                                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ $isSidebarMenuActive($menu) ? 'sidebar-subitem-active' : '' }}"
+                                           @if($isSidebarMenuActive($menu)) aria-current="page" @endif>
                                             @include('partials.sidebar-menu-icon', ['name' => $menu['icon'], 'small' => true])
                                             <span class="sidebar-subitem-label">{{ $menu['label'] }}</span>
                                         </a>
@@ -331,8 +339,9 @@
                     <div>
                         <button type="button"
                                 @click="openCO = !openCO; if (openCO) { openSetup = false; openCS = false; openCoach = false }"
-                                class="sidebar-item sidebar-focusable"
-                                :class="openCO ? 'sidebar-item-active' : 'sidebar-item-default'">
+                                class="sidebar-item sidebar-team-toggle sidebar-focusable"
+                                :class="openCO ? 'sidebar-team-toggle-open' : ''"
+                                :aria-expanded="openCO ? 'true' : 'false'">
                             <span class="sidebar-item-lead">
                                 @include('partials.sidebar-menu-icon', ['name' => 'briefcase'])
                                 <span>CO Team</span>
@@ -370,12 +379,8 @@
                                    @if(! empty($menu['blank'] ?? false))
                                        target="_blank" rel="noopener noreferrer"
                                    @endif
-                                   class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                                          {{ (! empty($menu['routeIs'] ?? null) && request()->routeIs($menu['routeIs']))
-                                             ? 'sidebar-subitem-active'
-                                             : ((! empty($menu['route'] ?? null) && request()->is($menu['route'].'*'))
-                                                 ? 'sidebar-subitem-active'
-                                                 : '') }}">
+                                   class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ $isSidebarMenuActive($menu) ? 'sidebar-subitem-active' : '' }}"
+                                   @if($isSidebarMenuActive($menu)) aria-current="page" @endif>
                                     @include('partials.sidebar-menu-icon', ['name' => $menu['icon'], 'small' => true])
                                     <span class="sidebar-subitem-label">{{ $menu['label'] }}</span>
                                 </a>

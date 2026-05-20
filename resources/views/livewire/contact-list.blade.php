@@ -324,6 +324,13 @@
                                                class="w-4 h-4 text-red-500 border-gray-300 focus:ring-red-400">
                                         <span class="text-gray-700">수업(X)</span>
                                     </label>
+                                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                                        <input type="radio"
+                                               wire:model="newClassParticipation"
+                                               value=""
+                                               class="w-4 h-4 text-gray-500 border-gray-300 focus:ring-gray-400">
+                                        <span class="text-gray-500">미참여</span>
+                                    </label>
                                 </div>
                             </div>
                         </div>

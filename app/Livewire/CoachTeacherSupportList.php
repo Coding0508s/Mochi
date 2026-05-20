@@ -204,6 +204,8 @@ class CoachTeacherSupportList extends Component
                     'type' => $r->Support_Type,
                     'issue' => $r->Issue,
                     'status' => $r->Status,
+                    'detail_key' => 'account:'.$r->ID,
+                    'teacher_id' => null,
                 ])
                 ->all();
         } catch (\Throwable) {
@@ -345,9 +347,7 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
-        $expectedSkCode = $this->teacherDetailInfo['sk_code']
-            ?? $this->institutionInfo['skcode']
-            ?? null;
+        $expectedSkCode = $this->expectedSupportHistorySkCode();
 
         $loaded = app(TeacherSupportHistoryFormLoader::class)->load(
             $detailKey,
@@ -385,6 +385,15 @@ class CoachTeacherSupportList extends Component
     {
         $this->showTeacherSupportHistoryDetailModal = false;
         $this->selectedTeacherSupportHistoryDetail = null;
+    }
+
+    private function expectedSupportHistorySkCode(): ?string
+    {
+        $skCode = $this->teacherDetailInfo['sk_code']
+            ?? $this->institutionInfo['sk_code']
+            ?? null;
+
+        return filled($skCode) ? (string) $skCode : null;
     }
 
     /**
