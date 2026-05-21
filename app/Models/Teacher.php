@@ -91,15 +91,15 @@ class Teacher extends Model
     protected function casts(): array
     {
         return [
-            'GrapeSEEDEssentials' => 'datetime',
-            'LittleSEEDEssentials' => 'datetime',
+            'GrapeSEEDEssentials' => LegacyDateTimeCast::class,
+            'LittleSEEDEssentials' => LegacyDateTimeCast::class,
             'Plan_1st_Support_Date' => LegacyDateTimeCast::class,
             'Plan_2nd_Support_Date' => LegacyDateTimeCast::class,
             'Unit_21_' => 'datetime',
-            '_1st_Support_Date' => 'datetime',
-            '_2nd_Support_Date' => 'datetime',
-            '_3rd_Support_Date' => 'datetime',
-            '_4th_Support_Date' => 'datetime',
+            '_1st_Support_Date' => LegacyDateTimeCast::class,
+            '_2nd_Support_Date' => LegacyDateTimeCast::class,
+            '_3rd_Support_Date' => LegacyDateTimeCast::class,
+            '_4th_Support_Date' => LegacyDateTimeCast::class,
             'Unit_31_' => 'datetime',
             'LittleSEED_Pro_Tips_' => 'datetime',
             'GrapeSEED_Connect_Training' => 'datetime',

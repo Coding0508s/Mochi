@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Notifications\CustomResetPassword;
+use App\Support\TeamMenuContext;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -32,17 +33,22 @@ class User extends Authenticatable
 
     public function isCoTeam(): bool
     {
-        return $this->normalizedTeamCode() === 'CO';
+        return $this->resolvedTeamCode() === 'CO';
     }
 
     public function isCsTeam(): bool
     {
-        return $this->normalizedTeamCode() === 'CS';
+        return $this->resolvedTeamCode() === 'CS';
     }
 
     public function isCoachTeam(): bool
     {
-        return in_array($this->normalizedTeamCode(), ['COACH', 'TR', 'TRAINING'], true);
+        return in_array($this->resolvedTeamCode(), ['COACH', 'TR', 'TRAINING'], true);
+    }
+
+    public function resolvedTeamCode(): string
+    {
+        return TeamMenuContext::resolveTeamCode($this);
     }
 
     public function hasFullAccess(): bool
@@ -134,6 +140,6 @@ class User extends Authenticatable
 
     private function normalizedTeamCode(): string
     {
-        return mb_strtoupper(trim((string) $this->team));
+        return $this->resolvedTeamCode();
     }
 }

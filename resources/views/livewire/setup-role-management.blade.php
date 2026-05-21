@@ -30,8 +30,8 @@
     </div>
 
     <div class="mochi-table-card">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm whitespace-nowrap">
+        <div class="overflow-x-auto isolate">
+            <table class="w-full min-w-[700px] text-sm whitespace-nowrap">
                 <thead class="mochi-table-head">
                 <tr class="text-gray-700">
                     <th class="px-3 py-2 text-left text-xs font-semibold">역할 키</th>

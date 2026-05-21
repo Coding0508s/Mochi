@@ -18,6 +18,10 @@
 }
 
 @layer components {
+    [x-cloak] {
+        display: none !important;
+    }
+
     /* data-special-text 정착 후 JS가 붙이는 클래스 — 쉬머 1회 후 animationend로 제거 */
     @keyframes mochi-special-text-shine {
         from {
@@ -191,6 +195,14 @@
         box-shadow: none;
     }
 
+    .mochi-sidebar-backdrop {
+        position: fixed;
+        inset: 64px 0 0;
+        z-index: 45;
+        background: rgba(15, 23, 42, 0.4);
+        backdrop-filter: blur(1px);
+    }
+
     .mochi-topbar {
         height: 64px;
         background: #1e4b9c;
@@ -206,6 +218,14 @@
         padding: 0 24px;
     }
 
+    .mochi-topbar-brand-wrap {
+        justify-self: start;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-width: 0;
+    }
+
     .mochi-topbar-brand {
         justify-self: start;
         font-size: 13px;
@@ -214,6 +234,18 @@
         color: #ffffff;
         letter-spacing: -0.01em;
         white-space: nowrap;
+    }
+
+    .mochi-topbar-menu-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 0.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #ffffff;
+        background: rgba(255, 255, 255, 0.12);
     }
 
     .mochi-topbar-nav {
@@ -504,9 +536,26 @@
     }
 
     @media (max-width: 767px) {
+        .mochi-sidebar {
+            position: fixed;
+            top: 64px;
+            bottom: 0;
+            left: 0;
+            z-index: 50;
+            transform: translateX(-100%);
+            transition: transform 0.2s ease;
+            width: min(80vw, 18rem);
+            min-width: min(80vw, 18rem);
+        }
+
+        .mochi-sidebar.sidebar-open {
+            transform: translateX(0);
+        }
+
         .mochi-topbar-inner {
             padding-inline: 10px;
             column-gap: 8px;
+            grid-template-columns: 1fr auto;
         }
 
         .mochi-topbar-brand {
@@ -514,10 +563,7 @@
         }
 
         .mochi-topbar-nav {
-            gap: 8px;
-            flex-wrap: wrap;
-            justify-content: center;
-            row-gap: 6px;
+            display: none;
         }
 
         .mochi-topbar-glass-link {
@@ -528,6 +574,7 @@
 
         .mochi-topbar-user {
             gap: 8px;
+            justify-self: end;
         }
 
         .mochi-topbar-profile {
@@ -539,6 +586,37 @@
         .mochi-topbar-logout {
             padding-inline: 0.5rem;
             min-width: 2.25rem;
+        }
+
+        .mochi-content-wrap {
+            padding: 12px;
+        }
+
+        .mochi-page {
+            gap: 10px;
+        }
+
+        .mochi-summary-card {
+            padding: 12px;
+        }
+
+        .mochi-filter-card {
+            padding: 10px 12px;
+        }
+
+        .mochi-summary-card .mochi-toggle-group,
+        .mochi-filter-card .mochi-toggle-group {
+            flex-wrap: wrap;
+            gap: 6px;
+            border: 0;
+            border-radius: 0;
+            overflow: visible;
+        }
+
+        .mochi-summary-card .mochi-toggle-group .mochi-toggle-btn,
+        .mochi-filter-card .mochi-toggle-group .mochi-toggle-btn {
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
         }
     }
 
@@ -583,10 +661,100 @@
         background: #eef5ff;
     }
 
-    /* 교사 지원 현황: SK_Code·기관명 고정열 (가로 스크롤 시 겹침 방지) */
+    .institution-list-table {
+        --institution-no-width: 3.25rem;
+        --institution-sk-width: 6.75rem;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .institution-list-table .institution-sticky-no,
+    .institution-list-table .institution-sticky-sk,
+    .institution-list-table .institution-sticky-name {
+        position: sticky;
+        background: #ffffff;
+        background-clip: padding-box;
+    }
+
+    .institution-list-table .institution-sticky-no {
+        left: 0;
+        width: var(--institution-no-width);
+        min-width: var(--institution-no-width);
+        z-index: 12;
+        border-right: 1px solid #e5e7eb;
+    }
+
+    .institution-list-table .institution-sticky-sk {
+        left: var(--institution-no-width);
+        width: var(--institution-sk-width);
+        min-width: var(--institution-sk-width);
+        z-index: 13;
+        border-right: 1px solid #e5e7eb;
+    }
+
+    .institution-list-table .institution-sticky-name {
+        left: calc(var(--institution-no-width) + var(--institution-sk-width));
+        z-index: 14;
+        border-right: 1px solid rgba(203, 213, 225, 0.95);
+        box-shadow: 6px 0 12px -8px rgba(15, 23, 42, 0.08);
+    }
+
+    .institution-list-table .institution-sticky-no--head,
+    .institution-list-table .institution-sticky-sk--head,
+    .institution-list-table .institution-sticky-name--head {
+        z-index: 16;
+        background: #e8e6d9;
+    }
+
+    .contact-list-table {
+        --contact-no-width: 3.25rem;
+        --contact-name-width: 9rem;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .contact-list-table .contact-sticky-no,
+    .contact-list-table .contact-sticky-name {
+        position: sticky;
+        background: #ffffff;
+        background-clip: padding-box;
+    }
+
+    .contact-list-table .contact-sticky-no {
+        left: 0;
+        width: var(--contact-no-width);
+        min-width: var(--contact-no-width);
+        z-index: 12;
+        border-right: 1px solid #e5e7eb;
+    }
+
+    .contact-list-table .contact-sticky-name {
+        left: var(--contact-no-width);
+        width: var(--contact-name-width);
+        min-width: var(--contact-name-width);
+        z-index: 13;
+        border-right: 1px solid rgba(203, 213, 225, 0.95);
+        box-shadow: 6px 0 12px -8px rgba(15, 23, 42, 0.08);
+    }
+
+    .contact-list-table .contact-sticky-no--head,
+    .contact-list-table .contact-sticky-name--head {
+        z-index: 16;
+        background: #e8e6d9;
+    }
+
+    /* 교사 지원 현황: SK~1차 계획일 고정열 (1차 계획타입부터 가로 스크롤) */
     .coach-teacher-support-table {
         --coach-support-sk-width: 5.75rem;
         --coach-support-inst-width: 13rem;
+        --coach-support-position-width: 5.5rem;
+        --coach-support-name-width: 9rem;
+        --coach-support-plan1-date-width: 8.5rem;
+        --coach-support-sticky-width: calc(
+            var(--coach-support-sk-width) + var(--coach-support-inst-width) +
+                var(--coach-support-position-width) + var(--coach-support-name-width) +
+                var(--coach-support-plan1-date-width)
+        );
         --coach-support-row-border: #e8ecf1;
         --coach-support-zone-divider: rgba(207, 214, 223, 0.9);
         border-collapse: separate;
@@ -610,6 +778,21 @@
     .coach-teacher-support-table .coach-support-col-institution {
         width: var(--coach-support-inst-width);
         min-width: var(--coach-support-inst-width);
+    }
+
+    .coach-teacher-support-table .coach-support-col-position {
+        width: var(--coach-support-position-width);
+        min-width: var(--coach-support-position-width);
+    }
+
+    .coach-teacher-support-table .coach-support-col-name {
+        width: var(--coach-support-name-width);
+        min-width: var(--coach-support-name-width);
+    }
+
+    .coach-teacher-support-table .coach-support-col-plan1-date {
+        width: var(--coach-support-plan1-date-width);
+        min-width: var(--coach-support-plan1-date-width);
     }
 
     .coach-teacher-support-table .coach-support-sticky-sk {
@@ -648,17 +831,89 @@
         max-width: var(--coach-support-inst-width);
         background-color: #ffffff;
         background-clip: padding-box;
+        border-right: 1px solid var(--coach-support-row-border);
+        box-shadow: none;
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-inst--head {
+        z-index: 31;
+        background-color: #e8e6d9;
+        border-right: 1px solid #d5dcd6;
+        box-shadow: none;
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-position {
+        position: sticky;
+        left: calc(var(--coach-support-sk-width) + var(--coach-support-inst-width));
+        z-index: 22;
+        width: var(--coach-support-position-width);
+        min-width: var(--coach-support-position-width);
+        max-width: var(--coach-support-position-width);
+        background-color: #ffffff;
+        background-clip: padding-box;
+        border-right: 1px solid var(--coach-support-row-border);
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-position--head {
+        z-index: 32;
+        background-color: #e8e6d9;
+        border-right: 1px solid #d5dcd6;
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-name {
+        position: sticky;
+        left: calc(
+            var(--coach-support-sk-width) + var(--coach-support-inst-width) +
+                var(--coach-support-position-width)
+        );
+        z-index: 23;
+        width: var(--coach-support-name-width);
+        min-width: var(--coach-support-name-width);
+        max-width: var(--coach-support-name-width);
+        background-color: #ffffff;
+        background-clip: padding-box;
+        border-right: 1px solid var(--coach-support-row-border);
+        box-shadow: none;
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-name--head {
+        z-index: 33;
+        background-color: #e8e6d9;
+        border-right: 1px solid #d5dcd6;
+        box-shadow: none;
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-plan1-date {
+        position: sticky;
+        left: calc(
+            var(--coach-support-sk-width) + var(--coach-support-inst-width) +
+                var(--coach-support-position-width) + var(--coach-support-name-width)
+        );
+        z-index: 24;
+        width: var(--coach-support-plan1-date-width);
+        min-width: var(--coach-support-plan1-date-width);
+        max-width: var(--coach-support-plan1-date-width);
+        background-color: #ffffff;
+        background-clip: padding-box;
         border-right: none;
         box-shadow:
             inset -1px 0 0 var(--coach-support-zone-divider),
             6px 0 12px -8px rgba(15, 23, 42, 0.07);
     }
 
-    .coach-teacher-support-table .coach-support-sticky-inst--head {
-        z-index: 31;
+    .coach-teacher-support-table .coach-support-sticky-plan1-date--head {
+        z-index: 34;
         background-color: #e8e6d9;
         border-right: none;
         box-shadow: inset -1px 0 0 #d5dcd6;
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-name .coach-support-name-link {
+        display: block;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .coach-teacher-support-table .coach-support-sticky-inst .coach-support-inst-link {
@@ -669,6 +924,18 @@
         white-space: nowrap;
     }
 
+    .coach-teacher-support-table .coach-support-schedule-cell.cursor-pointer {
+        transition: background-color 0.16s ease;
+    }
+
+    .coach-teacher-support-table .coach-support-schedule-cell.cursor-pointer:hover {
+        background-color: #eaf3ff;
+    }
+
+    .coach-teacher-support-table .coach-support-schedule-cell.bg-green-50.cursor-pointer:hover {
+        background-color: #dff1e7;
+    }
+
     /* rowspan 그룹열(SK·기관명)은 행 hover 제외 — 해당 교사 열만 강조 */
     .coach-teacher-support-table .mochi-table-row-hover:hover {
         background-color: transparent;
@@ -676,6 +943,16 @@
 
     .coach-teacher-support-table .mochi-table-row-hover:hover > td:not(.coach-support-sticky-sk):not(.coach-support-sticky-inst) {
         background-color: #eef5ff;
+    }
+
+    .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-position,
+    .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-name,
+    .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-plan1-date {
+        background-color: #eef5ff;
+    }
+
+    .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-plan1-date.coach-support-schedule-cell.cursor-pointer:hover {
+        background-color: #eaf3ff;
     }
 
     .coach-teacher-support-table .mochi-table-row-hover:hover > td.bg-green-50 {

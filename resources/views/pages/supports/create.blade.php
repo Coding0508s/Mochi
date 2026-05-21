@@ -1,4 +1,4 @@
-<x-layouts.app title="기관 지원 보고서 작성">
+<x-layouts.app :title="\App\Support\TeamMenuContext::institutionSupportReportFormHeading()">
 
     <livewire:support-create-form />
 

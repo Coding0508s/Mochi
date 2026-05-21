@@ -21,11 +21,11 @@
 
     {{-- ───── 상단: 필터 + 버튼 영역 ───── --}}
     <div class="mochi-filter-card">
-        <div class="flex flex-wrap items-center gap-3 lg:flex-nowrap">
+        <div class="flex flex-wrap items-stretch gap-3 lg:items-center lg:flex-nowrap">
 
             {{-- 년도 선택 --}}
             <select wire:model.live="filterYear"
-                    class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 max-lg:flex-1">
                 <option value="">전체 년도</option>
                 @foreach($years as $year)
                     <option value="{{ $year }}">{{ $year }}년</option>
@@ -34,7 +34,7 @@
 
             {{-- 담당자 필터 --}}
             <select wire:model.live="filterTr"
-                    class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 max-lg:flex-1">
                 <option value="">전체 담당</option>
                 @foreach($trList as $tr)
                     <option value="{{ $tr }}">{{ $tr }}</option>
@@ -43,7 +43,7 @@
 
             {{-- 기관 필터 --}}
             <select wire:model.live="filterSkCode"
-                    class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 max-lg:flex-1">
                 <option value="">전체 기관</option>
                 @foreach($institutions as $inst)
                     <option value="{{ $inst->SKcode }}">[{{ $inst->SKcode }}] {{ $inst->resolvedAccountName() }}</option>
@@ -63,13 +63,13 @@
             </div>
 
             {{-- 건수 --}}
-            <span class="shrink-0 whitespace-nowrap text-sm text-gray-500">
+            <span class="w-full lg:w-auto shrink-0 whitespace-nowrap text-sm text-gray-500">
                 총 <span class="font-semibold text-blue-600">{{ $records->total() }}</span>건
             </span>
 
-            <div class="ml-auto flex shrink-0 items-center gap-2 whitespace-nowrap">
-                <a href="/supports/create"
-                   class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700
+            <div class="w-full lg:w-auto lg:ml-auto flex flex-wrap shrink-0 items-center justify-end gap-2 whitespace-nowrap">
+                <a href="{{ \App\Support\TeamMenuContext::route('supports.create') }}"
+                   class="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700
                           text-white text-sm font-medium rounded-lg transition-colors">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -80,7 +80,7 @@
 
                 <button type="button"
                         wire:click="openContractUploadModal"
-                        class="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-800
+                        class="flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-800
                                text-white text-sm font-medium rounded-lg transition-colors">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -96,7 +96,7 @@
     {{-- ───── 데이터 테이블 ───── --}}
     <div class="mochi-table-card">
         <div class="overflow-x-auto">
-            <table class="w-full text-sm whitespace-nowrap">
+            <table class="w-full min-w-[980px] text-sm whitespace-nowrap">
 
                 <thead class="mochi-table-head">
                 <tr>
@@ -342,7 +342,7 @@
 
                             {{-- CO명 --}}
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">CO명</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">담당자</label>
                                 <input type="text"
                                        wire:model="formCoName"
                                        @disabled(!$institutionSelected)

@@ -39,7 +39,7 @@
     <tr>
         <td style="{{ $cellLabel }}">지원 유형</td>
         <td style="{{ $cellValue }}">{{ $supportRecord->Support_Type ?: '—' }}</td>
-        <td style="{{ $cellLabel }}">담당 CO</td>
+        <td style="{{ $cellLabel }}">{{ $reportAssigneeColumnLabel }}</td>
         <td style="{{ $cellValue }}">{{ $supportRecord->TR_Name ?: '—' }}</td>
     </tr>
     <tr>

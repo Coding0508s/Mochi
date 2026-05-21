@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Coach(Training Team) 교사 지원 현황 화면에서 사용하는 공통 스코프.
+ * Coach Team 교사 지원 현황 화면에서 사용하는 공통 스코프.
  *
  * - TR 기반 사용자 범위 제한
  * - hidden institution 제외

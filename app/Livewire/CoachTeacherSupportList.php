@@ -19,6 +19,7 @@ use App\Models\Institution;
 use App\Models\SupportRecord;
 use App\Models\Teacher;
 use App\Support\CoachTeacherScope;
+use App\Support\ExcelSerialDate;
 use App\Support\SkCodeNormalizer;
 use App\Support\TeacherSupportHistoryAggregator;
 use App\Support\TeacherSupportHistoryDetailResolver;
@@ -1822,38 +1823,15 @@ class CoachTeacherSupportList extends Component
     public function openEditModal(int $id): void
     {
         $teacher = Teacher::find($id);
-        if (! $teacher) {
+        if (! $teacher || ! $this->canOpenEditModalForTeacher($teacher)) {
             return;
         }
 
-        if (! $this->canViewTeacher($id)) {
-            return;
-        }
-
-        $user = auth()->user();
-        if (! $user?->hasFullAccess() && ! $this->canEditTeacher($teacher)) {
-            return;
-        }
-
-        $cols = config('coach_teacher_support.columns');
-
+        $this->showEditModal = false;
+        $this->editingTeacherId = null;
+        $this->editForm = [];
         $this->editingTeacherId = $id;
-        $this->editForm = [
-            'plan_1st' => $teacher->{$cols['plan_1st']}?->format('Y-m-d'),
-            'plan_2nd' => $teacher->{$cols['plan_2nd']}?->format('Y-m-d'),
-            'plan_type_1st' => $teacher->{$cols['plan_type_1st']} ?? '',
-            'plan_type_2nd' => $teacher->{$cols['plan_type_2nd']} ?? '',
-            'completed_1st' => $teacher->{$cols['completed_1st']}?->format('Y-m-d'),
-            'completed_2nd' => $teacher->{$cols['completed_2nd']}?->format('Y-m-d'),
-            'completed_3rd' => $teacher->{$cols['completed_3rd']}?->format('Y-m-d'),
-            'completed_4th' => $teacher->{$cols['completed_4th']}?->format('Y-m-d'),
-            'type_1st' => $teacher->{$cols['type_1st']} ?? '',
-            'type_2nd' => $teacher->{$cols['type_2nd']} ?? '',
-            'type_3rd' => $teacher->{$cols['type_3rd']} ?? '',
-            'type_4th' => $teacher->{$cols['type_4th']} ?? '',
-            'essentials_gs' => $teacher->{$cols['essentials_gs']}?->format('Y-m-d'),
-            'essentials_ls' => $teacher->{$cols['essentials_ls']}?->format('Y-m-d'),
-        ];
+        $this->editForm = $this->buildEditFormFromTeacher($teacher);
         $this->showEditModal = true;
     }
 
@@ -1882,6 +1860,16 @@ class CoachTeacherSupportList extends Component
         $this->closeEditModal();
     }
 
+    public function canOpenEditModal(int $id): bool
+    {
+        $teacher = Teacher::find($id);
+        if (! $teacher) {
+            return false;
+        }
+
+        return $this->canOpenEditModalForTeacher($teacher);
+    }
+
     public function render()
     {
         $baseQuery = $this->buildBaseQuery();
@@ -1905,6 +1893,8 @@ class CoachTeacherSupportList extends Component
             'teachers' => $teachers,
             'kpis' => $kpis,
             'supportTypes' => config('coach_teacher_support.support_types', []),
+            'planSupportTypes' => config('coach_teacher_support.plan_support_types', []),
+            'completionSupportTypes' => config('coach_teacher_support.completion_support_types', []),
             'demoLessonConfig' => config('coach_teacher_demo_lesson'),
             'lvaFrConfig' => config('coach_teacher_lva_fr'),
             'lvaFbConfig' => config('coach_teacher_lva_fb'),
@@ -2012,16 +2002,11 @@ class CoachTeacherSupportList extends Component
 
         $cols = config('coach_teacher_support.columns');
         $month = (int) $this->filterMonth;
+        $year = $this->filterYear;
 
-        $query->where(function (Builder $q) use ($cols, $month): void {
-            $q->where(function (Builder $sub) use ($cols, $month): void {
-                $sub->whereNotNull($cols['plan_1st'])
-                    ->whereMonth($cols['plan_1st'], $month);
-            })->orWhere(function (Builder $sub) use ($cols, $month): void {
-                $sub->whereNotNull($cols['plan_2nd'])
-                    ->whereMonth($cols['plan_2nd'], $month);
-            });
-        });
+        $query->whereNotNull($cols['plan_1st'])
+            ->whereYear($cols['plan_1st'], $year)
+            ->whereMonth($cols['plan_1st'], $month);
     }
 
     private function institutionDisplayName(?Institution $institution, ?string $schoolName = null): string
@@ -2047,5 +2032,55 @@ class CoachTeacherSupportList extends Component
         CoachTeacherScope::apply($scopedQuery, $user);
 
         return $scopedQuery->exists();
+    }
+
+    private function canOpenEditModalForTeacher(Teacher $teacher): bool
+    {
+        if (! $this->canViewTeacher($teacher->ID)) {
+            return false;
+        }
+
+        $user = auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->hasFullAccess()) {
+            return true;
+        }
+
+        return $this->canEditTeacher($teacher);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function buildEditFormFromTeacher(Teacher $teacher): array
+    {
+        $cols = config('coach_teacher_support.columns');
+
+        return [
+            'plan_1st' => $this->editFormDateValue($teacher, $cols['plan_1st']),
+            'plan_2nd' => $this->editFormDateValue($teacher, $cols['plan_2nd']),
+            'plan_type_1st' => trim((string) ($teacher->{$cols['plan_type_1st']} ?? '')),
+            'plan_type_2nd' => trim((string) ($teacher->{$cols['plan_type_2nd']} ?? '')),
+            'completed_1st' => $this->editFormDateValue($teacher, $cols['completed_1st']),
+            'completed_2nd' => $this->editFormDateValue($teacher, $cols['completed_2nd']),
+            'completed_3rd' => $this->editFormDateValue($teacher, $cols['completed_3rd']),
+            'completed_4th' => $this->editFormDateValue($teacher, $cols['completed_4th']),
+            'type_1st' => trim((string) ($teacher->{$cols['type_1st']} ?? '')),
+            'type_2nd' => trim((string) ($teacher->{$cols['type_2nd']} ?? '')),
+            'type_3rd' => trim((string) ($teacher->{$cols['type_3rd']} ?? '')),
+            'type_4th' => trim((string) ($teacher->{$cols['type_4th']} ?? '')),
+            'essentials_gs' => $this->editFormDateValue($teacher, $cols['essentials_gs']),
+            'essentials_ls' => $this->editFormDateValue($teacher, $cols['essentials_ls']),
+        ];
+    }
+
+    private function editFormDateValue(Teacher $teacher, string $column): string
+    {
+        $raw = $teacher->getAttributes()[$column] ?? $teacher->getRawOriginal($column);
+
+        return ExcelSerialDate::toStorageString($raw) ?? '';
     }
 }

@@ -110,7 +110,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/co/gs-brochure/main', function () {
         return view('pages.co.gs-brochure-main');
-    })->name('co.gs-brochure.main');
+    })->middleware('can:accessCoTeamFeatures')->name('co.gs-brochure.main');
     Route::get('/co/gs-brochure/requests', function () {
         return redirect()->route('co.gs-brochure.request', ['view' => 'list']);
     })->name('co.gs-brochure.requests');
@@ -148,33 +148,35 @@ Route::middleware(['auth'])->group(function () {
         return redirect()->route('co.gs-brochure.admin.dashboard');
     })->name('gs-brochure.legacy.admin.dashboard');
 
-    Route::get('/store/inventory', function () {
-        return view('pages.store.inventory.index');
-    })->name('store.inventory.index');
-    Route::get('/store/sales', function () {
-        return view('pages.store.sales.index');
-    })->name('store.sales.index');
-    Route::get('/store/inventory/skus', function () {
-        return view('pages.store.inventory.skus.index');
-    })->middleware('can:manageStoreInventory')
-        ->name('store.inventory.skus.index');
+    Route::middleware('can:accessCoTeamFeatures')->group(function (): void {
+        Route::get('/store/inventory', function () {
+            return view('pages.store.inventory.index');
+        })->name('store.inventory.index');
+        Route::get('/store/sales', function () {
+            return view('pages.store.sales.index');
+        })->name('store.sales.index');
+        Route::get('/store/inventory/skus', function () {
+            return view('pages.store.inventory.skus.index');
+        })->middleware('can:manageStoreInventory')
+            ->name('store.inventory.skus.index');
 
-    Route::get('/salesforce-files', function () {
-        return view('pages.salesforce-files.index');
-    })->name('salesforce-files.index');
+        Route::get('/salesforce-files', function () {
+            return view('pages.salesforce-files.index');
+        })->name('salesforce-files.index');
+
+        Route::get('/potential-institutions', function () {
+            return view('pages.potential-institutions.index');
+        })->name('potential-institutions.index');
+
+        Route::get('/potential-institutions/view', function () {
+            return view('pages.potential-institutions.view');
+        })->name('potential-institutions.view');
+    });
 
     Route::get('/contract-documents/{contractDocument}/download', [ContractDocumentFileController::class, 'download'])
         ->name('contract-documents.download');
     Route::get('/contract-documents/{contractDocument}/preview', [ContractDocumentFileController::class, 'preview'])
         ->name('contract-documents.preview');
-
-    Route::get('/potential-institutions', function () {
-        return view('pages.potential-institutions.index');
-    })->name('potential-institutions.index');
-
-    Route::get('/potential-institutions/view', function () {
-        return view('pages.potential-institutions.view');
-    })->name('potential-institutions.view');
 
     Route::get('/setup', function () {
         return view('pages.setup.index');

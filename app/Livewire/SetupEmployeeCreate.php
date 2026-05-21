@@ -5,6 +5,8 @@ namespace App\Livewire;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\User;
+use App\Support\EmployeeSex;
+use App\Support\TeamMenuContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Password;
@@ -31,6 +33,8 @@ class SetupEmployeeCreate extends Component
     public string $status = '1';
 
     public ?string $hireDate = null;
+
+    public string $sex = '';
 
     public bool $isGsBrochureAdmin = false;
 
@@ -69,6 +73,7 @@ class SetupEmployeeCreate extends Component
             'status' => ['nullable', 'in:0,1'],
             'workDept' => ['required', 'string', Rule::in($deptCodes)],
             'hireDate' => ['nullable', 'date'],
+            'sex' => ['nullable', 'string', Rule::in(EmployeeSex::allowedValues())],
             'isGsBrochureAdmin' => ['boolean'],
         ], [
             'empNo.required' => '사번은 필수입니다.',
@@ -84,6 +89,7 @@ class SetupEmployeeCreate extends Component
             'workDept.in' => '선택 가능한 부서를 선택해 주세요.',
             'status.in' => '상태 값이 올바르지 않습니다.',
             'job.in' => '직책은 목록에서 선택해 주세요.',
+            'sex.in' => '성별 값이 올바르지 않습니다.',
         ]);
 
         $email = strtolower(trim($validated['email']));
@@ -99,9 +105,10 @@ class SetupEmployeeCreate extends Component
                 'WORKDEPT' => $validated['workDept'],
                 'STATUS' => $validated['status'] === '' || $validated['status'] === null ? null : (int) $validated['status'],
                 'HIREDATE' => $validated['hireDate'] ?? null,
+                'SEX' => EmployeeSex::normalizeForStorage($validated['sex'] ?? null),
             ]);
 
-            User::query()->create([
+            $userPayload = [
                 'name' => trim($validated['koreanName']),
                 'email' => $email,
                 'employee_empno' => trim($validated['empNo']),
@@ -111,7 +118,15 @@ class SetupEmployeeCreate extends Component
                 'can_manage_store_inventory' => false,
                 'is_active' => true,
                 'email_verified_at' => null,
-            ]);
+            ];
+            $inferredTeam = TeamMenuContext::inferUserTeamForRegistration(
+                $validated['workDept'],
+                trim($validated['job'])
+            );
+            if ($inferredTeam !== null) {
+                $userPayload['team'] = $inferredTeam;
+            }
+            User::query()->create($userPayload);
         });
 
         $resetLinkSent = $this->sendResetLinkSafely($email);
@@ -136,10 +151,12 @@ class SetupEmployeeCreate extends Component
     private function getDeptOptions()
     {
         return Department::query()
-            ->selectRaw('DEPTNO as WORKDEPT')
-            ->selectRaw('DEPTNAME as dept_name')
             ->orderBy('DEPTNO')
-            ->get();
+            ->get()
+            ->map(fn (Department $dept) => (object) [
+                'WORKDEPT' => $dept->DEPTNO,
+                'dept_name' => $dept->displayName(),
+            ]);
     }
 
     private function getJobOptions()

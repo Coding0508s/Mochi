@@ -54,8 +54,8 @@
             </div>
         </div>
 
-        <div class="mochi-table-card overflow-x-auto">
-            <table class="w-full text-sm border-collapse">
+        <div class="mochi-table-card overflow-x-auto isolate">
+            <table class="w-full min-w-[860px] text-sm border-collapse">
                 <thead>
                 <tr class="bg-[#f5f0e8] text-gray-700">
                     <th class="px-3 py-2 text-left border border-gray-300">기관명</th>

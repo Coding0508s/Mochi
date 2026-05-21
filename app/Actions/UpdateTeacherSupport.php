@@ -71,22 +71,22 @@ final class UpdateTeacherSupport
      */
     private function validate(array $data): array
     {
-        $supportTypes = config('coach_teacher_support.support_types', []);
-        $typeRule = ['nullable', 'string', 'in:'.implode(',', $supportTypes)];
+        $planTypeRule = ['nullable', 'string', 'max:100'];
+        $completionTypeRule = ['nullable', 'string', 'max:100'];
 
         return Validator::make($data, [
             'plan_1st' => ['nullable', 'date'],
             'plan_2nd' => ['nullable', 'date'],
-            'plan_type_1st' => $typeRule,
-            'plan_type_2nd' => $typeRule,
+            'plan_type_1st' => $planTypeRule,
+            'plan_type_2nd' => $planTypeRule,
             'completed_1st' => ['nullable', 'date'],
             'completed_2nd' => ['nullable', 'date'],
             'completed_3rd' => ['nullable', 'date'],
             'completed_4th' => ['nullable', 'date'],
-            'type_1st' => $typeRule,
-            'type_2nd' => $typeRule,
-            'type_3rd' => $typeRule,
-            'type_4th' => $typeRule,
+            'type_1st' => $completionTypeRule,
+            'type_2nd' => $completionTypeRule,
+            'type_3rd' => $completionTypeRule,
+            'type_4th' => $completionTypeRule,
             'essentials_gs' => ['nullable', 'date'],
             'essentials_ls' => ['nullable', 'date'],
         ])->validate();

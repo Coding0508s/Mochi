@@ -8,6 +8,12 @@
         </div>
     @endif
 
+    @if(session('warning'))
+        <div class="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm" data-mochi-flash-dismiss="5000" role="status">
+            {{ session('warning') }}
+        </div>
+    @endif
+
     {{-- 요약 영역 --}}
     <div class="mochi-summary-card">
         <div class="flex flex-wrap items-center gap-4 text-sm">
@@ -26,7 +32,7 @@
             <button wire:click="$set('employmentFilter', 'inactive')"
                     class="text-gray-600 hover:text-blue-700 transition-colors cursor-pointer
                            {{ $employmentFilter === 'inactive' ? 'font-semibold text-red-700' : '' }}">
-                퇴직 <span class="font-semibold text-red-500">{{ $inactiveCount }}</span>
+                수업 미참여 <span class="font-semibold text-red-500">{{ $inactiveCount }}</span>
             </button>
             <span class="ml-auto text-gray-500">현재 조건 결과: <span class="font-semibold text-gray-700">{{ $teachers->total() }}</span>명</span>
         </div>
@@ -67,7 +73,7 @@
             @endif
 
             <button wire:click="openCreateModal"
-                    class="ml-auto flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer">
+                    class="ml-auto flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer max-md:w-full max-md:justify-center max-md:ml-0">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
@@ -78,12 +84,12 @@
 
     {{-- 목록 테이블 --}}
     <div class="mochi-table-card">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm whitespace-nowrap">
+        <div class="overflow-x-auto isolate">
+            <table class="contact-list-table w-full text-sm whitespace-nowrap">
                 <thead class="mochi-table-head">
                 <tr class="text-gray-700">
-                    <th class="px-3 py-2 text-left text-xs font-semibold">No</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold">이름</th>
+                    <th class="contact-sticky-no contact-sticky-no--head px-3 py-2 text-left text-xs font-semibold">No</th>
+                    <th class="contact-sticky-name contact-sticky-name--head px-3 py-2 text-left text-xs font-semibold">이름</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">이메일</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">전화번호</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">기관코드</th>
@@ -104,8 +110,8 @@
                     <tr wire:key="contact-row-{{ $teacher->ID }}"
                         wire:click="openDetailModal({{ $teacher->ID }})"
                         class="mochi-table-row-hover transition-colors cursor-pointer">
-                        <td class="px-3 py-2.5 text-gray-400 text-xs">{{ $teachers->firstItem() + $index }}</td>
-                        <td class="px-3 py-2.5 font-medium text-gray-900">{{ $teacher->Name ?? '-' }}</td>
+                        <td class="contact-sticky-no px-3 py-2.5 text-gray-400 text-xs">{{ $teachers->firstItem() + $index }}</td>
+                        <td class="contact-sticky-name px-3 py-2.5 font-medium text-gray-900">{{ $teacher->Name ?? '-' }}</td>
                         <td class="px-3 py-2.5 text-gray-600 text-xs">{{ $teacher->Email ?? '-' }}</td>
                         <td class="px-3 py-2.5 text-gray-600">{{ $teacher->Phone ?? '-' }}</td>
                         <td class="px-3 py-2.5">
@@ -128,8 +134,10 @@
                             @endif
                         </td>
                         <td class="px-3 py-2.5 text-center">
-                            @if(in_array(trim((string) $teacher->Status), ['inactive', '비활성', '비활성화', '퇴직'], true))
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600">비활성화</span>
+                            @if(trim((string) $teacher->Status) === '퇴직')
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">퇴직</span>
+                            @elseif(in_array(trim((string) $teacher->Status), ['inactive', '비활성', '비활성화'], true))
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">비활성화</span>
                             @else
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">활성화</span>
                             @endif
@@ -345,11 +353,12 @@
 
                     <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
                         <div class="flex items-center gap-2">
-                            @if($editingId)
+                            @if($editingId && ($canRetireCurrentTeacher ?? false))
                                 <button type="button"
                                         wire:click="retire"
+                                        wire:confirm="이 교사를 퇴직 처리합니다. 퇴직교사 리스트에 반영되며 교사 지원 목록에서는 기본적으로 숨겨집니다. 계속할까요?"
                                         class="px-4 py-2 text-sm text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer">
-                                    퇴직처리
+                                    퇴직 처리
                                 </button>
                                 <button type="button"
                                         wire:click="confirmDelete({{ $editingId }})"

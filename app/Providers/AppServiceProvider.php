@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\TeamSchedule;
 use App\Models\User;
 use App\Policies\TeamSchedulePolicy;
+use App\Support\TeamMenuContext;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -48,8 +49,10 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::policy(TeamSchedule::class, TeamSchedulePolicy::class);
 
-        /** 잠재기관 리스트/보기에서 미팅 추가 등 (로그인 사용자 — 라우트가 auth 그룹) */
-        Gate::define('managePotentialInstitutions', fn (?User $user): bool => $user !== null);
+        Gate::define('accessCoTeamFeatures', fn (?User $user): bool => TeamMenuContext::canAccessCoOnlyFeatures($user));
+
+        /** 잠재기관 리스트/보기 — CO 팀·관리자(및 팀 미지정 레거시 계정) */
+        Gate::define('managePotentialInstitutions', fn (?User $user): bool => TeamMenuContext::canAccessCoOnlyFeatures($user));
 
         /** 기관 지원 보고서(S_SupportInfo_Account) 삭제 — 관리자만 */
         Gate::define('deleteSupportRecords', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));

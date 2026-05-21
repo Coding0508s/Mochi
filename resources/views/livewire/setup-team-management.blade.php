@@ -46,7 +46,7 @@
                     @forelse($teams as $team)
                         <tr wire:key="setup-team-{{ $team->DEPTNO }}" class="mochi-table-row-hover transition-colors">
                             <td class="px-3 py-2 font-medium text-gray-900">{{ $team->DEPTNO }}</td>
-                            <td class="px-3 py-2 text-gray-700">{{ $team->DEPTNAME ?: '-' }}</td>
+                            <td class="px-3 py-2 text-gray-700">{{ $team->displayName() ?: '-' }}</td>
                             <td class="px-3 py-2 text-gray-700">{{ $team->ADMRDEPT ?: '-' }}</td>
                             <td class="px-3 py-2 text-gray-700">{{ $team->LOCATION ?: '-' }}</td>
                             <td class="px-3 py-2 text-center text-gray-700">{{ (int) ($team->employee_count ?? 0) }}</td>
@@ -109,7 +109,7 @@
                                 class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                             <option value="">미지정</option>
                             @foreach($parentOptions as $dept)
-                                <option value="{{ $dept->DEPTNO }}">{{ $dept->DEPTNAME ?: $dept->DEPTNO }}</option>
+                                <option value="{{ $dept->DEPTNO }}">{{ $dept->displayName() }}</option>
                             @endforeach
                         </select>
                         @error('newAdmrDept') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
@@ -169,7 +169,7 @@
                                 class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="">미지정</option>
                             @foreach($parentOptions as $dept)
-                                <option value="{{ $dept->DEPTNO }}">{{ $dept->DEPTNAME ?: $dept->DEPTNO }}</option>
+                                <option value="{{ $dept->DEPTNO }}">{{ $dept->displayName() }}</option>
                             @endforeach
                         </select>
                         @error('editAdmrDept') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror

@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Models\SupportRecord;
 use App\Models\User;
+use App\Support\TeamMenuContext;
 use DateTimeInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -21,12 +22,16 @@ class SupportReportStoredMail extends Mailable
 
     public string $submitterLabel;
 
-    /** 예: "CO팀의 기관 보고서가 저장되었습니다." */
+    /** 예: "Coach Team 기관 지원 보고서" */
     public string $reportSavedOpening;
+
+    /** 예: "Coach" */
+    public string $reportAssigneeColumnLabel;
 
     public function __construct(
         public SupportRecord $supportRecord,
         public ?User $submittedBy = null,
+        public ?string $teamMenu = null,
     ) {
         $sd = $supportRecord->Support_Date;
         $this->supportDate = $sd instanceof DateTimeInterface
@@ -51,13 +56,8 @@ class SupportReportStoredMail extends Mailable
             };
         }
 
-        $team = ($submittedBy instanceof User && filled(trim((string) ($submittedBy->team ?? ''))))
-            ? trim((string) $submittedBy->team)
-            : null;
-
-        $this->reportSavedOpening = $team !== null
-            ? $team.'팀 기관 지원 보고서'
-            : '기관 지원 보고서';
+        $this->reportSavedOpening = TeamMenuContext::institutionSupportReportMailOpening($submittedBy, $this->teamMenu);
+        $this->reportAssigneeColumnLabel = TeamMenuContext::institutionSupportReportMailAssigneeColumnLabel($submittedBy, $this->teamMenu);
     }
 
     public function envelope(): Envelope
@@ -66,8 +66,10 @@ class SupportReportStoredMail extends Mailable
             ? (string) $this->supportRecord->Account_Name
             : '기관';
 
+        $prefix = TeamMenuContext::institutionSupportReportMailSubjectPrefix($this->submittedBy, $this->teamMenu);
+
         return new Envelope(
-            subject: '[기관 지원 보고서] '.$label.'',
+            subject: $prefix.' '.$label,
         );
     }
 

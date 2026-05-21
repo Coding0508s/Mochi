@@ -94,8 +94,8 @@
     {{-- 테이블: 등록일 --}}
     @if($basisCreated)
         <div class="mochi-table-card">
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm whitespace-nowrap">
+            <div class="overflow-x-auto isolate">
+                <table class="w-full min-w-[860px] text-sm whitespace-nowrap">
                     <thead class="mochi-table-head">
                         <tr class="text-gray-700">
                             <th class="px-3 py-2 text-left text-xs font-semibold">No</th>
@@ -165,8 +165,8 @@
     @else
         {{-- 테이블: 미팅일 --}}
         <div class="mochi-table-card">
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm whitespace-nowrap">
+            <div class="overflow-x-auto isolate">
+                <table class="w-full min-w-[760px] text-sm whitespace-nowrap">
                     <thead class="mochi-table-head">
                         <tr class="text-gray-700">
                             <th class="px-3 py-2 text-left text-xs font-semibold">No</th>

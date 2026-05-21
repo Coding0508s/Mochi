@@ -27,7 +27,7 @@
             <button wire:click="nextMonth" class="py-1.5 px-3 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">다음 달</button>
             <div class="text-lg font-bold text-gray-900">{{ $monthLabel }}</div>
 
-            <div class="ml-auto flex flex-wrap items-center gap-2">
+            <div class="w-full lg:w-auto lg:ml-auto flex flex-wrap items-center gap-2">
                 {{-- 내 일정 / 팀 일정 토글 --}}
                 <div class="mochi-toggle-group">
                     <button type="button" wire:click="$set('viewMode', 'mine')"
@@ -64,7 +64,7 @@
                     </button>
                 </div>
 
-                <select wire:model.live="filterType" class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select wire:model.live="filterType" class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 max-lg:flex-1">
                     <option value="">전체 유형</option>
                     <option value="meeting">미팅</option>
                     <option value="task">업무</option>
@@ -72,7 +72,7 @@
                     <option value="etc">기타</option>
                 </select>
 
-                <select wire:model.live="filterStatus" class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select wire:model.live="filterStatus" class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 max-lg:flex-1">
                     <option value="">전체 상태</option>
                     <option value="planned">예정</option>
                     <option value="done">완료</option>
@@ -80,7 +80,7 @@
                 </select>
 
                 @if($viewMode === 'team' && auth()->user()?->hasFullAccess())
-                    <select wire:model.live="userFilter" class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select wire:model.live="userFilter" class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 max-lg:flex-1">
                         <option value="">전체 팀원</option>
                         @foreach($teamUsers as $teamUser)
                             <option value="{{ $teamUser->id }}">{{ $teamUser->name ?: $teamUser->email }}</option>

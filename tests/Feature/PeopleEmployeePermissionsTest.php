@@ -51,6 +51,7 @@ class PeopleEmployeePermissionsTest extends TestCase
                 $table->string('PHONENO')->nullable();
                 $table->integer('STATUS')->nullable();
                 $table->date('HIREDATE')->nullable();
+                $table->string('SEX')->default('');
             });
         }
 
@@ -282,11 +283,77 @@ class PeopleEmployeePermissionsTest extends TestCase
             'EMPNO' => 'E996',
             'WORKDEPT' => 'A01',
             'EMAIL' => 'modal-new@example.com',
+            'SEX' => '',
         ]);
 
         $newUser = User::query()->where('email', 'modal-new@example.com')->first();
         $this->assertNotNull($newUser);
         Notification::assertSentTo($newUser, CustomResetPassword::class);
+    }
+
+    public function test_register_employee_sets_user_team_from_coach_job(): void
+    {
+        Notification::fake();
+
+        Employee::query()->create([
+            'EMPNO' => 'E900',
+            'KOREANAME' => '기존코치',
+            'ENGLISHNAME' => 'Existing Coach',
+            'JOB' => 'Coach',
+            'EMAIL' => 'existing-coach@example.com',
+            'PHONENO' => '010-0000-0001',
+            'WORKDEPT' => 'A01',
+            'STATUS' => 1,
+            'SEX' => '',
+        ]);
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openCreateEmployeeModal')
+            ->set('createEmpNo', 'E994')
+            ->set('createKoreanName', '코치신규')
+            ->set('createEnglishName', 'Coach New')
+            ->set('createJob', 'Coach')
+            ->set('createEmail', 'coach-new@example.com')
+            ->set('createPhone', '010-4444-5555')
+            ->set('createWorkDept', 'A01')
+            ->set('createStatus', '1')
+            ->call('createEmployee')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'coach-new@example.com',
+            'team' => 'COACH',
+        ]);
+    }
+
+    public function test_admin_can_register_employee_with_optional_sex(): void
+    {
+        Notification::fake();
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openCreateEmployeeModal')
+            ->set('createEmpNo', 'E995')
+            ->set('createKoreanName', '성별테스트')
+            ->set('createEnglishName', 'Sex Test')
+            ->set('createJob', '매니저')
+            ->set('createEmail', 'sex-test@example.com')
+            ->set('createPhone', '010-2222-3333')
+            ->set('createWorkDept', 'A01')
+            ->set('createStatus', '1')
+            ->set('createSex', 'F')
+            ->call('createEmployee')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('employee', [
+            'EMPNO' => 'E995',
+            'SEX' => 'F',
+        ]);
     }
 
     public function test_admin_can_register_employee_via_setup(): void
@@ -313,6 +380,7 @@ class PeopleEmployeePermissionsTest extends TestCase
             'EMPNO' => 'E999',
             'WORKDEPT' => 'A01',
             'EMAIL' => 'new@example.com',
+            'SEX' => '',
         ]);
 
         $newUser = User::query()->where('email', 'new@example.com')->first();

@@ -5,6 +5,9 @@ namespace App\Livewire;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\User;
+use App\Support\DepartmentDisplay;
+use App\Support\EmployeeSex;
+use App\Support\TeamMenuContext;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -88,6 +91,8 @@ class PeopleEmployeesList extends Component
     public string $createWorkDept = '';
 
     public ?string $createHireDate = null;
+
+    public string $createSex = '';
 
     public bool $createIsGsBrochureAdmin = false;
 
@@ -313,7 +318,7 @@ class PeopleEmployeesList extends Component
 
                         $linkedUser = $linkedByEmail;
                     } else {
-                        $linkedUser = User::query()->create([
+                        $newUserPayload = [
                             'name' => trim((string) $validated['editKoreanName']),
                             'email' => $normalizedEmail,
                             'employee_empno' => $currentEmployeeEmpNo,
@@ -323,7 +328,15 @@ class PeopleEmployeesList extends Component
                             'can_manage_store_inventory' => (bool) $this->editCanManageStoreInventory,
                             'is_active' => (bool) $this->editUserIsActive,
                             'email_verified_at' => null,
-                        ]);
+                        ];
+                        $syncedTeam = TeamMenuContext::inferUserTeamForRegistration(
+                            $validated['editWorkDept'],
+                            trim($validated['editJob'])
+                        );
+                        if ($syncedTeam !== null && ! $this->editUserIsAdmin) {
+                            $newUserPayload['team'] = $syncedTeam;
+                        }
+                        $linkedUser = User::query()->create($newUserPayload);
                         $newlyCreatedUserEmail = $normalizedEmail;
                     }
                 }
@@ -364,7 +377,7 @@ class PeopleEmployeesList extends Component
                     }
                 }
 
-                $linkedUser->forceFill([
+                $linkedUserPayload = [
                     'name' => trim((string) $validated['editKoreanName']),
                     'email' => $normalizedEmail,
                     'employee_empno' => $currentEmployeeEmpNo,
@@ -372,7 +385,15 @@ class PeopleEmployeesList extends Component
                     'is_admin' => $this->editUserIsAdmin,
                     'is_gs_brochure_admin' => $this->editGsBrochureAdmin,
                     'can_manage_store_inventory' => $this->editCanManageStoreInventory,
-                ])->save();
+                ];
+                $syncedTeam = TeamMenuContext::inferUserTeamForRegistration(
+                    $validated['editWorkDept'],
+                    trim($validated['editJob'])
+                );
+                if ($syncedTeam !== null && ! $this->editUserIsAdmin) {
+                    $linkedUserPayload['team'] = $syncedTeam;
+                }
+                $linkedUser->forceFill($linkedUserPayload)->save();
             });
         } catch (ValidationException $e) {
             throw $e;
@@ -415,6 +436,7 @@ class PeopleEmployeesList extends Component
         $this->createStatus = '1';
         $this->createWorkDept = '';
         $this->createHireDate = null;
+        $this->createSex = '';
         $this->createIsGsBrochureAdmin = false;
         $this->resetErrorBag();
         $this->resetValidation();
@@ -458,6 +480,7 @@ class PeopleEmployeesList extends Component
             'createStatus' => ['nullable', 'in:0,1'],
             'createWorkDept' => ['required', 'string', Rule::in($deptCodes)],
             'createHireDate' => ['nullable', 'date'],
+            'createSex' => ['nullable', 'string', Rule::in(EmployeeSex::allowedValues())],
             'createIsGsBrochureAdmin' => ['boolean'],
         ], [
             'createEmpNo.required' => '사번은 필수입니다.',
@@ -473,6 +496,7 @@ class PeopleEmployeesList extends Component
             'createWorkDept.in' => '선택 가능한 부서를 선택해 주세요.',
             'createStatus.in' => '상태 값이 올바르지 않습니다.',
             'createJob.in' => '직책은 목록에서 선택해 주세요.',
+            'createSex.in' => '성별 값이 올바르지 않습니다.',
         ]);
 
         $email = strtolower(trim($validated['createEmail']));
@@ -488,9 +512,10 @@ class PeopleEmployeesList extends Component
                 'WORKDEPT' => $validated['createWorkDept'],
                 'STATUS' => $validated['createStatus'] === '' || $validated['createStatus'] === null ? null : (int) $validated['createStatus'],
                 'HIREDATE' => $validated['createHireDate'] ?? null,
+                'SEX' => EmployeeSex::normalizeForStorage($validated['createSex'] ?? null),
             ]);
 
-            User::query()->create([
+            $userPayload = [
                 'name' => trim($validated['createKoreanName']),
                 'email' => $email,
                 'employee_empno' => trim($validated['createEmpNo']),
@@ -499,7 +524,15 @@ class PeopleEmployeesList extends Component
                 'is_gs_brochure_admin' => (bool) ($validated['createIsGsBrochureAdmin'] ?? false),
                 'is_active' => true,
                 'email_verified_at' => null,
-            ]);
+            ];
+            $inferredTeam = TeamMenuContext::inferUserTeamForRegistration(
+                $validated['createWorkDept'],
+                trim($validated['createJob'])
+            );
+            if ($inferredTeam !== null) {
+                $userPayload['team'] = $inferredTeam;
+            }
+            User::query()->create($userPayload);
         });
 
         $resetLinkSent = $this->sendResetLink($email) === Password::RESET_LINK_SENT;
@@ -762,15 +795,23 @@ class PeopleEmployeesList extends Component
                 }
 
                 // 매우 드물게 이메일은 같은데 empno 연결만 빠져 있던 케이스 → 연결만 채워서 재사용
-                $existingByEmail->forceFill([
+                $relinkPayload = [
                     'employee_empno' => $empNo,
                     'is_active' => true,
-                ])->save();
+                ];
+                $syncedTeam = TeamMenuContext::inferUserTeamForRegistration(
+                    (string) ($employee->WORKDEPT ?? ''),
+                    (string) ($employee->JOB ?? '')
+                );
+                if ($syncedTeam !== null) {
+                    $relinkPayload['team'] = $syncedTeam;
+                }
+                $existingByEmail->forceFill($relinkPayload)->save();
 
                 return;
             }
 
-            User::query()->create([
+            $accountPayload = [
                 'name' => trim((string) ($employee->KOREANAME ?? $normalizedEmail)),
                 'email' => $normalizedEmail,
                 'employee_empno' => $empNo,
@@ -780,7 +821,15 @@ class PeopleEmployeesList extends Component
                 'can_manage_store_inventory' => false,
                 'is_active' => true,
                 'email_verified_at' => null,
-            ]);
+            ];
+            $syncedTeam = TeamMenuContext::inferUserTeamForRegistration(
+                (string) ($employee->WORKDEPT ?? ''),
+                (string) ($employee->JOB ?? '')
+            );
+            if ($syncedTeam !== null) {
+                $accountPayload['team'] = $syncedTeam;
+            }
+            User::query()->create($accountPayload);
         });
     }
 
@@ -850,6 +899,15 @@ class PeopleEmployeesList extends Component
             ->orderBy("employee.{$sortField}", $this->sortDirection)
             ->paginate(20);
 
+        $employees->getCollection()->transform(function ($employee) {
+            $employee->DEPARTMENT_NAME = DepartmentDisplay::name(
+                (string) ($employee->WORKDEPT ?? ''),
+                (string) ($employee->DEPARTMENT_NAME ?? '')
+            );
+
+            return $employee;
+        });
+
         $this->attachLinkedUserInfo($employees);
 
         $allCount = Employee::query()->count();
@@ -898,10 +956,12 @@ class PeopleEmployeesList extends Component
     private function getDeptOptions()
     {
         return Department::query()
-            ->selectRaw('DEPTNO as WORKDEPT')
-            ->selectRaw('DEPTNAME as dept_name')
             ->orderBy('DEPTNO')
-            ->get();
+            ->get()
+            ->map(fn (Department $dept) => (object) [
+                'WORKDEPT' => $dept->DEPTNO,
+                'dept_name' => $dept->displayName(),
+            ]);
     }
 
     private function getJobOptions()

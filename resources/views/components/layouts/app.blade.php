@@ -20,12 +20,18 @@
         || request()->is('co/*')
         || request()->is('coach/*')
         || request()->is('schedules*');
-    $activeTeamMenu = request()->query('team_menu');
+    $sidebarUser = auth()->user();
+    $activeTeamMenu = \App\Support\TeamMenuContext::activeMenu($sidebarUser);
+    $showCoTeamMenu = \App\Support\TeamMenuContext::showCoTeamSidebar($sidebarUser);
+    $showMultiTeamSidebar = \App\Support\TeamMenuContext::showMultiTeamSidebar($sidebarUser);
+    $showExclusiveCoachSidebar = \App\Support\TeamMenuContext::showExclusiveCoachSidebar($sidebarUser);
+    $showExclusiveCsSidebar = \App\Support\TeamMenuContext::showExclusiveCsSidebar($sidebarUser);
 @endphp
 
 {{-- Alpine.js: 사이드바 아코디언(열고 닫기) 에 사용 --}}
 <div class="h-screen flex flex-col overflow-hidden"
      x-data="{
+        sidebarOpen: false,
          openPeople: {{ request()->routeIs('people.*') ? 'true' : 'false' }},
          openTeams: true,
         openCS: {{ $isCoTeamRoute && ($activeTeamMenu === 'cs' || ($activeTeamMenu === null && auth()->user()?->isCsTeam())) ? 'true' : 'false' }},
@@ -34,7 +40,8 @@
          openReview: false,
          openGoal: false,
          openSetup: {{ request()->routeIs('setup.*') ? 'true' : 'false' }},
-    }">
+    }"
+    @keydown.escape.window="sidebarOpen = false">
     @php
         $topbarDisplayName = auth()->user()?->preferredDisplayName() ?? 'User';
         $canSeeManagementMenus = (bool) auth()->user()?->hasFullAccess();
@@ -43,7 +50,17 @@
     {{-- 상단 헤더 (전체 너비) --}}
     <header class="mochi-topbar flex-shrink-0">
         <div class="mochi-topbar-inner">
-            <div class="mochi-topbar-brand">GrapeSEED MOCHI</div>
+            <div class="mochi-topbar-brand-wrap">
+                <button type="button"
+                        class="mochi-topbar-menu-trigger md:hidden"
+                        @click="sidebarOpen = true"
+                        aria-label="메뉴 열기">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5m-16.5 5.25h16.5m-16.5 5.25h16.5" />
+                    </svg>
+                </button>
+                <div class="mochi-topbar-brand">GrapeSEED MOCHI</div>
+            </div>
 
             <nav class="mochi-topbar-nav">
                 {{-- liquid-glass-button과 동일 feDisplacementMap 필터 (호버 시 링크에만 적용) --}}
@@ -132,15 +149,23 @@
         </div>
     </header>
 
+    <div x-cloak
+         x-show="sidebarOpen"
+         class="mochi-sidebar-backdrop md:hidden"
+         @click="sidebarOpen = false"
+         aria-hidden="true"></div>
+
     <div class="flex flex-1 overflow-hidden">
 
     {{-- ══════════════════════════════════════════
          사이드바
     ══════════════════════════════════════════ --}}
-    <aside class="mochi-sidebar flex flex-col flex-shrink-0 overflow-y-auto">
+    <aside class="mochi-sidebar flex flex-col flex-shrink-0 overflow-y-auto"
+           :class="{ 'sidebar-open': sidebarOpen }">
 
         {{-- 메뉴 전체 (브랜드는 상단바에만 표시) --}}
-        <nav class="sidebar-nav flex-1">
+        <nav class="sidebar-nav flex-1"
+             @click="if (window.innerWidth < 768 && $event.target.closest('a')) { sidebarOpen = false }">
 
             {{-- ── People ── --}}
             <div class="sidebar-group">
@@ -184,7 +209,7 @@
                                   {{ request()->routeIs('people.*') && $activePeopleTeam === (string) $team->DEPTNO
                                       ? 'sidebar-subitem-active'
                                       : '' }}">
-                            <span class="sidebar-subitem-label">{{ $team->DEPTNAME ?: $team->DEPTNO }}</span>
+                            <span class="sidebar-subitem-label">{{ $team->displayName() }}</span>
                         </a>
                     @endforeach
                 </div>
@@ -223,61 +248,10 @@
                         };
                     @endphp
 
-                    @if(! auth()->user()?->isCoTeam())
-                        @php
-                            $isCsTeamUser = (bool) auth()->user()?->isCsTeam();
-                            $isCoachTeamUser = (bool) auth()->user()?->isCoachTeam();
-                            $isKnownNonCoTeamUser = $isCsTeamUser || $isCoachTeamUser;
+                    @if($showMultiTeamSidebar)
+                        @include('partials.sidebar-cs-team-block')
 
-                            // 팀별 노출 규칙:
-                            // - CS 계정: CS Team만
-                            // - Coach 계정: Coach Team만
-                            // - 관리자/기타 계정: 기존처럼 양쪽 팀 메뉴 노출
-                            $showCsTeamMenu = $canSeeManagementMenus || $isCsTeamUser || ! $isKnownNonCoTeamUser;
-                            $showCoachTeamMenu = $canSeeManagementMenus || $isCoachTeamUser || ! $isKnownNonCoTeamUser;
-                            $showAdminTeamMenu = $canSeeManagementMenus || ! $isKnownNonCoTeamUser;
-
-                            $sharedTeamMenus = [
-                                ['label' => '기관리스트', 'path' => '/institutions', 'route' => 'institutions', 'icon' => 'building'],
-                                ['label' => '교직원 연락처보기', 'path' => '/contacts', 'route' => 'contacts', 'icon' => 'phone'],
-                                ['label' => '기관지원보고서', 'path' => '/supports', 'route' => 'supports', 'icon' => 'document'],
-                                ['label' => '일정 관리', 'path' => route('schedules.index'), 'route' => '', 'routeIs' => 'schedules.index', 'icon' => 'calendar'],
-                            ];
-                        @endphp
-
-                        @if($showCsTeamMenu)
-                            {{-- CS Team --}}
-                            <div>
-                                <button type="button"
-                                        @click="openCS = !openCS; if (openCS) { openCoach = false; openCO = false }"
-                                        class="sidebar-item sidebar-team-toggle sidebar-focusable"
-                                        :class="openCS ? 'sidebar-team-toggle-open' : ''"
-                                        :aria-expanded="openCS ? 'true' : 'false'">
-                                    <span class="sidebar-item-lead min-w-0 flex-1 break-words text-left">
-                                        @include('partials.sidebar-menu-icon', ['name' => 'phone'])
-                                        <span>CS Team</span>
-                                    </span>
-                                    <svg class="h-3 w-3 shrink-0 text-[#98a2b3] transition-transform duration-200"
-                                         :class="openCS ? 'rotate-90' : ''"
-                                         fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
-                                    </svg>
-                                </button>
-
-                                <div x-show="openCS" class="sidebar-sublist">
-                                    @foreach($sharedTeamMenus as $menu)
-                                        <a href="{{ $menu['path'] }}{{ str_contains($menu['path'], '?') ? '&' : '?' }}team_menu=cs"
-                                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ $isSidebarMenuActive($menu) ? 'sidebar-subitem-active' : '' }}"
-                                           @if($isSidebarMenuActive($menu)) aria-current="page" @endif>
-                                            @include('partials.sidebar-menu-icon', ['name' => $menu['icon'], 'small' => true])
-                                            <span class="sidebar-subitem-label">{{ $menu['label'] }}</span>
-                                        </a>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endif
-
-                        @if($showAdminTeamMenu)
+                        @if($canSeeManagementMenus)
                             {{-- Admin --}}
                             <button type="button" class="sidebar-item sidebar-focusable sidebar-item-default">
                                 <span class="sidebar-item-lead min-w-0 flex-1 break-words text-left">
@@ -290,51 +264,14 @@
                             </button>
                         @endif
 
-                        @if($showCoachTeamMenu)
-                            {{-- Coach Team --}}
-                            <div>
-                                <button type="button"
-                                        @click="openCoach = !openCoach; if (openCoach) { openCS = false; openCO = false }"
-                                        class="sidebar-item sidebar-team-toggle sidebar-focusable"
-                                        :class="openCoach ? 'sidebar-team-toggle-open' : ''"
-                                        :aria-expanded="openCoach ? 'true' : 'false'">
-                                    <span class="sidebar-item-lead min-w-0 flex-1 break-words text-left">
-                                        @include('partials.sidebar-menu-icon', ['name' => 'users'])
-                                        <span>Coach Team</span>
-                                    </span>
-                                    <svg class="h-3 w-3 shrink-0 text-[#98a2b3] transition-transform duration-200"
-                                         :class="openCoach ? 'rotate-90' : ''"
-                                         fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
-                                    </svg>
-                                </button>
-
-                                <div x-show="openCoach" class="sidebar-sublist">
-                                    <a href="/coach/teacher-support?team_menu=coach"
-                                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ request()->routeIs('coach.teacher-support.*') ? 'sidebar-subitem-active' : '' }}"
-                                       @if(request()->routeIs('coach.teacher-support.*')) aria-current="page" @endif>
-                                        @include('partials.sidebar-menu-icon', ['name' => 'users', 'small' => true])
-                                        <span class="sidebar-subitem-label">교사 지원 현황</span>
-                                    </a>
-                                    <a href="/coach/retired-teachers?team_menu=coach"
-                                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ request()->routeIs('coach.retired-teachers.*') ? 'sidebar-subitem-active' : '' }}"
-                                       @if(request()->routeIs('coach.retired-teachers.*')) aria-current="page" @endif>
-                                        @include('partials.sidebar-menu-icon', ['name' => 'users', 'small' => true])
-                                        <span class="sidebar-subitem-label">퇴직교사 리스트</span>
-                                    </a>
-                                    @foreach($sharedTeamMenus as $menu)
-                                        <a href="{{ $menu['path'] }}{{ str_contains($menu['path'], '?') ? '&' : '?' }}team_menu=coach"
-                                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ $isSidebarMenuActive($menu) ? 'sidebar-subitem-active' : '' }}"
-                                           @if($isSidebarMenuActive($menu)) aria-current="page" @endif>
-                                            @include('partials.sidebar-menu-icon', ['name' => $menu['icon'], 'small' => true])
-                                            <span class="sidebar-subitem-label">{{ $menu['label'] }}</span>
-                                        </a>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endif
+                        @include('partials.sidebar-coach-team-block')
+                    @elseif($showExclusiveCsSidebar)
+                        @include('partials.sidebar-cs-team-block')
+                    @elseif($showExclusiveCoachSidebar)
+                        @include('partials.sidebar-coach-team-block')
                     @endif
 
+                    @if($showCoTeamMenu)
                     {{-- CO Team (하위 메뉴 포함) --}}
                     <div>
                         <button type="button"
@@ -388,6 +325,7 @@
 
                         </div>
                     </div>
+                    @endif
                 </div>
             </div>
 

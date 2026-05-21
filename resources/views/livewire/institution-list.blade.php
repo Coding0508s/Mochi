@@ -74,12 +74,12 @@
 
     {{-- 메인 리스트 테이블 --}}
     <div class="mochi-table-card">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm whitespace-nowrap">
+        <div class="overflow-x-auto isolate">
+            <table class="institution-list-table w-full text-sm whitespace-nowrap">
                 <thead class="mochi-table-head">
                 <tr class="text-gray-700">
-                    <th class="px-3 py-2 text-left text-xs font-semibold">No</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold">
+                    <th class="institution-sticky-no institution-sticky-no--head px-3 py-2 text-left text-xs font-semibold">No</th>
+                    <th class="institution-sticky-sk institution-sticky-sk--head px-3 py-2 text-left text-xs font-semibold">
                         <button wire:click="sort('SKcode')" class="flex items-center gap-1 hover:text-blue-700">
                             SK코드
                             @if($sortField === 'SKcode')
@@ -87,7 +87,7 @@
                             @endif
                         </button>
                     </th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold">
+                    <th class="institution-sticky-name institution-sticky-name--head px-3 py-2 text-left text-xs font-semibold">
                         <button wire:click="sort('AccountName')" class="flex items-center gap-1 hover:text-blue-700">
                             기관명
                             @if($sortField === 'AccountName')
@@ -123,13 +123,13 @@
                     <tr wire:key="institution-row-{{ $inst->ID }}"
                         wire:click="openDetailModal({{ $inst->ID }})"
                         class="mochi-table-row-hover transition-colors cursor-pointer">
-                        <td class="px-3 py-2 text-gray-500 text-xs">{{ $institutions->firstItem() + $index }}</td>
-                        <td class="px-3 py-2">
+                        <td class="institution-sticky-no px-3 py-2 text-gray-500 text-xs">{{ $institutions->firstItem() + $index }}</td>
+                        <td class="institution-sticky-sk px-3 py-2">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
                                 {{ $inst->SKcode ?? '-' }}
                             </span>
                         </td>
-                        <td class="px-3 py-2 font-medium text-gray-900">
+                        <td class="institution-sticky-name px-3 py-2 font-medium text-gray-900">
                             {{ $inst->resolvedAccountName() ?: '-' }}
                             @if($inst->EnglishName)
                                 <span class="block text-xs text-gray-400">{{ $inst->EnglishName }}</span>

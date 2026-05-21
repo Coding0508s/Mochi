@@ -10,6 +10,7 @@ use App\Models\Institution;
 use App\Models\SalesforceAccount;
 use App\Models\SalesforceFile;
 use App\Models\SupportRecord;
+use App\Support\TeamMenuContext;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -62,6 +63,9 @@ class SupportCreateForm extends Component
     /** 저장 후 이동할 라우트 이름 (supports.index | institutions.index) */
     public string $afterSaveRouteName = 'supports.index';
 
+    /** 작성 화면 진입 시 팀 메뉴(cs|coach|co) — 저장·메일 라벨에 동일 적용 */
+    public ?string $formTeamMenu = null;
+
     protected array $rules = [
         'formSkCode' => ['nullable', 'required_without:formPotentialTargetId'],
         'formPotentialTargetId' => ['nullable', 'integer', 'required_without:formSkCode'],
@@ -88,6 +92,8 @@ class SupportCreateForm extends Component
 
     public function mount(?int $potentialTargetId = null): void
     {
+        $this->formTeamMenu = TeamMenuContext::activeMenu();
+
         $user = auth()->user();
         $this->formCoName = $user !== null ? $user->nameForCoReports() : '';
         $this->formSupportDate = now()->format('Y-m-d');
@@ -425,7 +431,11 @@ class SupportCreateForm extends Component
         $notify = config('support_report_mail.notify_addresses', []);
         if ($supportRecord instanceof SupportRecord && $notify !== []) {
             try {
-                Mail::to($notify)->send(new SupportReportStoredMail($supportRecord, auth()->user()));
+                Mail::to($notify)->send(new SupportReportStoredMail(
+                    $supportRecord,
+                    auth()->user(),
+                    $this->formTeamMenu,
+                ));
             } catch (\Throwable $mailException) {
                 report($mailException);
                 Log::warning('기관 지원 보고서 알림 메일 발송 실패', [
@@ -441,7 +451,10 @@ class SupportCreateForm extends Component
 
         $this->sfUpload = null;
         session()->flash('success', '지원 보고서가 저장되었습니다.');
-        $this->redirectRoute($this->afterSaveRouteName, navigate: true);
+        $this->redirect(
+            TeamMenuContext::route($this->afterSaveRouteName, [], null, $this->formTeamMenu),
+            navigate: true,
+        );
     }
 
     public function clearSfUpload(): void

@@ -87,7 +87,7 @@
 
     {{-- 목록 --}}
     <div class="mochi-table-card">
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto isolate">
             <table class="w-full min-w-[640px] text-sm">
                 <thead class="mochi-table-head">
                     <tr class="text-gray-700">

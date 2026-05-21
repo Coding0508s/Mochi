@@ -111,4 +111,21 @@ final class ExcelSerialDate
             'Plan_2nd_Support_Date',
         ];
     }
+
+    /**
+     * @return list<string>
+     */
+    public static function teacherSupportDateColumns(): array
+    {
+        return [
+            'Plan_1st_Support_Date',
+            'Plan_2nd_Support_Date',
+            '_1st_Support_Date',
+            '_2nd_Support_Date',
+            '_3rd_Support_Date',
+            '_4th_Support_Date',
+            'GrapeSEEDEssentials',
+            'LittleSEEDEssentials',
+        ];
+    }
 }

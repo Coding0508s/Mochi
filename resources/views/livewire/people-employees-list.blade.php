@@ -105,8 +105,8 @@
 
     {{-- 리스트 --}}
     <div class="mochi-table-card">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm whitespace-nowrap">
+        <div class="overflow-x-auto isolate">
+            <table class="w-full min-w-[920px] text-sm whitespace-nowrap">
                 <thead class="mochi-table-head">
                     <tr class="text-gray-700">
                         <th class="px-3 py-2 text-left text-xs font-semibold">No</th>
@@ -332,6 +332,17 @@
                             <input type="date" wire:model.defer="createHireDate"
                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                             @error('createHireDate') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">성별</label>
+                            <select wire:model.defer="createSex"
+                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                @foreach(\App\Support\EmployeeSex::options() as $value => $label)
+                                    <option value="{{ $value }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            @error('createSex') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
                     </div>
 

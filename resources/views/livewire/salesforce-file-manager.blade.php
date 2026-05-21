@@ -42,8 +42,8 @@
             </div>
 
             @if($masterTab === 'accounts')
-                <div class="overflow-y-auto overflow-x-auto max-h-[650px] relative border-t border-gray-100">
-                    <table class="w-full text-sm whitespace-nowrap">
+                <div class="overflow-y-auto overflow-x-auto max-h-[650px] relative border-t border-gray-100 isolate">
+                    <table class="w-full min-w-[820px] text-sm whitespace-nowrap">
                         <thead class="bg-gray-50 sticky top-0 shadow-sm z-10">
                         <tr>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">No</th>
@@ -78,8 +78,8 @@
                     @endif
                 </div>
             @else
-                <div class="overflow-y-auto overflow-x-auto max-h-[650px] relative border-t border-gray-100">
-                    <table class="w-full text-sm whitespace-nowrap">
+                <div class="overflow-y-auto overflow-x-auto max-h-[650px] relative border-t border-gray-100 isolate">
+                    <table class="w-full min-w-[820px] text-sm whitespace-nowrap">
                         <thead class="bg-gray-50 sticky top-0 shadow-sm z-10">
                         <tr>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">No</th>
@@ -149,8 +149,8 @@
                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100" />
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm whitespace-nowrap">
+            <div class="overflow-x-auto isolate">
+                <table class="w-full min-w-[720px] text-sm whitespace-nowrap">
                     <thead class="bg-gray-50">
                     <tr>
                         <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">No</th>

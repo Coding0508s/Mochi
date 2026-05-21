@@ -2,9 +2,13 @@
 
 namespace App\Livewire;
 
+use App\Actions\RetireTeacher;
 use App\Models\Institution;
 use App\Models\Teacher;
+use App\Models\User;
+use App\Support\CoachTeacherScope;
 use App\Support\SkCodeNormalizer;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -349,9 +353,60 @@ class ContactList extends Component
             return;
         }
 
-        $this->newEmploymentStatus = 'inactive';
-        $this->newClassParticipation = 'out';
-        $this->save();
+        $teacher = Teacher::query()->find($this->editingId);
+        if (! $teacher) {
+            return;
+        }
+
+        if ($teacher->isRetired()) {
+            session()->flash('warning', '이미 퇴직 처리된 교사입니다.');
+            $this->closeModal();
+
+            return;
+        }
+
+        $user = auth()->user();
+        if (! $user instanceof User) {
+            return;
+        }
+
+        try {
+            app(RetireTeacher::class)->execute($this->editingId, $user);
+            session()->flash('success', '교사가 퇴직 처리되었습니다. 퇴직교사 리스트에 반영됩니다.');
+            $this->closeModal();
+            $this->resetPage();
+        } catch (AuthorizationException) {
+            session()->flash(
+                'warning',
+                '이 교사의 퇴직 처리 권한이 없습니다. Coach 담당 TR 기관 교사는 교사 지원 화면에서 퇴직하거나, 권한이 있는 계정으로 처리해 주세요.',
+            );
+        }
+    }
+
+    public function canRetireTeacher(?int $teacherId): bool
+    {
+        if ($teacherId === null || $teacherId <= 0) {
+            return false;
+        }
+
+        $user = auth()->user();
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        $teacher = Teacher::query()->find($teacherId);
+        if (! $teacher || $teacher->isRetired()) {
+            return false;
+        }
+
+        if ($user->hasFullAccess()) {
+            return true;
+        }
+
+        $scopedQuery = Teacher::query()->where('ID', $teacherId);
+        CoachTeacherScope::apply($scopedQuery, $user);
+
+        return $scopedQuery->exists();
     }
 
     public function confirmDelete(int $id): void
@@ -452,6 +507,7 @@ class ContactList extends Component
             'totalCount' => $totalCount,
             'activeCount' => $activeCount,
             'inactiveCount' => $inactiveCount,
+            'canRetireCurrentTeacher' => $this->canRetireTeacher($this->editingId),
         ]);
     }
 

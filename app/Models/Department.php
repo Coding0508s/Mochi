@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\DepartmentDisplay;
 use Illuminate\Database\Eloquent\Model;
 
 class Department extends Model
@@ -27,4 +28,9 @@ class Department extends Model
         'FGC_LastModifyDate',
         'FGC_Creator',
     ];
+
+    public function displayName(): string
+    {
+        return DepartmentDisplay::name((string) $this->DEPTNO, $this->DEPTNAME);
+    }
 }

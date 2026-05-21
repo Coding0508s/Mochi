@@ -31,7 +31,7 @@ class InstitutionList extends Component
     // 상세 모달의 CO / Coach / CS 드롭다운은 아래 부서(WORKDEPT) 활성 직원만 후보로 노출합니다.
     private const DEPT_CO = 'A02'; // Consulting Team
 
-    private const DEPT_TR = 'A05'; // Training Team (Coach)
+    private const DEPT_TR = 'A05'; // Coach Team
 
     private const DEPT_CS = 'A03'; // Customer Support Team
 
@@ -737,7 +737,7 @@ class InstitutionList extends Component
 
         // 담당자 드롭다운 옵션 (직원 마스터 기준, 부서 매핑 + 활성 직원만)
         //  - CO    -> Consulting Team (A02)
-        //  - Coach -> Training Team   (A05)
+        //  - Coach -> Coach Team (A05)
         //  - CS    -> Customer Support Team (A03)
         // 과거 S_Account_Information 이력값을 그대로 끌어오면 퇴사자/비직원도 후보로 떴기 때문에,
         // employee 테이블의 활성 직원(STATUS=1) 만 영문명 기준으로 노출합니다.

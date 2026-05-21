@@ -185,6 +185,18 @@ class SupportCreateFormTest extends TestCase
         ]);
     }
 
+    public function test_create_form_shows_coach_team_heading_when_team_menu_is_coach(): void
+    {
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'coach'])
+            ->test(SupportCreateForm::class)
+            ->assertSee('Coach Team 기관지원보고서 작성')
+            ->assertSee('Coach Team명')
+            ->assertDontSee('CO 기관지원보고서 작성');
+    }
+
     public function test_save_sends_mail_when_support_report_notify_addresses_configured(): void
     {
         Mail::fake();
@@ -211,6 +223,36 @@ class SupportCreateFormTest extends TestCase
         Mail::assertSent(SupportReportStoredMail::class, function (SupportReportStoredMail $mail): bool {
             return $mail->hasTo('group@test.org')
                 && $mail->hasTo('backup@test.org');
+        });
+    }
+
+    public function test_save_sends_mail_with_coach_team_labels_when_team_menu_is_coach(): void
+    {
+        Mail::fake();
+
+        config([
+            'support_report_mail.notify_addresses' => ['coach-notify@test.org'],
+        ]);
+
+        Institution::query()->create([
+            'SKcode' => 'SK-COACH-MAIL',
+            'AccountName' => 'Coach 메일 기관',
+        ]);
+
+        $user = User::factory()->create(['name' => 'TEST', 'email' => 'coach@example.com', 'team' => 'CO']);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'coach'])
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-COACH-MAIL')
+            ->set('formToAccount', 'Coach 팀 소통')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        Mail::assertSent(SupportReportStoredMail::class, function (SupportReportStoredMail $mail): bool {
+            return $mail->reportSavedOpening === 'Coach Team 기관 지원 보고서'
+                && $mail->reportAssigneeColumnLabel === 'Coach'
+                && $mail->envelope()->subject === '[Coach Team 기관 지원 보고서] Coach 메일 기관';
         });
     }
 

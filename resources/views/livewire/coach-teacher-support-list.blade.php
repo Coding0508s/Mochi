@@ -45,7 +45,7 @@
                         <option value="{{ $y }}">{{ $y }}년</option>
                     @endfor
                 </select>
-                <a href="{{ route('supports.index') }}"
+                <a href="{{ \App\Support\TeamMenuContext::route('supports.index') }}"
                    class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600">
                     기관지원보고서
                 </a>
@@ -67,7 +67,7 @@
             }
 
             if ($filterMonth) {
-                $activeFilterChips[] = ['label' => '계획월: '.$filterMonth.'월', 'action' => 'clearMonthFilter'];
+                $activeFilterChips[] = ['label' => '1차 계획월: '.$filterYear.'년 '.$filterMonth.'월', 'action' => 'clearMonthFilter'];
             }
 
             if ($search) {
@@ -100,7 +100,7 @@
 
             <select wire:model.live="filterMonth"
                     class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">계획 월 전체</option>
+                <option value="">전체</option>
                 @for($m = 1; $m <= 12; $m++)
                     <option value="{{ $m }}">{{ $m }}월</option>
                 @endfor
@@ -174,11 +174,33 @@
                 @endforeach
             </div>
         @endif
+
+        <p class="mt-3 border-t border-gray-100 pt-3 text-xs text-gray-500">
+            계획·완료 칸을 클릭하면 일정을 수정할 수 있습니다.
+        </p>
     </div>
 
     {{-- Table --}}
+    @php
+        $items = $teachers->items();
+        $cols = config('coach_teacher_support.columns');
+        $rowspans = [];
+        $i = 0;
+        while ($i < count($items)) {
+            $sk = $items[$i]->SK_Code;
+            $count = 1;
+            while ($i + $count < count($items) && $items[$i + $count]->SK_Code === $sk) {
+                $count++;
+            }
+            $rowspans[$i] = $count;
+            for ($j = 1; $j < $count; $j++) {
+                $rowspans[$i + $j] = 0;
+            }
+            $i += $count;
+        }
+    @endphp
     <div class="mochi-table-card relative">
-        <div wire:loading.flex wire:target="search,filterYear,filterRound,filterMonth,kpiFilter,showAllTeachers,showExtendedColumns,setKpiFilter,resetFilters,clearSearch,clearRoundFilter,clearMonthFilter,clearKpiFilter"
+        <div wire:loading.flex wire:target="search,filterYear,filterRound,filterMonth,kpiFilter,showAllTeachers,showExtendedColumns,setKpiFilter,resetFilters,clearSearch,clearRoundFilter,clearMonthFilter,clearKpiFilter,openEditModal,saveEditForm"
              class="absolute inset-0 z-20 hidden items-center justify-center bg-white/70 backdrop-blur-[1px]">
             <div class="flex items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-2 text-sm font-medium text-blue-700 shadow-sm">
                 <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -188,27 +210,46 @@
                 목록을 불러오는 중
             </div>
         </div>
-        <div class="overflow-x-auto isolate">
+        <div class="md:hidden space-y-3 p-3">
+            @forelse($items as $teacher)
+                @php
+                    $canOpenEditModal = $this->canOpenEditModal($teacher->ID);
+                @endphp
+                @include('partials.coach.teacher-support-mobile-card', [
+                    'teacher' => $teacher,
+                    'cols' => $cols,
+                    'canOpenEditModal' => $canOpenEditModal,
+                ])
+            @empty
+                <div class="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500">
+                    조건에 맞는 교사가 없습니다.
+                </div>
+            @endforelse
+        </div>
+
+        <div class="hidden md:block overflow-x-auto isolate">
             <table class="coach-teacher-support-table w-full text-sm whitespace-nowrap">
                 <colgroup>
                     <col class="coach-support-col-sk">
                     <col class="coach-support-col-institution">
+                    <col class="coach-support-col-position">
+                    <col class="coach-support-col-name">
+                    <col class="coach-support-col-plan1-date">
                 </colgroup>
                 <thead class="mochi-table-head">
                 <tr class="text-gray-700">
                     <th class="coach-support-sticky-sk coach-support-sticky-sk--head coach-support-sk-code px-3 py-2 text-center">SK_Code</th>
                     <th class="coach-support-sticky-inst coach-support-sticky-inst--head px-3 py-2 text-center">기관명</th>
-                    <th class="px-3 py-2 text-left">직급</th>
-                    <th class="px-3 py-2 text-left">이름</th>
-                    <th class="px-3 py-2 text-left">1차 지원<br>계획일자</th>
-                    <th class="px-3 py-2 text-left">1차 지원<br>계획타입</th>
-                    <th class="px-3 py-2 text-left">2차 지원<br>계획일자</th>
-                    <th class="px-3 py-2 text-left">2차 지원<br>계획타입</th>
-                    <th class="px-3 py-2 text-center w-[50px]"></th>
-                    <th class="px-3 py-2 text-left">1차 지원<br>완료일</th>
-                    <th class="px-3 py-2 text-left">1차 완료<br>타입</th>
-                    <th class="px-3 py-2 text-left">2차 지원<br>완료일</th>
-                    <th class="px-3 py-2 text-left">2차 완료<br>타입</th>
+                    <th class="coach-support-sticky-position coach-support-sticky-position--head px-3 py-2 text-left">직급</th>
+                    <th class="coach-support-sticky-name coach-support-sticky-name--head px-3 py-2 text-left">이름</th>
+                    <th class="coach-support-sticky-plan1-date coach-support-sticky-plan1-date--head px-3 py-2 text-left">1차 지원 계획일자</th>
+                    <th class="px-3 py-2 text-left">1차 지원 계획타입</th>
+                    <th class="px-3 py-2 text-left">2차 지원 계획일자</th>
+                    <th class="px-3 py-2 text-left">2차 지원 계획타입</th>
+                    <th class="px-3 py-2 text-left">1차 지원 완료일</th>
+                    <th class="px-3 py-2 text-left">1차 완료 타입</th>
+                    <th class="px-3 py-2 text-left">2차 지원 완료일</th>
+                    <th class="px-3 py-2 text-left">2차 완료 타입</th>
                     @if($showExtendedColumns)
                         <th class="px-3 py-2 text-left">3차 완료</th>
                         <th class="px-3 py-2 text-left">4차 완료</th>
@@ -218,30 +259,11 @@
                 </tr>
                 </thead>
                 <tbody>
-                @php
-                    // rowspan 계산: 현재 페이지 내에서 같은 SK_Code별 연속 행 수
-                    $items = $teachers->items();
-                    $rowspans = [];
-                    $i = 0;
-                    while ($i < count($items)) {
-                        $sk = $items[$i]->SK_Code;
-                        $count = 1;
-                        while ($i + $count < count($items) && $items[$i + $count]->SK_Code === $sk) {
-                            $count++;
-                        }
-                        $rowspans[$i] = $count;
-                        for ($j = 1; $j < $count; $j++) {
-                            $rowspans[$i + $j] = 0;
-                        }
-                        $i += $count;
-                    }
-                @endphp
-
                 @forelse($items as $idx => $teacher)
                     @php
-                        $cols = config('coach_teacher_support.columns');
                         $isFirstInGroup = ($rowspans[$idx] ?? 0) > 0;
                         $span = $rowspans[$idx] ?? 0;
+                        $canOpenEditModal = $this->canOpenEditModal($teacher->ID);
                     @endphp
                     <tr wire:key="teacher-{{ $teacher->ID }}"
                         class="mochi-table-row-hover">
@@ -259,7 +281,7 @@
                                 </button>
                             </td>
                         @endif
-                        <td class="px-3 py-2">
+                        <td class="coach-support-sticky-position px-3 py-2 align-middle">
                             @if($teacher->Position)
                                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
                                     {{ $teacher->isRetired() ? 'bg-red-100 text-red-800' : 'text-gray-700' }}">
@@ -267,42 +289,134 @@
                                 </span>
                             @endif
                         </td>
-                        <td class="px-3 py-2">
+                        <td class="coach-support-sticky-name px-3 py-2 align-middle">
                             <button type="button"
-                                    class="text-blue-700 underline text-left hover:text-blue-900 cursor-pointer"
+                                    class="coach-support-name-link text-blue-700 underline text-left hover:text-blue-900 cursor-pointer"
                                     wire:click.stop="openTeacherModal({{ $teacher->ID }})">
                                     {{ $teacher->Name }}
-                                </button>
-                        </td>
-                        <td class="px-3 py-2">{{ \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_1st']}) }}</td>
-                        <td class="px-3 py-2">{{ $teacher->{$cols['plan_type_1st']} }}</td>
-                        <td class="px-3 py-2">{{ \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_2nd']}) }}</td>
-                        <td class="px-3 py-2">{{ $teacher->{$cols['plan_type_2nd']} }}</td>
-                        <td class="px-3 py-2 text-center">
-                            <button type="button"
-                                    wire:click="openEditModal({{ $teacher->ID }})"
-                                    class="inline-flex items-center rounded border border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
-                                일정 수정
                             </button>
                         </td>
-                        <td class="px-3 py-2 {{ $teacher->{$cols['completed_1st']} ? 'bg-green-50' : '' }}">
-                            {{ $teacher->{$cols['completed_1st']}?->format('Y-m-d') }}
+                        <td class="coach-support-sticky-plan1-date px-3 py-2 align-middle coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                            @if($canOpenEditModal)
+                                wire:click="openEditModal({{ $teacher->ID }})"
+                                role="button"
+                                tabindex="0"
+                                aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                            @endif>
+                            <div class="inline-flex items-center gap-1.5">
+                                <span>{{ \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_1st']}) }}</span>
+                                @if($canOpenEditModal)
+                                    <svg class="h-3.5 w-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    </svg>
+                                @endif
+                            </div>
                         </td>
-                        <td class="px-3 py-2">{{ $teacher->{$cols['type_1st']} }}</td>
-                        <td class="px-3 py-2 {{ $teacher->{$cols['completed_2nd']} ? 'bg-green-50' : '' }}">
-                            {{ $teacher->{$cols['completed_2nd']}?->format('Y-m-d') }}
+                        <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                            @if($canOpenEditModal)
+                                wire:click="openEditModal({{ $teacher->ID }})"
+                                role="button"
+                                tabindex="0"
+                                aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                            @endif>
+                            {{ $teacher->{$cols['plan_type_1st']} }}
                         </td>
-                        <td class="px-3 py-2">{{ $teacher->{$cols['type_2nd']} }}</td>
+                        <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                            @if($canOpenEditModal)
+                                wire:click="openEditModal({{ $teacher->ID }})"
+                                role="button"
+                                tabindex="0"
+                                aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                            @endif>
+                            {{ \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_2nd']}) }}
+                        </td>
+                        <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                            @if($canOpenEditModal)
+                                wire:click="openEditModal({{ $teacher->ID }})"
+                                role="button"
+                                tabindex="0"
+                                aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                            @endif>
+                            {{ $teacher->{$cols['plan_type_2nd']} }}
+                        </td>
+                        <td class="px-3 py-2 coach-support-schedule-cell {{ $teacher->{$cols['completed_1st']} ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                            @if($canOpenEditModal)
+                                wire:click="openEditModal({{ $teacher->ID }})"
+                                role="button"
+                                tabindex="0"
+                                aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                            @endif>
+                            {{ \App\Support\ExcelSerialDate::toStorageString($teacher->getRawOriginal($cols['completed_1st'])) }}
+                        </td>
+                        <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                            @if($canOpenEditModal)
+                                wire:click="openEditModal({{ $teacher->ID }})"
+                                role="button"
+                                tabindex="0"
+                                aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                            @endif>
+                            {{ $teacher->{$cols['type_1st']} }}
+                        </td>
+                        <td class="px-3 py-2 coach-support-schedule-cell {{ $teacher->{$cols['completed_2nd']} ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                            @if($canOpenEditModal)
+                                wire:click="openEditModal({{ $teacher->ID }})"
+                                role="button"
+                                tabindex="0"
+                                aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                            @endif>
+                            {{ \App\Support\ExcelSerialDate::toStorageString($teacher->getRawOriginal($cols['completed_2nd'])) }}
+                        </td>
+                        <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                            @if($canOpenEditModal)
+                                wire:click="openEditModal({{ $teacher->ID }})"
+                                role="button"
+                                tabindex="0"
+                                aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                            @endif>
+                            {{ $teacher->{$cols['type_2nd']} }}
+                        </td>
                         @if($showExtendedColumns)
-                            <td class="px-3 py-2">{{ $teacher->{$cols['completed_3rd']}?->format('Y-m-d') }}</td>
-                            <td class="px-3 py-2">{{ $teacher->{$cols['completed_4th']}?->format('Y-m-d') }}</td>
-                            <td class="px-3 py-2">{{ $teacher->{$cols['essentials_gs']}?->format('Y-m-d') }}</td>
-                            <td class="px-3 py-2">{{ $teacher->{$cols['essentials_ls']}?->format('Y-m-d') }}</td>
+                            <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                                @if($canOpenEditModal)
+                                    wire:click="openEditModal({{ $teacher->ID }})"
+                                    role="button"
+                                    tabindex="0"
+                                    aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                                @endif>
+                                {{ \App\Support\ExcelSerialDate::toStorageString($teacher->getRawOriginal($cols['completed_3rd'])) }}
+                            </td>
+                            <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                                @if($canOpenEditModal)
+                                    wire:click="openEditModal({{ $teacher->ID }})"
+                                    role="button"
+                                    tabindex="0"
+                                    aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                                @endif>
+                                {{ \App\Support\ExcelSerialDate::toStorageString($teacher->getRawOriginal($cols['completed_4th'])) }}
+                            </td>
+                            <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                                @if($canOpenEditModal)
+                                    wire:click="openEditModal({{ $teacher->ID }})"
+                                    role="button"
+                                    tabindex="0"
+                                    aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                                @endif>
+                                {{ \App\Support\ExcelSerialDate::toStorageString($teacher->getRawOriginal($cols['essentials_gs'])) }}
+                            </td>
+                            <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                                @if($canOpenEditModal)
+                                    wire:click="openEditModal({{ $teacher->ID }})"
+                                    role="button"
+                                    tabindex="0"
+                                    aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                                @endif>
+                                {{ \App\Support\ExcelSerialDate::toStorageString($teacher->getRawOriginal($cols['essentials_ls'])) }}
+                            </td>
                         @endif
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ $showExtendedColumns ? 17 : 13 }}" class="px-4 py-12 text-center text-gray-400">
+                        <td colspan="{{ $showExtendedColumns ? 16 : 12 }}" class="px-4 py-12 text-center text-gray-400">
                             <div class="flex flex-col items-center gap-2">
                                 <svg class="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
@@ -493,7 +607,7 @@
     {{-- Edit Modal --}}
     @if($showEditModal && $editingTeacherId)
         <div class="mochi-modal-overlay" wire:click.self="closeEditModal">
-            <div class="mochi-modal-shell max-w-2xl" @click.stop>
+            <div class="mochi-modal-shell max-w-2xl" wire:key="coach-edit-modal-{{ $editingTeacherId }}" @click.stop>
                 <div class="flex items-center justify-between px-6 py-4 border-b">
                     <h3 class="text-lg font-semibold text-gray-800">지원 일정 수정</h3>
                     <button wire:click="closeEditModal" class="text-gray-400 hover:text-gray-600">
@@ -517,7 +631,10 @@
                                 <select wire:model="editForm.plan_type_1st"
                                         class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                                     <option value="">-</option>
-                                    @foreach($supportTypes as $type)
+                                    @if(filled($editForm['plan_type_1st'] ?? '') && ! in_array($editForm['plan_type_1st'], $planSupportTypes, true))
+                                        <option value="{{ $editForm['plan_type_1st'] }}">{{ $editForm['plan_type_1st'] }}</option>
+                                    @endif
+                                    @foreach($planSupportTypes as $type)
                                         <option value="{{ $type }}">{{ $type }}</option>
                                     @endforeach
                                 </select>
@@ -532,7 +649,10 @@
                                 <select wire:model="editForm.plan_type_2nd"
                                         class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                                     <option value="">-</option>
-                                    @foreach($supportTypes as $type)
+                                    @if(filled($editForm['plan_type_2nd'] ?? '') && ! in_array($editForm['plan_type_2nd'], $planSupportTypes, true))
+                                        <option value="{{ $editForm['plan_type_2nd'] }}">{{ $editForm['plan_type_2nd'] }}</option>
+                                    @endif
+                                    @foreach($planSupportTypes as $type)
                                         <option value="{{ $type }}">{{ $type }}</option>
                                     @endforeach
                                 </select>
@@ -546,7 +666,9 @@
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">1차 완료일</label>
-                                <input type="date" wire:model="editForm.completed_1st"
+                                <input type="date"
+                                       wire:key="edit-completed-1st-{{ $editingTeacherId }}"
+                                       wire:model="editForm.completed_1st"
                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                             </div>
                             <div>
@@ -554,14 +676,19 @@
                                 <select wire:model="editForm.type_1st"
                                         class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                                     <option value="">-</option>
-                                    @foreach($supportTypes as $type)
+                                    @if(filled($editForm['type_1st'] ?? '') && ! in_array($editForm['type_1st'], $completionSupportTypes, true))
+                                        <option value="{{ $editForm['type_1st'] }}">{{ $editForm['type_1st'] }}</option>
+                                    @endif
+                                    @foreach($completionSupportTypes as $type)
                                         <option value="{{ $type }}">{{ $type }}</option>
                                     @endforeach
                                 </select>
                             </div>
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">2차 완료일</label>
-                                <input type="date" wire:model="editForm.completed_2nd"
+                                <input type="date"
+                                       wire:key="edit-completed-2nd-{{ $editingTeacherId }}"
+                                       wire:model="editForm.completed_2nd"
                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                             </div>
                             <div>
@@ -569,7 +696,10 @@
                                 <select wire:model="editForm.type_2nd"
                                         class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                                     <option value="">-</option>
-                                    @foreach($supportTypes as $type)
+                                    @if(filled($editForm['type_2nd'] ?? '') && ! in_array($editForm['type_2nd'], $completionSupportTypes, true))
+                                        <option value="{{ $editForm['type_2nd'] }}">{{ $editForm['type_2nd'] }}</option>
+                                    @endif
+                                    @foreach($completionSupportTypes as $type)
                                         <option value="{{ $type }}">{{ $type }}</option>
                                     @endforeach
                                 </select>
@@ -583,7 +713,9 @@
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">3차 완료일</label>
-                                <input type="date" wire:model="editForm.completed_3rd"
+                                <input type="date"
+                                       wire:key="edit-completed-3rd-{{ $editingTeacherId }}"
+                                       wire:model="editForm.completed_3rd"
                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                             </div>
                             <div>
@@ -591,14 +723,19 @@
                                 <select wire:model="editForm.type_3rd"
                                         class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                                     <option value="">-</option>
-                                    @foreach($supportTypes as $type)
+                                    @if(filled($editForm['type_3rd'] ?? '') && ! in_array($editForm['type_3rd'], $completionSupportTypes, true))
+                                        <option value="{{ $editForm['type_3rd'] }}">{{ $editForm['type_3rd'] }}</option>
+                                    @endif
+                                    @foreach($completionSupportTypes as $type)
                                         <option value="{{ $type }}">{{ $type }}</option>
                                     @endforeach
                                 </select>
                             </div>
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">4차 완료일</label>
-                                <input type="date" wire:model="editForm.completed_4th"
+                                <input type="date"
+                                       wire:key="edit-completed-4th-{{ $editingTeacherId }}"
+                                       wire:model="editForm.completed_4th"
                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                             </div>
                             <div>
@@ -606,7 +743,10 @@
                                 <select wire:model="editForm.type_4th"
                                         class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                                     <option value="">-</option>
-                                    @foreach($supportTypes as $type)
+                                    @if(filled($editForm['type_4th'] ?? '') && ! in_array($editForm['type_4th'], $completionSupportTypes, true))
+                                        <option value="{{ $editForm['type_4th'] }}">{{ $editForm['type_4th'] }}</option>
+                                    @endif
+                                    @foreach($completionSupportTypes as $type)
                                         <option value="{{ $type }}">{{ $type }}</option>
                                     @endforeach
                                 </select>
@@ -835,10 +975,13 @@
                         </div>
                     </div>
 
-                    {{-- 새 지원 Pill --}}
-                    @if($teacherDetailInfo['class_in_out'] && !$teacherModalEditMode)
+                    {{-- 새 지원 Pill (지원 내역 유무·수업 O/X와 무관 — 퇴직·수정 모드만 제외) --}}
+                    @if(!$teacherModalEditMode)
                         <div>
                             <h4 class="text-sm font-semibold text-gray-700 mb-2">교사 지원 신규 작성:</h4>
+                            @unless($teacherDetailInfo['class_in_out'])
+                                <p class="text-xs text-gray-500 mb-2">수업 미참여(수업 X) 교사도 지원 보고서를 작성할 수 있습니다.</p>
+                            @endunless
                             <div class="grid grid-cols-2 gap-2">
                                 @foreach(config('coach_teacher_support_create.types', []) as $pill)
                                     @php
@@ -924,6 +1067,18 @@
             </div>
         </div>
     @endif
+
+    <div wire:loading.delay
+         wire:target="openEditModal,saveEditForm"
+         class="fixed bottom-6 right-6 z-50">
+        <div class="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 shadow-lg">
+            <svg class="h-4 w-4 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+            </svg>
+            처리 중...
+        </div>
+    </div>
 
     @include('components.coach.demo-lesson-support-modal', ['demoLessonConfig' => $demoLessonConfig])
     @include('components.coach.lva-fr-support-modal', ['lvaFrConfig' => $lvaFrConfig])

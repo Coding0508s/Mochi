@@ -1,0 +1,21 @@
+<div>
+    <button type="button"
+            @click="openCS = !openCS; if (openCS) { openCoach = false; openCO = false }"
+            class="sidebar-item sidebar-team-toggle sidebar-focusable"
+            :class="openCS ? 'sidebar-team-toggle-open' : ''"
+            :aria-expanded="openCS ? 'true' : 'false'">
+        <span class="sidebar-item-lead min-w-0 flex-1 break-words text-left">
+            @include('partials.sidebar-menu-icon', ['name' => 'phone'])
+            <span>CS Team</span>
+        </span>
+        <svg class="h-3 w-3 shrink-0 text-[#98a2b3] transition-transform duration-200"
+             :class="openCS ? 'rotate-90' : ''"
+             fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+        </svg>
+    </button>
+
+    <div x-show="openCS" class="sidebar-sublist">
+        @include('partials.sidebar-shared-team-menus', ['teamMenuQuery' => 'cs'])
+    </div>
+</div>

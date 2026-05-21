@@ -840,20 +840,43 @@ class CoachTeacherSupportListTest extends TestCase
         $this->assertSame('이교사', $names[1]);
     }
 
-    public function test_month_filter_uses_plan_dates(): void
+    public function test_month_filter_uses_first_plan_date_only(): void
     {
         $admin = $this->createAdminUser();
         $year = now()->year;
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
         $this->createTeacher('SK001', '3월계획', ['Plan_1st_Support_Date' => "{$year}-03-01"]);
-        $this->createTeacher('SK001', '5월계획', ['Plan_2nd_Support_Date' => "{$year}-05-01", 'Plan_1st_Support_Date' => "{$year}-01-01"]);
+        $this->createTeacher('SK001', '5월2차만', ['Plan_2nd_Support_Date' => "{$year}-05-01", 'Plan_1st_Support_Date' => "{$year}-01-01"]);
 
         Livewire::actingAs($admin)
             ->test(CoachTeacherSupportList::class)
+            ->set('filterYear', $year)
             ->set('filterMonth', '3')
             ->assertSee('3월계획')
-            ->assertDontSee('5월계획');
+            ->assertDontSee('5월2차만');
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->set('filterYear', $year)
+            ->set('filterMonth', '5')
+            ->assertDontSee('5월2차만');
+    }
+
+    public function test_month_filter_respects_selected_filter_year(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '2026년1월', ['Plan_1st_Support_Date' => '2026-01-15']);
+        $this->createTeacher('SK001', '2025년1월', ['Plan_1st_Support_Date' => '2025-01-15']);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->set('filterYear', 2026)
+            ->set('filterMonth', '1')
+            ->assertSee('2026년1월')
+            ->assertDontSee('2025년1월');
     }
 
     public function test_save_edit_form_updates_teacher(): void
@@ -878,6 +901,27 @@ class CoachTeacherSupportListTest extends TestCase
         $cols = config('coach_teacher_support.columns');
         $this->assertSame("{$year}-03-15", $teacher->{$cols['completed_1st']}->format('Y-m-d'));
         $this->assertSame('방문', $teacher->{$cols['type_1st']});
+    }
+
+    public function test_teacher_modal_shows_create_pills_when_no_history_and_class_out(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $id = $this->createTeacher('SK001', '수업미참여', [
+            'ClassInOut' => false,
+            'Plan_1st_Support_Date' => '2026-03-01',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openTeacherModal', $id)
+            ->assertSet('showTeacherModal', true)
+            ->assertSee('지원 내역 없음')
+            ->assertSee('교사 지원 신규 작성:')
+            ->assertSee('LVA + FR')
+            ->call('openLvaFrModal', $id)
+            ->assertSet('showLvaFrModal', true);
     }
 
     public function test_retired_teacher_modals_blocked_until_inactive_filter_enabled(): void
@@ -1280,6 +1324,96 @@ class CoachTeacherSupportListTest extends TestCase
 
         $this->assertTrue($component->get('showTeacherModal'));
         $this->assertFalse($component->get('showEditModal'));
+    }
+
+    public function test_schedule_cells_render_without_legacy_edit_button_column(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '홍길동', [
+            'Plan_1st_Support_Date' => "{$year}-03-01",
+            'Plan_1st_Support_Type' => 'On-site',
+        ]);
+
+        $component = Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class);
+
+        $html = $component->html();
+
+        $this->assertStringContainsString('coach-support-schedule-cell', $html);
+        $this->assertStringContainsString('coach-support-mobile-card', $html);
+        $this->assertStringContainsString('wire:click="openEditModal(', $html);
+        $this->assertStringContainsString('wire:click.stop="openTeacherModal(', $html);
+        $this->assertStringNotContainsString('>일정 수정<', $html);
+    }
+
+    public function test_open_edit_modal_prefills_form_matching_table_display(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $id = $this->createTeacher('SK001', '신혜정', [
+            'Plan_1st_Support_Date' => '45778',
+            'Plan_1st_Support_Type' => 'LVA+FB',
+            'Plan_2nd_Support_Date' => '45931',
+            'Plan_2nd_Support_Type' => 'LVA+FB',
+            '_1st_Support_Date' => '45840',
+            '_1st_Support_Type' => 'LVA+FB',
+            '_2nd_Support_Date' => '45809',
+            '_2nd_Support_Type' => 'On-Site',
+            '_3rd_Support_Date' => '45931',
+            '_3rd_Support_Type' => '방문',
+            '_4th_Support_Date' => null,
+            '_4th_Support_Type' => null,
+        ]);
+
+        $component = Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openEditModal', $id)
+            ->assertSet('showEditModal', true);
+
+        $this->assertSame('2025-05-01', $component->get('editForm.plan_1st'));
+        $this->assertSame('LVA+FB', $component->get('editForm.plan_type_1st'));
+        $this->assertSame('2025-10-01', $component->get('editForm.plan_2nd'));
+        $this->assertSame('LVA+FB', $component->get('editForm.plan_type_2nd'));
+        $this->assertSame('2025-07-02', $component->get('editForm.completed_1st'));
+        $this->assertSame('LVA+FB', $component->get('editForm.type_1st'));
+        $this->assertSame('2025-06-01', $component->get('editForm.completed_2nd'));
+        $this->assertSame('On-Site', $component->get('editForm.type_2nd'));
+        $this->assertSame('2025-10-01', $component->get('editForm.completed_3rd'));
+        $this->assertSame('방문', $component->get('editForm.type_3rd'));
+        $this->assertSame('', $component->get('editForm.completed_4th'));
+        $this->assertSame('', $component->get('editForm.type_4th'));
+
+        $html = $component->html();
+        $this->assertStringContainsString('2025년 5월', $html);
+        $this->assertStringContainsString('2025년 10월', $html);
+        $this->assertStringContainsString('2025-07-02', $html);
+        $this->assertStringContainsString('2025-06-01', $html);
+        $this->assertStringContainsString('LVA+FB', $html);
+        $this->assertStringContainsString('value="LVA+FB"', $html);
+        $this->assertStringContainsString('value="On-Site"', $html);
+    }
+
+    public function test_institution_click_does_not_open_edit_modal(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $id = $this->createTeacher('SK001', '홍길동');
+
+        $component = Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openInstitutionModal', 'SK001');
+
+        $this->assertTrue($component->get('showInstitutionModal'));
+        $this->assertFalse($component->get('showEditModal'));
+
+        $component
+            ->call('openEditModal', $id)
+            ->assertSet('showEditModal', true);
     }
 
     public function test_teacher_modal_sk_code_fallback(): void

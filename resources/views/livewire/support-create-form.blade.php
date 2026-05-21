@@ -1,6 +1,6 @@
 <div class="mochi-page">
     <div class="mb-4">
-        <a href="/supports"
+        <a href="{{ \App\Support\TeamMenuContext::route('supports.index', [], null, $formTeamMenu) }}"
            class="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
@@ -12,8 +12,8 @@
     <div class="mochi-table-card max-w-5xl">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
             <div>
-                <h2 class="text-base font-semibold text-gray-900">CO 기관지원보고서 작성</h2>
-                <p class="text-xs text-gray-400 mt-0.5">기관 지원 보고서</p>
+                <h2 class="text-base font-semibold text-gray-900">{{ \App\Support\TeamMenuContext::institutionSupportReportFormHeading(null, $formTeamMenu) }}</h2>
+                <p class="text-xs text-gray-400 mt-0.5">{{ \App\Support\TeamMenuContext::institutionSupportReportFormSubtitle(null, $formTeamMenu) }}</p>
             </div>
         </div>
 
@@ -103,7 +103,7 @@
 
                     {{-- CO명 --}}
                     <div class="w-44 shrink-0">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">CO명</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ \App\Support\TeamMenuContext::institutionSupportReportAssigneeLabel(null, $formTeamMenu) }}</label>
                         <input type="text"
                                wire:model="formCoName"
                                @disabled(!$institutionSelected)
@@ -259,7 +259,7 @@
                 </label>
 
                 <div class="flex items-center gap-3">
-                    <a href="/supports"
+                    <a href="{{ \App\Support\TeamMenuContext::route('supports.index', [], null, $formTeamMenu) }}"
                        class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
                         취소하기
                     </a>
