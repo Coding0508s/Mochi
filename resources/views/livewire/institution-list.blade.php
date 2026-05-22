@@ -196,25 +196,17 @@
              wire:click.self="closeDetailModal">
             <div class="mochi-modal-shell flex w-full max-w-2xl max-h-[90vh] flex-col overflow-hidden"
                  wire:click.stop>
-                <div class="flex shrink-0 items-center justify-between border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white px-4 py-3 sm:px-5">
-                    <div class="flex items-start gap-3">
-                        <span class="mt-0.5 inline-block w-1.5 h-8 rounded-full bg-blue-600"></span>
-                        <div>
-                            <h2 class="text-lg font-bold tracking-tight text-gray-900">기관 상세 정보</h2>
-                            <p class="text-sm text-gray-600 mt-0.5">
-                                {{ $selectedInstitution['name'] ?? '-' }}
-                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
-                                    {{ $selectedInstitution['skcode'] ?? '-' }}
-                                </span>
-                            </p>
-                        </div>
-                    </div>
-                    <button wire:click="closeDetailModal" class="text-gray-400 hover:text-gray-600 p-1">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
+                <x-admin.modal-header
+                    title="기관 상세 정보"
+                    :subtitle="$selectedInstitution['name'] ?? '-'"
+                    close-action="closeDetailModal"
+                >
+                    <x-slot:titleAddon>
+                        <span class="inline-flex items-center rounded-full bg-mochi-header/10 px-2 py-0.5 text-xs font-semibold text-mochi-header">
+                            {{ $selectedInstitution['skcode'] ?? '-' }}
+                        </span>
+                    </x-slot:titleAddon>
+                </x-admin.modal-header>
 
                 <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 text-sm sm:px-5">
                     <div class="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4">

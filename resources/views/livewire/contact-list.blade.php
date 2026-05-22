@@ -186,16 +186,10 @@
              wire:click.self="closeModal">
             <div class="mochi-modal-shell max-w-2xl"
                  wire:click.stop>
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white">
-                    <h2 class="text-base font-semibold text-gray-900">
-                        {{ $editingId ? '교사정보 수정하기' : '신규 교사 생성' }}
-                    </h2>
-                    <button wire:click="closeModal" class="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
+                <x-admin.modal-header
+                    :title="$editingId ? '교사정보 수정하기' : '신규 교사 생성'"
+                    close-action="closeModal"
+                />
 
                 <form wire:submit="save" class="max-h-[80vh] overflow-y-auto">
                     <div class="px-6 py-5 space-y-4">
@@ -418,14 +412,7 @@
              wire:click.self="closeDetailModal">
             <div class="mochi-modal-shell max-w-2xl"
                  wire:click.stop>
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white">
-                    <h2 class="text-base font-semibold text-gray-900">연락처 상세 정보</h2>
-                    <button wire:click="closeDetailModal" class="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
+                <x-admin.modal-header title="연락처 상세 정보" close-action="closeDetailModal" />
 
                 <div class="px-6 py-5">
                     <div class="border border-gray-200 rounded-lg overflow-hidden">

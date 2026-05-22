@@ -210,14 +210,7 @@
     @if($showCreateModal)
         <div class="mochi-modal-overlay" wire:click.self="closeCreateModal">
             <div class="mochi-modal-shell max-w-5xl h-[85vh] max-h-[85vh] flex flex-col" wire:click.stop>
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white">
-                    <h2 class="text-xl font-semibold text-gray-900">잠재 기관 등록</h2>
-                    <button wire:click="closeCreateModal" class="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
+                <x-admin.modal-header title="잠재 기관 등록" close-action="closeCreateModal" />
 
                 <form wire:submit="saveNewTarget" class="flex-1 overflow-y-auto">
                     <div class="px-6 py-5 space-y-6">
@@ -488,19 +481,11 @@
              wire:click.self="closeDetailModal">
             <div class="mochi-modal-shell max-w-4xl h-[80vh] max-h-[80vh] flex flex-col"
                  wire:click.stop>
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white">
-                    <div>
-                        <h2 class="text-base font-semibold text-gray-900">잠재고객 상세 정보</h2>
-                        <p class="text-xs text-gray-500 mt-0.5">
-                            {{ $selectedTarget['account_name'] ?? '-' }} (ID: {{ $selectedTarget['id'] ?? '-' }})
-                        </p>
-                    </div>
-                    <button wire:click="closeDetailModal" class="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
+                <x-admin.modal-header
+                    title="잠재고객 상세 정보"
+                    :subtitle="($selectedTarget['account_name'] ?? '-').' (ID: '.($selectedTarget['id'] ?? '-').')'"
+                    close-action="closeDetailModal"
+                />
 
                 <div class="px-6 py-5 text-sm flex-1 overflow-y-auto">
                     <x-potential-institution.detail-summary
@@ -676,19 +661,11 @@
     @if(config('potential_institutions.show_support_report_ui') && $showSupportDetailModal && $selectedSupportRecord)
         <div class="mochi-modal-overlay z-[60]" wire:click.self="closeSupportDetailModal">
             <div class="mochi-modal-shell max-w-3xl h-[70vh] max-h-[70vh] flex flex-col" wire:click.stop>
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white">
-                    <div>
-                        <h3 class="text-base font-semibold text-gray-900">기관지원보고서 상세</h3>
-                        <p class="text-xs text-gray-500 mt-0.5">
-                            {{ $selectedTarget['account_name'] ?? '-' }} · {{ $selectedSupportRecord['support_date'] ?? '-' }}
-                        </p>
-                    </div>
-                    <button wire:click="closeSupportDetailModal" class="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
+                <x-admin.modal-header
+                    title="기관지원보고서 상세"
+                    :subtitle="($selectedTarget['account_name'] ?? '-').' · '.($selectedSupportRecord['support_date'] ?? '-')"
+                    close-action="closeSupportDetailModal"
+                />
 
                 <div class="px-6 py-5 flex-1 overflow-y-auto">
                     <div class="border border-gray-200 rounded-lg overflow-hidden mb-4">
@@ -745,16 +722,10 @@
     @if($showContractChangeConfirmModal)
         <div class="mochi-modal-overlay" wire:click.self="cancelContractChange">
             <div class="mochi-modal-shell max-w-md flex flex-col" wire:click.stop>
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white">
-                    <h2 class="text-base font-semibold text-gray-900">
-                        {{ $pendingContractChange ? '계약 전환 확인' : '미계약 전환 확인' }}
-                    </h2>
-                    <button wire:click="cancelContractChange" class="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
+                <x-admin.modal-header
+                    :title="$pendingContractChange ? '계약 전환 확인' : '미계약 전환 확인'"
+                    close-action="cancelContractChange"
+                />
                 <div class="px-6 py-5 space-y-3">
                     <p class="text-sm font-semibold text-gray-900">{{ $pendingContractChangeName ?: '-' }}</p>
                     @if($pendingContractChange)
@@ -793,14 +764,7 @@
     @if($showContractModal)
         <div class="mochi-modal-overlay" wire:click.self="closeContractModal">
             <div class="mochi-modal-shell max-w-md flex flex-col" wire:click.stop>
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-orange-50/80 to-white">
-                    <h2 class="text-base font-semibold text-gray-900">계약 완료 처리</h2>
-                    <button wire:click="closeContractModal" class="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
+                <x-admin.modal-header title="계약 완료 처리" close-action="closeContractModal" />
                 <div class="px-6 py-5 space-y-4">
                     <div>
                         <p class="text-xs font-medium text-gray-500">계약 처리 대상</p>

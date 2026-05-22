@@ -228,19 +228,11 @@
     @if($showDetailModal && $selectedTarget)
         <div class="mochi-modal-overlay" wire:click.self="closeDetailModal">
             <div class="mochi-modal-shell max-w-4xl h-[80vh] max-h-[80vh] flex flex-col" wire:click.stop>
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white">
-                    <div>
-                        <h3 class="text-base font-semibold text-gray-900">잠재기관 상세 정보</h3>
-                        <p class="text-xs text-gray-500 mt-0.5">
-                            {{ $selectedTarget['account_name'] }} (ID: {{ $selectedTarget['id'] }})
-                        </p>
-                    </div>
-                    <button wire:click="closeDetailModal" class="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
+                <x-admin.modal-header
+                    title="잠재기관 상세 정보"
+                    :subtitle="$selectedTarget['account_name'].' (ID: '.$selectedTarget['id'].')'"
+                    close-action="closeDetailModal"
+                />
 
                 <div class="px-6 py-5 text-sm flex-1 overflow-y-auto space-y-4">
                     <x-potential-institution.detail-summary

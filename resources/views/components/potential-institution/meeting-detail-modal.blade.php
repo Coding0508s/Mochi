@@ -19,19 +19,11 @@
 @if($show && $selectedMeeting)
     <div class="mochi-modal-overlay z-[60]" wire:click.self="closeMeetingDetailModal">
         <div class="mochi-modal-shell max-w-3xl h-[70vh] max-h-[70vh] flex flex-col" wire:click.stop>
-            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50/80 to-white">
-                <div>
-                    <h3 class="text-base font-semibold text-gray-900">미팅/컨설팅 상세</h3>
-                    <p class="text-xs text-gray-500 mt-0.5">
-                        {{ $selectedMeeting['account_name'] ?? '-' }} · {{ $selectedMeeting['meeting_date'] ?? '-' }}
-                    </p>
-                </div>
-                <button type="button" wire:click="closeMeetingDetailModal" class="text-gray-400 hover:text-gray-600 p-1 cursor-pointer">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-            </div>
+            <x-admin.modal-header
+                title="미팅/컨설팅 상세"
+                :subtitle="($selectedMeeting['account_name'] ?? '-').' · '.($selectedMeeting['meeting_date'] ?? '-')"
+                close-action="closeMeetingDetailModal"
+            />
 
             @if ($isContract)
                 <div class="px-6 py-2 bg-gray-50 border-b border-gray-100">

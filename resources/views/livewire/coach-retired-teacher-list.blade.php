@@ -127,15 +127,7 @@
              wire:click.self="closeDetailModal">
             <div class="mochi-modal bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
                  role="dialog" aria-modal="true">
-                <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-                    <h3 class="text-lg font-semibold text-blue-700">퇴직 교사 상세</h3>
-                    <button type="button" wire:click="closeDetailModal"
-                            class="text-gray-400 hover:text-gray-600 cursor-pointer">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
+                <x-admin.modal-header title="퇴직 교사 상세" close-action="closeDetailModal" />
                 <div class="px-5 py-4 space-y-3 text-sm">
                     <div class="grid grid-cols-3 gap-2">
                         <span class="text-gray-500">교사명</span>
