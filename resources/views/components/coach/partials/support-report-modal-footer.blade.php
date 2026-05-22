@@ -18,12 +18,12 @@
         <div class="flex items-center gap-4">
             <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                 <input type="checkbox" wire:model="{{ $markCompletedModel }}" class="sr-only peer">
-                <span class="relative w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></span>
+                <span class="relative w-11 h-6 rounded-full bg-gray-200 peer peer-checked:bg-mochi-header after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
                 <span>완료처리</span>
             </label>
             <button type="button"
                     wire:click="{{ $saveAction }}"
-                    class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 cursor-pointer">
+                    class="cursor-pointer rounded-lg bg-mochi-header px-4 py-2 text-sm font-medium text-white hover:bg-mochi-header/90">
                 저장하기
             </button>
         </div>
