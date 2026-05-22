@@ -40,7 +40,7 @@
 
             <div class="ml-auto flex flex-wrap items-center gap-2">
                 <select wire:model.live="filterYear"
-                        class="py-1.5 px-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        class="py-1.5 px-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                     @for($y = now()->year; $y >= now()->year - 3; $y--)
                         <option value="{{ $y }}">{{ $y }}년</option>
                     @endfor
@@ -99,7 +99,7 @@
             </div>
 
             <select wire:model.live="filterMonth"
-                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                 <option value="">전체</option>
                 @for($m = 1; $m <= 12; $m++)
                     <option value="{{ $m }}">{{ $m }}월</option>
@@ -122,7 +122,7 @@
                 <input type="text"
                        wire:model.live.debounce.300ms="search"
                        placeholder="이름, 기관명, SK코드 검색"
-                       class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                       class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
             </div>
 
             <div class="ml-auto flex flex-wrap items-center gap-3">
@@ -160,12 +160,12 @@
             <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 text-xs">
                 <span class="text-gray-400">적용 필터</span>
                 @foreach($activeFilterChips as $chip)
-                    <span class="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 font-medium text-blue-700">
+                    <span class="inline-flex items-center gap-1 rounded-full border border-mochi-header/20 bg-mochi-header/10 px-2.5 py-1 font-medium text-mochi-header">
                         {{ $chip['label'] }}
                         @if($chip['action'])
                             <button type="button"
                                     wire:click="{{ $chip['action'] }}"
-                                    class="ml-0.5 text-blue-400 hover:text-blue-700"
+                                    class="ml-0.5 text-mochi-header/60 hover:text-mochi-header"
                                     aria-label="{{ $chip['label'] }} 필터 해제">
                                 ×
                             </button>
@@ -202,7 +202,7 @@
     <div class="mochi-table-card relative">
         <div wire:loading.flex wire:target="search,filterYear,filterRound,filterMonth,kpiFilter,showAllTeachers,showExtendedColumns,setKpiFilter,resetFilters,clearSearch,clearRoundFilter,clearMonthFilter,clearKpiFilter,openEditModal,saveEditForm"
              class="absolute inset-0 z-20 hidden items-center justify-center bg-white/70 backdrop-blur-[1px]">
-            <div class="flex items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-2 text-sm font-medium text-blue-700 shadow-sm">
+            <div class="flex items-center gap-2 rounded-full border border-mochi-header/20 bg-white px-3 py-2 text-sm font-medium text-mochi-header shadow-sm">
                 <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
@@ -275,7 +275,7 @@
                             <td class="coach-support-sticky-inst px-3 py-2 align-middle text-center"
                                 rowspan="{{ $span }}">
                                 <button type="button"
-                                        class="coach-support-inst-link text-blue-700 underline text-center hover:text-blue-900 cursor-pointer"
+                                        class="coach-support-inst-link cursor-pointer text-center text-mochi-header underline hover:text-mochi-header/80"
                                         wire:click.stop="openInstitutionModal('{{ $teacher->SK_Code }}')">
                                     {{ $teacher->institution?->resolvedAccountName() ?: $teacher->School_Name }}
                                 </button>
@@ -291,7 +291,7 @@
                         </td>
                         <td class="coach-support-sticky-name px-3 py-2 align-middle">
                             <button type="button"
-                                    class="coach-support-name-link text-blue-700 underline text-left hover:text-blue-900 cursor-pointer"
+                                    class="coach-support-name-link cursor-pointer text-left text-mochi-header underline hover:text-mochi-header/80"
                                     wire:click.stop="openTeacherModal({{ $teacher->ID }})">
                                     {{ $teacher->Name }}
                             </button>
@@ -441,54 +441,47 @@
     {{-- Institution Info Modal --}}
     @if($showInstitutionModal && $institutionInfo)
         <div class="mochi-modal-overlay" wire:click.self="closeInstitutionModal">
-            <div class="mochi-modal-shell max-w-4xl" @click.stop>
-                <div class="flex items-center justify-between px-6 py-4 border-b">
-                    <h3 class="text-lg font-semibold text-blue-700">TR 기관정보조회</h3>
-                    <button wire:click="closeInstitutionModal" class="text-gray-400 hover:text-gray-600">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
-                <div class="px-6 py-4 max-h-[80vh] overflow-y-auto space-y-6">
+            <div class="mochi-modal-shell max-w-4xl max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex flex-col" @click.stop>
+                <x-admin.modal-header title="TR 기관정보조회" close-action="closeInstitutionModal" />
+                <div class="mochi-modal-body-scroll px-6 py-4 space-y-6">
 
                     {{-- 기관정보 --}}
                     <div>
-                        <h4 class="text-base font-semibold text-blue-700 mb-3">기관정보</h4>
+                        <h4 class="mb-3 text-base font-semibold text-mochi-header">기관정보</h4>
                         <div class="grid grid-cols-2 gap-4 text-sm">
                             <div class="flex items-center gap-3">
                                 <span class="text-gray-500 w-20 shrink-0">기관명:</span>
-                                <span class="px-3 py-1.5 border border-gray-300 rounded flex-1">{{ $institutionInfo['name'] }}</span>
+                                <span class="flex-1 rounded-lg bg-gray-50 px-3 py-1.5 text-gray-800">{{ $institutionInfo['name'] }}</span>
                             </div>
                             <div class="flex items-center gap-3">
                                 <span class="text-gray-500 w-20 shrink-0">Consultant:</span>
-                                <span class="px-3 py-1.5 border border-gray-300 rounded flex-1">{{ $institutionInfo['co'] }}</span>
+                                <span class="flex-1 rounded-lg bg-gray-50 px-3 py-1.5 text-gray-800">{{ $institutionInfo['co'] }}</span>
                             </div>
                             <div class="flex items-center gap-3">
                                 <span class="text-gray-500 w-20 shrink-0">주소:</span>
-                                <span class="px-3 py-1.5 border border-gray-300 rounded flex-1">{{ $institutionInfo['address'] }}</span>
+                                <span class="flex-1 rounded-lg bg-gray-50 px-3 py-1.5 text-gray-800">{{ $institutionInfo['address'] }}</span>
                             </div>
                             <div class="flex items-center gap-3">
                                 <span class="text-gray-500 w-20 shrink-0">CS:</span>
-                                <span class="px-3 py-1.5 border border-gray-300 rounded flex-1">{{ $institutionInfo['cs'] }}</span>
+                                <span class="flex-1 rounded-lg bg-gray-50 px-3 py-1.5 text-gray-800">{{ $institutionInfo['cs'] }}</span>
                             </div>
                             <div></div>
                             <div class="flex items-center gap-3">
                                 <span class="text-gray-500 w-20 shrink-0">Coach:</span>
-                                <span class="px-3 py-1.5 border border-gray-300 rounded flex-1">{{ $institutionInfo['tr'] }}</span>
+                                <span class="flex-1 rounded-lg bg-gray-50 px-3 py-1.5 text-gray-800">{{ $institutionInfo['tr'] }}</span>
                             </div>
                         </div>
                     </div>
 
                     {{-- 기관 지원 내역 --}}
                     <div>
-                        <h4 class="text-sm font-semibold text-gray-700 mb-2">기관 지원 내역:(완료처리)</h4>
+                        <h4 class="text-sm font-semibold text-gray-700 mb-2">기관 지원 내역</h4>
                         <div class="overflow-x-auto border border-gray-200 rounded">
                             <table class="w-full text-xs whitespace-nowrap">
                                 <thead class="mochi-table-head text-gray-700">
                                 <tr>
                                     <th class="px-2 py-1.5 text-left border-b">ID</th>
-                                    <th class="px-2 py-1.5 text-left border-b">코치명</th>
+                                    <th class="px-2 py-1.5 text-left border-b">담당자</th>
                                     <th class="px-2 py-1.5 text-left border-b">지원날짜</th>
                                     <th class="px-2 py-1.5 text-left border-b">지원 타입</th>
                                     <th class="px-2 py-1.5 text-left border-b">기관이슈</th>
@@ -507,7 +500,7 @@
                                         @endif>
                                         <td class="px-2 py-1.5">{{ $record['id'] }}</td>
                                         <td class="px-2 py-1.5">{{ $record['coach'] }}</td>
-                                        <td class="px-2 py-1.5 @if(!empty($record['detail_key'])) text-blue-600 underline @endif">{{ $record['date'] }}</td>
+                                        <td class="px-2 py-1.5 @if(!empty($record['detail_key'])) text-mochi-header underline @endif">{{ $record['date'] }}</td>
                                         <td class="px-2 py-1.5">{{ $record['type'] }}</td>
                                         <td class="px-2 py-1.5">{{ $record['issue'] }}</td>
                                         <td class="px-2 py-1.5">{{ $record['status'] }}</td>
@@ -528,7 +521,7 @@
                                 <thead class="mochi-table-head text-gray-700">
                                 <tr>
                                     <th class="px-2 py-1.5 text-left border-b">ID</th>
-                                    <th class="px-2 py-1.5 text-left border-b">코치명</th>
+                                    <th class="px-2 py-1.5 text-left border-b">담당 코치</th>
                                     <th class="px-2 py-1.5 text-left border-b">교사명</th>
                                     <th class="px-2 py-1.5 text-left border-b">지원 날짜</th>
                                     <th class="px-2 py-1.5 text-left border-b">상태</th>
@@ -607,16 +600,9 @@
     {{-- Edit Modal --}}
     @if($showEditModal && $editingTeacherId)
         <div class="mochi-modal-overlay" wire:click.self="closeEditModal">
-            <div class="mochi-modal-shell max-w-2xl" wire:key="coach-edit-modal-{{ $editingTeacherId }}" @click.stop>
-                <div class="flex items-center justify-between px-6 py-4 border-b">
-                    <h3 class="text-lg font-semibold text-gray-800">지원 일정 수정</h3>
-                    <button wire:click="closeEditModal" class="text-gray-400 hover:text-gray-600">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
-                <div class="px-6 py-4 space-y-6 max-h-[70vh] overflow-y-auto">
+            <div class="mochi-modal-shell max-w-2xl max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex flex-col" wire:key="coach-edit-modal-{{ $editingTeacherId }}" @click.stop>
+                <x-admin.modal-header title="지원 일정 수정" close-action="closeEditModal" />
+                <div class="mochi-modal-body-scroll px-6 py-4 space-y-6">
                     {{-- 1·2차 계획 --}}
                     <div class="border-t pt-4">
                         <h4 class="text-sm font-semibold text-gray-700 mb-3">계획</h4>
@@ -624,12 +610,12 @@
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">1차 계획일</label>
                                 <input type="date" wire:model="editForm.plan_1st"
-                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                             </div>
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">1차 계획 타입</label>
                                 <select wire:model="editForm.plan_type_1st"
-                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                                     <option value="">-</option>
                                     @if(filled($editForm['plan_type_1st'] ?? '') && ! in_array($editForm['plan_type_1st'], $planSupportTypes, true))
                                         <option value="{{ $editForm['plan_type_1st'] }}">{{ $editForm['plan_type_1st'] }}</option>
@@ -642,12 +628,12 @@
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">2차 계획일</label>
                                 <input type="date" wire:model="editForm.plan_2nd"
-                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                             </div>
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">2차 계획 타입</label>
                                 <select wire:model="editForm.plan_type_2nd"
-                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                                     <option value="">-</option>
                                     @if(filled($editForm['plan_type_2nd'] ?? '') && ! in_array($editForm['plan_type_2nd'], $planSupportTypes, true))
                                         <option value="{{ $editForm['plan_type_2nd'] }}">{{ $editForm['plan_type_2nd'] }}</option>
@@ -669,12 +655,12 @@
                                 <input type="date"
                                        wire:key="edit-completed-1st-{{ $editingTeacherId }}"
                                        wire:model="editForm.completed_1st"
-                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                             </div>
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">1차 타입</label>
                                 <select wire:model="editForm.type_1st"
-                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                                     <option value="">-</option>
                                     @if(filled($editForm['type_1st'] ?? '') && ! in_array($editForm['type_1st'], $completionSupportTypes, true))
                                         <option value="{{ $editForm['type_1st'] }}">{{ $editForm['type_1st'] }}</option>
@@ -689,12 +675,12 @@
                                 <input type="date"
                                        wire:key="edit-completed-2nd-{{ $editingTeacherId }}"
                                        wire:model="editForm.completed_2nd"
-                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                             </div>
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">2차 타입</label>
                                 <select wire:model="editForm.type_2nd"
-                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                                     <option value="">-</option>
                                     @if(filled($editForm['type_2nd'] ?? '') && ! in_array($editForm['type_2nd'], $completionSupportTypes, true))
                                         <option value="{{ $editForm['type_2nd'] }}">{{ $editForm['type_2nd'] }}</option>
@@ -716,12 +702,12 @@
                                 <input type="date"
                                        wire:key="edit-completed-3rd-{{ $editingTeacherId }}"
                                        wire:model="editForm.completed_3rd"
-                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                             </div>
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">3차 타입</label>
                                 <select wire:model="editForm.type_3rd"
-                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                                     <option value="">-</option>
                                     @if(filled($editForm['type_3rd'] ?? '') && ! in_array($editForm['type_3rd'], $completionSupportTypes, true))
                                         <option value="{{ $editForm['type_3rd'] }}">{{ $editForm['type_3rd'] }}</option>
@@ -736,12 +722,12 @@
                                 <input type="date"
                                        wire:key="edit-completed-4th-{{ $editingTeacherId }}"
                                        wire:model="editForm.completed_4th"
-                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                             </div>
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">4차 타입</label>
                                 <select wire:model="editForm.type_4th"
-                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                                     <option value="">-</option>
                                     @if(filled($editForm['type_4th'] ?? '') && ! in_array($editForm['type_4th'], $completionSupportTypes, true))
                                         <option value="{{ $editForm['type_4th'] }}">{{ $editForm['type_4th'] }}</option>
@@ -761,12 +747,12 @@
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">GrapeSEED Essentials</label>
                                 <input type="date" wire:model="editForm.essentials_gs"
-                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                             </div>
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">LittleSEED Essentials</label>
                                 <input type="date" wire:model="editForm.essentials_ls"
-                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                             </div>
                         </div>
                     </div>
@@ -777,7 +763,7 @@
                         취소
                     </button>
                     <button wire:click="saveEditForm"
-                            class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                            class="rounded-lg bg-mochi-header px-4 py-2 text-sm text-white hover:bg-mochi-header/90">
                         저장
                     </button>
                 </div>
@@ -788,28 +774,32 @@
     {{-- Teacher Detail Modal --}}
     @if($showTeacherModal && $teacherDetailInfo)
         <div class="mochi-modal-overlay" wire:click.self="closeTeacherModal">
-            <div class="mochi-modal-shell max-w-4xl" @click.stop>
-                <div class="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-blue-50/80 to-white">
-                    <h3 class="text-lg font-semibold text-blue-700">TR 교사정보</h3>
-                    <div class="flex items-center gap-2">
-                        @if(!$teacherModalEditMode && $teacherDetailInfo['class_in_out'])
-                            <button wire:click="confirmRetireTeacher"
-                                    class="px-3 py-1.5 text-xs text-red-700 border border-red-300 rounded-lg hover:bg-red-50 cursor-pointer">
+            <div class="mochi-modal-shell max-w-4xl max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex flex-col" @click.stop>
+                <x-admin.modal-header title="TR 교사정보">
+                    <x-slot:actions>
+                        @if(! $teacherModalEditMode && $teacherDetailInfo['class_in_out'])
+                            <button type="button"
+                                    wire:click="confirmRetireTeacher"
+                                    class="cursor-pointer rounded-lg border border-red-300 px-3 py-1.5 text-xs text-red-700 hover:bg-red-50">
                                 퇴직
                             </button>
-                            <button wire:click="startTeacherEdit"
-                                    class="px-3 py-1.5 text-xs text-amber-700 border border-amber-300 rounded-lg hover:bg-amber-50 cursor-pointer">
+                            <button type="button"
+                                    wire:click="startTeacherEdit"
+                                    class="cursor-pointer rounded-lg border border-amber-300 px-3 py-1.5 text-xs text-amber-700 hover:bg-amber-50">
                                 수정
                             </button>
                         @endif
-                        <button wire:click="closeTeacherModal" class="text-gray-400 hover:text-gray-600 cursor-pointer">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <button type="button"
+                                wire:click="closeTeacherModal"
+                                class="cursor-pointer text-gray-400 transition-colors hover:text-gray-600"
+                                aria-label="닫기">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                             </svg>
                         </button>
-                    </div>
-                </div>
-                <div class="px-6 py-4 max-h-[80vh] overflow-y-auto space-y-6">
+                    </x-slot:actions>
+                </x-admin.modal-header>
+                <div class="mochi-modal-body-scroll px-6 py-4 space-y-6">
 
                     {{-- 퇴직 확인 --}}
                     @if($confirmingRetire)
@@ -836,32 +826,32 @@
                                 <div>
                                     <label class="block text-xs text-gray-500 mb-1">이름</label>
                                     <input type="text" wire:model="teacherProfileForm.name"
-                                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                                 </div>
                                 <div>
                                     <label class="block text-xs text-gray-500 mb-1">이메일</label>
                                     <input type="email" wire:model="teacherProfileForm.email"
-                                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                                 </div>
                                 <div>
                                     <label class="block text-xs text-gray-500 mb-1">전화</label>
                                     <input type="text" wire:model="teacherProfileForm.phone"
-                                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                                 </div>
                                 <div>
                                     <label class="block text-xs text-gray-500 mb-1">직급</label>
                                     <input type="text" wire:model="teacherProfileForm.position"
-                                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                                 </div>
                                 <div class="col-span-2">
                                     <label class="block text-xs text-gray-500 mb-1">비고</label>
                                     <textarea wire:model="teacherProfileForm.description" rows="2"
-                                              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                                              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header"></textarea>
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <label class="text-xs text-gray-500">수업참여</label>
                                     <input type="checkbox" wire:model="teacherProfileForm.class_in_out"
-                                           class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                           class="rounded border-gray-300 text-mochi-header focus:ring-mochi-header">
                                 </div>
                             </div>
                             <div class="flex justify-end gap-2 mt-4">
@@ -870,7 +860,7 @@
                                     취소
                                 </button>
                                 <button wire:click="saveTeacherProfile"
-                                        class="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 cursor-pointer">
+                                        class="cursor-pointer rounded-lg bg-mochi-header px-4 py-2 text-sm text-white hover:bg-mochi-header/90">
                                     저장
                                 </button>
                             </div>
@@ -943,7 +933,7 @@
                                 <thead class="mochi-table-head text-gray-700">
                                 <tr>
                                     <th class="px-2 py-1.5 text-left border-b">ID</th>
-                                    <th class="px-2 py-1.5 text-left border-b">코치명</th>
+                                    <th class="px-2 py-1.5 text-left border-b">담당자</th>
                                     <th class="px-2 py-1.5 text-left border-b">교사명</th>
                                     <th class="px-2 py-1.5 text-left border-b">지원 날짜</th>
                                     <th class="px-2 py-1.5 text-left border-b">상태</th>
@@ -1072,7 +1062,7 @@
          wire:target="openEditModal,saveEditForm"
          class="fixed bottom-6 right-6 z-50">
         <div class="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 shadow-lg">
-            <svg class="h-4 w-4 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24">
+            <svg class="h-4 w-4 animate-spin text-mochi-header" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
             </svg>
