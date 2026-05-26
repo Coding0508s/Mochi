@@ -8,12 +8,7 @@
     {{-- Summary --}}
     <div class="mochi-summary-card">
         @php
-            $kpiToggleLabels = [
-                'first_round' => '1차 대상',
-                'second_round' => '2차 대상',
-                'completed' => '지원 완료',
-                'unsupported' => '미지원',
-            ];
+            $kpiToggleLabels = \App\Support\TeacherSupportKpiCalculator::toggleLabels();
         @endphp
 
         <div class="flex flex-wrap items-center gap-3 text-sm">
@@ -67,7 +62,15 @@
             }
 
             if ($filterMonth) {
-                $activeFilterChips[] = ['label' => '1차 계획월: '.$filterYear.'년 '.$filterMonth.'월', 'action' => 'clearMonthFilter'];
+                $planMonthRoundLabel = ($filterRound !== '' ? $filterRound : '1').'차';
+                $activeFilterChips[] = [
+                    'label' => $planMonthRoundLabel.' 계획월: '.$filterYear.'년 '.$filterMonth.'월',
+                    'action' => 'clearMonthFilter',
+                ];
+            }
+
+            if ($filterCoach) {
+                $activeFilterChips[] = ['label' => '담당 코치: '.$filterCoach, 'action' => 'clearCoachFilter'];
             }
 
             if ($search) {
@@ -80,7 +83,7 @@
         @endphp
 
         <div class="flex flex-wrap items-center gap-3">
-            <div class="flex items-center gap-2 text-sm">
+            <div class="hidden flex items-center gap-2 text-sm" aria-hidden="true">
                 <span class="text-gray-500">계획 차수</span>
                 <div class="mochi-toggle-group">
                     <button type="button" wire:click="$set('filterRound', '')"
@@ -98,6 +101,16 @@
                 </div>
             </div>
 
+            @if($coachFilterOptions->isNotEmpty())
+                <select wire:model.live="filterCoach"
+                        class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                    <option value="">전체 담당</option>
+                    @foreach($coachFilterOptions as $coachName)
+                        <option value="{{ $coachName }}">{{ $coachName }}</option>
+                    @endforeach
+                </select>
+            @endif
+
             <select wire:model.live="filterMonth"
                     class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                 <option value="">전체</option>
@@ -106,7 +119,7 @@
                 @endfor
             </select>
 
-            @if($search || $filterRound || $filterMonth || $kpiFilter)
+            @if($search || $filterRound || $filterMonth || $filterCoach || $kpiFilter)
                 <button wire:click="resetFilters"
                         class="py-2 px-3 text-sm text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50">
                     초기화
@@ -219,6 +232,7 @@
                     'teacher' => $teacher,
                     'cols' => $cols,
                     'canOpenEditModal' => $canOpenEditModal,
+                    'showExtendedColumns' => $showExtendedColumns,
                 ])
             @empty
                 <div class="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500">
@@ -246,6 +260,12 @@
                     <th class="px-3 py-2 text-left">1차 지원 계획타입</th>
                     <th class="px-3 py-2 text-left">2차 지원 계획일자</th>
                     <th class="px-3 py-2 text-left">2차 지원 계획타입</th>
+                    @if($showExtendedColumns)
+                        <th class="px-3 py-2 text-left">3차 지원 계획일자</th>
+                        <th class="px-3 py-2 text-left">3차 지원 계획타입</th>
+                        <th class="px-3 py-2 text-left">4차 지원 계획일자</th>
+                        <th class="px-3 py-2 text-left">4차 지원 계획타입</th>
+                    @endif
                     <th class="px-3 py-2 text-left">1차 지원 완료일</th>
                     <th class="px-3 py-2 text-left">1차 완료 타입</th>
                     <th class="px-3 py-2 text-left">2차 지원 완료일</th>
@@ -274,8 +294,11 @@
                             </td>
                             <td class="coach-support-sticky-inst px-3 py-2 align-middle text-center"
                                 rowspan="{{ $span }}">
+                                @php
+                                    $institutionIsTerminated = $teacher->institution?->isTerminatedCustomer() ?? false;
+                                @endphp
                                 <button type="button"
-                                        class="coach-support-inst-link cursor-pointer text-center text-mochi-header underline hover:text-mochi-header/80"
+                                        class="coach-support-inst-link cursor-pointer text-center underline {{ $institutionIsTerminated ? 'coach-support-inst-link--terminated text-red-700 hover:text-red-800' : 'text-mochi-header hover:text-mochi-header/80' }}"
                                         wire:click.stop="openInstitutionModal('{{ $teacher->SK_Code }}')">
                                     {{ $teacher->institution?->resolvedAccountName() ?: $teacher->School_Name }}
                                 </button>
@@ -339,6 +362,44 @@
                             @endif>
                             {{ $teacher->{$cols['plan_type_2nd']} }}
                         </td>
+                        @if($showExtendedColumns)
+                            <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                                @if($canOpenEditModal)
+                                    wire:click="openEditModal({{ $teacher->ID }})"
+                                    role="button"
+                                    tabindex="0"
+                                    aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                                @endif>
+                                {{ \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_3rd']}) }}
+                            </td>
+                            <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                                @if($canOpenEditModal)
+                                    wire:click="openEditModal({{ $teacher->ID }})"
+                                    role="button"
+                                    tabindex="0"
+                                    aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                                @endif>
+                                {{ $teacher->{$cols['plan_type_3rd']} }}
+                            </td>
+                            <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                                @if($canOpenEditModal)
+                                    wire:click="openEditModal({{ $teacher->ID }})"
+                                    role="button"
+                                    tabindex="0"
+                                    aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                                @endif>
+                                {{ \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_4th']}) }}
+                            </td>
+                            <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                                @if($canOpenEditModal)
+                                    wire:click="openEditModal({{ $teacher->ID }})"
+                                    role="button"
+                                    tabindex="0"
+                                    aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                                @endif>
+                                {{ $teacher->{$cols['plan_type_4th']} }}
+                            </td>
+                        @endif
                         <td class="px-3 py-2 coach-support-schedule-cell {{ $teacher->{$cols['completed_1st']} ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
                                 wire:click="openEditModal({{ $teacher->ID }})"
@@ -416,7 +477,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ $showExtendedColumns ? 16 : 12 }}" class="px-4 py-12 text-center text-gray-400">
+                        <td colspan="{{ $showExtendedColumns ? 20 : 12 }}" class="px-4 py-12 text-center text-gray-400">
                             <div class="flex flex-col items-center gap-2">
                                 <svg class="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
@@ -451,7 +512,9 @@
                         <div class="grid grid-cols-2 gap-4 text-sm">
                             <div class="flex items-center gap-3">
                                 <span class="text-gray-500 w-20 shrink-0">기관명:</span>
-                                <span class="flex-1 rounded-lg bg-gray-50 px-3 py-1.5 text-gray-800">{{ $institutionInfo['name'] }}</span>
+                                <span class="flex-1 min-w-0 truncate rounded-lg bg-gray-50 px-3 py-1.5 {{ ! empty($institutionInfo['is_terminated']) ? 'text-red-700 font-medium' : 'text-gray-800' }}">
+                                    {{ $institutionInfo['name'] }}
+                                </span>
                             </div>
                             <div class="flex items-center gap-3">
                                 <span class="text-gray-500 w-20 shrink-0">Consultant:</span>
@@ -603,9 +666,9 @@
             <div class="mochi-modal-shell max-w-2xl max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex flex-col" wire:key="coach-edit-modal-{{ $editingTeacherId }}" @click.stop>
                 <x-admin.modal-header title="지원 일정 수정" close-action="closeEditModal" />
                 <div class="mochi-modal-body-scroll px-6 py-4 space-y-6">
-                    {{-- 1·2차 계획 --}}
+                    {{-- 1·2차 계획 (필수) + 3·4차 계획 (선택) --}}
                     <div class="border-t pt-4">
-                        <h4 class="text-sm font-semibold text-gray-700 mb-3">계획</h4>
+                        <h4 class="text-sm font-semibold text-gray-700 mb-3">계획 (1·2차)</h4>
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">1차 계획일</label>
@@ -642,6 +705,48 @@
                                         <option value="{{ $type }}">{{ $type }}</option>
                                     @endforeach
                                 </select>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 border-t border-dashed border-gray-200 pt-4">
+                            <h4 class="text-sm font-medium text-gray-600 mb-3">3·4차 계획 (선택)</h4>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">3차 계획일</label>
+                                    <input type="date" wire:model="editForm.plan_3rd"
+                                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">3차 계획 타입</label>
+                                    <select wire:model="editForm.plan_type_3rd"
+                                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
+                                        <option value="">-</option>
+                                        @if(filled($editForm['plan_type_3rd'] ?? '') && ! in_array($editForm['plan_type_3rd'], $planSupportTypes, true))
+                                            <option value="{{ $editForm['plan_type_3rd'] }}">{{ $editForm['plan_type_3rd'] }}</option>
+                                        @endif
+                                        @foreach($planSupportTypes as $type)
+                                            <option value="{{ $type }}">{{ $type }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">4차 계획일</label>
+                                    <input type="date" wire:model="editForm.plan_4th"
+                                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">4차 계획 타입</label>
+                                    <select wire:model="editForm.plan_type_4th"
+                                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
+                                        <option value="">-</option>
+                                        @if(filled($editForm['plan_type_4th'] ?? '') && ! in_array($editForm['plan_type_4th'], $planSupportTypes, true))
+                                            <option value="{{ $editForm['plan_type_4th'] }}">{{ $editForm['plan_type_4th'] }}</option>
+                                        @endif
+                                        @foreach($planSupportTypes as $type)
+                                            <option value="{{ $type }}">{{ $type }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -803,14 +908,20 @@
 
                     {{-- 퇴직 확인 --}}
                     @if($confirmingRetire)
-                        <div class="p-4 bg-red-50 border border-red-200 rounded-lg">
-                            <p class="text-sm text-red-800 font-medium mb-3">정말 이 교사를 퇴직 처리하시겠습니까? 이 작업은 되돌릴 수 없습니다.</p>
+                        <div class="p-4 bg-red-50 border border-red-200 rounded-lg space-y-4">
+                            <p class="text-sm text-red-800 font-medium">정말 이 교사를 퇴직 처리하시겠습니까? 이 작업은 되돌릴 수 없습니다.</p>
+                            @include('partials.admin.teacher-retire-recommendation-fields')
                             <div class="flex gap-2">
-                                <button wire:click="retireTeacher"
+                                <button type="button"
+                                        wire:click="retireTeacher"
+                                        wire:loading.attr="disabled"
+                                        wire:loading.class="opacity-70 cursor-not-allowed"
                                         class="px-3 py-1.5 text-xs text-white bg-red-600 rounded hover:bg-red-700 cursor-pointer">
-                                    퇴직 확인
+                                    <span wire:loading.remove wire:target="retireTeacher">퇴직 확인</span>
+                                    <span wire:loading wire:target="retireTeacher">처리 중...</span>
                                 </button>
-                                <button wire:click="cancelRetireTeacher"
+                                <button type="button"
+                                        wire:click="cancelRetireTeacher"
                                         class="px-3 py-1.5 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50 cursor-pointer">
                                     취소
                                 </button>
@@ -909,7 +1020,9 @@
                                     </tr>
                                     <tr>
                                         <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">기관</th>
-                                        <td class="px-3 py-2 text-gray-900">{{ $teacherDetailInfo['school_name'] ?? '-' }} ({{ $teacherDetailInfo['sk_code'] }})</td>
+                                        <td class="px-3 py-2 {{ ! empty($teacherDetailInfo['is_terminated']) ? 'text-red-700 font-medium' : 'text-gray-900' }}">
+                                            {{ $teacherDetailInfo['school_name'] ?? '-' }} ({{ $teacherDetailInfo['sk_code'] }})
+                                        </td>
                                         <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium"></th>
                                         <td></td>
                                     </tr>

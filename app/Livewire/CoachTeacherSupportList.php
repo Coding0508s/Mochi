@@ -15,17 +15,24 @@ use App\Actions\StoreTeacherUnit21PlusSupportReport;
 use App\Actions\StoreTeacherUnit31PlusSupportReport;
 use App\Actions\UpdateTeacherProfile;
 use App\Actions\UpdateTeacherSupport;
+use App\Models\AccountInformation;
 use App\Models\Institution;
 use App\Models\SupportRecord;
 use App\Models\Teacher;
 use App\Support\CoachTeacherScope;
 use App\Support\ExcelSerialDate;
+use App\Support\InstitutionResolver;
+use App\Support\ManagerNameNormalizer;
 use App\Support\SkCodeNormalizer;
+use App\Support\TeacherRetirementRecommendation;
 use App\Support\TeacherSupportHistoryAggregator;
 use App\Support\TeacherSupportHistoryDetailResolver;
 use App\Support\TeacherSupportHistoryFormLoader;
 use App\Support\TeacherSupportKpiCalculator;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -38,6 +45,8 @@ class CoachTeacherSupportList extends Component
     public string $filterRound = '';
 
     public string $filterMonth = '';
+
+    public string $filterCoach = '';
 
     public string $search = '';
 
@@ -80,6 +89,10 @@ class CoachTeacherSupportList extends Component
     public array $teacherProfileForm = [];
 
     public bool $confirmingRetire = false;
+
+    public string $retireRecommendChoice = 'no';
+
+    public string $retireRecommendDescription = '';
 
     public bool $showDemoLessonModal = false;
 
@@ -163,7 +176,20 @@ class CoachTeacherSupportList extends Component
 
     public function mount(): void
     {
-        $this->filterYear = (int) (config('coach_teacher_support.default_year') ?? now()->year);
+        $year = request()->query('filterYear');
+        $this->filterYear = is_numeric($year)
+            ? (int) $year
+            : (int) (config('coach_teacher_support.default_year') ?? now()->year);
+
+        $coach = request()->query('filterCoach');
+        if (is_string($coach) && filled($coach)) {
+            $this->filterCoach = $coach;
+        }
+
+        $month = request()->query('filterMonth');
+        if (is_string($month) && $month !== '' && (int) $month >= 1 && (int) $month <= 12) {
+            $this->filterMonth = (string) (int) $month;
+        }
     }
 
     public function openInstitutionModal(string $skCode): void
@@ -171,10 +197,11 @@ class CoachTeacherSupportList extends Component
         $normalizedSkCode = SkCodeNormalizer::normalize($skCode) ?? $skCode;
         $candidateSkCodes = SkCodeNormalizer::candidates($skCode);
 
-        $institution = Institution::query()
-            ->whereIn('SKcode', $candidateSkCodes)
-            ->with('accountInfo')
-            ->first();
+        if (! $this->canViewInstitutionSk($skCode)) {
+            return;
+        }
+
+        $institution = InstitutionResolver::resolve($candidateSkCodes);
 
         if (! $institution) {
             return;
@@ -185,10 +212,13 @@ class CoachTeacherSupportList extends Component
         $this->institutionInfo = [
             'sk_code' => $normalizedSkCode,
             'name' => $institution->resolvedAccountName(),
-            'address' => $institution->Address ?? '',
+            'address' => trim((string) ($institution->Address ?? '')) !== ''
+                ? $institution->Address
+                : ($accountInfo?->Address ?? ''),
             'co' => $accountInfo?->CO ?? '',
             'tr' => $accountInfo?->TR ?? '',
             'cs' => $accountInfo?->CS ?? '',
+            'is_terminated' => $institution->isTerminatedCustomer(),
         ];
 
         try {
@@ -283,16 +313,7 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
-        $institution = $teacher->institution;
-        if (! $institution) {
-            $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
-            if ($normalizedSkCode) {
-                $institution = Institution::query()
-                    ->with('accountInfo')
-                    ->where('SKcode', $normalizedSkCode)
-                    ->first();
-            }
-        }
+        $institution = InstitutionResolver::resolveForTeacher($teacher);
 
         $accountInfo = $institution?->accountInfo;
 
@@ -306,6 +327,7 @@ class CoachTeacherSupportList extends Component
             'description' => $teacher->Description,
             'sk_code' => SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
             'school_name' => $this->institutionDisplayName($institution, $teacher->School_Name),
+            'is_terminated' => $institution?->isTerminatedCustomer() ?? false,
             'gs_essentials' => $teacher->GrapeSEEDEssentials?->format('Y-m-d'),
             'ls_essentials' => $teacher->LittleSEEDEssentials?->format('Y-m-d'),
             'tr' => $accountInfo?->TR ?? '',
@@ -333,6 +355,7 @@ class CoachTeacherSupportList extends Component
         $this->teacherModalEditMode = false;
         $this->teacherProfileForm = [];
         $this->confirmingRetire = false;
+        $this->resetRetireRecommendationForm();
     }
 
     public function openTeacherSupportHistoryDetail(string $detailKey, ?int $teacherId = null): void
@@ -545,10 +568,28 @@ class CoachTeacherSupportList extends Component
             ->where('ID', $teacherId);
         $this->applyTeacherListVisibilityFilter($scopedQuery);
 
-        if ($user->hasFullAccess()) {
+        if ($user->hasPlatformWideViewAccess()) {
             return $scopedQuery->exists();
         }
 
+        CoachTeacherScope::apply($scopedQuery, $user);
+
+        return $scopedQuery->exists();
+    }
+
+    private function canViewInstitutionSk(string $skCode): bool
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->hasPlatformWideViewAccess()) {
+            return InstitutionResolver::resolve(SkCodeNormalizer::candidates($skCode)) !== null;
+        }
+
+        $scopedQuery = Teacher::query()->whereIn('SK_Code', SkCodeNormalizer::candidates($skCode));
+        $this->applyTeacherListVisibilityFilter($scopedQuery);
         CoachTeacherScope::apply($scopedQuery, $user);
 
         return $scopedQuery->exists();
@@ -663,12 +704,14 @@ class CoachTeacherSupportList extends Component
 
     public function confirmRetireTeacher(): void
     {
+        $this->resetRetireRecommendationForm();
         $this->confirmingRetire = true;
     }
 
     public function cancelRetireTeacher(): void
     {
         $this->confirmingRetire = false;
+        $this->resetRetireRecommendationForm();
     }
 
     public function retireTeacher(): void
@@ -677,16 +720,36 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
+        $this->validate(
+            TeacherRetirementRecommendation::livewireRules(fn (): bool => $this->retireRecommendChoice === 'yes'),
+            TeacherRetirementRecommendation::livewireMessages(),
+        );
+
         $user = auth()->user();
         if (! $user) {
             return;
         }
 
+        $recommendation = TeacherRetirementRecommendation::fromForm(
+            $this->retireRecommendChoice,
+            $this->retireRecommendDescription,
+        );
+
         $action = new RetireTeacher;
-        $action->execute($this->teacherDetailInfo['id'], $user);
+        $action->execute($this->teacherDetailInfo['id'], $user, $recommendation);
 
         session()->flash('success', '교사가 퇴직 처리되었습니다.');
         $this->closeTeacherModal();
+    }
+
+    private function resetRetireRecommendationForm(): void
+    {
+        $this->retireRecommendChoice = 'no';
+        $this->retireRecommendDescription = '';
+        $this->resetValidation([
+            'retireRecommendChoice',
+            'retireRecommendDescription',
+        ]);
     }
 
     public function openDemoLessonModal(int $teacherId): void
@@ -1776,6 +1839,12 @@ class CoachTeacherSupportList extends Component
         $this->resetPage();
     }
 
+    public function updatedFilterCoach(): void
+    {
+        $this->filterCoach = $this->resolveAllowedFilterCoach();
+        $this->resetPage();
+    }
+
     public function updatedShowAllTeachers(): void
     {
         $this->resetPage();
@@ -1792,6 +1861,7 @@ class CoachTeacherSupportList extends Component
         $this->search = '';
         $this->filterRound = '';
         $this->filterMonth = '';
+        $this->filterCoach = '';
         $this->kpiFilter = '';
         $this->resetPage();
     }
@@ -1817,6 +1887,12 @@ class CoachTeacherSupportList extends Component
     public function clearKpiFilter(): void
     {
         $this->kpiFilter = '';
+        $this->resetPage();
+    }
+
+    public function clearCoachFilter(): void
+    {
+        $this->filterCoach = '';
         $this->resetPage();
     }
 
@@ -1854,7 +1930,13 @@ class CoachTeacherSupportList extends Component
         }
 
         $action = new UpdateTeacherSupport;
-        $action->execute($this->editingTeacherId, $this->editForm, $user);
+        try {
+            $action->execute($this->editingTeacherId, $this->editForm, $user);
+        } catch (AuthorizationException $e) {
+            $this->addError('editForm', $e->getMessage());
+
+            return;
+        }
 
         session()->flash('success', '지원 일정이 저장되었습니다.');
         $this->closeEditModal();
@@ -1874,7 +1956,11 @@ class CoachTeacherSupportList extends Component
     {
         $baseQuery = $this->buildBaseQuery();
 
-        $kpis = TeacherSupportKpiCalculator::calculate(clone $baseQuery, $this->filterYear);
+        $kpiQuery = clone $baseQuery;
+        $this->applyRoundFilter($kpiQuery);
+        $this->applyMonthFilter($kpiQuery);
+
+        $kpis = TeacherSupportKpiCalculator::calculate($kpiQuery, $this->filterYear);
 
         $teachers = (clone $baseQuery)
             ->tap(fn (Builder $q) => $this->applyKpiFilter($q))
@@ -1889,9 +1975,12 @@ class CoachTeacherSupportList extends Component
             ->select('Teachers.*')
             ->paginate(50);
 
+        $this->hydrateTeacherInstitutions($teachers);
+
         return view('livewire.coach-teacher-support-list', [
             'teachers' => $teachers,
             'kpis' => $kpis,
+            'coachFilterOptions' => $this->coachFilterOptions(),
             'supportTypes' => config('coach_teacher_support.support_types', []),
             'planSupportTypes' => config('coach_teacher_support.plan_support_types', []),
             'completionSupportTypes' => config('coach_teacher_support.completion_support_types', []),
@@ -1908,12 +1997,87 @@ class CoachTeacherSupportList extends Component
         ]);
     }
 
+    /**
+     * Teachers.SK_Code가 *SK2693 형태이거나 S_AccountName 행이 없을 때도
+     * S_Account_Information 기준으로 institution·해지 스타일을 붙인다.
+     *
+     * @param  LengthAwarePaginator<Teacher>  $teachers
+     */
+    private function hydrateTeacherInstitutions($teachers): void
+    {
+        $collection = $teachers->getCollection();
+
+        $normalizedSkCodes = $collection
+            ->map(fn (Teacher $teacher): ?string => SkCodeNormalizer::normalize($teacher->SK_Code))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($normalizedSkCodes->isEmpty()) {
+            return;
+        }
+
+        $institutionsBySk = Institution::query()
+            ->with('accountInfo')
+            ->whereIn('SKcode', $normalizedSkCodes->all())
+            ->get()
+            ->keyBy('SKcode');
+
+        $accountInfosBySk = AccountInformation::query()
+            ->whereIn('SK_Code', $normalizedSkCodes->all())
+            ->get()
+            ->keyBy(fn (AccountInformation $info): string => SkCodeNormalizer::normalize($info->SK_Code) ?? $info->SK_Code);
+
+        $collection->each(function (Teacher $teacher) use ($institutionsBySk, $accountInfosBySk): void {
+            $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
+
+            if ($normalizedSkCode === null) {
+                return;
+            }
+
+            $institution = $teacher->institution ?? $institutionsBySk->get($normalizedSkCode);
+
+            if ($institution !== null) {
+                $institution->loadMissing('accountInfo');
+
+                if ($institution->accountInfo === null) {
+                    $accountInfo = $accountInfosBySk->get($normalizedSkCode);
+
+                    if ($accountInfo !== null) {
+                        $institution->setRelation('accountInfo', $accountInfo);
+                    }
+                }
+
+                $teacher->setRelation('institution', $institution);
+
+                return;
+            }
+
+            $accountInfo = $accountInfosBySk->get($normalizedSkCode);
+
+            if ($accountInfo === null) {
+                return;
+            }
+
+            $teacher->setRelation('institution', InstitutionResolver::fromAccountInformation($accountInfo));
+        });
+
+        $teachers->setCollection($collection);
+    }
+
     private function buildBaseQuery(): Builder
     {
         $query = Teacher::query();
         $this->applyTeacherListVisibilityFilter($query);
 
-        CoachTeacherScope::apply($query);
+        $user = auth()->user();
+        $allowedCoachFilter = $this->resolveAllowedFilterCoach();
+
+        if ($user?->canViewCoachTeamKpi() && filled($allowedCoachFilter)) {
+            CoachTeacherScope::excludeHiddenInstitutions($query);
+        } else {
+            CoachTeacherScope::apply($query);
+        }
 
         if (filled($this->search)) {
             $term = '%'.preg_replace('/\s+/u', '', $this->search).'%';
@@ -1924,7 +2088,86 @@ class CoachTeacherSupportList extends Component
             });
         }
 
+        $this->applyCoachFilter($query);
+
         return $query;
+    }
+
+    /**
+     * @param  Builder<Teacher>  $query
+     */
+    private function applyCoachFilter(Builder $query): void
+    {
+        $coach = $this->resolveAllowedFilterCoach();
+
+        if (! filled($coach)) {
+            return;
+        }
+
+        $normalizedCoach = ManagerNameNormalizer::normalize($coach);
+        $sqlNormalizedTr = ManagerNameNormalizer::sqlColumnExpression('TR');
+
+        $query->whereHas('institution.accountInfo', function (Builder $sub) use ($normalizedCoach, $sqlNormalizedTr): void {
+            $sub->whereRaw("{$sqlNormalizedTr} = ?", [$normalizedCoach]);
+        });
+    }
+
+    private function resolveAllowedFilterCoach(): string
+    {
+        if (! filled($this->filterCoach)) {
+            return '';
+        }
+
+        $user = auth()->user();
+
+        if (! $user) {
+            return '';
+        }
+
+        if ($user->canViewCoachTeamKpi()) {
+            return $this->filterCoach;
+        }
+
+        $normalizedFilter = ManagerNameNormalizer::normalize($this->filterCoach);
+
+        foreach (CoachTeacherScope::resolveTrAliases($user) as $alias) {
+            if (ManagerNameNormalizer::normalize($alias) === $normalizedFilter) {
+                return $this->filterCoach;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * 현재 사용자 스코프 안에서 실제 담당(TR)이 있는 코치 목록.
+     *
+     * @return Collection<int, string>
+     */
+    private function coachFilterOptions(): Collection
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return collect();
+        }
+
+        $scopedTeacherQuery = Teacher::query();
+        $this->applyTeacherListVisibilityFilter($scopedTeacherQuery);
+
+        if ($user->canViewCoachTeamKpi()) {
+            CoachTeacherScope::excludeHiddenInstitutions($scopedTeacherQuery);
+        } else {
+            CoachTeacherScope::apply($scopedTeacherQuery, $user);
+        }
+
+        return AccountInformation::query()
+            ->whereIn('SK_Code', $scopedTeacherQuery->select('SK_Code'))
+            ->whereNotNull('TR')
+            ->where('TR', '!=', '')
+            ->distinct()
+            ->orderBy('TR')
+            ->pluck('TR');
     }
 
     /**
@@ -1947,34 +2190,12 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
-        $cols = config('coach_teacher_support.columns');
         $year = $this->filterYear;
 
         match ($this->kpiFilter) {
-            'first_round' => $query->whereNotNull($cols['completed_1st'])
-                ->whereYear($cols['completed_1st'], $year),
-            'second_round' => $query->whereNotNull($cols['completed_2nd'])
-                ->whereYear($cols['completed_2nd'], $year),
-            'completed' => $query->whereNotNull($cols['completed_1st'])
-                ->whereYear($cols['completed_1st'], $year)
-                ->whereNotNull($cols['completed_2nd'])
-                ->whereYear($cols['completed_2nd'], $year),
-            'unsupported' => $query->where(function (Builder $q) use ($cols, $year): void {
-                $q->where(function (Builder $sub) use ($cols, $year): void {
-                    $sub->whereNotNull($cols['plan_1st'])
-                        ->where(function (Builder $inner) use ($cols, $year): void {
-                            $inner->whereNull($cols['completed_1st'])
-                                ->orWhereYear($cols['completed_1st'], '!=', $year);
-                        });
-                })->orWhere(function (Builder $sub) use ($cols, $year): void {
-                    $sub->whereNotNull($cols['plan_2nd'])
-                        ->where(function (Builder $inner) use ($cols, $year): void {
-                            $inner->whereNull($cols['completed_2nd'])
-                                ->orWhereYear($cols['completed_2nd'], '!=', $year);
-                        });
-                });
-            }),
-            default => null,
+            'completed' => TeacherSupportKpiCalculator::applyAllRoundsCompletedScope($query, $year),
+            'unsupported' => TeacherSupportKpiCalculator::applyUnsupportedScope($query, $year),
+            default => TeacherSupportKpiCalculator::applyRoundCompletedScope($query, $this->kpiFilter, $year),
         };
     }
 
@@ -1984,14 +2205,7 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
-        $cols = config('coach_teacher_support.columns');
-        $year = $this->filterYear;
-
-        match ($this->filterRound) {
-            '1' => $query->whereNotNull($cols['plan_1st']),
-            '2' => $query->whereNotNull($cols['plan_2nd']),
-            default => null,
-        };
+        TeacherSupportKpiCalculator::applyPlanRoundScope($query, $this->filterRound, $this->filterYear);
     }
 
     private function applyMonthFilter(Builder $query): void
@@ -2000,13 +2214,18 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
-        $cols = config('coach_teacher_support.columns');
         $month = (int) $this->filterMonth;
         $year = $this->filterYear;
+        $planRound = $this->filterRound !== '' ? $this->filterRound : '1';
+        $planColumn = TeacherSupportKpiCalculator::planColumnForFilterRound($planRound);
 
-        $query->whereNotNull($cols['plan_1st'])
-            ->whereYear($cols['plan_1st'], $year)
-            ->whereMonth($cols['plan_1st'], $month);
+        if ($planColumn === null) {
+            return;
+        }
+
+        $query->whereNotNull($planColumn)
+            ->whereYear($planColumn, $year)
+            ->whereMonth($planColumn, $month);
     }
 
     private function institutionDisplayName(?Institution $institution, ?string $schoolName = null): string
@@ -2045,6 +2264,11 @@ class CoachTeacherSupportList extends Component
             return false;
         }
 
+        $institution = InstitutionResolver::resolveForTeacher($teacher);
+        if ($institution?->isTerminatedCustomer()) {
+            return false;
+        }
+
         if ($user->hasFullAccess()) {
             return true;
         }
@@ -2062,8 +2286,12 @@ class CoachTeacherSupportList extends Component
         return [
             'plan_1st' => $this->editFormDateValue($teacher, $cols['plan_1st']),
             'plan_2nd' => $this->editFormDateValue($teacher, $cols['plan_2nd']),
+            'plan_3rd' => $this->editFormDateValue($teacher, $cols['plan_3rd']),
+            'plan_4th' => $this->editFormDateValue($teacher, $cols['plan_4th']),
             'plan_type_1st' => trim((string) ($teacher->{$cols['plan_type_1st']} ?? '')),
             'plan_type_2nd' => trim((string) ($teacher->{$cols['plan_type_2nd']} ?? '')),
+            'plan_type_3rd' => trim((string) ($teacher->{$cols['plan_type_3rd']} ?? '')),
+            'plan_type_4th' => trim((string) ($teacher->{$cols['plan_type_4th']} ?? '')),
             'completed_1st' => $this->editFormDateValue($teacher, $cols['completed_1st']),
             'completed_2nd' => $this->editFormDateValue($teacher, $cols['completed_2nd']),
             'completed_3rd' => $this->editFormDateValue($teacher, $cols['completed_3rd']),

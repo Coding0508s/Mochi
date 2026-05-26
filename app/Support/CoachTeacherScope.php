@@ -33,7 +33,7 @@ final class CoachTeacherScope
             return;
         }
 
-        if ($user->hasFullAccess()) {
+        if ($user->hasPlatformWideViewAccess()) {
             return;
         }
 

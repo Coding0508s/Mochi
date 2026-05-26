@@ -142,6 +142,14 @@ class Institution extends Model
     }
 
     /**
+     * S_Account_Information.Customer_Type에 "해지"가 포함되면 해지 기관으로 본다.
+     */
+    public function isTerminatedCustomer(): bool
+    {
+        return str_contains((string) ($this->accountInfo?->Customer_Type ?? ''), '해지');
+    }
+
+    /**
      * 이 기관에 속한 교사(연락처) 목록
      *
      * 사용 예:

@@ -7,6 +7,7 @@ use App\Models\Teacher;
 use App\Models\TeacherProConSupportReport;
 use App\Models\User;
 use App\Support\CoachTeacherScope;
+use App\Support\CoachTeacherSupportPayload;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -22,6 +23,7 @@ class StoreTeacherProConSupportReport
         $this->authorize($teacher, $user);
 
         $validated = $this->validate($data);
+        $validated = CoachTeacherSupportPayload::applyTrustedContext($validated, $teacher);
         $markCompleted = (bool) ($validated['mark_completed'] ?? false);
         $status = $markCompleted ? '완료' : '임시';
 

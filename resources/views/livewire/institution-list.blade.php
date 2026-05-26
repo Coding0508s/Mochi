@@ -1,12 +1,18 @@
 <div class="mochi-page">
     @if(session('success'))
-        <div class="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm" data-mochi-flash-dismiss="3000" role="status">
+        <div class="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex items-center gap-2" data-mochi-flash-dismiss="3000" role="status">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
             {{ session('success') }}
         </div>
     @endif
 
     @if(session('warning'))
-        <div class="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm" data-mochi-flash-dismiss="3000" role="status">
+        <div class="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm flex items-center gap-2" data-mochi-flash-dismiss="3000" role="status">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
             {{ session('warning') }}
         </div>
     @endif
@@ -14,7 +20,7 @@
     {{-- 상단 요약 영역 (잠재기관 페이지와 동일 톤) --}}
     <div class="mochi-summary-card">
         <div class="flex flex-wrap items-center gap-4 text-sm">
-            <h2 class="text-base font-semibold text-[#2b78c5]">기관리스트</h2>
+            <h2 class="text-base font-semibold text-mochi-header">기관리스트</h2>
             <span class="text-gray-300">|</span>
             <button wire:click="$set('assignmentFilter', '')"
                     class="text-gray-600 hover:text-blue-700 transition-colors cursor-pointer">
@@ -32,8 +38,8 @@
             </button>
             <button wire:click="$set('assignmentFilter', 'unassigned')"
                     class="text-gray-600 hover:text-blue-700 transition-colors
-                           {{ $assignmentFilter === 'unassigned' ? 'font-semibold text-red-700' : '' }} cursor-pointer">
-                미배정 <span class="font-semibold text-red-500">{{ $unassignedCoCount }}</span>
+                           {{ $assignmentFilter === 'unassigned' ? 'font-semibold text-mochi-header' : '' }} cursor-pointer">
+                미배정 <span class="font-semibold text-gray-600">{{ $unassignedCoCount }}</span>
             </button>
             <div class="ml-auto text-gray-500">
                 현재 조건 결과: <span class="font-semibold text-gray-700">{{ $institutions->total() }}</span>건
@@ -45,7 +51,7 @@
     <div class="mochi-filter-card">
         <div class="flex flex-wrap items-center gap-3">
             <select wire:model.live="statusFilter"
-                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                 <option value="active">운영 기관</option>
                 <option value="terminated">해지 기관</option>
                 <option value="all">전체</option>
@@ -67,7 +73,7 @@
                 <input type="text"
                        wire:model.live.debounce.300ms="search"
                        placeholder="기관명, SK코드, 원장명, 주소, CO·Coach·CS 검색"
-                       class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                       class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
             </div>
         </div>
     </div>
@@ -141,9 +147,7 @@
                         <td class="px-3 py-2 text-gray-600 font-mono text-xs">{{ $inst->resolvedGsNumber() ?: '-' }}</td>
                         <td class="px-3 py-2">
                             @if($inst->Gubun)
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                                    {{ $inst->Gubun }}
-                                </span>
+                                <span class="text-xs text-gray-600">{{ $inst->Gubun }}</span>
                             @else
                                 <span class="text-gray-400">-</span>
                             @endif
@@ -174,6 +178,9 @@
                 @empty
                     <tr>
                         <td colspan="13" class="px-4 py-16 text-center text-gray-400">
+                            <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
                             <p class="font-medium">검색 결과가 없습니다</p>
                             <p class="text-sm mt-1">다른 조건으로 다시 검색해 보세요.</p>
                         </td>
@@ -239,7 +246,7 @@
                                     <td class="px-3 py-2 font-mono text-sm text-gray-900">
                                         @if($editDetailCoreFields)
                                             <input type="text" wire:model.defer="editDetailSkCode"
-                                                   class="w-full py-1.5 px-2 text-sm font-mono border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                   class="w-full py-1.5 px-2 text-sm font-mono border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                             @error('editDetailSkCode')
                                                 <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                             @enderror
@@ -251,7 +258,7 @@
                                     <td class="px-3 py-2 font-medium text-gray-900">
                                         @if($editDetailCoreFields)
                                             <input type="text" wire:model.defer="editDetailInstitutionName"
-                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                             @error('editDetailInstitutionName')
                                                 <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                             @enderror
@@ -265,7 +272,7 @@
                                     <td colspan="3" class="px-3 py-2 font-medium text-gray-900">
                                         @if($editDetailCoreFields)
                                             <input type="text" wire:model.defer="editDetailEnglishName"
-                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                             @error('editDetailEnglishName')
                                                 <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                             @enderror
@@ -279,7 +286,7 @@
                                     <td colspan="3" class="px-3 py-2 font-medium text-gray-900">
                                         @if($editDetailCoreFields)
                                             <input type="text" wire:model.defer="editDetailPortalName"
-                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                             @error('editDetailPortalName')
                                                 <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                             @enderror
@@ -293,7 +300,7 @@
                                     <td colspan="3" class="px-3 py-2 font-medium text-gray-900 font-mono text-sm">
                                         @if($editDetailCoreFields)
                                             <input type="text" wire:model.defer="editDetailPortalCampusId"
-                                                   class="w-full py-1.5 px-2 text-sm font-mono border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                   class="w-full py-1.5 px-2 text-sm font-mono border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                             @error('editDetailPortalCampusId')
                                                 <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                             @enderror
@@ -307,7 +314,7 @@
                                     <td colspan="3" class="px-3 py-2 font-medium text-gray-900">
                                         @if($editDetailCoreFields)
                                             <input type="text" wire:model.defer="editDetailAccountNo"
-                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                             @error('editDetailAccountNo')
                                                 <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                             @enderror
@@ -321,7 +328,7 @@
                                     <td class="px-3 py-2 font-medium text-gray-900">
                                         @if($editDetailCoreFields)
                                             <input type="text" wire:model.defer="editDetailGubun" list="institution-detail-gubun-options"
-                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                             <datalist id="institution-detail-gubun-options">
                                                 @foreach($gubunList as $gubunOption)
                                                     <option value="{{ $gubunOption }}"></option>
@@ -339,7 +346,7 @@
                                         @if($editDetailCoreFields)
                                             <div>
                                                 <select wire:model.defer="editCustomerType"
-                                                        class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                        class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                                     <option value="">선택</option>
                                                     @foreach($customerTypeOptions as $typeOption)
                                                         <option value="{{ $typeOption }}">{{ $typeOption }}</option>
@@ -362,7 +369,7 @@
                                                 <input type="text"
                                                        wire:model.defer="editGsNo"
                                                        placeholder="GS Number 입력"
-                                                       class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                       class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                                 @error('editGsNo')
                                                     <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                                 @enderror
@@ -375,7 +382,7 @@
                                     <td class="px-3 py-2 font-medium text-gray-900">
                                         @if($editDetailCoField)
                                             <select wire:model.defer="editDetailCo"
-                                                    class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                    class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                                 <option value="">미지정</option>
                                                 @foreach($coManagerOptions as $manager)
                                                     <option value="{{ $manager }}">{{ $manager }}</option>
@@ -394,7 +401,7 @@
                                     <td class="px-3 py-2 font-medium text-gray-900">
                                         @if($editDetailTrField)
                                             <select wire:model.defer="editDetailTr"
-                                                    class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                    class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                                 <option value="">미지정</option>
                                                 @foreach($trManagerOptions as $manager)
                                                     <option value="{{ $manager }}">{{ $manager }}</option>
@@ -411,7 +418,7 @@
                                     <td class="px-3 py-2 font-medium text-gray-900">
                                         @if($editDetailCsField)
                                             <select wire:model.defer="editDetailCs"
-                                                    class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                    class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                                 <option value="">미지정</option>
                                                 @foreach($csManagerOptions as $manager)
                                                     <option value="{{ $manager }}">{{ $manager }}</option>
@@ -430,7 +437,7 @@
                                     <td class="px-3 py-2 font-medium text-gray-900">
                                         @if($editDetailCoreFields)
                                             <input type="text" wire:model.defer="editDetailDirector"
-                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                             @error('editDetailDirector')
                                                 <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                             @enderror
@@ -442,7 +449,7 @@
                                     <td class="px-3 py-2 font-medium text-gray-900">
                                         @if($editDetailCoreFields)
                                             <input type="text" wire:model.defer="editDetailPhone"
-                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                             @error('editDetailPhone')
                                                 <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                             @enderror
@@ -456,7 +463,7 @@
                                     <td class="px-3 py-2 font-medium text-gray-900">
                                         @if($editDetailCoreFields)
                                             <input type="text" wire:model.defer="editDetailAccountTel"
-                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                             @error('editDetailAccountTel')
                                                 <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                             @enderror
@@ -477,7 +484,7 @@
                                     <td colspan="3" class="px-3 py-2 font-medium text-gray-900">
                                         @if($editDetailCoreFields)
                                             <textarea wire:model.defer="editDetailAddress" rows="2"
-                                                      class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                                                      class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header"></textarea>
                                             @error('editDetailAddress')
                                                 <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                             @enderror
@@ -499,7 +506,7 @@
                     <div class="col-span-2 mt-2">
                         <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
                             <h3 class="text-base font-bold text-[#1f4f8f] flex items-center gap-2">
-                                <span class="inline-block w-2 h-2 rounded-full bg-[#2b78c5]"></span>
+                                <span class="inline-block w-2 h-2 rounded-full bg-mochi-header"></span>
                                 최근 10년 지원/소통 이력
                             </h3>
                             <div class="flex flex-wrap items-center gap-2">
@@ -508,7 +515,7 @@
                                 </span>
                                 @if($detailSkCode !== '' && ! $detailIsTerminated)
                                     <a href="{{ route('supports.create', ['sk_code' => $detailSkCode, 'return' => 'institutions']) }}"
-                                       class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                                       class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-mochi-header rounded-lg hover:bg-mochi-header/90">
                                         지원보고서 작성
                                     </a>
                                 @elseif($detailSkCode !== '' && $detailIsTerminated)
@@ -547,8 +554,7 @@
                                             <td class="px-3 py-2 max-w-28 truncate" title="{{ $history['issue'] }}">{{ $history['issue'] }}</td>
                                             <td class="px-3 py-2 max-w-36 truncate" title="{{ $history['to_account'] }}">{{ $history['to_account'] }}</td>
                                             <td class="px-3 py-2 text-center">
-                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium
-                                                    {{ $history['status'] === '완료' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700' }}">
+                                                <span class="text-[11px] {{ $history['status'] === '완료' ? 'text-green-700' : 'text-gray-600' }}">
                                                     {{ $history['status'] }}
                                                 </span>
                                             </td>
@@ -556,6 +562,9 @@
                                     @empty
                                         <tr>
                                             <td colspan="8" class="px-3 py-8 text-center text-gray-400">
+                                                <svg class="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                </svg>
                                                 최근 10년 지원/소통 이력이 없습니다.
                                             </td>
                                         </tr>
@@ -576,7 +585,7 @@
                             취소
                         </button>
                         <button wire:click="saveDetailFields"
-                                class="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors cursor-pointer mr-2"
+                                class="px-4 py-2 text-sm text-white bg-mochi-header hover:bg-mochi-header/90 rounded-lg transition-colors cursor-pointer mr-2"
                                 wire:loading.attr="disabled"
                                 wire:loading.class="opacity-70 cursor-not-allowed"
                                 wire:target="saveDetailFields">
@@ -630,7 +639,7 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">담당 CO</label>
                         @if($canEditDetailCo ?? false)
                             <select wire:model="editCo"
-                                    class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                 <option value="">미지정</option>
                                 @foreach($coManagerOptions as $manager)
                                     <option value="{{ $manager }}">{{ $manager }}</option>
@@ -645,7 +654,7 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">담당 Coach</label>
                         @if($canEditDetailTr ?? false)
                             <select wire:model="editTr"
-                                    class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                 <option value="">미지정</option>
                                 @foreach($trManagerOptions as $manager)
                                     <option value="{{ $manager }}">{{ $manager }}</option>
@@ -660,7 +669,7 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">담당 CS</label>
                         @if($canEditDetailCs ?? false)
                             <select wire:model="editCs"
-                                    class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                 <option value="">미지정</option>
                                 @foreach($csManagerOptions as $manager)
                                     <option value="{{ $manager }}">{{ $manager }}</option>
@@ -681,7 +690,7 @@
                             취소
                         </button>
                         <button type="submit"
-                                class="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                                class="px-4 py-2 text-sm text-white bg-mochi-header hover:bg-mochi-header/90 rounded-lg transition-colors"
                                 wire:loading.attr="disabled"
                                 wire:loading.class="opacity-70 cursor-not-allowed">
                             <span wire:loading.remove wire:target="saveManagers">저장</span>

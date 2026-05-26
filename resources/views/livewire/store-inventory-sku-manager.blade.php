@@ -11,7 +11,7 @@
     {{-- 상단 요약 --}}
     <div class="mochi-summary-card">
         <div class="flex flex-wrap items-center gap-4 text-sm">
-            <h2 class="text-base font-semibold text-[#2b78c5]">Store 재고 품목</h2>
+            <h2 class="text-base font-semibold text-mochi-header">Store 재고 품목</h2>
             <span class="text-gray-300">|</span>
             <span class="text-gray-600">이카운트 <span class="font-semibold text-blue-600">PROD_CD</span> 기준 등록</span>
         </div>
@@ -80,7 +80,7 @@
     {{-- 연동 품목 목록 (아코디언) --}}
     <div x-data="{ openSkuList: false }" class="mochi-table-card">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-gray-200 px-4 py-3">
-            <h3 class="min-w-0 flex-1 text-base font-semibold text-[#2b78c5]">스토어 품목 수정 (이미지 수정 및 품목 활성 비활성)</h3>
+            <h3 class="min-w-0 flex-1 text-base font-semibold text-mochi-header">스토어 품목 수정 (이미지 수정 및 품목 활성 비활성)</h3>
             <div class="flex shrink-0 items-center gap-2">
                 <div class="relative w-full min-w-[12rem] max-w-xs sm:w-56">
                     <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
@@ -182,9 +182,9 @@
                                 </td>
                                 <td class="px-3 py-2 align-middle text-center">
                                     @if($sku->is_active)
-                                        <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 whitespace-nowrap">활성</span>
+                                        <span class="text-xs text-green-700 whitespace-nowrap">활성</span>
                                     @else
-                                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 whitespace-nowrap">비활성</span>
+                                        <span class="text-xs text-gray-600 whitespace-nowrap">비활성</span>
                                     @endif
                                 </td>
                                 <td class="px-3 py-2 align-middle text-center">

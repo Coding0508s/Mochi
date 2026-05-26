@@ -136,7 +136,7 @@ class TeamMenuContextTest extends TestCase
         ]));
 
         $this->assertSame('Coach Team', TeamMenuContext::institutionSupportReportBrand($user));
-        $this->assertSame('Coach Team명', TeamMenuContext::institutionSupportReportAssigneeLabel($user));
+        $this->assertSame('담당 Coach', TeamMenuContext::institutionSupportReportAssigneeLabel($user));
         $this->assertSame('Coach', TeamMenuContext::institutionSupportReportMailAssigneeColumnLabel($user));
     }
 }

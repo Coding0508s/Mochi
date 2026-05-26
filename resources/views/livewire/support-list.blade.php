@@ -25,7 +25,7 @@
 
             {{-- 년도 선택 --}}
             <select wire:model.live="filterYear"
-                    class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 max-lg:flex-1">
+                    class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header max-lg:flex-1">
                 <option value="">전체 년도</option>
                 @foreach($years as $year)
                     <option value="{{ $year }}">{{ $year }}년</option>
@@ -34,7 +34,7 @@
 
             {{-- 담당자 필터 --}}
             <select wire:model.live="filterTr"
-                    class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 max-lg:flex-1">
+                    class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header max-lg:flex-1">
                 <option value="">전체 담당</option>
                 @foreach($trList as $tr)
                     <option value="{{ $tr }}">{{ $tr }}</option>
@@ -43,7 +43,7 @@
 
             {{-- 기관 필터 --}}
             <select wire:model.live="filterSkCode"
-                    class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 max-lg:flex-1">
+                    class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header max-lg:flex-1">
                 <option value="">전체 기관</option>
                 @foreach($institutions as $inst)
                     <option value="{{ $inst->SKcode }}">[{{ $inst->SKcode }}] {{ $inst->resolvedAccountName() }}</option>
@@ -59,7 +59,7 @@
                 <input type="text"
                        wire:model.live.debounce.300ms="search"
                        placeholder="기관명, 이슈, 소통내용 검색..."
-                       class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                       class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header"/>
             </div>
 
             {{-- 건수 --}}
@@ -69,7 +69,7 @@
 
             <div class="w-full lg:w-auto lg:ml-auto flex flex-wrap shrink-0 items-center justify-end gap-2 whitespace-nowrap">
                 <a href="{{ \App\Support\TeamMenuContext::route('supports.create') }}"
-                   class="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700
+                   class="flex items-center justify-center gap-2 px-4 py-2 bg-mochi-header hover:bg-mochi-header/90
                           text-white text-sm font-medium rounded-lg transition-colors">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -122,7 +122,7 @@
                 <tbody class="divide-y divide-gray-100">
                 @forelse($records as $index => $record)
                     <tr wire:key="support-row-{{ $record->ID }}"
-                        wire:click="openEditModal({{ $record->ID }})"
+                        wire:click="openDetailModal({{ $record->ID }})"
                         class="cursor-pointer mochi-table-row-hover transition-colors
                                {{ $record->CompletedDate ? 'opacity-70' : '' }}">
 
@@ -160,18 +160,8 @@
 
                         {{-- 지원방법 --}}
                         <td class="px-3 py-2.5">
-                            @php
-                                $typeColor = match($record->Support_Type) {
-                                    '대면'   => 'bg-orange-100 text-orange-700',
-                                    '전화'   => 'bg-sky-100 text-sky-700',
-                                    '화상'   => 'bg-violet-100 text-violet-700',
-                                    default  => 'bg-gray-100 text-gray-600',
-                                };
-                            @endphp
                             @if($record->Support_Type)
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $typeColor }}">
-                                    {{ $record->Support_Type }}
-                                </span>
+                                <span class="text-xs text-gray-600">{{ $record->Support_Type }}</span>
                             @else
                                 <span class="text-gray-400">-</span>
                             @endif
@@ -197,32 +187,33 @@
                         {{-- 상태 배지 --}}
                         <td class="px-3 py-2.5 text-center">
                             @if($record->CompletedDate)
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                                    완료
-                                </span>
+                                <span class="text-xs text-green-700">완료</span>
                             @else
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
-                                    진행중
-                                </span>
+                                <span class="text-xs text-gray-600">진행중</span>
                             @endif
                         </td>
 
                         {{-- 완료처리 토글: wire:click.stop으로 행 클릭 이벤트 차단 --}}
                         <td class="px-3 py-2.5 text-center">
-                            <button wire:click.stop="toggleComplete({{ $record->ID }})"
-                                    class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent
-                                           transition-colors duration-200 focus:outline-none
-                                           {{ $record->CompletedDate ? 'bg-green-500' : 'bg-gray-300' }}">
-                                <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200
-                                             {{ $record->CompletedDate ? 'translate-x-4' : 'translate-x-0' }}">
-                                </span>
-                            </button>
+                            @can('updateSupportRecord', $record)
+                                <button wire:click.stop="toggleComplete({{ $record->ID }})"
+                                        class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent
+                                               transition-colors duration-200 focus:outline-none
+                                               {{ $record->CompletedDate ? 'bg-green-500' : 'bg-gray-300' }}">
+                                    <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200
+                                                 {{ $record->CompletedDate ? 'translate-x-4' : 'translate-x-0' }}">
+                                    </span>
+                                </button>
+                            @else
+                                <span class="text-xs text-gray-400">-</span>
+                            @endcan
                         </td>
 
-                        {{-- 수정 버튼 --}}
+                        {{-- 상세 보기 --}}
                         <td class="px-3 py-2.5 text-center">
-                            <button wire:click.stop="openEditModal({{ $record->ID }})"
-                                    class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                            <button wire:click.stop="openDetailModal({{ $record->ID }})"
+                                    class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                    title="상세 보기">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                           d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -279,23 +270,18 @@
                  wire:click.stop>
 
                 {{-- 모달 헤더 --}}
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
-                    <div>
-                        <h2 class="text-base font-semibold text-gray-900">기관 지원 내역 수정</h2>
-                        <p class="text-xs text-gray-400 mt-0.5">기관 지원 보고서</p>
-                    </div>
-                    <button wire:click="closeModal" class="text-gray-400 hover:text-gray-600 p-1">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
+                <x-admin.modal-header
+                    :title="$modalViewOnly ? '기관 지원 내역' : '기관 지원 내역 수정'"
+                    :subtitle="$modalViewOnly ? '기관 지원 보고서 · 조회' : '기관 지원 보고서'"
+                    close-action="closeModal"
+                />
 
                 {{-- 모달 폼 (스크롤 가능) --}}
-                <form wire:submit="save" class="flex-1 overflow-y-auto">
+                <form @unless($modalViewOnly) wire:submit="save" @endunless class="flex-1 overflow-y-auto">
                     @php
                         // 기관 선택 전에는 나머지 입력을 막아 실수를 줄입니다.
                         $institutionSelected = filled($formSkCode);
+                        $fieldsDisabled = $modalViewOnly || ! $institutionSelected;
                     @endphp
                     <div class="px-6 py-5 space-y-5">
 
@@ -310,10 +296,12 @@
                                 <input type="text"
                                        wire:model.live.debounce.200ms="formInstitutionKeyword"
                                        placeholder="기관명을 입력하세요 (예: 분당)"
-                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
-                                              {{ $errors->has('formSkCode') ? 'border-red-400' : 'border-gray-300' }}" />
+                                       @disabled($fieldsDisabled)
+                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header
+                                              {{ $errors->has('formSkCode') ? 'border-red-400' : 'border-gray-300' }}
+                                              {{ $fieldsDisabled ? 'bg-gray-50 text-gray-700 cursor-not-allowed' : '' }}" />
 
-                                @if(filled($formInstitutionKeyword) && blank($formSkCode) && $institutionSuggestions->isNotEmpty())
+                                @if(! $modalViewOnly && filled($formInstitutionKeyword) && blank($formSkCode) && $institutionSuggestions->isNotEmpty())
                                     <div class="mt-2 max-h-44 overflow-auto border border-gray-200 rounded-lg bg-white shadow-sm">
                                         @foreach($institutionSuggestions as $inst)
                                             <button type="button"
@@ -345,9 +333,9 @@
                                 <label class="block text-sm font-medium text-gray-700 mb-1">담당자</label>
                                 <input type="text"
                                        wire:model="formCoName"
-                                       @disabled(!$institutionSelected)
+                                       @disabled($fieldsDisabled)
                                        class="w-full py-2 px-3 text-sm border rounded-lg
-                                              {{ $institutionSelected ? 'border-gray-300 bg-white text-gray-700' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}"/>
+                                              {{ $fieldsDisabled ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed' : 'border-gray-300 bg-white text-gray-700' }}"/>
                                 {{-- CO명은 자동 입력되므로 수정 불가 처리 --}}
                             </div>
 
@@ -358,10 +346,10 @@
                                 </label>
                                 <input type="date"
                                        wire:model="formSupportDate"
-                                       @disabled(!$institutionSelected)
-                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
+                                       @disabled($fieldsDisabled)
+                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header
                                               {{ $errors->has('formSupportDate') ? 'border-red-400' : '' }}
-                                              {{ $institutionSelected ? 'border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}"/>
+                                              {{ $fieldsDisabled ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed' : 'border-gray-300' }}"/>
                                 @error('formSupportDate')
                                     <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                 @enderror
@@ -371,9 +359,9 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">지원 방법</label>
                                 <select wire:model="formSupportType"
-                                        @disabled(!$institutionSelected)
-                                        class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
-                                               {{ $institutionSelected ? 'border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}">
+                                        @disabled($fieldsDisabled)
+                                        class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header
+                                               {{ $fieldsDisabled ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed' : 'border-gray-300' }}">
                                     <option>전화</option>
                                     <option>대면</option>
                                     <option>화상</option>
@@ -390,9 +378,9 @@
                                 </label>
                                 <input type="time"
                                        wire:model="formSupportTime"
-                                       @disabled(!$institutionSelected)
-                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
-                                              {{ $institutionSelected ? 'border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}"/>
+                                       @disabled($fieldsDisabled)
+                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header
+                                              {{ $fieldsDisabled ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed' : 'border-gray-300' }}"/>
                             </div>
 
                             {{-- 참석자 --}}
@@ -400,10 +388,10 @@
                                 <label class="block text-sm font-medium text-gray-700 mb-1">참석자</label>
                                 <input type="text"
                                        wire:model="formTarget"
-                                       @disabled(!$institutionSelected)
+                                       @disabled($fieldsDisabled)
                                        placeholder="예: 원장, 교사 2명"
-                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
-                                              {{ $institutionSelected ? 'border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}"/>
+                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header
+                                              {{ $fieldsDisabled ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed' : 'border-gray-300' }}"/>
                             </div>
 
                         </div>
@@ -416,12 +404,12 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">기관과의 소통내용</label>
                                 <textarea wire:model="formToAccount"
-                                          @disabled(!$institutionSelected)
+                                          @disabled($fieldsDisabled)
                                           rows="5"
                                           placeholder="기관과 나눈 주요 대화 내용을 기록해 주세요 (Enter 시 새 줄에 ▶ 추가)"
-                                          x-on:keydown.enter="mochiSupportEnterTriangle($event)"
-                                          class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none
-                                                 {{ $institutionSelected ? 'border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}">
+                                          @unless($modalViewOnly) x-on:keydown.enter="mochiSupportEnterTriangle($event)" @endunless
+                                          class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header resize-none
+                                                 {{ $fieldsDisabled ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed' : 'border-gray-300' }}">
                                 </textarea>
                             </div>
                         </div>
@@ -431,53 +419,78 @@
                     {{-- 모달 하단 버튼 영역 --}}
                     <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-wrap items-center justify-between gap-3 flex-shrink-0 rounded-b-2xl">
 
-                        <div class="flex flex-wrap items-center gap-3">
-                        @can('deleteSupportRecords')
-                            @if($editingId)
-                                <button type="button"
-                                        wire:click="deleteRecord({{ $editingId }})"
-                                        wire:confirm="이 지원 보고서를 삭제할까요? 되돌릴 수 없습니다."
-                                        class="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors">
-                                    삭제
-                                </button>
-                            @endif
-                        @endcan
+                        @unless($modalViewOnly)
+                            <div class="flex flex-wrap items-center gap-3">
+                                @can('deleteSupportRecords')
+                                    @if($editingId)
+                                        <button type="button"
+                                                wire:click="deleteRecord({{ $editingId }})"
+                                                wire:confirm="이 지원 보고서를 삭제할까요? 되돌릴 수 없습니다."
+                                                class="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors">
+                                            삭제
+                                        </button>
+                                    @endif
+                                @endcan
 
-                        {{-- 완료처리 토글 --}}
-                        <label class="flex items-center gap-3 cursor-pointer">
-                            <span class="text-sm font-medium text-gray-700">완료처리</span>
-                            <button type="button"
-                                    wire:click="$toggle('formCompleted')"
-                                    @disabled(!$institutionSelected)
-                                    class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent
-                                           transition-colors duration-200 focus:outline-none
-                                           {{ $formCompleted ? 'bg-green-500' : 'bg-gray-300' }}
-                                           {{ $institutionSelected ? '' : 'opacity-50 cursor-not-allowed' }}">
-                                <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200
-                                             {{ $formCompleted ? 'translate-x-5' : 'translate-x-0' }}">
-                                </span>
-                            </button>
-                            <span class="text-xs {{ $formCompleted ? 'text-green-600 font-medium' : 'text-gray-400' }}">
-                                {{ $formCompleted ? '완료됨' : '진행중' }}
-                            </span>
-                        </label>
-                        </div>
+                                {{-- 완료처리 토글 --}}
+                                <label class="flex items-center gap-3 cursor-pointer">
+                                    <span class="text-sm font-medium text-gray-700">완료처리</span>
+                                    <button type="button"
+                                            wire:click="$toggle('formCompleted')"
+                                            @disabled(! $institutionSelected)
+                                            class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent
+                                                   transition-colors duration-200 focus:outline-none
+                                                   {{ $formCompleted ? 'bg-green-500' : 'bg-gray-300' }}
+                                                   {{ $institutionSelected ? '' : 'opacity-50 cursor-not-allowed' }}">
+                                        <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200
+                                                     {{ $formCompleted ? 'translate-x-5' : 'translate-x-0' }}">
+                                        </span>
+                                    </button>
+                                    <span class="text-xs {{ $formCompleted ? 'text-green-600 font-medium' : 'text-gray-400' }}">
+                                        {{ $formCompleted ? '완료됨' : '진행중' }}
+                                    </span>
+                                </label>
+                            </div>
+                        @else
+                            <div class="text-sm text-gray-500">
+                                @if($formCompleted)
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">완료</span>
+                                @else
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">진행중</span>
+                                @endif
+                            </div>
+                        @endunless
 
                         {{-- 버튼들 --}}
                         <div class="flex items-center gap-3">
-                            <button type="button"
-                                    wire:click="closeModal"
-                                    class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
-                                취소하기
-                            </button>
-                            <button type="submit"
-                                    @disabled(!$institutionSelected)
-                                    class="px-5 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                                    wire:loading.attr="disabled"
-                                    wire:loading.class="opacity-70 cursor-not-allowed">
-                                <span wire:loading.remove wire:target="save">저장하기</span>
-                                <span wire:loading wire:target="save">저장 중...</span>
-                            </button>
+                            @if($modalViewOnly)
+                                <button type="button"
+                                        wire:click="closeModal"
+                                        class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                                    닫기
+                                </button>
+                                @if($this->canUpdateEditingRecord())
+                                    <button type="button"
+                                            wire:click="startModalEdit"
+                                            class="px-5 py-2 text-sm font-medium bg-mochi-header hover:bg-mochi-header/90 text-white rounded-lg transition-colors">
+                                        수정
+                                    </button>
+                                @endif
+                            @else
+                                <button type="button"
+                                        wire:click="cancelModalEdit"
+                                        class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                                    취소
+                                </button>
+                                <button type="submit"
+                                        @disabled(! $institutionSelected)
+                                        class="px-5 py-2 text-sm font-medium bg-mochi-header hover:bg-mochi-header/90 text-white rounded-lg transition-colors"
+                                        wire:loading.attr="disabled"
+                                        wire:loading.class="opacity-70 cursor-not-allowed">
+                                    <span wire:loading.remove wire:target="save">저장하기</span>
+                                    <span wire:loading wire:target="save">저장 중...</span>
+                                </button>
+                            @endif
                         </div>
 
                     </div>
@@ -494,19 +507,12 @@
         <div class="mochi-modal-overlay z-[55]" wire:click.self="closeContractUploadModal">
             <div class="mochi-modal-shell max-w-6xl h-[90vh] max-h-[90vh] flex flex-col" wire:click.stop>
                 {{-- CO 파일업로드 + 계약서 업로드 헤더 통합 --}}
-                <div class="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-200 bg-white flex-shrink-0 rounded-t-xl">
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold text-gray-900">계약서 파일 Upload</h2>
-                        <p class="text-xs text-gray-500 mt-1">CO 파일 업로드 · 계약서 PDF·이미지·문서를 등록합니다.</p>
-                    </div>
-                    <button type="button" wire:click="closeContractUploadModal"
-                            class="shrink-0 p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer shadow-sm"
-                            aria-label="닫기">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
+                <x-admin.modal-header
+                    title="계약서 파일 Upload"
+                    subtitle="CO 파일 업로드 · 계약서 PDF·이미지·문서를 등록합니다."
+                    close-action="closeContractUploadModal"
+                    class="rounded-t-xl bg-white"
+                />
 
                 <form wire:submit="saveContractDocument" class="flex flex-col flex-1 min-h-0">
                     <div class="px-6 py-4 space-y-5 overflow-y-auto flex-1">
@@ -520,7 +526,7 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">기관명 <span class="text-red-500">*</span></label>
                                 <select wire:model.live="contractSkCode"
-                                        class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                     <option value="">기관을 선택하세요</option>
                                     @foreach($institutions as $inst)
                                         <option value="{{ $inst->SKcode }}">[{{ $inst->SKcode }}] {{ $inst->resolvedAccountName() }}</option>
@@ -531,7 +537,7 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">변경된 기관명</label>
                                 <input type="text" wire:model="contractChangedAccountName"
-                                       class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                       class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header"
                                        placeholder="변경된 기관명이 있으면 입력" />
                             </div>
                         </div>
@@ -539,7 +545,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">사업자 번호</label>
                             <input type="text" wire:model="contractBusinessNumber"
-                                   class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-md"
+                                   class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header max-w-md"
                                    placeholder="사업자등록번호" />
                         </div>
 
@@ -547,13 +553,13 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">날짜 <span class="text-red-500">*</span></label>
                                 <input type="date" wire:model="contractDocumentDate"
-                                       class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                       class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                 @error('contractDocumentDate') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">시간 <span class="text-red-500">*</span></label>
                                 <input type="time" wire:model="contractDocumentTime"
-                                       class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                       class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                 @error('contractDocumentTime') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                             </div>
                         </div>
@@ -561,7 +567,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">담당자</label>
                             <input type="text" wire:model="contractConsultant"
-                                   class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-md"
+                                   class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header max-w-md"
                                    placeholder="담당자명" />
                         </div>
 
@@ -605,6 +611,9 @@
                                                 @empty
                                                     <tr>
                                                         <td colspan="7" class="px-4 py-8 text-center text-gray-400">
+                                                            <svg class="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                            </svg>
                                                             @if(filled($contractSkCode))
                                                                 등록된 계약서 파일이 없습니다. 우측에서 파일을 선택한 뒤 하단「업로드」를 누르세요.
                                                             @else
@@ -623,7 +632,7 @@
                                            class="hidden"
                                            accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,application/pdf,image/*" />
                                     <label for="contract-upload-input"
-                                           class="flex items-center justify-center w-full px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg cursor-pointer transition-colors">
+                                           class="flex items-center justify-center w-full px-4 py-2.5 text-sm font-medium text-white bg-mochi-header hover:bg-mochi-header/90 rounded-lg cursor-pointer transition-colors">
                                         파일 선택
                                     </label>
                                     <div wire:loading wire:target="contractUpload" class="text-xs text-blue-600">파일 처리 중…</div>
@@ -677,7 +686,7 @@
                             취소하기
                         </button>
                         <button type="submit"
-                                class="px-6 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer"
+                                class="px-6 py-2 text-sm font-medium bg-mochi-header hover:bg-mochi-header/90 text-white rounded-lg cursor-pointer"
                                 wire:loading.attr="disabled"
                                 wire:target="saveContractDocument,contractUpload">
                             <span wire:loading.remove wire:target="saveContractDocument">{{ $contractSelectedId ? '수정 저장' : '업로드' }}</span>

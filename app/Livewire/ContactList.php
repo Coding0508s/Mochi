@@ -2,13 +2,19 @@
 
 namespace App\Livewire;
 
+use App\Actions\ReinstateTeacher;
 use App\Actions\RetireTeacher;
 use App\Models\Institution;
 use App\Models\Teacher;
 use App\Models\User;
 use App\Support\CoachTeacherScope;
+use App\Support\RetirementListWriter;
 use App\Support\SkCodeNormalizer;
+use App\Support\TeacherMasterWriter;
+use App\Support\TeacherRetirementRecommendation;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -32,6 +38,22 @@ class ContactList extends Component
     public bool $showModal = false;
 
     public ?int $editingId = null; // null: 신규, 숫자: 수정
+
+    // ─── 퇴직 확인 모달 상태 ────────────────────────────────────────
+    public bool $showRetireModal = false;
+
+    public string $retireTargetName = '';
+
+    public string $retireRecommendChoice = 'no';
+
+    public string $retireRecommendDescription = '';
+
+    // ─── 복직 확인 모달 상태 ────────────────────────────────────────
+    public bool $showReinstateModal = false;
+
+    public string $reinstateTargetName = '';
+
+    public string $reinstateClassParticipation = 'in';
 
     // ─── 삭제 확인 모달 상태 ────────────────────────────────────────
     public bool $showDeleteModal = false;
@@ -321,6 +343,21 @@ class ContactList extends Component
         $grapeDate = trim($this->newGrapeSeedEssentials);
         $littleDate = trim($this->newLittleSeedEssentials);
 
+        $existingTeacher = $this->editingId
+            ? Teacher::query()->find($this->editingId)
+            : null;
+
+        if ($existingTeacher?->isRetired() && $isActive) {
+            session()->flash('warning', '퇴직 교사는 「복직 처리」를 사용해 주세요. 연락처 수정만으로 재직 상태가 바뀌지 않습니다.');
+
+            return;
+        }
+
+        $status = $isActive ? '활성화' : '비활성화';
+        if ($existingTeacher?->isRetired()) {
+            $status = '퇴직';
+        }
+
         $data = [
             'Name' => $this->newName,
             'Phone' => $this->newPhone,
@@ -329,7 +366,7 @@ class ContactList extends Component
             'SK_Code' => $this->newSkCode,
             'School_Name' => $this->newSchoolName,
             'Description' => $this->newDescription,
-            'Status' => $isActive ? '활성화' : '비활성화',
+            'Status' => $status,
             'ClassInOut' => $this->classInOutFromParticipation($this->newClassParticipation),
             'GrapeSEEDEssentials' => $grapeDate === '' ? null : $grapeDate,
             'LittleSEEDEssentials' => $littleDate === '' ? null : $littleDate,
@@ -347,6 +384,31 @@ class ContactList extends Component
         $this->closeModal();
     }
 
+    public function openRetireModal(): void
+    {
+        if (! $this->editingId) {
+            return;
+        }
+
+        $teacher = Teacher::query()->find($this->editingId);
+        if (! $teacher || $teacher->isRetired()) {
+            session()->flash('warning', '이미 퇴직 처리된 교사입니다.');
+
+            return;
+        }
+
+        $this->retireTargetName = (string) ($teacher->Name ?? '연락처');
+        $this->resetRetireForm();
+        $this->showRetireModal = true;
+    }
+
+    public function closeRetireModal(): void
+    {
+        $this->showRetireModal = false;
+        $this->retireTargetName = '';
+        $this->resetRetireForm();
+    }
+
     public function retire(): void
     {
         if (! $this->editingId) {
@@ -360,19 +422,31 @@ class ContactList extends Component
 
         if ($teacher->isRetired()) {
             session()->flash('warning', '이미 퇴직 처리된 교사입니다.');
+            $this->closeRetireModal();
             $this->closeModal();
 
             return;
         }
+
+        $this->validate(
+            TeacherRetirementRecommendation::livewireRules(fn (): bool => $this->retireRecommendChoice === 'yes'),
+            TeacherRetirementRecommendation::livewireMessages(),
+        );
 
         $user = auth()->user();
         if (! $user instanceof User) {
             return;
         }
 
+        $recommendation = TeacherRetirementRecommendation::fromForm(
+            $this->retireRecommendChoice,
+            $this->retireRecommendDescription,
+        );
+
         try {
-            app(RetireTeacher::class)->execute($this->editingId, $user);
+            app(RetireTeacher::class)->execute($this->editingId, $user, $recommendation);
             session()->flash('success', '교사가 퇴직 처리되었습니다. 퇴직교사 리스트에 반영됩니다.');
+            $this->closeRetireModal();
             $this->closeModal();
             $this->resetPage();
         } catch (AuthorizationException) {
@@ -381,6 +455,16 @@ class ContactList extends Component
                 '이 교사의 퇴직 처리 권한이 없습니다. Coach 담당 TR 기관 교사는 교사 지원 화면에서 퇴직하거나, 권한이 있는 계정으로 처리해 주세요.',
             );
         }
+    }
+
+    private function resetRetireForm(): void
+    {
+        $this->retireRecommendChoice = 'no';
+        $this->retireRecommendDescription = '';
+        $this->resetValidation([
+            'retireRecommendChoice',
+            'retireRecommendDescription',
+        ]);
     }
 
     public function canRetireTeacher(?int $teacherId): bool
@@ -409,6 +493,108 @@ class ContactList extends Component
         return $scopedQuery->exists();
     }
 
+    public function openReinstateModal(): void
+    {
+        if (! $this->editingId) {
+            return;
+        }
+
+        $teacher = Teacher::query()->find($this->editingId);
+        if (! $teacher || ! $teacher->isRetired()) {
+            session()->flash('warning', '퇴직 상태인 교사만 복직 처리할 수 있습니다.');
+
+            return;
+        }
+
+        $this->reinstateTargetName = (string) ($teacher->Name ?? '연락처');
+        $this->reinstateClassParticipation = $teacher->ClassInOut ? 'in' : 'out';
+        $this->resetReinstateForm();
+        $this->showReinstateModal = true;
+    }
+
+    public function closeReinstateModal(): void
+    {
+        $this->showReinstateModal = false;
+        $this->reinstateTargetName = '';
+        $this->reinstateClassParticipation = 'in';
+        $this->resetReinstateForm();
+    }
+
+    public function reinstate(): void
+    {
+        if (! $this->editingId) {
+            return;
+        }
+
+        $teacher = Teacher::query()->find($this->editingId);
+        if (! $teacher || ! $teacher->isRetired()) {
+            session()->flash('warning', '퇴직 상태인 교사만 복직 처리할 수 있습니다.');
+            $this->closeReinstateModal();
+
+            return;
+        }
+
+        $this->validate([
+            'reinstateClassParticipation' => ['required', Rule::in(['in', 'out'])],
+        ], [
+            'reinstateClassParticipation.required' => '수업 참여 여부를 선택해 주세요.',
+            'reinstateClassParticipation.in' => '수업 참여 여부를 선택해 주세요.',
+        ]);
+
+        $user = auth()->user();
+        if (! $user instanceof User) {
+            return;
+        }
+
+        $classInOut = $this->reinstateClassParticipation === 'in';
+
+        try {
+            app(ReinstateTeacher::class)->execute($this->editingId, $user, $classInOut);
+            session()->flash('success', '교사가 복직 처리되었습니다. 교사 지원·연락처 목록에 다시 표시됩니다.');
+            $this->closeReinstateModal();
+            $this->closeModal();
+            $this->resetPage();
+        } catch (AuthorizationException) {
+            session()->flash(
+                'warning',
+                '이 교사의 복직 처리 권한이 없습니다. Coach 담당 TR 기관 교사는 권한이 있는 계정으로 처리해 주세요.',
+            );
+        } catch (\InvalidArgumentException $exception) {
+            session()->flash('warning', $exception->getMessage());
+        }
+    }
+
+    public function canReinstateTeacher(?int $teacherId): bool
+    {
+        if ($teacherId === null || $teacherId <= 0) {
+            return false;
+        }
+
+        $user = auth()->user();
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        $teacher = Teacher::query()->find($teacherId);
+        if (! $teacher || ! $teacher->isRetired()) {
+            return false;
+        }
+
+        if ($user->hasFullAccess()) {
+            return true;
+        }
+
+        $scopedQuery = Teacher::query()->where('ID', $teacherId);
+        CoachTeacherScope::apply($scopedQuery, $user);
+
+        return $scopedQuery->exists();
+    }
+
+    private function resetReinstateForm(): void
+    {
+        $this->resetValidation(['reinstateClassParticipation']);
+    }
+
     public function confirmDelete(int $id): void
     {
         $teacher = Teacher::findOrFail($id);
@@ -426,27 +612,39 @@ class ContactList extends Component
 
     public function delete(): void
     {
+        Gate::authorize('deleteContactRecords');
+
         if (! $this->deleteTargetId) {
             return;
         }
 
-        Teacher::where('ID', $this->deleteTargetId)->delete();
+        $teacherId = $this->deleteTargetId;
+
+        DB::transaction(function () use ($teacherId): void {
+            app(RetirementListWriter::class)->deleteForTeacher($teacherId);
+            app(TeacherMasterWriter::class)->deleteForTeacher($teacherId);
+            Teacher::where('ID', $teacherId)->delete();
+        });
+
         $this->closeDeleteModal();
-        session()->flash('success', '연락처가 삭제되었습니다.');
+        session()->flash('success', '연락처와 퇴직교사 관련 기록이 삭제되었습니다.');
         $this->resetPage();
     }
 
     // ─── 화면 렌더링 ──────────────────────────────────────────────
     public function render()
     {
-        $teachers = Teacher::query()
+        $teachersQuery = Teacher::query()
             ->searchBy($this->searchType, $this->search)
             ->when($this->employmentFilter === 'active', function ($query) {
                 $query->where('ClassInOut', true);
             })
             ->when($this->employmentFilter === 'inactive', function ($query) {
                 $query->where('ClassInOut', false);
-            })
+            });
+        CoachTeacherScope::apply($teachersQuery);
+
+        $teachers = $teachersQuery
             ->with('institution.accountInfo')
             ->orderBy('ID', 'desc')
             ->paginate(20);
@@ -483,9 +681,11 @@ class ContactList extends Component
             });
         }
 
-        $totalCount = Teacher::query()->count();
-        $activeCount = Teacher::query()->where('ClassInOut', true)->count();
-        $inactiveCount = Teacher::query()->where('ClassInOut', false)->count();
+        $statsQuery = Teacher::query();
+        CoachTeacherScope::apply($statsQuery);
+        $totalCount = (clone $statsQuery)->count();
+        $activeCount = (clone $statsQuery)->where('ClassInOut', true)->count();
+        $inactiveCount = (clone $statsQuery)->where('ClassInOut', false)->count();
 
         $teacherInstitutionSuggestions = collect();
         if ($this->showModal && blank($this->newSkCode)) {
@@ -508,6 +708,7 @@ class ContactList extends Component
             'activeCount' => $activeCount,
             'inactiveCount' => $inactiveCount,
             'canRetireCurrentTeacher' => $this->canRetireTeacher($this->editingId),
+            'canReinstateCurrentTeacher' => $this->canReinstateTeacher($this->editingId),
         ]);
     }
 

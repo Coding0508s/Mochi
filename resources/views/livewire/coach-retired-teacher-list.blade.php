@@ -11,9 +11,14 @@
             <span class="text-gray-300">|</span>
             <span class="text-gray-500">
                 @if($tableMissing ?? false)
-                    퇴직 이력 테이블을 사용할 수 없습니다.
+                    퇴직교사 마스터 테이블을 사용할 수 없습니다.
                 @else
-                    {{ $filterYear }}년 · <span class="font-semibold text-gray-700">{{ $retirements->total() }}</span>명
+                    @if(filled($filterYear))
+                        {{ $filterYear }}년 ·
+                    @else
+                        전체 ·
+                    @endif
+                    <span class="font-semibold text-gray-700">{{ $retirements->total() }}</span>명
                 @endif
             </span>
         </div>
@@ -21,13 +26,14 @@
 
     @if($tableMissing ?? false)
         <div class="mochi-table-card p-8 text-center text-gray-500 text-sm">
-            <p>S_RetirementList 테이블이 없어 목록을 표시할 수 없습니다.</p>
+            <p>S_TeacherMasterDB 테이블이 없어 목록을 표시할 수 없습니다.</p>
         </div>
     @else
         <div class="mochi-filter-card">
             <div class="flex flex-wrap items-center gap-3">
                 <select wire:model.live="filterYear"
                         class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">전체</option>
                     @for($y = now()->year; $y >= now()->year - 10; $y--)
                         <option value="{{ $y }}">{{ $y }}년</option>
                     @endfor
@@ -97,7 +103,7 @@
                         </td>
                         <td class="px-3 py-2 border border-gray-200">{{ $row->TR_Name ?: '-' }}</td>
                         <td class="px-3 py-2 border border-gray-200 text-center">
-                            @if($row->RecommendYN)
+                            @if($row->displayRecommendYn())
                                 <span class="text-green-700 font-medium">Y</span>
                             @else
                                 <span class="text-gray-400">-</span>
@@ -172,10 +178,46 @@
                         </div>
                     @endif
                 </div>
-                <div class="px-5 py-4 border-t border-gray-200 flex justify-end">
+                <div class="px-5 py-4 border-t border-gray-200 flex justify-end gap-2">
+                    @if($selectedRetirement['can_reinstate'] ?? false)
+                        <button type="button" wire:click="openReinstateModal"
+                                class="px-4 py-2 text-sm text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-50 cursor-pointer">
+                            복직 처리
+                        </button>
+                    @endif
                     <button type="button" wire:click="closeDetailModal"
                             class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer">
                         닫기
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if($showReinstateModal)
+        <div class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40"
+             wire:click.self="closeReinstateModal">
+            <div class="mochi-modal bg-white rounded-lg shadow-xl w-full max-w-md"
+                 wire:click.stop>
+                <x-admin.modal-header title="복직 처리" close-action="closeReinstateModal" />
+                <div class="px-5 py-4 space-y-4 text-sm text-gray-700">
+                    <p>
+                        <span class="font-semibold text-gray-900">{{ $reinstateTargetName }}</span> 교사를 복직 처리합니다.
+                        퇴직교사 리스트에서는 제외되며, 교사 지원·연락처 목록에 다시 표시됩니다.
+                    </p>
+                    @include('partials.admin.teacher-reinstate-fields')
+                </div>
+                <div class="px-5 py-4 border-t border-gray-200 flex justify-end gap-2">
+                    <button type="button" wire:click="closeReinstateModal"
+                            class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer">
+                        취소
+                    </button>
+                    <button type="button" wire:click="reinstate"
+                            wire:loading.attr="disabled"
+                            wire:loading.class="opacity-70 cursor-not-allowed"
+                            class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer">
+                        <span wire:loading.remove wire:target="reinstate">복직 확인</span>
+                        <span wire:loading wire:target="reinstate">처리 중...</span>
                     </button>
                 </div>
             </div>

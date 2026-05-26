@@ -13,6 +13,8 @@ return [
     'columns' => [
         'plan_1st' => 'Plan_1st_Support_Date',
         'plan_2nd' => 'Plan_2nd_Support_Date',
+        'plan_3rd' => 'Plan_3rd_Support_Date',
+        'plan_4th' => 'Plan_4th_Support_Date',
         'completed_1st' => '_1st_Support_Date',
         'completed_2nd' => '_2nd_Support_Date',
         'completed_3rd' => '_3rd_Support_Date',
@@ -23,8 +25,48 @@ return [
         'type_4th' => '_4th_Support_Type',
         'plan_type_1st' => 'Plan_1st_Support_Type',
         'plan_type_2nd' => 'Plan_2nd_Support_Type',
+        'plan_type_3rd' => 'Plan_3rd_Support_Type',
+        'plan_type_4th' => 'Plan_4th_Support_Type',
         'essentials_gs' => 'GrapeSEEDEssentials',
         'essentials_ls' => 'LittleSEEDEssentials',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | KPI 차수 정의 (1~4차 완료·필터·집계 공통)
+    |--------------------------------------------------------------------------
+    */
+
+    'kpi_rounds' => [
+        'first_round' => [
+            'plan' => 'plan_1st',
+            'completed' => 'completed_1st',
+            'label' => '1차 완료',
+            'filter_round' => '1',
+        ],
+        'second_round' => [
+            'plan' => 'plan_2nd',
+            'completed' => 'completed_2nd',
+            'label' => '2차 완료',
+            'filter_round' => '2',
+        ],
+        'third_round' => [
+            'plan' => 'plan_3rd',
+            'completed' => 'completed_3rd',
+            'label' => '3차 완료',
+            'filter_round' => '3',
+        ],
+        'fourth_round' => [
+            'plan' => 'plan_4th',
+            'completed' => 'completed_4th',
+            'label' => '4차 완료',
+            'filter_round' => '4',
+        ],
+    ],
+
+    'kpi_aggregate_labels' => [
+        'completed' => '전차 완료',
+        'unsupported' => '미지원',
     ],
 
     /*

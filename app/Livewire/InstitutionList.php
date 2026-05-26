@@ -1110,7 +1110,7 @@ class InstitutionList extends Component
     private function shouldScopeToAssignedInstitutions(): bool
     {
         $user = auth()->user();
-        if (! $user || $user->hasFullAccess()) {
+        if (! $user || $user->hasPlatformWideViewAccess()) {
             return false;
         }
 

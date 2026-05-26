@@ -91,4 +91,24 @@ class RetirementList extends Model
         $column = config('coach_retired_teachers.columns.retirement_date', 'RetirementDate');
         $query->whereYear($column, $year);
     }
+
+    /**
+     * 현재 퇴직 중인 교사만 (복직 처리된 이력·연결 교사 활성 상태는 제외).
+     *
+     * @param  Builder<RetirementList>  $query
+     */
+    public function scopeCurrentlyRetired(Builder $query): void
+    {
+        $statusColumn = config('coach_retired_teachers.columns.status', 'Status');
+        $retiredStatus = config('coach_retired_teachers.statuses.retired', '퇴직');
+
+        $query->where(function (Builder $q) use ($statusColumn, $retiredStatus): void {
+            $q->whereHas('teacher', function (Builder $teacherQuery): void {
+                $teacherQuery->where('Status', '퇴직');
+            })->orWhere(function (Builder $orphan) use ($statusColumn, $retiredStatus): void {
+                $orphan->where($statusColumn, $retiredStatus)
+                    ->whereDoesntHave('teacher');
+            });
+        });
+    }
 }

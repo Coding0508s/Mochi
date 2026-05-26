@@ -79,7 +79,7 @@
 
                 <label class="mt-3 flex items-start gap-2 cursor-pointer select-none">
                     <input type="checkbox" wire:model.defer="isGsBrochureAdmin"
-                           class="mt-0.5 rounded border-gray-300 text-[#2b78c5] focus:ring-[#2b78c5]"/>
+                           class="mt-0.5 rounded border-gray-300 text-mochi-header focus:ring-mochi-header"/>
                     <span class="text-sm text-gray-700 leading-snug">
                         GS Brochure 관리 권한 부여
                         <span class="block text-[11px] text-gray-500 font-normal mt-0.5">
@@ -87,6 +87,17 @@
                         </span>
                     </span>
                 </label>
+                <label class="mt-3 flex items-start gap-2 cursor-pointer select-none">
+                    <input type="checkbox" wire:model.defer="coachTeamKpi"
+                           class="mt-0.5 rounded border-gray-300 text-mochi-header focus:ring-mochi-header"/>
+                    <span class="text-sm text-gray-700 leading-snug">
+                        팀 지원 KPI 조회 (Coach 팀장)
+                        <span class="block text-[11px] text-gray-500 font-normal mt-0.5">
+                            Coach 부서({{ $coachDeptCode }})의 Department Manager(재직)일 때만 부여할 수 있습니다.
+                        </span>
+                    </span>
+                </label>
+                @error('coachTeamKpi') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
             </div>
 
             <div>
@@ -132,7 +143,7 @@
                 취소
             </a>
             <button type="submit"
-                    class="py-2 px-4 text-sm text-white bg-[#2b78c5] rounded-lg hover:bg-[#256bb0] cursor-pointer">
+                    class="py-2 px-4 text-sm text-white bg-mochi-header rounded-lg hover:bg-mochi-header/90 cursor-pointer">
                 등록
             </button>
         </div>

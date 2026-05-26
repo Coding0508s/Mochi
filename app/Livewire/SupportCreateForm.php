@@ -365,23 +365,25 @@ class SupportCreateForm extends Component
             }
 
             DB::transaction(function () use ($upload, $storedPath, $originalFilename, $detectedMimeType, $detectedSize, $resolvedPotentialTargetId, &$supportRecord): void {
-                $supportRecord = SupportRecord::query()->create([
-                    'Year' => (int) date('Y', strtotime($this->formSupportDate)),
-                    'SK_Code' => $this->formSkCode !== '' ? $this->formSkCode : null,
-                    'potential_target_id' => $resolvedPotentialTargetId,
-                    'Account_Name' => $this->formAccountName,
-                    'TR_Name' => $this->formCoName,
-                    'Support_Date' => $this->formSupportDate,
-                    'Meet_Time' => $this->formSupportTime.':00',
-                    'Support_Type' => $this->formSupportType,
-                    'Target' => $this->formTarget,
-                    'Issue' => null,
-                    'TO_Account' => $this->formToAccount,
-                    'TO_Depart' => $this->formToDepart,
-                    'Status' => $this->formCompleted ? '완료' : '진행중',
-                    'CompletedDate' => $this->formCompleted ? now() : null,
-                    'CreatedDate' => now(),
-                ]);
+                $supportRecord = SupportRecord::query()->create(
+                    SupportRecord::filterAttributesForTable([
+                        'Year' => (int) date('Y', strtotime($this->formSupportDate)),
+                        'SK_Code' => $this->formSkCode !== '' ? $this->formSkCode : null,
+                        'potential_target_id' => $resolvedPotentialTargetId,
+                        'Account_Name' => $this->formAccountName,
+                        'TR_Name' => $this->formCoName,
+                        'Support_Date' => $this->formSupportDate,
+                        'Meet_Time' => $this->formSupportTime.':00',
+                        'Support_Type' => $this->formSupportType,
+                        'Target' => $this->formTarget,
+                        'Issue' => null,
+                        'TO_Account' => $this->formToAccount,
+                        'TO_Depart' => $this->formToDepart,
+                        'Status' => $this->formCompleted ? '완료' : '진행중',
+                        'CompletedDate' => $this->formCompleted ? now() : null,
+                        'CreatedDate' => now(),
+                    ])
+                );
 
                 $this->mirrorSupportToPotentialDetail($supportRecord);
 

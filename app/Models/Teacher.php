@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use App\Casts\LegacyDateTimeCast;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -66,8 +69,12 @@ class Teacher extends Model
         'LittleSEEDEssentials',
         'Plan_1st_Support_Date',
         'Plan_2nd_Support_Date',
+        'Plan_3rd_Support_Date',
+        'Plan_4th_Support_Date',
         'Plan_1st_Support_Type',
         'Plan_2nd_Support_Type',
+        'Plan_3rd_Support_Type',
+        'Plan_4th_Support_Type',
         '_1st_Support_Date',
         '_2nd_Support_Date',
         '_3rd_Support_Date',
@@ -95,6 +102,8 @@ class Teacher extends Model
             'LittleSEEDEssentials' => LegacyDateTimeCast::class,
             'Plan_1st_Support_Date' => LegacyDateTimeCast::class,
             'Plan_2nd_Support_Date' => LegacyDateTimeCast::class,
+            'Plan_3rd_Support_Date' => LegacyDateTimeCast::class,
+            'Plan_4th_Support_Date' => LegacyDateTimeCast::class,
             'Unit_21_' => 'datetime',
             '_1st_Support_Date' => LegacyDateTimeCast::class,
             '_2nd_Support_Date' => LegacyDateTimeCast::class,
@@ -133,6 +142,104 @@ class Teacher extends Model
     {
         return $this->belongsTo(Institution::class, 'SK_Code', 'SKcode');
         // "S_AccountName 테이블에서 SKcode = 이 교사의 SK_Code 인 기관을 찾아"
+    }
+
+    public function masterRecord(): HasOne
+    {
+        $foreignKey = (new TeacherMasterDb)->teacherIdColumn();
+
+        return $this->hasOne(TeacherMasterDb::class, $foreignKey, 'ID');
+    }
+
+    public function retirementList(): HasOne
+    {
+        $foreignKey = config('coach_retired_teachers.columns.teacher_id', 'TearcherID');
+
+        return $this->hasOne(RetirementList::class, $foreignKey, 'ID');
+    }
+
+    public function displayAccountName(): string
+    {
+        $fromInstitution = trim($this->institution?->resolvedAccountName() ?? '');
+        if ($fromInstitution !== '') {
+            return $fromInstitution;
+        }
+
+        $fromMaster = trim((string) ($this->masterRecord?->displayAccountName() ?? ''));
+        if ($fromMaster !== '') {
+            return $fromMaster;
+        }
+
+        return trim((string) ($this->School_Name ?? ''));
+    }
+
+    public function displayPosition(): ?string
+    {
+        $position = trim((string) ($this->Position ?? ''));
+
+        return $position !== '' ? $position : null;
+    }
+
+    public function displayRecommendYn(): bool
+    {
+        if ($this->relationLoaded('retirementList')) {
+            return (bool) ($this->retirementList?->RecommendYN);
+        }
+
+        return (bool) ($this->retirementList()->value('RecommendYN'));
+    }
+
+    public function listTrName(): string
+    {
+        $fromMaster = trim((string) ($this->masterRecord?->getAttribute(
+            config('coach_retired_teachers.teacher_master.columns.tr_name', 'TR_Name')
+        ) ?? ''));
+        if ($fromMaster !== '') {
+            return $fromMaster;
+        }
+
+        return trim((string) ($this->institution?->accountInfo?->TR ?? ''));
+    }
+
+    public function listRetirementDate(): ?Carbon
+    {
+        $masterDate = $this->normalizeLegacyDate(
+            $this->masterRecord?->getAttribute(
+                config('coach_retired_teachers.teacher_master.columns.retired_at', 'RetirementDate')
+            )
+        );
+        if ($masterDate !== null) {
+            return $masterDate;
+        }
+
+        return $this->normalizeLegacyDate($this->retirementList?->RetirementDate);
+    }
+
+    private function normalizeLegacyDate(mixed $value): ?Carbon
+    {
+        if (! $value instanceof CarbonInterface) {
+            return null;
+        }
+
+        return $value instanceof Carbon ? $value : Carbon::instance($value);
+    }
+
+    /**
+     * @param  Builder<Teacher>  $query
+     */
+    public function scopeRetired(Builder $query): Builder
+    {
+        return $query->where('Status', config('coach_retired_teachers.statuses.retired', '퇴직'));
+    }
+
+    public function getRetirementDateAttribute(): ?Carbon
+    {
+        return $this->listRetirementDate();
+    }
+
+    public function getTRNameAttribute(): string
+    {
+        return $this->listTrName();
     }
 
     // ════════════════════════════════════════════════════════════════

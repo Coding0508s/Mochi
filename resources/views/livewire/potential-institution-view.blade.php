@@ -1,6 +1,9 @@
 <div class="mochi-page">
     @if(session('success'))
-        <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-800" role="status" data-mochi-flash-dismiss="3000">
+        <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-800 flex items-center gap-2" role="status" data-mochi-flash-dismiss="3000">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
             {{ session('success') }}
         </div>
     @endif
@@ -30,11 +33,11 @@
             <fieldset class="flex flex-wrap items-center gap-3 border-0 p-0 m-0">
                 <span class="text-sm text-gray-600">구간</span>
                 <label class="inline-flex items-center gap-1.5 text-sm cursor-pointer">
-                    <input type="radio" wire:model.live="periodGranularity" value="month" class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    <input type="radio" wire:model.live="periodGranularity" value="month" class="rounded-full border-gray-300 text-blue-600 focus:ring-mochi-header" />
                     월별
                 </label>
                 <label class="inline-flex items-center gap-1.5 text-sm cursor-pointer">
-                    <input type="radio" wire:model.live="periodGranularity" value="year" class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    <input type="radio" wire:model.live="periodGranularity" value="year" class="rounded-full border-gray-300 text-blue-600 focus:ring-mochi-header" />
                     연도별
                 </label>
             </fieldset>
@@ -45,14 +48,14 @@
                     <input id="piv-year-month"
                            type="month"
                            wire:model.live="yearMonth"
-                           class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                           class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                 </div>
             @else
                 <div class="flex items-center gap-2">
                     <label for="piv-filter-year" class="text-sm text-gray-600 whitespace-nowrap">연도</label>
                     <select id="piv-filter-year"
                             wire:model.live="filterYear"
-                            class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[7rem]">
+                            class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header min-w-[7rem]">
                         @foreach($yearOptions as $y)
                             <option value="{{ $y }}">{{ $y }}년</option>
                         @endforeach
@@ -63,11 +66,11 @@
             <fieldset class="flex flex-wrap items-center gap-3 border-0 p-0 m-0">
                 <span class="text-sm text-gray-600">기준</span>
                 <label class="inline-flex items-center gap-1.5 text-sm cursor-pointer">
-                    <input type="radio" wire:model.live="dateBasis" value="created" class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    <input type="radio" wire:model.live="dateBasis" value="created" class="rounded-full border-gray-300 text-blue-600 focus:ring-mochi-header" />
                     등록일
                 </label>
                 <label class="inline-flex items-center gap-1.5 text-sm cursor-pointer">
-                    <input type="radio" wire:model.live="dateBasis" value="meeting" class="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    <input type="radio" wire:model.live="dateBasis" value="meeting" class="rounded-full border-gray-300 text-blue-600 focus:ring-mochi-header" />
                     미팅일
                 </label>
             </fieldset>
@@ -82,7 +85,7 @@
                        wire:model.live.debounce.300ms="search"
                        placeholder="검색 (기관명·코드·담당 등)"
                        autocomplete="off"
-                       class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                       class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
             </div>
         </div>
         <p class="mt-2 text-xs text-gray-500">
@@ -148,6 +151,9 @@
                         @empty
                             <tr>
                                 <td colspan="{{ (config('potential_institutions.show_support_report_ui') && \Illuminate\Support\Facades\Gate::allows('managePotentialInstitutions')) ? 12 : 11 }}" class="px-4 py-16 text-center text-gray-400">
+                                    <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
                                     <p class="font-medium">해당 월에 등록된 잠재기관이 없습니다</p>
                                     <p class="text-sm mt-1">연·월 또는 검색어를 바꿔 보세요.</p>
                                 </td>
@@ -209,6 +215,9 @@
                         @empty
                             <tr>
                                 <td colspan="9" class="px-4 py-16 text-center text-gray-400">
+                                    <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
                                     <p class="font-medium">해당 월에 예정된 미팅·상담이 없습니다</p>
                                     <p class="text-sm mt-1">연·월 또는 검색어를 바꿔 보세요.</p>
                                 </td>
@@ -306,7 +315,12 @@
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="5" class="px-3 py-8 text-center text-gray-400">미팅/컨설팅 이력이 없습니다.</td>
+                                                <td colspan="5" class="px-3 py-8 text-center text-gray-400">
+                                                    <svg class="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                    </svg>
+                                                    미팅/컨설팅 이력이 없습니다.
+                                                </td>
                                             </tr>
                                         @endforelse
                                     </tbody>
@@ -326,7 +340,7 @@
                                 @can('managePotentialInstitutions')
                                     @if(!($selectedTarget['is_contract'] ?? false) && ($selectedTarget['can_manage'] ?? false))
                                         <a href="{{ route('supports.create', ['potential_target_id' => $selectedTarget['id']]) }}"
-                                           class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                                           class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-mochi-header rounded-lg hover:bg-mochi-header/90">
                                             지원 보고서 작성
                                         </a>
                                     @endif
@@ -359,7 +373,12 @@
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="6" class="px-3 py-8 text-center text-gray-400">기관지원보고서 이력이 없습니다.</td>
+                                                <td colspan="6" class="px-3 py-8 text-center text-gray-400">
+                                                    <svg class="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                    </svg>
+                                                    기관지원보고서 이력이 없습니다.
+                                                </td>
                                             </tr>
                                         @endforelse
                                     </tbody>

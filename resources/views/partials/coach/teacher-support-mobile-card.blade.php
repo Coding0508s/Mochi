@@ -27,6 +27,8 @@
         @php
             $plan1 = \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_1st']});
             $plan2 = \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_2nd']});
+            $plan3 = \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_3rd']});
+            $plan4 = \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_4th']});
             $done1 = \App\Support\ExcelSerialDate::toStorageString($teacher->getRawOriginal($cols['completed_1st'])) ?? '-';
             $done2 = \App\Support\ExcelSerialDate::toStorageString($teacher->getRawOriginal($cols['completed_2nd'])) ?? '-';
         @endphp
@@ -50,6 +52,28 @@
             <div class="mt-0.5 font-medium text-gray-800">{{ $plan2 !== '' ? $plan2 : '-' }}</div>
             <div class="mt-0.5 text-gray-500">{{ $teacher->{$cols['plan_type_2nd']} ?: '-' }}</div>
         </button>
+
+        @if($showExtendedColumns)
+            <button type="button"
+                    class="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-2 text-left {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                    @if($canOpenEditModal)
+                        wire:click="openEditModal({{ $teacher->ID }})"
+                    @endif>
+                <div class="text-[11px] text-blue-600">3차 계획</div>
+                <div class="mt-0.5 font-medium text-gray-800">{{ $plan3 !== '' ? $plan3 : '-' }}</div>
+                <div class="mt-0.5 text-gray-500">{{ $teacher->{$cols['plan_type_3rd']} ?: '-' }}</div>
+            </button>
+
+            <button type="button"
+                    class="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-2 text-left {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                    @if($canOpenEditModal)
+                        wire:click="openEditModal({{ $teacher->ID }})"
+                    @endif>
+                <div class="text-[11px] text-blue-600">4차 계획</div>
+                <div class="mt-0.5 font-medium text-gray-800">{{ $plan4 !== '' ? $plan4 : '-' }}</div>
+                <div class="mt-0.5 text-gray-500">{{ $teacher->{$cols['plan_type_4th']} ?: '-' }}</div>
+            </button>
+        @endif
 
         <button type="button"
                 class="rounded-lg border border-green-100 bg-green-50 px-2.5 py-2 text-left {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"

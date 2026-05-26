@@ -1099,7 +1099,7 @@ class PotentialInstitutionList extends Component
             return;
         }
 
-        if ($user->hasFullAccess()) {
+        if ($user->hasPlatformWideViewAccess()) {
             return;
         }
 

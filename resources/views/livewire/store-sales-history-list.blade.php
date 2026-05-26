@@ -6,7 +6,7 @@
     @endif
 
     <div class="mochi-summary-card">
-        <h2 class="text-base font-semibold text-[#2b78c5]">Store 전체 판매내역</h2>
+        <h2 class="text-base font-semibold text-mochi-header">Store 전체 판매내역</h2>
         <p class="mt-1 text-xs text-gray-600">그누보드(스토어사이트)의 모든 주문 내역을 시간순으로 조회합니다.</p>
     </div>
 

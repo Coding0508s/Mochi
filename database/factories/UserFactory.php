@@ -47,4 +47,20 @@ class UserFactory extends Factory
             'is_admin' => true,
         ]);
     }
+
+    public function coachTeamLead(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'team' => 'COACH',
+            'is_coach_team_lead' => true,
+        ]);
+    }
+
+    public function deputyAdmin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_admin' => false,
+            'is_deputy_admin' => true,
+        ]);
+    }
 }

@@ -193,7 +193,7 @@ class SupportCreateFormTest extends TestCase
             ->withQueryParams(['team_menu' => 'coach'])
             ->test(SupportCreateForm::class)
             ->assertSee('Coach Team 기관지원보고서 작성')
-            ->assertSee('Coach Team명')
+            ->assertSee('담당 Coach')
             ->assertDontSee('CO 기관지원보고서 작성');
     }
 

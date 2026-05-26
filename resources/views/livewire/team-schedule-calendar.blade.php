@@ -20,7 +20,7 @@
 
     <div class="mochi-summary-card">
         <div class="flex flex-wrap items-center gap-3">
-            <h2 class="text-base font-semibold text-[#2b78c5]">일정 관리</h2>
+            <h2 class="text-base font-semibold text-mochi-header">일정 관리</h2>
             <span class="text-gray-300">|</span>
             <button wire:click="previousMonth" class="py-1.5 px-3 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">이전 달</button>
             <button wire:click="goToday" class="py-1.5 px-3 text-sm border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50">이번 달</button>
@@ -79,7 +79,7 @@
                     <option value="cancelled">취소</option>
                 </select>
 
-                @if($viewMode === 'team' && auth()->user()?->hasFullAccess())
+                @if($viewMode === 'team' && auth()->user()?->hasPlatformWideViewAccess())
                     <select wire:model.live="userFilter" class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 max-lg:flex-1">
                         <option value="">전체 팀원</option>
                         @foreach($teamUsers as $teamUser)
@@ -230,9 +230,9 @@
     @endif
 
     @if($showFormModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-            <div class="w-full max-w-2xl rounded-2xl bg-white shadow-xl">
-                <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+        <div class="mochi-modal-overlay" wire:key="team-schedule-form-modal">
+            <div class="mochi-modal-shell max-w-2xl max-h-[90vh] min-h-0 flex flex-col">
+                <div class="shrink-0 flex items-center justify-between border-b border-gray-200 px-6 py-4">
                     <div>
                         <h3 class="text-lg font-semibold text-gray-900">{{ $viewOnly ? '일정 상세' : ($editingScheduleId ? '일정 수정' : '일정 추가') }}</h3>
                         <p class="text-sm text-gray-500">{{ $viewOnly ? '다른 사람 일정은 보기만 가능합니다.' : '본인 일정은 직접 수정할 수 있고, 팀 공개 일정은 팀 일정 보기에서 공유됩니다.' }}</p>
@@ -246,7 +246,8 @@
                     </button>
                 </div>
 
-                <form wire:submit.prevent="save" class="space-y-4 px-6 py-5">
+                <form wire:submit.prevent="save" class="flex min-h-0 flex-1 flex-col">
+                    <div class="mochi-modal-body-scroll flex-1 space-y-4 px-6 py-5">
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">제목 <span class="text-red-500">*</span></label>
                         <input type="text" wire:model.defer="title" @disabled($viewOnly) class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
@@ -341,7 +342,6 @@
                                 <button type="button" wire:click="confirmRecurringDelete" class="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700">삭제</button>
                             </div>
                         </div>
-                    </div>
                     @endif
 
                     <div>
@@ -349,8 +349,9 @@
                         <textarea wire:model.defer="description" rows="4" @disabled($viewOnly) class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"></textarea>
                         @error('description') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
+                    </div>
 
-                    <div class="flex items-center justify-between border-t border-gray-100 pt-4">
+                    <div class="shrink-0 flex items-center justify-between border-t border-gray-200 bg-gray-50 px-6 py-4">
                         <div>
                             @if($editingScheduleId && ! $viewOnly)
                                 <button type="button" wire:click="delete" wire:confirm="이 일정을 삭제할까요?" class="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600 hover:bg-red-50">삭제</button>

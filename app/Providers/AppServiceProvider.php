@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\SupportRecord;
 use App\Models\TeamSchedule;
 use App\Models\User;
 use App\Policies\TeamSchedulePolicy;
+use App\Support\ManagerNameNormalizer;
 use App\Support\TeamMenuContext;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -47,6 +49,9 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::define('manageUserAccounts', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
 
+        /** Coach Team 지원 KPI 대시보드 — 팀장·관리자 */
+        Gate::define('viewCoachTeamKpi', fn (?User $user): bool => (bool) $user?->canViewCoachTeamKpi());
+
         Gate::policy(TeamSchedule::class, TeamSchedulePolicy::class);
 
         Gate::define('accessCoTeamFeatures', fn (?User $user): bool => TeamMenuContext::canAccessCoOnlyFeatures($user));
@@ -54,13 +59,33 @@ class AppServiceProvider extends ServiceProvider
         /** 잠재기관 리스트/보기 — CO 팀·관리자(및 팀 미지정 레거시 계정) */
         Gate::define('managePotentialInstitutions', fn (?User $user): bool => TeamMenuContext::canAccessCoOnlyFeatures($user));
 
+        Gate::define('deleteTeamStructure', fn (?User $user): bool => (bool) ($user?->canDeletePlatformData()));
+
+        Gate::define('deleteContactRecords', fn (?User $user): bool => (bool) ($user?->canDeletePlatformData()));
+
         /** 기관 지원 보고서(S_SupportInfo_Account) 삭제 — 관리자만 */
-        Gate::define('deleteSupportRecords', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
+        Gate::define('deleteSupportRecords', fn (?User $user): bool => (bool) ($user?->canDeletePlatformData()));
+
+        /** 기관 지원 보고서 수정 — 관리자 전체, 일반 사용자는 본인 담당(TR_Name) 건만 */
+        Gate::define('updateSupportRecord', function (?User $user, SupportRecord $record): bool {
+            if ($user === null) {
+                return false;
+            }
+
+            if ($user->hasFullAccess()) {
+                return true;
+            }
+
+            $authorKey = ManagerNameNormalizer::normalize((string) ($record->TR_Name ?? ''));
+            $userKey = ManagerNameNormalizer::normalize($user->nameForCoReports());
+
+            return $authorKey !== '' && $userKey !== '' && $authorKey === $userKey;
+        });
 
         /** 잠재기관 미팅/컨설팅 이력 삭제 — 관리자만 */
-        Gate::define('deletePotentialMeetingDetails', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
+        Gate::define('deletePotentialMeetingDetails', fn (?User $user): bool => (bool) ($user?->canDeletePlatformData()));
 
         /** 잠재기관(CoNewTarget) 삭제 — 관리자만 (미계약만 허용은 컴포넌트에서 추가 검증) */
-        Gate::define('deletePotentialInstitutions', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
+        Gate::define('deletePotentialInstitutions', fn (?User $user): bool => (bool) ($user?->canDeletePlatformData()));
     }
 }

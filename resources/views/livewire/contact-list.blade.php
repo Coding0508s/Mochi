@@ -9,7 +9,10 @@
     @endif
 
     @if(session('warning'))
-        <div class="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm" data-mochi-flash-dismiss="5000" role="status">
+        <div class="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm flex items-center gap-2" data-mochi-flash-dismiss="5000" role="status">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
             {{ session('warning') }}
         </div>
     @endif
@@ -17,7 +20,7 @@
     {{-- 요약 영역 --}}
     <div class="mochi-summary-card">
         <div class="flex flex-wrap items-center gap-4 text-sm">
-            <h2 class="text-base font-semibold text-[#2b78c5]">기관 연락처</h2>
+            <h2 class="text-base font-semibold text-mochi-header">기관 연락처</h2>
             <span class="text-gray-300">|</span>
             <button wire:click="$set('employmentFilter', 'all')"
                     class="text-gray-600 hover:text-blue-700 transition-colors cursor-pointer
@@ -31,8 +34,8 @@
             </button>
             <button wire:click="$set('employmentFilter', 'inactive')"
                     class="text-gray-600 hover:text-blue-700 transition-colors cursor-pointer
-                           {{ $employmentFilter === 'inactive' ? 'font-semibold text-red-700' : '' }}">
-                수업 미참여 <span class="font-semibold text-red-500">{{ $inactiveCount }}</span>
+                           {{ $employmentFilter === 'inactive' ? 'font-semibold text-mochi-header' : '' }}">
+                수업 미참여 <span class="font-semibold text-gray-600">{{ $inactiveCount }}</span>
             </button>
             <span class="ml-auto text-gray-500">현재 조건 결과: <span class="font-semibold text-gray-700">{{ $teachers->total() }}</span>명</span>
         </div>
@@ -45,7 +48,7 @@
                 @foreach(['name' => '이름', 'email' => '이메일', 'school' => '기관', 'phone' => '전화번호'] as $value => $label)
                     <label class="flex items-center gap-1.5 cursor-pointer">
                         <input type="radio" wire:model.live="searchType" value="{{ $value }}"
-                               class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"/>
+                               class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-mochi-header"/>
                         <span class="{{ $searchType === $value ? 'text-blue-600 font-semibold' : 'text-gray-600' }}">
                             {{ $label }}
                         </span>
@@ -62,7 +65,7 @@
                 <input type="text"
                        wire:model.live.debounce.300ms="search"
                        placeholder="{{ ['name' => '이름', 'email' => '이메일', 'school' => '기관명', 'phone' => '전화번호'][$searchType] }}(으)로 검색..."
-                       class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                       class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
             </div>
 
             @if($search)
@@ -73,7 +76,7 @@
             @endif
 
             <button wire:click="openCreateModal"
-                    class="ml-auto flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer max-md:w-full max-md:justify-center max-md:ml-0">
+                    class="ml-auto flex items-center gap-2 px-4 py-2 bg-mochi-header hover:bg-mochi-header/90 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer max-md:w-full max-md:justify-center max-md:ml-0">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
@@ -126,9 +129,7 @@
                         <td class="px-3 py-2.5 text-gray-700 max-w-36 truncate" title="{{ $teacher->School_Name }}">{{ $teacher->School_Name ?? '-' }}</td>
                         <td class="px-3 py-2.5">
                             @if($teacher->Position)
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-                                    {{ $teacher->Position }}
-                                </span>
+                                <span class="text-xs text-gray-600">{{ $teacher->Position }}</span>
                             @else
                                 <span class="text-gray-400">-</span>
                             @endif
@@ -137,9 +138,9 @@
                             @if(trim((string) $teacher->Status) === '퇴직')
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">퇴직</span>
                             @elseif(in_array(trim((string) $teacher->Status), ['inactive', '비활성', '비활성화'], true))
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">비활성화</span>
+                                <span class="text-xs text-gray-600">비활성화</span>
                             @else
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">활성화</span>
+                                <span class="text-xs text-green-700">활성화</span>
                             @endif
                         </td>
                         <td class="px-3 py-2.5 text-gray-600 text-xs">
@@ -166,6 +167,7 @@
                                       d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                             </svg>
                             <p class="font-medium">검색 결과가 없습니다</p>
+                            <p class="text-sm mt-1">검색어 또는 필터 조건을 변경해 보세요.</p>
                         </td>
                     </tr>
                 @endforelse
@@ -214,7 +216,7 @@
                                        wire:model.live.debounce.250ms="newInstitutionKeyword"
                                        placeholder="기관명 또는 SK 코드로 검색…"
                                        autocomplete="off"
-                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 {{ $errors->has('newSkCode') ? 'border-red-400' : 'border-gray-300' }}"/>
+                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header {{ $errors->has('newSkCode') ? 'border-red-400' : 'border-gray-300' }}"/>
                                 @if(filled(trim($newInstitutionKeyword)) && $teacherInstitutionSuggestions->isNotEmpty())
                                     <div class="mt-2 max-h-52 overflow-auto border border-gray-200 rounded-lg bg-white shadow-sm divide-y divide-gray-100">
                                         @foreach($teacherInstitutionSuggestions as $inst)
@@ -242,13 +244,13 @@
                                     Name <span class="text-red-500">*</span>
                                 </label>
                                 <input type="text" wire:model="newName" placeholder="홍길동"
-                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 {{ $errors->has('newName') ? 'border-red-400' : 'border-gray-300' }}"/>
+                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header {{ $errors->has('newName') ? 'border-red-400' : 'border-gray-300' }}"/>
                                 @error('newName') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">직급</label>
                                 <select wire:model="newPosition"
-                                        class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                     <option value="">선택</option>
                                     <option value="원장">원장</option>
                                     <option value="부원장">부원장</option>
@@ -263,13 +265,13 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">eMail <span class="text-red-500">*</span></label>
                                 <input type="email" wire:model="newEmail" placeholder="example@email.com"
-                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 {{ $errors->has('newEmail') ? 'border-red-400' : 'border-gray-300' }}"/>
+                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header {{ $errors->has('newEmail') ? 'border-red-400' : 'border-gray-300' }}"/>
                                 @error('newEmail') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                                 <input type="text" wire:model="newPhone" placeholder="010-0000-0000"
-                                       class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                                       class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header"/>
                             </div>
                         </div>
 
@@ -277,13 +279,13 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">GrapeSEED Essentials</label>
                                 <input type="date" wire:model="newGrapeSeedEssentials"
-                                       class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                                       class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header"/>
                                 @error('newGrapeSeedEssentials') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">LittleSEED Essentials</label>
                                 <input type="date" wire:model="newLittleSeedEssentials"
-                                       class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                                       class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header"/>
                                 @error('newLittleSeedEssentials') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                             </div>
                         </div>
@@ -296,14 +298,14 @@
                                         <input type="radio"
                                                wire:model="newEmploymentStatus"
                                                value="active"
-                                               class="w-4 h-4 text-red-500 border-gray-300 focus:ring-red-400">
+                                               class="w-4 h-4 text-mochi-header border-gray-300 focus:ring-mochi-header">
                                         <span class="text-gray-700">활성화</span>
                                     </label>
                                     <label class="inline-flex items-center gap-2 cursor-pointer">
                                         <input type="radio"
                                                wire:model="newEmploymentStatus"
                                                value="inactive"
-                                               class="w-4 h-4 text-red-500 border-gray-300 focus:ring-red-400">
+                                               class="w-4 h-4 text-mochi-header border-gray-300 focus:ring-mochi-header">
                                         <span class="text-gray-700">비활성화</span>
                                     </label>
                                 </div>
@@ -316,14 +318,14 @@
                                         <input type="radio"
                                                wire:model="newClassParticipation"
                                                value="in"
-                                               class="w-4 h-4 text-red-500 border-gray-300 focus:ring-red-400">
+                                               class="w-4 h-4 text-mochi-header border-gray-300 focus:ring-mochi-header">
                                         <span class="text-gray-700">수업(O)</span>
                                     </label>
                                     <label class="inline-flex items-center gap-2 cursor-pointer">
                                         <input type="radio"
                                                wire:model="newClassParticipation"
                                                value="out"
-                                               class="w-4 h-4 text-red-500 border-gray-300 focus:ring-red-400">
+                                               class="w-4 h-4 text-mochi-header border-gray-300 focus:ring-mochi-header">
                                         <span class="text-gray-700">수업(X)</span>
                                     </label>
                                     <label class="inline-flex items-center gap-2 cursor-pointer">
@@ -341,29 +343,39 @@
                             <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
                             <textarea wire:model="newDescription" rows="4"
                                       placeholder="메모할 내용을 입력하세요"
-                                      class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+                                      class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header resize-none"></textarea>
                         </div>
                     </div>
 
                     <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
                         <div class="flex items-center gap-2">
+                            @if($editingId && ($canReinstateCurrentTeacher ?? false))
+                                <button type="button"
+                                        wire:click="openReinstateModal"
+                                        class="px-4 py-2 text-sm text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors cursor-pointer">
+                                    복직 처리
+                                </button>
+                            @endif
                             @if($editingId && ($canRetireCurrentTeacher ?? false))
                                 <button type="button"
-                                        wire:click="retire"
-                                        wire:confirm="이 교사를 퇴직 처리합니다. 퇴직교사 리스트에 반영되며 교사 지원 목록에서는 기본적으로 숨겨집니다. 계속할까요?"
+                                        wire:click="openRetireModal"
                                         class="px-4 py-2 text-sm text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer">
                                     퇴직 처리
                                 </button>
-                                <button type="button"
-                                        wire:click="confirmDelete({{ $editingId }})"
-                                        class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
-                                    삭제하기
-                                </button>
+                            @endif
+                            @if($editingId)
+                                @can('deleteContactRecords')
+                                    <button type="button"
+                                            wire:click="confirmDelete({{ $editingId }})"
+                                            class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+                                        삭제하기
+                                    </button>
+                                @endcan
                             @endif
                         </div>
 
                         <button type="submit"
-                                class="px-5 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors cursor-pointer"
+                                class="px-5 py-2 text-sm font-medium bg-mochi-header hover:bg-mochi-header/90 text-white rounded-lg transition-colors cursor-pointer"
                                 wire:loading.attr="disabled"
                                 wire:loading.class="opacity-70 cursor-not-allowed">
                             <span wire:loading.remove wire:target="save">{{ $editingId ? '수정하기' : '저장하기' }}</span>
@@ -371,6 +383,74 @@
                         </button>
                         </div>
                 </form>
+            </div>
+        </div>
+    @endif
+
+    {{-- 퇴직 확인 모달 --}}
+    @if($showRetireModal)
+        <div class="mochi-modal-overlay"
+             wire:click.self="closeRetireModal">
+            <div class="mochi-modal-shell max-w-md"
+                 wire:click.stop>
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-base font-semibold text-gray-900">퇴직 처리</h3>
+                </div>
+                <div class="px-6 py-5 space-y-4 text-sm text-gray-700">
+                    <p>
+                        <span class="font-semibold text-gray-900">{{ $retireTargetName }}</span> 교사를 퇴직 처리합니다.
+                        퇴직교사 리스트에 반영되며, 교사 지원 목록에서는 기본적으로 숨겨집니다.
+                    </p>
+                    @include('partials.admin.teacher-retire-recommendation-fields')
+                </div>
+                <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+                    <button type="button" wire:click="closeRetireModal"
+                            class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer">
+                        취소
+                    </button>
+                    <button type="button"
+                            wire:click="retire"
+                            wire:loading.attr="disabled"
+                            wire:loading.class="opacity-70 cursor-not-allowed"
+                            class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 cursor-pointer">
+                        <span wire:loading.remove wire:target="retire">퇴직 확인</span>
+                        <span wire:loading wire:target="retire">처리 중...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- 복직 확인 모달 --}}
+    @if($showReinstateModal)
+        <div class="mochi-modal-overlay"
+             wire:click.self="closeReinstateModal">
+            <div class="mochi-modal-shell max-w-md"
+                 wire:click.stop>
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-base font-semibold text-gray-900">복직 처리</h3>
+                </div>
+                <div class="px-6 py-5 space-y-4 text-sm text-gray-700">
+                    <p>
+                        <span class="font-semibold text-gray-900">{{ $reinstateTargetName }}</span> 교사를 복직 처리합니다.
+                        퇴직교사 리스트에서는 제외되며, 교사 지원·연락처 목록에 다시 표시됩니다. 퇴직 이력은 유지됩니다.
+                    </p>
+                    @include('partials.admin.teacher-reinstate-fields')
+                </div>
+                <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+                    <button type="button" wire:click="closeReinstateModal"
+                            class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer">
+                        취소
+                    </button>
+                    <button type="button"
+                            wire:click="reinstate"
+                            wire:loading.attr="disabled"
+                            wire:loading.class="opacity-70 cursor-not-allowed"
+                            class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 cursor-pointer">
+                        <span wire:loading.remove wire:target="reinstate">복직 확인</span>
+                        <span wire:loading wire:target="reinstate">처리 중...</span>
+                    </button>
+                </div>
             </div>
         </div>
     @endif
@@ -388,7 +468,7 @@
                     <p>
                         <span class="font-semibold text-gray-900">{{ $deleteTargetName }}</span> 연락처를 삭제할까요?
                     </p>
-                    <p class="text-xs text-gray-500 mt-2">삭제 후 복구할 수 없습니다.</p>
+                    <p class="text-xs text-gray-500 mt-2">연락처와 퇴직교사 리스트 기록이 함께 삭제되며, 복구할 수 없습니다.</p>
                 </div>
                 <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
                     <button type="button" wire:click="closeDeleteModal"
@@ -481,7 +561,7 @@
                     </button>
                     <button type="button"
                             wire:click="openEditFromDetail"
-                            class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors cursor-pointer">
+                            class="px-4 py-2 text-sm font-medium text-white bg-mochi-header hover:bg-mochi-header/90 rounded-lg transition-colors cursor-pointer">
                         수정
                     </button>
                 </div>
@@ -490,7 +570,7 @@
     @endif
 
     <div wire:loading.delay
-         wire:target="save,delete,retire,openDetailModal,openEditModal,openEditFromDetail,gotoPage,nextPage,previousPage"
+         wire:target="save,delete,retire,reinstate,openDetailModal,openEditModal,openEditFromDetail,gotoPage,nextPage,previousPage"
          class="fixed bottom-6 right-6 z-50">
         <div class="bg-white rounded-xl px-4 py-3 shadow-lg border border-gray-200 flex items-center gap-2 text-sm text-gray-700">
             <svg class="animate-spin w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24">

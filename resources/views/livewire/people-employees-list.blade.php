@@ -1,11 +1,17 @@
 <div class="mochi-page">
     @if(session('success'))
-        <div class="mb-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700" data-mochi-flash-dismiss="3000" role="status">
+        <div class="mb-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 flex items-center gap-2" data-mochi-flash-dismiss="3000" role="status">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
             {{ session('success') }}
         </div>
     @endif
     @if(session('error'))
-        <div class="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" data-mochi-flash-dismiss="3000" role="alert">
+        <div class="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center gap-2" data-mochi-flash-dismiss="3000" role="alert">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
             {{ session('error') }}
         </div>
     @endif
@@ -13,12 +19,12 @@
     {{-- 상단 요약 --}}
     <div class="mochi-summary-card">
         <div class="flex flex-wrap items-center gap-4 text-sm">
-            <h2 class="text-base font-semibold text-[#2b78c5]">Employees</h2>
+            <h2 class="text-base font-semibold text-mochi-header">Employees</h2>
             <span class="text-gray-300">|</span>
             <span class="text-gray-600">현재 팀 <span class="font-semibold text-indigo-600">{{ $currentTeamLabel }}</span></span>
             <span class="text-gray-600">전체 <span class="font-semibold text-blue-600">{{ $allCount }}</span></span>
             <span class="text-gray-600">재직 <span class="font-semibold text-green-600">{{ $activeCount }}</span></span>
-            <span class="text-gray-600">비활성 <span class="font-semibold text-red-500">{{ $inactiveCount }}</span></span>
+            <span class="text-gray-600">비활성 <span class="font-semibold text-gray-600">{{ $inactiveCount }}</span></span>
             <div class="ml-auto text-gray-500">
                 현재 조건 결과: <span class="font-semibold text-gray-700">{{ $employees->total() }}</span>명
             </div>
@@ -32,8 +38,8 @@
                 @foreach(['name' => '이름', 'email' => '이메일', 'department' => '부서'] as $value => $label)
                     <label class="flex items-center gap-1.5 cursor-pointer">
                         <input type="radio" wire:model.live="searchType" value="{{ $value }}"
-                               class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"/>
-                        <span class="{{ $searchType === $value ? 'text-blue-600 font-semibold' : 'text-gray-600' }}">
+                               class="w-4 h-4 text-mochi-header border-gray-300 focus:ring-mochi-header"/>
+                        <span class="{{ $searchType === $value ? 'text-mochi-header font-semibold' : 'text-gray-600' }}">
                             {{ $label }}
                         </span>
                     </label>
@@ -41,7 +47,7 @@
             </div>
 
             <select wire:model.live="filterStatus"
-                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                 <option value="">전체 상태</option>
                 @foreach($statusOptions as $status)
                     <option value="{{ (string) $status }}">
@@ -51,7 +57,7 @@
             </select>
 
             <select wire:model.live="filterDept"
-                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                 <option value="">전체 부서</option>
                 @foreach($deptOptions as $dept)
                     <option value="{{ $dept->WORKDEPT }}">
@@ -69,7 +75,7 @@
                 <input type="text"
                        wire:model.live.debounce.300ms="search"
                        placeholder="{{ ['name' => '이름', 'email' => '이메일', 'department' => '부서'][$searchType] }} 검색"
-                       class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                       class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
             </div>
 
             @if($search || $filterStatus !== '' || $filterDept !== '')
@@ -93,13 +99,15 @@
                         class="py-2 px-3 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 cursor-pointer">
                     팀 추가
                 </button>
+            @endif
 
+            @can('deleteTeamStructure')
                 <button type="button"
                         wire:click="openDeleteTeamModal"
                         class="py-2 px-3 text-sm text-white bg-rose-600 rounded-lg hover:bg-rose-700 cursor-pointer">
                     팀 삭제
                 </button>
-            @endif
+            @endcan
         </div>
     </div>
 
@@ -142,11 +150,11 @@
                             <td class="px-3 py-2 text-gray-700">{{ $emp->HIREDATE ? \Illuminate\Support\Carbon::parse($emp->HIREDATE)->format('Y-m-d') : '-' }}</td>
                             <td class="px-3 py-2 text-center">
                                 @if((int) ($emp->STATUS ?? -1) === 1)
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">재직</span>
+                                    <span class="text-xs text-green-700">재직</span>
                                 @elseif((int) ($emp->STATUS ?? -1) === 0)
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600">비활성</span>
+                                    <span class="text-xs text-gray-600">비활성</span>
                                 @else
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">-</span>
+                                    <span class="text-xs text-gray-600">-</span>
                                 @endif
                             </td>
                             @if($canManageUserAccounts)
@@ -164,7 +172,7 @@
                                                 wire:click.stop="openSendResetModal('{{ $emp->EMPNO }}')"
                                                 title="비밀번호 재설정 메일 보내기"
                                                 aria-label="비밀번호 재설정 메일 보내기"
-                                                class="inline-flex items-center justify-center w-7 h-7 rounded-md text-[#2b78c5] hover:bg-blue-50 cursor-pointer">
+                                                class="inline-flex items-center justify-center w-7 h-7 rounded-md text-mochi-header hover:bg-blue-50 cursor-pointer">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                       d="M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
@@ -183,17 +191,17 @@
                                         </button>
                                     @elseif($linkedId !== null && $linkedActive === false)
                                         <span title="비활성 계정 (활성 후 발송 가능)"
-                                              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">
+                                              class="text-[10px] text-gray-500">
                                             비활성
                                         </span>
                                     @elseif($linkedId === null && ! $isEmployeeActive)
                                         <span title="재직 중이 아닌 직원은 계정을 만들 수 없습니다"
-                                              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">
+                                              class="text-[10px] text-gray-500">
                                             불가
                                         </span>
                                     @elseif($linkedId === null && $employeeEmail === '')
                                         <span title="이메일이 비어 있어 계정을 만들 수 없습니다"
-                                              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700">
+                                              class="text-[10px] text-gray-600">
                                             이메일 없음
                                         </span>
                                     @endif
@@ -203,6 +211,9 @@
                     @empty
                         <tr>
                             <td colspan="{{ $canManageUserAccounts ? 10 : 9 }}" class="px-4 py-16 text-center text-gray-400">
+                                <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
                                 <p class="font-medium">직원 데이터가 없습니다</p>
                                 <p class="text-sm mt-1">검색/필터 조건을 변경해 보세요.</p>
                             </td>
@@ -221,24 +232,19 @@
 
     @if($showCreateEmployeeModal)
         <div class="mochi-modal-overlay" wire:key="employee-create-modal">
-            <div class="mochi-modal-shell max-w-3xl">
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
-                    <h3 class="text-lg font-semibold text-gray-800">직원 등록</h3>
-                    <button type="button"
-                            wire:click="closeCreateEmployeeModal"
-                            class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
+            <div class="mochi-modal-shell max-w-3xl max-h-[90vh] min-h-0 flex flex-col">
+                <x-admin.modal-header
+                    title="직원 등록"
+                    close-action="closeCreateEmployeeModal"
+                />
 
-                <form wire:submit.prevent="createEmployee" class="px-6 py-5 space-y-4">
+                <form wire:submit.prevent="createEmployee" class="flex min-h-0 flex-1 flex-col">
+                    <div class="mochi-modal-body-scroll flex-1 px-6 py-5 space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="md:col-span-2">
                             <label class="block text-xs font-semibold text-gray-500 mb-1">사번 <span class="text-red-500">*</span></label>
                             <input type="text" wire:model.defer="createEmpNo" maxlength="20"
-                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header"
                                    placeholder="예: E2026001"/>
                             @error('createEmpNo') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
@@ -246,14 +252,14 @@
                         <div>
                             <label class="block text-xs font-semibold text-gray-500 mb-1">이름(한글) <span class="text-red-500">*</span></label>
                             <input type="text" wire:model.defer="createKoreanName" maxlength="20"
-                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header"/>
                             @error('createKoreanName') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label class="block text-xs font-semibold text-gray-500 mb-1">영어 이름 <span class="text-red-500">*</span></label>
                             <input type="text" wire:model.defer="createEnglishName" maxlength="50"
-                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header"/>
                             @error('createEnglishName') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
 
@@ -261,12 +267,12 @@
                             <label class="block text-xs font-semibold text-gray-500 mb-1">직책 <span class="text-red-500">*</span></label>
                             @if($jobOptions->isEmpty())
                                 <input type="text" wire:model.defer="createJob" maxlength="100"
-                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header"
                                        placeholder="직책을 입력하세요"/>
                                 <p class="mt-1 text-[11px] text-amber-700">기존 직원 데이터가 없어 자유 입력입니다.</p>
                             @else
                                 <select wire:model.defer="createJob"
-                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                     <option value="">직책 선택</option>
                                     @foreach($jobOptions as $job)
                                         <option value="{{ $job }}">{{ $job }}</option>
@@ -279,7 +285,7 @@
                         <div>
                             <label class="block text-xs font-semibold text-gray-500 mb-1">부서(팀) <span class="text-red-500">*</span></label>
                             <select wire:model.defer="createWorkDept"
-                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                 <option value="">부서 선택</option>
                                 @foreach($deptOptions as $dept)
                                     <option value="{{ $dept->WORKDEPT }}">
@@ -293,7 +299,7 @@
                         <div class="md:col-span-2">
                             <label class="block text-xs font-semibold text-gray-500 mb-1">이메일 <span class="text-red-500">*</span></label>
                             <input type="email" wire:model.defer="createEmail" maxlength="100"
-                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header"/>
                             @error('createEmail') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
 
                             <p class="mt-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-700">
@@ -302,24 +308,35 @@
 
                             <label class="mt-3 flex items-start gap-2 cursor-pointer select-none">
                                 <input type="checkbox" wire:model.defer="createIsGsBrochureAdmin"
-                                       class="mt-0.5 rounded border-gray-300 text-[#2b78c5] focus:ring-[#2b78c5]"/>
+                                       class="mt-0.5 rounded border-gray-300 text-mochi-header focus:ring-mochi-header"/>
                                 <span class="text-sm text-gray-700 leading-snug">
                                     GS Brochure 관리 권한 부여
                                 </span>
                             </label>
+                            <label class="mt-3 flex items-start gap-2 cursor-pointer select-none">
+                                <input type="checkbox" wire:model.defer="createCoachTeamKpi"
+                                       class="mt-0.5 rounded border-gray-300 text-mochi-header focus:ring-mochi-header"/>
+                                <span class="text-sm text-gray-700 leading-snug">
+                                    팀 지원 KPI 조회 (Coach 팀장)
+                                    <span class="mt-0.5 block text-[11px] font-normal text-gray-500">
+                                        Coach 부서({{ $coachDeptCode }})의 Department Manager(재직)일 때만 부여할 수 있습니다.
+                                    </span>
+                                </span>
+                            </label>
+                            @error('createCoachTeamKpi') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label class="block text-xs font-semibold text-gray-500 mb-1">연락처 <span class="text-red-500">*</span></label>
                             <input type="text" wire:model.defer="createPhone" maxlength="20"
-                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header"/>
                             @error('createPhone') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label class="block text-xs font-semibold text-gray-500 mb-1">상태</label>
                             <select wire:model.defer="createStatus"
-                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                 <option value="">미지정</option>
                                 <option value="1">재직</option>
                                 <option value="0">퇴사</option>
@@ -330,14 +347,14 @@
                         <div>
                             <label class="block text-xs font-semibold text-gray-500 mb-1">입사일</label>
                             <input type="date" wire:model.defer="createHireDate"
-                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header"/>
                             @error('createHireDate') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label class="block text-xs font-semibold text-gray-500 mb-1">성별</label>
                             <select wire:model.defer="createSex"
-                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                 @foreach(\App\Support\EmployeeSex::options() as $value => $label)
                                     <option value="{{ $value }}">{{ $label }}</option>
                                 @endforeach
@@ -346,14 +363,14 @@
                         </div>
                     </div>
 
-                    <div class="flex justify-end gap-2 pt-2">
+                    <div class="shrink-0 flex items-center justify-end gap-2 border-t border-gray-200 bg-gray-50 px-6 py-4">
                         <button type="button"
                                 wire:click="closeCreateEmployeeModal"
-                                class="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">
+                                class="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 cursor-pointer">
                             취소
                         </button>
                         <button type="submit"
-                                class="px-4 py-2 text-sm text-white bg-[#2b78c5] rounded-lg hover:bg-[#256bb0] cursor-pointer"
+                                class="px-4 py-2 text-sm text-white bg-mochi-header rounded-lg hover:bg-mochi-header/90 cursor-pointer disabled:opacity-60"
                                 wire:loading.attr="disabled"
                                 wire:target="createEmployee">
                             등록
@@ -366,40 +383,33 @@
 
     @if($showEditModal)
         <div class="mochi-modal-overlay" wire:key="employee-edit-modal">
-            <div class="mochi-modal-shell max-w-3xl">
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-800">직원 정보 수정</h3>
-                        <p class="text-xs text-gray-500 mt-1">사번: {{ $editingEmpNo }}</p>
-                    </div>
-                    <button type="button"
-                            wire:click="closeEditModal"
-                            class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
+            <div class="mochi-modal-shell max-w-3xl max-h-[90vh] min-h-0 flex flex-col">
+                <x-admin.modal-header
+                    title="직원 정보 수정"
+                    subtitle="사번: {{ $editingEmpNo }}"
+                    close-action="closeEditModal"
+                />
 
-                <form wire:submit.prevent="saveEmployee" class="px-6 py-5">
+                <form wire:submit.prevent="saveEmployee" class="flex min-h-0 flex-1 flex-col">
+                    <div class="mochi-modal-body-scroll flex-1 px-6 py-5">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-semibold text-gray-500 mb-1">이름(한글)</label>
                             <input type="text" wire:model.defer="editKoreanName"
-                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                             @error('editKoreanName') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-500 mb-1">영어이름</label>
                             <input type="text" wire:model.defer="editEnglishName"
-                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                             @error('editEnglishName') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label class="block text-xs font-semibold text-gray-500 mb-1">직책</label>
                             <select wire:model.defer="editJob"
-                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                 <option value="">직책 선택</option>
                                 @foreach($jobOptions as $job)
                                     <option value="{{ $job }}">{{ $job }}</option>
@@ -410,20 +420,20 @@
                         <div>
                             <label class="block text-xs font-semibold text-gray-500 mb-1">연락처</label>
                             <input type="text" wire:model.defer="editPhone"
-                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                             @error('editPhone') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label class="block text-xs font-semibold text-gray-500 mb-1">이메일</label>
                             <input type="email" wire:model.defer="editEmail"
-                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                             @error('editEmail') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-500 mb-1">상태</label>
                             <select wire:model.defer="editStatus"
-                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                 <option value="">미설정</option>
                                 <option value="1">재직</option>
                                 <option value="0">비활성</option>
@@ -445,7 +455,7 @@
                                 <label class="flex items-start gap-2 cursor-pointer select-none">
                                     <input type="checkbox"
                                            wire:model.defer="editUserIsAdmin"
-                                           class="mt-0.5 rounded border-gray-300 text-[#2b78c5] focus:ring-[#2b78c5]"/>
+                                           class="mt-0.5 rounded border-gray-300 text-mochi-header focus:ring-mochi-header"/>
                                     <span class="text-sm text-gray-700 leading-snug">
                                         관리자 권한
                                         <span class="mt-0.5 block text-[11px] font-normal text-gray-500">
@@ -457,8 +467,22 @@
 
                                 <label class="flex items-start gap-2 cursor-pointer select-none">
                                     <input type="checkbox"
+                                           wire:model.defer="editUserIsDeputyAdmin"
+                                           @disabled($editUserIsAdmin)
+                                           class="mt-0.5 rounded border-gray-300 text-mochi-header focus:ring-mochi-header disabled:bg-gray-100 disabled:cursor-not-allowed"/>
+                                    <span class="text-sm text-gray-700 leading-snug">
+                                        준관리자 (전역 조회)
+                                        <span class="mt-0.5 block text-[11px] font-normal text-gray-500">
+                                            소속 팀과 무관하게 플랫폼 데이터를 조회할 수 있습니다. 삭제·Setup·People 수정 권한은 없습니다.
+                                        </span>
+                                    </span>
+                                </label>
+                                @error('editUserIsDeputyAdmin') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+
+                                <label class="flex items-start gap-2 cursor-pointer select-none">
+                                    <input type="checkbox"
                                            wire:model.defer="editGsBrochureAdmin"
-                                           class="mt-0.5 rounded border-gray-300 text-[#2b78c5] focus:ring-[#2b78c5]"/>
+                                           class="mt-0.5 rounded border-gray-300 text-mochi-header focus:ring-mochi-header"/>
                                     <span class="text-sm text-gray-700 leading-snug">
                                         GS Brochure 권한
                                         <span class="mt-0.5 block text-[11px] font-normal text-gray-500">
@@ -470,7 +494,7 @@
                                 <label class="flex items-start gap-2 cursor-pointer select-none">
                                     <input type="checkbox"
                                            wire:model.defer="editCanManageStoreInventory"
-                                           class="mt-0.5 rounded border-gray-300 text-[#2b78c5] focus:ring-[#2b78c5]"/>
+                                           class="mt-0.5 rounded border-gray-300 text-mochi-header focus:ring-mochi-header"/>
                                     <span class="text-sm text-gray-700 leading-snug">
                                         스토어 재고 수량 수정
                                         <span class="mt-0.5 block text-[11px] font-normal text-gray-500">
@@ -479,6 +503,25 @@
                                     </span>
                                 </label>
                                 @error('editCanManageStoreInventory') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+
+                                <label class="flex items-start gap-2 cursor-pointer select-none">
+                                    <input type="checkbox"
+                                           wire:model.defer="editCoachTeamKpi"
+                                           @disabled($editUserIsAdmin || $editUserIsDeputyAdmin)
+                                           class="mt-0.5 rounded border-gray-300 text-mochi-header focus:ring-mochi-header disabled:bg-gray-100 disabled:cursor-not-allowed"/>
+                                    <span class="text-sm text-gray-700 leading-snug">
+                                        팀 지원 KPI 조회 (Coach 팀장)
+                                        <span class="mt-0.5 block text-[11px] font-normal text-gray-500">
+                                            Coach 부서({{ $coachDeptCode }})의 Department Manager(재직)일 때만 부여할 수 있습니다.
+                                        </span>
+                                        @if($editUserIsAdmin || $editUserIsDeputyAdmin)
+                                            <span class="mt-0.5 block text-[11px] font-normal text-amber-700">
+                                                관리자·준관리자 권한이 있으면 별도 체크 없이 팀 지원 KPI에 접근할 수 있습니다.
+                                            </span>
+                                        @endif
+                                    </span>
+                                </label>
+                                @error('editCoachTeamKpi') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
 
                                 @if(! $hasLinkedLoginAccount)
                                     <p class="text-[11px] text-amber-700">
@@ -491,7 +534,7 @@
                                     @if($hasLinkedLoginAccount && $editUserIsActive)
                                         <button type="button"
                                                 wire:click="openSendResetModalFromEdit"
-                                                class="inline-flex items-center gap-2 px-3 py-2 text-sm text-[#2b78c5] border border-[#2b78c5] rounded-lg hover:bg-blue-50 cursor-pointer">
+                                                class="inline-flex items-center gap-2 px-3 py-2 text-sm text-mochi-header border border-mochi-header rounded-lg hover:bg-blue-50 cursor-pointer">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                       d="M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
@@ -531,7 +574,7 @@
                             <label class="block text-xs font-semibold text-gray-500 mb-1">부서(팀)</label>
                             @can('manageEmployeeDepartment')
                                 <select wire:model.defer="editWorkDept"
-                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                     <option value="">부서 선택</option>
                                     @foreach($deptOptions as $dept)
                                         <option value="{{ $dept->WORKDEPT }}">
@@ -555,15 +598,16 @@
                             @error('editWorkDept') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
                     </div>
+                    </div>
 
-                    <div class="mt-6 flex items-center justify-end gap-2">
+                    <div class="shrink-0 flex items-center justify-end gap-2 border-t border-gray-200 bg-gray-50 px-6 py-4">
                         <button type="button"
                                 wire:click="closeEditModal"
                                 class="px-4 py-2 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 cursor-pointer">
                             취소
                         </button>
                         <button type="submit"
-                                class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer disabled:opacity-60"
+                                class="px-4 py-2 text-sm bg-mochi-header text-white rounded-lg hover:bg-mochi-header/90 cursor-pointer disabled:opacity-60"
                                 wire:loading.attr="disabled"
                                 wire:target="saveEmployee">
                             저장
@@ -577,16 +621,10 @@
     @if($showCreateTeamModal)
         <div class="mochi-modal-overlay" wire:key="team-create-modal">
             <div class="mochi-modal-shell max-w-lg">
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
-                    <h3 class="text-lg font-semibold text-gray-800">팀 생성</h3>
-                    <button type="button"
-                            wire:click="closeCreateTeamModal"
-                            class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
+                <x-admin.modal-header
+                    title="새 팀 추가"
+                    close-action="closeCreateTeamModal"
+                />
 
                 <form wire:submit.prevent="createTeam" class="px-6 py-5">
                     <div class="space-y-4">
@@ -625,16 +663,10 @@
     @if($showDeleteTeamModal)
         <div class="mochi-modal-overlay" wire:key="team-delete-modal">
             <div class="mochi-modal-shell max-w-lg">
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
-                    <h3 class="text-lg font-semibold text-gray-800">팀 삭제</h3>
-                    <button type="button"
-                            wire:click="closeDeleteTeamModal"
-                            class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
+                <x-admin.modal-header
+                    title="팀 삭제 확인"
+                    close-action="closeDeleteTeamModal"
+                />
 
                 <form wire:submit.prevent="deleteTeam" class="px-6 py-5">
                     <div class="space-y-4">
@@ -651,7 +683,7 @@
                             </select>
                             @error('deleteDeptNo') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
-                        <p class="text-xs text-rose-600">
+                        <p class="text-xs text-gray-600">
                             팀에 소속된 직원이 1명 이상 있으면 삭제되지 않습니다.
                         </p>
                     </div>
@@ -677,22 +709,16 @@
     @if($showSendResetModal)
         <div class="mochi-modal-overlay" wire:key="password-reset-confirm-modal">
             <div class="mochi-modal-shell max-w-lg">
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
-                    <h3 class="text-lg font-semibold text-gray-800">
+                <x-admin.modal-header
+                    title="
                         @if($resetTargetMode === 'create_and_send')
                             계정 발급 + 비밀번호 설정 메일 보내기
                         @else
                             비밀번호 재설정 메일 보내기
                         @endif
-                    </h3>
-                    <button type="button"
-                            wire:click="closeSendResetModal"
-                            class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
+                    "
+                    close-action="closeSendResetModal"
+                />
 
                 <div class="px-6 py-5 space-y-4">
                     @if($resetTargetMode === 'create_and_send')
@@ -736,7 +762,7 @@
                             wire:click="sendPasswordResetLink"
                             wire:loading.attr="disabled"
                             wire:target="sendPasswordResetLink"
-                            class="px-4 py-2 text-sm text-white {{ $resetTargetMode === 'create_and_send' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#2b78c5] hover:bg-[#256bb0]' }} rounded-lg cursor-pointer disabled:opacity-60">
+                            class="px-4 py-2 text-sm text-white {{ $resetTargetMode === 'create_and_send' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-mochi-header hover:bg-mochi-header/90' }} rounded-lg cursor-pointer disabled:opacity-60">
                         @if($resetTargetMode === 'create_and_send')
                             계정 발급 + 발송
                         @else

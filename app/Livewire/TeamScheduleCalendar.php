@@ -357,7 +357,7 @@ class TeamScheduleCalendar extends Component
                         });
                 });
             })
-            ->when($this->viewMode === 'team' && $this->userFilter !== null && $user?->hasFullAccess(), function (Builder $query): void {
+            ->when($this->viewMode === 'team' && $this->userFilter !== null && $user?->hasPlatformWideViewAccess(), function (Builder $query): void {
                 $query->where('user_id', $this->userFilter);
             })
             ->when($this->filterType !== '', function (Builder $query): void {

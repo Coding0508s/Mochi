@@ -32,6 +32,9 @@ class SupportList extends Component
     // ─── 보고서 작성 모달 상태 ────────────────────────────────────
     public bool $showModal = false;
 
+    /** true: 읽기 전용 상세, false: 편집 */
+    public bool $modalViewOnly = true;
+
     public ?int $editingId = null; // 수정 중인 레코드 ID (null이면 신규)
 
     // 모달 입력 필드
@@ -445,15 +448,71 @@ class SupportList extends Component
     #[On('support.open-edit')]
     public function handleOpenEdit(int $id): void
     {
-        $this->openEditModal($id);
+        $this->openDetailModal($id);
     }
 
-    // ─── 모달: 기존 레코드 수정 ───────────────────────────────────
+    // ─── 모달: 기존 레코드 상세(읽기) ─────────────────────────────
+    public function openDetailModal(int $id): void
+    {
+        $record = SupportRecord::query()->findOrFail($id);
+        $this->loadRecordIntoForm($record);
+        $this->modalViewOnly = true;
+        $this->showModal = true;
+    }
+
+    /** @deprecated 행/연필 클릭은 openDetailModal 사용. 테스트·이벤트 호환용 */
     public function openEditModal(int $id): void
     {
-        $record = SupportRecord::findOrFail($id);
+        $this->openDetailModal($id);
+    }
 
-        $this->editingId = $id;
+    public function startModalEdit(): void
+    {
+        if ($this->editingId === null) {
+            return;
+        }
+
+        $record = SupportRecord::query()->findOrFail($this->editingId);
+        Gate::authorize('updateSupportRecord', $record);
+        $this->modalViewOnly = false;
+    }
+
+    public function cancelModalEdit(): void
+    {
+        if ($this->editingId === null) {
+            $this->closeModal();
+
+            return;
+        }
+
+        $record = SupportRecord::query()->findOrFail($this->editingId);
+        $this->loadRecordIntoForm($record);
+        $this->modalViewOnly = true;
+        $this->resetValidation();
+    }
+
+    // ─── 모달 닫기 ────────────────────────────────────────────────
+    public function closeModal(): void
+    {
+        $this->showModal = false;
+        $this->resetForm();
+    }
+
+    public function canUpdateEditingRecord(): bool
+    {
+        if ($this->editingId === null) {
+            return false;
+        }
+
+        $record = SupportRecord::query()->find($this->editingId);
+
+        return $record instanceof SupportRecord
+            && Gate::allows('updateSupportRecord', $record);
+    }
+
+    private function loadRecordIntoForm(SupportRecord $record): void
+    {
+        $this->editingId = (int) $record->ID;
         $this->formSkCode = $record->SK_Code ?? '';
         $this->formAccountName = $record->Account_Name ?? '';
         $this->formInstitutionKeyword = $record->Account_Name ?? '';
@@ -464,19 +523,11 @@ class SupportList extends Component
         $this->formTarget = $record->Target ?? '';
         $this->formToAccount = $record->TO_Account ?? '';
         $this->formCompleted = ! is_null($record->CompletedDate);
-
-        $this->showModal = true;
-    }
-
-    // ─── 모달 닫기 ────────────────────────────────────────────────
-    public function closeModal(): void
-    {
-        $this->showModal = false;
-        $this->resetForm();
     }
 
     private function resetForm(): void
     {
+        $this->modalViewOnly = true;
         $this->editingId = null;
         $this->formSkCode = '';
         $this->formAccountName = '';
@@ -494,15 +545,18 @@ class SupportList extends Component
     // ─── 저장 (수정 전용) ────────────────────────────────────────
     public function save(): void
     {
-        if ($this->editingId === null) {
+        if ($this->editingId === null || $this->modalViewOnly) {
             return;
         }
+
+        $record = SupportRecord::query()->findOrFail($this->editingId);
+        Gate::authorize('updateSupportRecord', $record);
 
         $this->formSupportTime = $this->normalizeTimeForInput($this->formSupportTime);
         $this->validate();
 
         DB::transaction(function (): void {
-            $data = [
+            $data = SupportRecord::filterAttributesForTable([
                 'Year' => (int) date('Y', strtotime($this->formSupportDate)),
                 'SK_Code' => $this->formSkCode,
                 'Account_Name' => $this->formAccountName,
@@ -515,7 +569,7 @@ class SupportList extends Component
                 'Status' => $this->formCompleted ? '완료' : '진행중',
                 'CompletedDate' => $this->formCompleted ? now() : null,
                 'CreatedDate' => now(),
-            ];
+            ]);
 
             SupportRecord::where('ID', $this->editingId)->update($data);
         });
@@ -527,7 +581,8 @@ class SupportList extends Component
     // ─── 완료처리 토글 (모달 밖 리스트에서 바로 클릭) ────────────
     public function toggleComplete(int $id): void
     {
-        $record = SupportRecord::findOrFail($id);
+        $record = SupportRecord::query()->findOrFail($id);
+        Gate::authorize('updateSupportRecord', $record);
         $record->toggleComplete(is_null($record->CompletedDate));
     }
 
@@ -556,26 +611,21 @@ class SupportList extends Component
             ->ofTr($this->filterTr)
             ->ofInstitution($this->filterSkCode)
             ->keyword($this->search)
-            ->with('institution')
-            // 최근에 저장(작성)된 보고서가 위로 — NULL CreatedDate(구데이터)는 맨 뒤
-            ->orderByRaw('CreatedDate IS NULL ASC')
-            ->orderByDesc('CreatedDate')
-            ->orderByDesc('ID')
+            ->withInstitutionWhenPossible()
+            ->orderedForList()
             ->paginate(20);
 
-        // 필터 드롭다운용 데이터
-        $years = SupportRecord::query()
-            ->whereNotNull('Year')
-            ->distinct()
-            ->orderBy('Year', 'desc')
-            ->pluck('Year');
+        // 필터 드롭다운용 데이터 (Year 컬럼 없으면 Support_Date 연도 사용)
+        $years = SupportRecord::distinctFilterYears();
 
-        $trList = SupportRecord::query()
-            ->whereNotNull('TR_Name')
-            ->where('TR_Name', '!=', '')
-            ->distinct()
-            ->orderBy('TR_Name')
-            ->pluck('TR_Name');
+        $trList = SupportRecord::tableHasColumn('TR_Name')
+            ? SupportRecord::query()
+                ->whereNotNull('TR_Name')
+                ->where('TR_Name', '!=', '')
+                ->distinct()
+                ->orderBy('TR_Name')
+                ->pluck('TR_Name')
+            : collect();
 
         $institutions = Institution::query()
             ->with('accountInfo')

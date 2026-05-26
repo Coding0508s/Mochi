@@ -27,7 +27,7 @@
     {{-- 상단 요약 --}}
     <div class="mochi-summary-card">
         <div class="flex flex-wrap items-center gap-4 text-sm">
-            <h2 class="text-base font-semibold text-[#2b78c5]">상품재고관리</h2>
+            <h2 class="text-base font-semibold text-mochi-header">상품재고관리</h2>
             <span class="text-gray-300">|</span>
             <span class="text-gray-600">이카운트 <span class="font-semibold text-blue-600">창고재고</span> 기준</span>
             <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-800">조회 전용</span>

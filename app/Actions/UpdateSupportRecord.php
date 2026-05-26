@@ -58,7 +58,7 @@ class UpdateSupportRecord
         $meetTime = trim((string) $payload['support_time']);
         $completed = (bool) ($payload['completed'] ?? false);
 
-        $record->update([
+        $record->update(SupportRecord::filterAttributesForTable([
             'Year' => (int) $supportDate->format('Y'),
             'Support_Date' => $supportDate->format('Y-m-d'),
             'Meet_Time' => $meetTime !== '' ? $meetTime.':00' : null,
@@ -70,7 +70,7 @@ class UpdateSupportRecord
             'Others' => filled($payload['others'] ?? null) ? trim((string) $payload['others']) : null,
             'Status' => $completed ? '완료' : '진행중',
             'CompletedDate' => $completed ? ($record->CompletedDate ?? now()) : null,
-        ]);
+        ]));
 
         return $record->fresh() ?? $record;
     }

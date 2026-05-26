@@ -6,18 +6,23 @@ use App\Models\Teacher;
 use App\Models\User;
 use App\Support\CoachTeacherScope;
 use App\Support\RetirementListWriter;
+use App\Support\TeacherMasterWriter;
+use App\Support\TeacherRetirementRecommendation;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 
 class RetireTeacher
 {
-    public function execute(int $teacherId, User $user): Teacher
-    {
+    public function execute(
+        int $teacherId,
+        User $user,
+        ?TeacherRetirementRecommendation $recommendation = null,
+    ): Teacher {
         $teacher = Teacher::findOrFail($teacherId);
 
         $this->authorize($teacher, $user);
 
-        return DB::transaction(function () use ($teacher, $user): Teacher {
+        return DB::transaction(function () use ($teacher, $user, $recommendation): Teacher {
             $teacher->update([
                 'ClassInOut' => false,
                 'Status' => '퇴직',
@@ -25,7 +30,8 @@ class RetireTeacher
 
             $teacher->refresh();
 
-            app(RetirementListWriter::class)->recordFromTeacher($teacher, $user);
+            app(RetirementListWriter::class)->recordFromTeacher($teacher, $user, $recommendation);
+            app(TeacherMasterWriter::class)->recordFromTeacher($teacher, $user);
 
             return $teacher;
         });

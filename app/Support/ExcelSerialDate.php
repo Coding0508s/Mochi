@@ -109,6 +109,8 @@ final class ExcelSerialDate
         return [
             'Plan_1st_Support_Date',
             'Plan_2nd_Support_Date',
+            'Plan_3rd_Support_Date',
+            'Plan_4th_Support_Date',
         ];
     }
 
@@ -120,6 +122,8 @@ final class ExcelSerialDate
         return [
             'Plan_1st_Support_Date',
             'Plan_2nd_Support_Date',
+            'Plan_3rd_Support_Date',
+            'Plan_4th_Support_Date',
             '_1st_Support_Date',
             '_2nd_Support_Date',
             '_3rd_Support_Date',

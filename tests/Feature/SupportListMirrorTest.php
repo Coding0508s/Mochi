@@ -140,11 +140,12 @@ class SupportListMirrorTest extends TestCase
             'CreatedDate' => now(),
         ]);
 
-        $user = User::factory()->create();
+        $admin = User::factory()->admin()->create();
 
-        Livewire::actingAs($user)
+        Livewire::actingAs($admin)
             ->test(SupportList::class)
-            ->call('openEditModal', $record->ID)
+            ->call('openDetailModal', $record->ID)
+            ->call('startModalEdit')
             ->set('formSupportDate', '2026-04-12')
             ->set('formSupportTime', '11:20')
             ->set('formSupportType', '대면')
@@ -212,11 +213,12 @@ class SupportListMirrorTest extends TestCase
             'CreatedDate' => now(),
         ]);
 
-        $user = User::factory()->create();
+        $admin = User::factory()->admin()->create();
 
-        Livewire::actingAs($user)
+        Livewire::actingAs($admin)
             ->test(SupportList::class)
-            ->call('openEditModal', $record->ID)
+            ->call('openDetailModal', $record->ID)
+            ->call('startModalEdit')
             ->set('formSupportDate', '2026-04-12')
             ->set('formSupportTime', '11:20')
             ->call('save')

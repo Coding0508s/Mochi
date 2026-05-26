@@ -14,7 +14,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Schema;
 
-#[Fillable(['name', 'email', 'employee_empno', 'password', 'is_admin', 'team', 'is_gs_brochure_admin', 'can_manage_store_inventory', 'is_active'])]
+#[Fillable(['name', 'email', 'employee_empno', 'password', 'is_admin', 'team', 'is_gs_brochure_admin', 'can_manage_store_inventory', 'is_coach_team_lead', 'is_deputy_admin', 'is_active'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -54,6 +54,28 @@ class User extends Authenticatable
     public function hasFullAccess(): bool
     {
         return (bool) $this->is_admin;
+    }
+
+    public function isDeputyAdmin(): bool
+    {
+        return ! $this->hasFullAccess() && (bool) $this->is_deputy_admin;
+    }
+
+    /** 팀·담당자 스코프 없이 플랫폼 데이터 전체 조회 */
+    public function hasPlatformWideViewAccess(): bool
+    {
+        return $this->hasFullAccess() || (bool) $this->is_deputy_admin;
+    }
+
+    /** 삭제 등 파괴적 작업 — Full Access(관리자)만 */
+    public function canDeletePlatformData(): bool
+    {
+        return $this->hasFullAccess();
+    }
+
+    public function canViewCoachTeamKpi(): bool
+    {
+        return $this->hasPlatformWideViewAccess() || (bool) $this->is_coach_team_lead;
     }
 
     /**
@@ -133,6 +155,8 @@ class User extends Authenticatable
             'is_admin' => 'boolean',
             'is_gs_brochure_admin' => 'boolean',
             'can_manage_store_inventory' => 'boolean',
+            'is_coach_team_lead' => 'boolean',
+            'is_deputy_admin' => 'boolean',
             'is_active' => 'boolean',
             'last_inbound_seen_at' => 'datetime',
         ];

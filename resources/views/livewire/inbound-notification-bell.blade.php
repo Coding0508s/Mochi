@@ -53,7 +53,7 @@
                 <button
                     type="button"
                     wire:click="markAllAsRead"
-                    class="text-xs font-medium text-[#2b78c5] hover:underline"
+                    class="text-xs font-medium text-mochi-header hover:underline"
                 >
                     모두 읽음
                 </button>

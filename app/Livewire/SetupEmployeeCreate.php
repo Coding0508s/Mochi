@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\User;
+use App\Support\CoachTeamLeadEligibility;
 use App\Support\EmployeeSex;
 use App\Support\TeamMenuContext;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class SetupEmployeeCreate extends Component
@@ -38,9 +40,26 @@ class SetupEmployeeCreate extends Component
 
     public bool $isGsBrochureAdmin = false;
 
+    public bool $coachTeamKpi = false;
+
     public function mount(): void
     {
         Gate::authorize('manageEmployeeDepartment');
+    }
+
+    public function updatedJob(): void
+    {
+        $this->syncCoachTeamKpiRecommendation();
+    }
+
+    public function updatedWorkDept(): void
+    {
+        $this->syncCoachTeamKpiRecommendation();
+    }
+
+    public function updatedStatus(): void
+    {
+        $this->syncCoachTeamKpiRecommendation();
     }
 
     public function save(): void
@@ -75,6 +94,7 @@ class SetupEmployeeCreate extends Component
             'hireDate' => ['nullable', 'date'],
             'sex' => ['nullable', 'string', Rule::in(EmployeeSex::allowedValues())],
             'isGsBrochureAdmin' => ['boolean'],
+            'coachTeamKpi' => ['boolean'],
         ], [
             'empNo.required' => '사번은 필수입니다.',
             'empNo.unique' => '이미 등록된 사번입니다.',
@@ -91,6 +111,17 @@ class SetupEmployeeCreate extends Component
             'job.in' => '직책은 목록에서 선택해 주세요.',
             'sex.in' => '성별 값이 올바르지 않습니다.',
         ]);
+
+        if (! CoachTeamLeadEligibility::allowsTeamKpiCheckbox(
+            (bool) ($validated['coachTeamKpi'] ?? false),
+            trim((string) $validated['job']),
+            (string) $validated['workDept'],
+            $validated['status'] === '' || $validated['status'] === null ? null : (int) $validated['status'],
+        )) {
+            throw ValidationException::withMessages([
+                'coachTeamKpi' => ['팀 지원 KPI 권한은 Coach 부서(A05)의 Department Manager(재직)에게만 부여할 수 있습니다.'],
+            ]);
+        }
 
         $email = strtolower(trim($validated['email']));
 
@@ -116,6 +147,7 @@ class SetupEmployeeCreate extends Component
                 'is_admin' => false,
                 'is_gs_brochure_admin' => (bool) ($validated['isGsBrochureAdmin'] ?? false),
                 'can_manage_store_inventory' => false,
+                'is_coach_team_lead' => (bool) ($validated['coachTeamKpi'] ?? false),
                 'is_active' => true,
                 'email_verified_at' => null,
             ];
@@ -145,7 +177,27 @@ class SetupEmployeeCreate extends Component
         return view('livewire.setup-employee-create', [
             'deptOptions' => $this->getDeptOptions(),
             'jobOptions' => $this->getJobOptions(),
+            'coachDeptCode' => TeamMenuContext::DEPT_COACH,
         ]);
+    }
+
+    private function syncCoachTeamKpiRecommendation(): void
+    {
+        $this->coachTeamKpi = CoachTeamLeadEligibility::recommendsTeamKpi(
+            $this->job,
+            $this->workDept,
+            $this->normalizeStatusValue($this->status),
+        );
+    }
+
+    private function normalizeStatusValue(?string $status): ?int
+    {
+        $statusValue = trim((string) $status);
+        if ($statusValue === '') {
+            return null;
+        }
+
+        return (int) $statusValue;
     }
 
     private function getDeptOptions()

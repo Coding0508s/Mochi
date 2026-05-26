@@ -58,7 +58,7 @@ class CoNewTarget extends Model
 
     public function isManagedBy(User $user): bool
     {
-        if ($user->hasFullAccess()) {
+        if ($user->hasPlatformWideViewAccess()) {
             return true;
         }
 

@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -124,13 +126,152 @@ class SupportRecord extends Model
      * 사용 예:
      *   SupportRecord::ofYear(2025)->get()
      */
+    /**
+     * @return list<string>
+     */
+    public static function tableColumns(): array
+    {
+        return once(function (): array {
+            $table = (new static)->getTable();
+
+            if (! Schema::hasTable($table)) {
+                return [];
+            }
+
+            return Schema::getColumnListing($table);
+        });
+    }
+
+    public static function tableHasColumn(string $column): bool
+    {
+        return in_array($column, static::tableColumns(), true);
+    }
+
+    public static function tableHasYearColumn(): bool
+    {
+        return static::tableHasColumn('Year');
+    }
+
+    /**
+     * 연도 필터·distinct 목록에 쓸 수 있는 컬럼 (우선순위 순).
+     */
+    public static function yearSourceColumn(): ?string
+    {
+        foreach (['Year', 'Support_Date', 'CreatedDate', 'FGC_CreateDate'] as $column) {
+            if (static::tableHasColumn($column)) {
+                return $column;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 레거시 DB처럼 컬럼이 없는 환경에서 mass assignment/update 오류를 막습니다.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    public static function filterAttributesForTable(array $attributes): array
+    {
+        foreach (array_keys($attributes) as $column) {
+            if (! static::tableHasColumn($column)) {
+                unset($attributes[$column]);
+            }
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * 연도 필터 드롭다운용 distinct 연도 목록.
+     *
+     * @return Collection<int, int>
+     */
+    public static function distinctFilterYears(): Collection
+    {
+        $column = static::yearSourceColumn();
+
+        if ($column === null) {
+            return collect();
+        }
+
+        if ($column === 'Year') {
+            return static::query()
+                ->whereNotNull('Year')
+                ->distinct()
+                ->orderByDesc('Year')
+                ->pluck('Year')
+                ->map(fn (mixed $year): int => (int) $year)
+                ->values();
+        }
+
+        $yearExpression = static::yearExpressionForColumn($column);
+
+        return static::query()
+            ->whereNotNull($column)
+            ->selectRaw("{$yearExpression} as filter_year")
+            ->distinct()
+            ->orderByDesc('filter_year')
+            ->pluck('filter_year')
+            ->map(fn (mixed $year): int => (int) $year)
+            ->values();
+    }
+
+    private static function yearExpressionForColumn(string $column): string
+    {
+        $quoted = '`'.str_replace('`', '``', $column).'`';
+
+        return match (Schema::getConnection()->getDriverName()) {
+            'sqlite' => "CAST(strftime('%Y', {$quoted}) AS INTEGER)",
+            default => "YEAR({$quoted})",
+        };
+    }
+
     public function scopeOfYear(Builder $query, ?int $year): Builder
     {
         if (blank($year)) {
             return $query;
         }
 
-        return $query->where('Year', $year);
+        $column = static::yearSourceColumn();
+
+        if ($column === null) {
+            return $query;
+        }
+
+        if ($column === 'Year') {
+            return $query->where('Year', $year);
+        }
+
+        return $query->whereNotNull($column)
+            ->whereYear($column, $year);
+    }
+
+    public function scopeOrderedForList(Builder $query): Builder
+    {
+        if (static::tableHasColumn('CreatedDate')) {
+            $query->orderByRaw('CreatedDate IS NULL ASC')
+                ->orderByDesc('CreatedDate');
+        } elseif (static::tableHasColumn('FGC_CreateDate')) {
+            $query->orderByRaw('FGC_CreateDate IS NULL ASC')
+                ->orderByDesc('FGC_CreateDate');
+        }
+
+        if (static::tableHasColumn('ID')) {
+            $query->orderByDesc('ID');
+        }
+
+        return $query;
+    }
+
+    public function scopeWithInstitutionWhenPossible(Builder $query): Builder
+    {
+        if (static::tableHasColumn('SK_Code')) {
+            return $query->with('institution');
+        }
+
+        return $query;
     }
 
     /**
@@ -141,7 +282,7 @@ class SupportRecord extends Model
      */
     public function scopeOfInstitution(Builder $query, ?string $skCode): Builder
     {
-        if (blank($skCode)) {
+        if (blank($skCode) || ! static::tableHasColumn('SK_Code')) {
             return $query;
         }
 
@@ -156,7 +297,7 @@ class SupportRecord extends Model
      */
     public function scopeOfTr(Builder $query, ?string $trName): Builder
     {
-        if (blank($trName)) {
+        if (blank($trName) || ! static::tableHasColumn('TR_Name')) {
             return $query;
         }
 
@@ -171,8 +312,11 @@ class SupportRecord extends Model
      */
     public function scopeCompleted(Builder $query): Builder
     {
+        if (! static::tableHasColumn('CompletedDate')) {
+            return $query->whereRaw('1 = 0');
+        }
+
         return $query->whereNotNull('CompletedDate');
-        // 완료일이 기록된 것 = 완료 처리된 것으로 판단합니다.
     }
 
     /**
@@ -183,6 +327,10 @@ class SupportRecord extends Model
      */
     public function scopeInProgress(Builder $query): Builder
     {
+        if (! static::tableHasColumn('CompletedDate')) {
+            return $query;
+        }
+
         return $query->whereNull('CompletedDate');
     }
 
@@ -203,11 +351,22 @@ class SupportRecord extends Model
             return $query;
         }
 
-        return $query->where(function (Builder $q) use ($normalizedKeyword) {
-            $q->whereRaw("REPLACE(Account_Name, ' ', '') like ?", ["%{$normalizedKeyword}%"])
-                ->orWhereRaw("REPLACE(Issue, ' ', '') like ?", ["%{$normalizedKeyword}%"])
-                ->orWhereRaw("REPLACE(TO_Account, ' ', '') like ?", ["%{$normalizedKeyword}%"])
-                ->orWhereRaw("REPLACE(SK_Code, ' ', '') like ?", ["%{$normalizedKeyword}%"]);
+        $searchableColumns = array_values(array_filter(
+            ['Account_Name', 'Issue', 'TO_Account', 'SK_Code'],
+            static::tableHasColumn(...)
+        ));
+
+        if ($searchableColumns === []) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $q) use ($normalizedKeyword, $searchableColumns) {
+            foreach ($searchableColumns as $column) {
+                $q->orWhereRaw(
+                    "REPLACE({$column}, ' ', '') like ?",
+                    ["%{$normalizedKeyword}%"]
+                );
+            }
         });
     }
 
@@ -227,6 +386,10 @@ class SupportRecord extends Model
      */
     public function toggleComplete(bool $done): void
     {
+        if (! static::tableHasColumn('CompletedDate')) {
+            return;
+        }
+
         $this->CompletedDate = $done ? now() : null;
         $this->save();
     }

@@ -1,12 +1,18 @@
 <div class="mochi-page">
     @if(session('success'))
-        <div class="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm" data-mochi-flash-dismiss="3000" role="status">
+        <div class="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex items-center gap-2" data-mochi-flash-dismiss="3000" role="status">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
             {{ session('success') }}
         </div>
     @endif
 
     @error('authorization')
-        <div class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm" data-mochi-flash-dismiss="4000" role="alert">
+        <div class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center gap-2" data-mochi-flash-dismiss="4000" role="alert">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
             {{ $message }}
         </div>
     @enderror
@@ -41,7 +47,7 @@
     <div class="mochi-filter-card">
         <div class="flex flex-wrap items-center gap-3">
             <select wire:model.live="filterYear"
-                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                 <option value="">전체 연도</option>
                 @foreach($yearList as $year)
                     <option value="{{ $year }}">{{ $year }}</option>
@@ -49,7 +55,7 @@
             </select>
 
             <select wire:model.live="filterManager"
-                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                 <option value="">전체 담당자</option>
                 @foreach($managerList as $manager)
                     <option value="{{ $manager }}">{{ $manager }}</option>
@@ -57,7 +63,7 @@
             </select>
 
             <select wire:model.live="filterType"
-                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                 <option value="">전체 신규구분</option>
                 @foreach($typeList as $type)
                     <option value="{{ $type }}">{{ $type }}</option>
@@ -67,7 +73,7 @@
             <input type="text"
                    wire:model.live.debounce.300ms="filterRegion"
                    placeholder="지역(주소) 검색"
-                   class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                   class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
 
             <div class="relative flex-1 min-w-56">
                 <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
@@ -78,18 +84,18 @@
                 <input type="text"
                        wire:model.live.debounce.300ms="search"
                        placeholder="기관명, 코드, 원장명, 주소 검색"
-                       class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                       class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
             </div>
 
             <button type="button"
                     wire:click="openCreateModal"
-                    class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors cursor-pointer">
+                    class="px-4 py-2 text-sm font-medium text-white bg-mochi-header hover:bg-mochi-header/90 rounded-lg transition-colors cursor-pointer">
                 신규 잠재 기관 등록
             </button>
         </div>
         <div class="flex flex-wrap items-center gap-3 pt-3 mt-3 border-t border-gray-200/80">
             <select wire:model.live="filterIntroductionPath"
-                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                 <option value="">전체 소개경로</option>
                 <option value="__empty__">(미입력)</option>
                 @foreach($introductionPathList as $path)
@@ -98,7 +104,7 @@
             </select>
 
             <select wire:model.live="filterContractPossibility"
-                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                 <option value="">전체 계약가능성</option>
                 <option value="contract">계약</option>
                 <option value="A">A</option>
@@ -190,6 +196,9 @@
                     @empty
                         <tr>
                             <td colspan="15" class="px-4 py-16 text-center text-gray-400">
+                                <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
                                 <p class="font-medium">잠재고객 데이터가 없습니다</p>
                                 <p class="text-sm mt-1">필터 조건을 변경해 보세요.</p>
                             </td>
@@ -225,7 +234,7 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">담당자</label>
-                                    <input type="text" wire:model="newManager" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="담당자명" />
+                                    <input type="text" wire:model="newManager" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" placeholder="담당자명" />
                                     @error('newManager') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                 </div>
                                 <div>
@@ -233,7 +242,7 @@
                                     <input type="text"
                                            list="potential-consulting-type-suggestions"
                                            wire:model="newConsultingType"
-                                           class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                           class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header"
                                            placeholder="직접 입력하거나 목록에서 선택" />
                                     <datalist id="potential-consulting-type-suggestions">
                                         <option value="신규기관방문"></option>
@@ -246,42 +255,42 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">소개경로</label>
-                                    <input type="text" wire:model="newConnected" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="예: 지인 소개" />
+                                    <input type="text" wire:model="newConnected" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" placeholder="예: 지인 소개" />
                                     @error('newConnected') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                 </div>
 
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">기관명 <span class="text-red-500">*</span></label>
-                                    <input type="text" wire:model="newAccountName" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="기관명을 입력하세요" />
+                                    <input type="text" wire:model="newAccountName" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" placeholder="기관명을 입력하세요" />
                                     @error('newAccountName') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">원장명</label>
-                                    <input type="text" wire:model="newDirector" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="원장명" />
+                                    <input type="text" wire:model="newDirector" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" placeholder="원장명" />
                                     @error('newDirector') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                 </div>
 
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">연락처</label>
-                                    <input type="text" wire:model="newPhone" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="연락처" />
+                                    <input type="text" wire:model="newPhone" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" placeholder="연락처" />
                                     @error('newPhone') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                 </div>
                                 <div class="grid grid-cols-3 gap-2">
                                     <div class="col-span-2">
                                         <label class="block text-sm font-medium text-gray-700 mb-1">미팅일자 <span class="text-red-500">*</span></label>
-                                        <input type="date" wire:model="newMeetingDate" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                        <input type="date" wire:model="newMeetingDate" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                         @error('newMeetingDate') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">시작시간</label>
-                                        <input type="time" wire:model="newMeetingTime" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                        <input type="time" wire:model="newMeetingTime" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                         @error('newMeetingTime') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                     </div>
                                 </div>
 
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">신규구분 <span class="text-red-500">*</span></label>
-                                    <select wire:model="newType" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <select wire:model="newType" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                         <option value="">선택</option>
                                         <option value="신규(24년)">신규(24년)</option>
                                         <option value="신규(25년)">신규(25년)</option>
@@ -291,7 +300,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">가능성정도</label>
-                                    <select wire:model="newPossibility" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <select wire:model="newPossibility" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                         <option value="">선택</option>
                                         <option value="A">A</option>
                                         <option value="B">B</option>
@@ -302,7 +311,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">주소</label>
-                                    <input type="text" wire:model="newAddress" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="기관 주소" />
+                                    <input type="text" wire:model="newAddress" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" placeholder="기관 주소" />
                                     @error('newAddress') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                 </div>
                             </div>
@@ -324,17 +333,17 @@
                             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">LittleSEED</label>
-                                    <input type="number" min="0" wire:model.live.debounce.200ms="newLS" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <input type="number" min="0" wire:model.live.debounce.200ms="newLS" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                     @error('newLS') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">GrapeSEED(유)</label>
-                                    <input type="number" min="0" wire:model.live.debounce.200ms="newGSK" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <input type="number" min="0" wire:model.live.debounce.200ms="newGSK" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                     @error('newGSK') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">GrapeSEED(초)</label>
-                                    <input type="number" min="0" wire:model.live.debounce.200ms="newGSE" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <input type="number" min="0" wire:model.live.debounce.200ms="newGSE" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                     @error('newGSE') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                 </div>
                                 <div>
@@ -348,7 +357,7 @@
 
                         <section class="space-y-3 border-t border-gray-200 pt-5">
                             <h3 class="text-base font-semibold text-gray-900">미팅내용</h3>
-                            <textarea wire:model="newDescription" rows="6" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y" placeholder="미팅/컨설팅 내용을 입력하세요"></textarea>
+                            <textarea wire:model="newDescription" rows="6" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header resize-y" placeholder="미팅/컨설팅 내용을 입력하세요"></textarea>
                             @error('newDescription') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </section>
 
@@ -357,7 +366,7 @@
                             <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                                 <h3 class="text-base font-semibold text-gray-900">기관 지원 보고서 <span class="text-sm font-normal text-gray-500">(선택)</span></h3>
                                 <label class="inline-flex items-center gap-2 cursor-pointer select-none">
-                                    <input type="checkbox" wire:model.live="newIncludeSupportReport" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                    <input type="checkbox" wire:model.live="newIncludeSupportReport" class="rounded border-gray-300 text-blue-600 focus:ring-mochi-header" />
                                     <span class="text-sm text-gray-700">같이 등록</span>
                                 </label>
                             </div>
@@ -367,17 +376,17 @@
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">지원 날짜 <span class="text-red-500">*</span></label>
-                                        <input type="date" wire:model="newSupportReportDate" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                        <input type="date" wire:model="newSupportReportDate" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                         @error('newSupportReportDate') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">지원 시간 <span class="text-red-500">*</span></label>
-                                        <input type="time" wire:model="newSupportReportTime" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                        <input type="time" wire:model="newSupportReportTime" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                         @error('newSupportReportTime') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">지원 방법 <span class="text-red-500">*</span></label>
-                                        <select wire:model="newSupportReportType" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        <select wire:model="newSupportReportType" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                             <option>전화</option>
                                             <option>대면</option>
                                             <option>화상</option>
@@ -389,29 +398,29 @@
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">CO명</label>
-                                        <input type="text" wire:model="newSupportReportTrName" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="보고서 담당 표기명" />
+                                        <input type="text" wire:model="newSupportReportTrName" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" placeholder="보고서 담당 표기명" />
                                         @error('newSupportReportTrName') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                     </div>
                                     <div class="md:col-span-2">
                                         <label class="block text-sm font-medium text-gray-700 mb-1">참석자</label>
-                                        <input type="text" wire:model="newSupportReportTarget" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="예: 원장, 교사 2명" />
+                                        <input type="text" wire:model="newSupportReportTarget" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" placeholder="예: 원장, 교사 2명" />
                                         @error('newSupportReportTarget') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                     </div>
                                 </div>
                                 <div class="space-y-3">
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">기관과의 소통내용</label>
-                                        <textarea wire:model="newSupportReportToAccount" rows="5" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+                                        <textarea wire:model="newSupportReportToAccount" rows="5" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header resize-y"></textarea>
                                         @error('newSupportReportToAccount') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">본사/타 부서 공유 내용</label>
-                                        <textarea wire:model="newSupportReportToDepart" rows="3" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+                                        <textarea wire:model="newSupportReportToDepart" rows="3" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header resize-y"></textarea>
                                         @error('newSupportReportToDepart') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                     </div>
                                 </div>
                                 <label class="inline-flex items-center gap-2 cursor-pointer select-none">
-                                    <input type="checkbox" wire:model="newSupportReportCompleted" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                    <input type="checkbox" wire:model="newSupportReportCompleted" class="rounded border-gray-300 text-blue-600 focus:ring-mochi-header" />
                                     <span class="text-sm text-gray-700">완료 처리</span>
                                 </label>
                             @endif
@@ -423,27 +432,27 @@
                             <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">관계형성</label>
-                                    <input type="number" min="0" wire:model="newApproaching" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <input type="number" min="0" wire:model="newApproaching" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                     @error('newApproaching') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">제품소개</label>
-                                    <input type="number" min="0" wire:model="newPresenting" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <input type="number" min="0" wire:model="newPresenting" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                     @error('newPresenting') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">상담/조정</label>
-                                    <input type="number" min="0" wire:model="newConsultingCount" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <input type="number" min="0" wire:model="newConsultingCount" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                     @error('newConsultingCount') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">도입제안</label>
-                                    <input type="number" min="0" wire:model="newClosing" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <input type="number" min="0" wire:model="newClosing" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                     @error('newClosing') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">도입취소</label>
-                                    <input type="number" min="0" wire:model="newDroppedOut" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <input type="number" min="0" wire:model="newDroppedOut" class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                     @error('newDroppedOut') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                                 </div>
                             </div>
@@ -462,7 +471,7 @@
                             취소하기
                         </button>
                         <button type="submit"
-                                class="px-5 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors cursor-pointer"
+                                class="px-5 py-2 text-sm font-medium bg-mochi-header hover:bg-mochi-header/90 text-white rounded-lg transition-colors cursor-pointer"
                                 wire:loading.attr="disabled"
                                 wire:loading.class="opacity-70 cursor-not-allowed"
                                 wire:target="saveNewTarget">
@@ -507,7 +516,7 @@
                                         <td class="px-3 py-2" wire:click.stop @if($selectedTarget['is_contract'] ?? false) colspan="3" @endif>
                                             <select wire:model="detailModalContract"
                                                     wire:change="requestContractChange"
-                                                    class="w-full max-w-[11rem] py-1.5 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                    class="w-full max-w-[11rem] py-1.5 px-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                                 <option value="0">미계약</option>
                                                 <option value="1">계약</option>
                                             </select>
@@ -518,7 +527,7 @@
                                             <input type="text"
                                                    wire:model.defer="detailModalSkCode"
                                                    placeholder="계약 처리 시 임시 SK CODE (자동발급)"
-                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                                             <p class="mt-1 text-xs text-gray-400"> LEAD-xxx 임시 코드가 발급됩니다.</p>
                                         </td>
                                         @endif
@@ -576,6 +585,9 @@
                                         @empty
                                             <tr>
                                                 <td colspan="6" class="px-3 py-8 text-center text-gray-400">
+                                                    <svg class="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                    </svg>
                                                     미팅/컨설팅 이력이 없습니다.
                                                 </td>
                                             </tr>
@@ -597,7 +609,7 @@
                                 @can('managePotentialInstitutions')
                                     @if(!($selectedTarget['is_contract'] ?? false))
                                         <a href="{{ route('supports.create', ['potential_target_id' => $selectedTarget['id']]) }}"
-                                           class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                                           class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-mochi-header rounded-lg hover:bg-mochi-header/90">
                                             지원 보고서 작성
                                         </a>
                                     @endif
@@ -630,8 +642,7 @@
                                                 <td class="px-3 py-2">{{ $supportRecord['support_type'] }}</td>
                                                 <td class="px-3 py-2">{{ $supportRecord['target'] }}</td>
                                                 <td class="px-3 py-2">
-                                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold
-                                                        {{ $supportRecord['completed'] ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700' }}">
+                                                    <span class="text-[10px] {{ $supportRecord['completed'] ? 'text-green-700' : 'text-gray-600' }}">
                                                         {{ $supportRecord['status'] }}
                                                     </span>
                                                 </td>
@@ -642,6 +653,9 @@
                                         @empty
                                             <tr>
                                                 <td colspan="7" class="px-3 py-8 text-center text-gray-400">
+                                                    <svg class="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                    </svg>
                                                     작성된 기관지원보고서가 없습니다.
                                                 </td>
                                             </tr>
@@ -688,8 +702,7 @@
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedSupportRecord['target'] ?? '-' }}</td>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">상태</th>
                                     <td class="px-3 py-2">
-                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold
-                                            {{ ($selectedSupportRecord['completed'] ?? false) ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700' }}">
+                                        <span class="text-[10px] {{ ($selectedSupportRecord['completed'] ?? false) ? 'text-green-700' : 'text-gray-600' }}">
                                             {{ $selectedSupportRecord['status'] ?? '-' }}
                                         </span>
                                     </td>
@@ -749,7 +762,7 @@
                             wire:loading.attr="disabled"
                             wire:loading.class="opacity-70 cursor-not-allowed"
                             wire:target="confirmContractChange"
-                            class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors cursor-pointer">
+                            class="px-4 py-2 text-sm font-medium text-white bg-mochi-header hover:bg-mochi-header/90 rounded-lg transition-colors cursor-pointer">
                         <span wire:loading.remove wire:target="confirmContractChange">
                             {{ $pendingContractChange ? '계약으로 변경' : '미계약으로 전환' }}
                         </span>

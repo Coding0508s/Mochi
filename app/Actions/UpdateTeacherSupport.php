@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Models\Teacher;
 use App\Models\User;
 use App\Support\CoachTeacherScope;
+use App\Support\InstitutionResolver;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -30,8 +31,12 @@ final class UpdateTeacherSupport
         $fillData = [
             $cols['plan_1st'] => $validated['plan_1st'] ?: null,
             $cols['plan_2nd'] => $validated['plan_2nd'] ?: null,
+            $cols['plan_3rd'] => $validated['plan_3rd'] ?: null,
+            $cols['plan_4th'] => $validated['plan_4th'] ?: null,
             $cols['plan_type_1st'] => $validated['plan_type_1st'] ?: null,
             $cols['plan_type_2nd'] => $validated['plan_type_2nd'] ?: null,
+            $cols['plan_type_3rd'] => $validated['plan_type_3rd'] ?: null,
+            $cols['plan_type_4th'] => $validated['plan_type_4th'] ?: null,
             $cols['completed_1st'] => $validated['completed_1st'] ?: null,
             $cols['completed_2nd'] => $validated['completed_2nd'] ?: null,
             $cols['completed_3rd'] => $validated['completed_3rd'] ?: null,
@@ -51,6 +56,13 @@ final class UpdateTeacherSupport
 
     private function authorize(Teacher $teacher, User $user): void
     {
+        $institution = InstitutionResolver::resolveForTeacher($teacher);
+        if ($institution?->isTerminatedCustomer()) {
+            throw new AuthorizationException(
+                '해지된 기관의 지원 일정은 수정할 수 없습니다.'
+            );
+        }
+
         if ($user->hasFullAccess()) {
             return;
         }
@@ -77,8 +89,12 @@ final class UpdateTeacherSupport
         return Validator::make($data, [
             'plan_1st' => ['nullable', 'date'],
             'plan_2nd' => ['nullable', 'date'],
+            'plan_3rd' => ['nullable', 'date'],
+            'plan_4th' => ['nullable', 'date'],
             'plan_type_1st' => $planTypeRule,
             'plan_type_2nd' => $planTypeRule,
+            'plan_type_3rd' => $planTypeRule,
+            'plan_type_4th' => $planTypeRule,
             'completed_1st' => ['nullable', 'date'],
             'completed_2nd' => ['nullable', 'date'],
             'completed_3rd' => ['nullable', 'date'],

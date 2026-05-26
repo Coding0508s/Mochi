@@ -22,6 +22,14 @@
             @include('partials.sidebar-menu-icon', ['name' => 'users', 'small' => true])
             <span class="sidebar-subitem-label">교사 지원 현황</span>
         </a>
+        @can('viewCoachTeamKpi')
+            <a href="{{ route('coach.team-kpi.index', ['team_menu' => 'coach']) }}"
+               class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ request()->routeIs('coach.team-kpi.*') ? 'sidebar-subitem-active' : '' }}"
+               @if(request()->routeIs('coach.team-kpi.*')) aria-current="page" @endif>
+                @include('partials.sidebar-menu-icon', ['name' => 'chart', 'small' => true])
+                <span class="sidebar-subitem-label">팀 지원 KPI</span>
+            </a>
+        @endcan
         <a href="/coach/retired-teachers?team_menu=coach"
            class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ request()->routeIs('coach.retired-teachers.*') ? 'sidebar-subitem-active' : '' }}"
            @if(request()->routeIs('coach.retired-teachers.*')) aria-current="page" @endif>

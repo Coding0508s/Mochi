@@ -924,6 +924,14 @@
         white-space: nowrap;
     }
 
+    .coach-teacher-support-table .coach-support-sticky-inst .coach-support-inst-link.coach-support-inst-link--terminated {
+        color: #b91c1c;
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-inst .coach-support-inst-link.coach-support-inst-link--terminated:hover {
+        color: #991b1b;
+    }
+
     .coach-teacher-support-table .coach-support-schedule-cell.cursor-pointer {
         transition: background-color 0.16s ease;
     }

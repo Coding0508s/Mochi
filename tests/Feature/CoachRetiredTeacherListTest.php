@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Actions\ReinstateTeacher;
 use App\Actions\RetireTeacher;
 use App\Livewire\CoachRetiredTeacherList;
 use App\Models\RetirementList;
 use App\Models\User;
+use App\Support\TeacherRetirementRecommendation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
@@ -23,6 +25,7 @@ class CoachRetiredTeacherListTest extends TestCase
 
     private function createRequiredTables(): void
     {
+        Schema::dropIfExists('S_TeacherMasterDB');
         Schema::dropIfExists('S_RetirementList');
         Schema::dropIfExists('institution_visibility_overrides');
         Schema::dropIfExists('Teachers');
@@ -80,6 +83,28 @@ class CoachRetiredTeacherListTest extends TestCase
             $table->string('RecommendDescription', 190)->nullable();
             $table->string('Description', 190)->nullable();
             $table->string('Status', 190)->nullable();
+            $table->string('FGC_Creator', 190)->nullable();
+            $table->dateTime('FGC_CreateDate')->nullable();
+            $table->string('FGC_LastModifier', 190)->nullable();
+            $table->dateTime('FGC_LastModifyDate')->nullable();
+        });
+
+        Schema::create('S_TeacherMasterDB', function ($table): void {
+            $table->bigIncrements('ID');
+            $table->unsignedBigInteger('TearcherID')->nullable();
+            $table->unsignedBigInteger('TeacherID')->nullable();
+            $table->string('Name', 190)->nullable();
+            $table->string('SK_Code', 190)->nullable();
+            $table->string('Account_Name', 190)->nullable();
+            $table->string('School_Name', 190)->nullable();
+            $table->string('TR_Name', 190)->nullable();
+            $table->dateTime('RetirementDate')->nullable();
+            $table->string('Status', 190)->nullable();
+            $table->string('Email', 190)->nullable();
+            $table->string('Phone', 50)->nullable();
+            $table->dateTime('GrapeSEEDEssentials')->nullable();
+            $table->dateTime('LittleSEEDEssentials')->nullable();
+            $table->string('Description', 190)->nullable();
             $table->string('FGC_Creator', 190)->nullable();
             $table->dateTime('FGC_CreateDate')->nullable();
             $table->string('FGC_LastModifier', 190)->nullable();
@@ -143,6 +168,39 @@ class CoachRetiredTeacherListTest extends TestCase
         ], $attributes));
     }
 
+    private function createMasterRecord(array $attributes): int
+    {
+        $skCode = (string) ($attributes['SK_Code'] ?? 'SK001');
+        $name = (string) ($attributes['Name'] ?? '퇴직교사');
+        $teacherId = $attributes['TearcherID'] ?? $attributes['TeacherID'] ?? null;
+
+        if ($teacherId === null) {
+            $teacherId = $this->createTeacher($skCode, $name, [
+                'Status' => '퇴직',
+                'School_Name' => $attributes['Account_Name'] ?? $attributes['School_Name'] ?? '기관A',
+            ]);
+            $attributes['TearcherID'] = $teacherId;
+        } else {
+            \DB::table('Teachers')->where('ID', $teacherId)->update([
+                'Status' => '퇴직',
+            ]);
+        }
+
+        unset($attributes['TeacherID']);
+
+        \DB::table('S_TeacherMasterDB')->insert(array_merge([
+            'TearcherID' => $teacherId,
+            'Name' => $name,
+            'SK_Code' => $skCode,
+            'Account_Name' => $attributes['Account_Name'] ?? $attributes['School_Name'] ?? '기관A',
+            'TR_Name' => 'Coach A',
+            'RetirementDate' => now()->format('Y-m-d H:i:s'),
+            'Status' => '퇴직',
+        ], $attributes));
+
+        return (int) $teacherId;
+    }
+
     public function test_page_requires_authentication(): void
     {
         $this->get(route('coach.retired-teachers.index'))
@@ -156,8 +214,8 @@ class CoachRetiredTeacherListTest extends TestCase
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
         $this->createInstitution('SK002', '기관B', 'Coach B');
-        $this->createRetirementRecord(['Name' => 'A퇴직', 'SK_Code' => 'SK001', 'TR_Name' => 'Coach A', 'RetirementDate' => "{$year}-03-01 00:00:00"]);
-        $this->createRetirementRecord(['Name' => 'B퇴직', 'SK_Code' => 'SK002', 'TR_Name' => 'Coach B', 'RetirementDate' => "{$year}-04-01 00:00:00"]);
+        $this->createMasterRecord(['Name' => 'A퇴직', 'SK_Code' => 'SK001', 'TR_Name' => 'Coach A', 'RetirementDate' => "{$year}-03-01 00:00:00"]);
+        $this->createMasterRecord(['Name' => 'B퇴직', 'SK_Code' => 'SK002', 'TR_Name' => 'Coach B', 'RetirementDate' => "{$year}-04-01 00:00:00"]);
 
         Livewire::actingAs($admin)
             ->test(CoachRetiredTeacherList::class)
@@ -172,8 +230,8 @@ class CoachRetiredTeacherListTest extends TestCase
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
         $this->createInstitution('SK002', '기관B', 'Coach B');
-        $this->createRetirementRecord(['Name' => '내TR퇴직', 'SK_Code' => 'SK001', 'TR_Name' => 'Coach A', 'RetirementDate' => "{$year}-03-01 00:00:00"]);
-        $this->createRetirementRecord(['Name' => '다른TR퇴직', 'SK_Code' => 'SK002', 'TR_Name' => 'Coach B', 'RetirementDate' => "{$year}-03-01 00:00:00"]);
+        $this->createMasterRecord(['Name' => '내TR퇴직', 'SK_Code' => 'SK001', 'TR_Name' => 'Coach A', 'RetirementDate' => "{$year}-03-01 00:00:00"]);
+        $this->createMasterRecord(['Name' => '다른TR퇴직', 'SK_Code' => 'SK002', 'TR_Name' => 'Coach B', 'RetirementDate' => "{$year}-03-01 00:00:00"]);
 
         Livewire::actingAs($coach)
             ->test(CoachRetiredTeacherList::class)
@@ -186,8 +244,8 @@ class CoachRetiredTeacherListTest extends TestCase
         $admin = $this->createAdminUser();
         $year = now()->year;
 
-        $this->createRetirementRecord(['Name' => '김퇴직', 'RetirementDate' => "{$year}-03-01 00:00:00"]);
-        $this->createRetirementRecord(['Name' => '박퇴직', 'RetirementDate' => "{$year}-03-01 00:00:00"]);
+        $this->createMasterRecord(['Name' => '김퇴직', 'RetirementDate' => "{$year}-03-01 00:00:00"]);
+        $this->createMasterRecord(['Name' => '박퇴직', 'RetirementDate' => "{$year}-03-01 00:00:00"]);
 
         Livewire::actingAs($admin)
             ->test(CoachRetiredTeacherList::class)
@@ -196,18 +254,99 @@ class CoachRetiredTeacherListTest extends TestCase
             ->assertDontSee('박퇴직');
     }
 
+    public function test_master_list_shows_account_name_position_and_recommendation(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK2528', '양산 니트', 'Levi Kim');
+        $teacherId = $this->createTeacher('SK2528', '박세빌 Lily', [
+            'Status' => '퇴직',
+            'Position' => '교사',
+            'School_Name' => '양산 니트',
+        ]);
+
+        $this->createMasterRecord([
+            'TearcherID' => $teacherId,
+            'Name' => '박세빌 Lily',
+            'SK_Code' => 'SK2528',
+            'Account_Name' => '양산 니트',
+            'TR_Name' => 'Levi Kim',
+            'RetirementDate' => "{$year}-02-01 00:00:00",
+        ]);
+
+        $this->createRetirementRecord([
+            'TearcherID' => $teacherId,
+            'Name' => '박세빌 Lily',
+            'SK_Code' => 'SK2528',
+            'Account_Name' => '양산 니트',
+            'TR_Name' => 'Levi Kim',
+            'RetirementDate' => "{$year}-02-01 00:00:00",
+            'RecommendYN' => true,
+            'RecommendDescription' => '높은 GrapeSEED 이해도',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachRetiredTeacherList::class)
+            ->set('filterYear', $year)
+            ->set('search', 'SK2528')
+            ->assertSee('양산 니트')
+            ->assertSee('교사')
+            ->assertSee('Y');
+    }
+
     public function test_year_filter_limits_results(): void
     {
         $admin = $this->createAdminUser();
 
-        $this->createRetirementRecord(['Name' => '올해퇴직', 'RetirementDate' => now()->format('Y-m-d H:i:s')]);
-        $this->createRetirementRecord(['Name' => '작년퇴직', 'RetirementDate' => now()->subYear()->format('Y-m-d H:i:s')]);
+        $this->createMasterRecord(['Name' => '올해퇴직', 'RetirementDate' => now()->format('Y-m-d H:i:s')]);
+        $this->createMasterRecord(['Name' => '작년퇴직', 'RetirementDate' => now()->subYear()->format('Y-m-d H:i:s')]);
 
         Livewire::actingAs($admin)
             ->test(CoachRetiredTeacherList::class)
-            ->set('filterYear', now()->year)
+            ->set('filterYear', (string) now()->year)
             ->assertSee('올해퇴직')
             ->assertDontSee('작년퇴직');
+    }
+
+    public function test_list_includes_retired_teacher_without_master_row(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $teacherId = $this->createTeacher('SK2575', '마스터없음퇴직', [
+            'Status' => '퇴직',
+            'School_Name' => '양산 니트',
+        ]);
+
+        $this->createRetirementRecord([
+            'TearcherID' => $teacherId,
+            'Name' => '마스터없음퇴직',
+            'SK_Code' => 'SK2575',
+            'Account_Name' => '양산 니트',
+            'RetirementDate' => "{$year}-05-01 00:00:00",
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachRetiredTeacherList::class)
+            ->set('filterYear', (string) $year)
+            ->assertSee('마스터없음퇴직')
+            ->assertSee("{$year}-05-01");
+    }
+
+    public function test_year_filter_all_shows_every_retired_year(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createMasterRecord(['Name' => '올해퇴직', 'RetirementDate' => now()->format('Y-m-d H:i:s')]);
+        $this->createMasterRecord(['Name' => '작년퇴직', 'RetirementDate' => now()->subYear()->format('Y-m-d H:i:s')]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachRetiredTeacherList::class)
+            ->set('filterYear', '')
+            ->assertSee('전체')
+            ->assertSee('올해퇴직')
+            ->assertSee('작년퇴직');
     }
 
     public function test_retire_teacher_writes_retirement_list_row(): void
@@ -231,10 +370,55 @@ class CoachRetiredTeacherListTest extends TestCase
             'SK_Code' => 'SK001',
             'Status' => '퇴직',
         ]);
+        $this->assertDatabaseHas('S_TeacherMasterDB', [
+            'TearcherID' => $teacherId,
+            'Name' => '퇴직대상',
+            'SK_Code' => 'SK001',
+            'Status' => '퇴직',
+        ]);
 
         $record = RetirementList::query()->where('TearcherID', $teacherId)->first();
         $this->assertNotNull($record);
         $this->assertSame('기관A', $record->Account_Name);
+    }
+
+    public function test_retire_teacher_stores_recommendation_when_provided(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createTeacher('SK001', '추천대상');
+
+        $recommendation = TeacherRetirementRecommendation::fromForm(
+            'yes',
+            '높은 GrapeSEED 이해도',
+        );
+
+        app(RetireTeacher::class)->execute($teacherId, $admin, $recommendation);
+
+        $this->assertDatabaseHas('S_RetirementList', [
+            'TearcherID' => $teacherId,
+            'RecommendYN' => 1,
+            'RecommendDescription' => '높은 GrapeSEED 이해도',
+        ]);
+    }
+
+    public function test_retire_teacher_stores_default_description_when_not_recommended(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createTeacher('SK001', '비추천대상');
+
+        $recommendation = TeacherRetirementRecommendation::fromForm('no', null);
+
+        app(RetireTeacher::class)->execute($teacherId, $admin, $recommendation);
+
+        $this->assertDatabaseHas('S_RetirementList', [
+            'TearcherID' => $teacherId,
+            'RecommendYN' => 0,
+            'RecommendDescription' => '해당사항없음',
+        ]);
     }
 
     public function test_retire_teacher_updates_existing_retirement_list_row(): void
@@ -272,7 +456,7 @@ class CoachRetiredTeacherListTest extends TestCase
         $coach = $this->createCoachUser('Coach A', 'coacha@example.com');
         $year = now()->year;
 
-        $otherTrRecordId = $this->createRetirementRecord([
+        $otherTrRecordId = $this->createMasterRecord([
             'Name' => '다른TR상세',
             'SK_Code' => 'SK002',
             'TR_Name' => 'Coach B',
@@ -291,12 +475,12 @@ class CoachRetiredTeacherListTest extends TestCase
         $admin = $this->createAdminUser();
         $year = now()->year;
 
-        $this->createRetirementRecord([
+        $this->createMasterRecord([
             'Name' => '숨김기관퇴직',
             'SK_Code' => 'SK-HIDDEN',
             'RetirementDate' => "{$year}-03-01 00:00:00",
         ]);
-        $this->createRetirementRecord([
+        $this->createMasterRecord([
             'Name' => '일반기관퇴직',
             'SK_Code' => 'SK-VISIBLE',
             'RetirementDate' => "{$year}-03-01 00:00:00",
@@ -318,7 +502,7 @@ class CoachRetiredTeacherListTest extends TestCase
         $admin = $this->createAdminUser();
         $year = now()->year;
 
-        $id = $this->createRetirementRecord([
+        $id = $this->createMasterRecord([
             'Name' => '상세교사',
             'RetirementDate' => "{$year}-05-01 00:00:00",
         ]);
@@ -328,5 +512,63 @@ class CoachRetiredTeacherListTest extends TestCase
             ->call('openDetailModal', $id)
             ->assertSet('showDetailModal', true)
             ->assertSet('selectedRetirement.name', '상세교사');
+    }
+
+    public function test_reinstated_teacher_not_shown_in_current_retired_list(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createTeacher('SK001', '복직후숨김', ['Status' => '활성화']);
+
+        app(RetireTeacher::class)->execute($teacherId, $admin);
+
+        Livewire::actingAs($admin)
+            ->test(CoachRetiredTeacherList::class)
+            ->set('filterYear', $year)
+            ->assertSee('복직후숨김');
+
+        app(ReinstateTeacher::class)->execute($teacherId, $admin, true);
+
+        Livewire::actingAs($admin)
+            ->test(CoachRetiredTeacherList::class)
+            ->set('filterYear', $year)
+            ->assertDontSee('복직후숨김');
+
+        $this->assertDatabaseHas('S_RetirementList', [
+            'TearcherID' => $teacherId,
+            'Status' => '복직',
+        ]);
+        $this->assertDatabaseHas('S_TeacherMasterDB', [
+            'TearcherID' => $teacherId,
+            'Status' => '활성화',
+        ]);
+    }
+
+    public function test_reinstate_from_retired_list_detail_modal(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createTeacher('SK001', '리스트복직');
+
+        app(RetireTeacher::class)->execute($teacherId, $admin);
+
+        Livewire::actingAs($admin)
+            ->test(CoachRetiredTeacherList::class)
+            ->set('filterYear', (string) $year)
+            ->call('openDetailModal', $teacherId)
+            ->call('openReinstateModal')
+            ->set('reinstateClassParticipation', 'out')
+            ->call('reinstate')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('Teachers', [
+            'ID' => $teacherId,
+            'Status' => '활성화',
+            'ClassInOut' => false,
+        ]);
     }
 }

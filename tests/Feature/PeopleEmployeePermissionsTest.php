@@ -58,6 +58,7 @@ class PeopleEmployeePermissionsTest extends TestCase
         Department::query()->insert([
             ['DEPTNO' => 'A01', 'DEPTNAME' => '팀 A', 'ADMRDEPT' => '', 'LOCATION' => ''],
             ['DEPTNO' => 'A02', 'DEPTNAME' => '팀 B', 'ADMRDEPT' => '', 'LOCATION' => ''],
+            ['DEPTNO' => 'A05', 'DEPTNAME' => 'Coach', 'ADMRDEPT' => '', 'LOCATION' => ''],
         ]);
 
         Employee::query()->create([
@@ -68,6 +69,17 @@ class PeopleEmployeePermissionsTest extends TestCase
             'EMAIL' => 'e001@example.com',
             'PHONENO' => '010-0000-0000',
             'WORKDEPT' => 'A01',
+            'STATUS' => 1,
+        ]);
+
+        Employee::query()->create([
+            'EMPNO' => 'E010',
+            'KOREANAME' => '부서장',
+            'ENGLISHNAME' => 'Dept Manager',
+            'JOB' => 'Department Manager',
+            'EMAIL' => 'dept.manager@example.com',
+            'PHONENO' => '010-0000-1010',
+            'WORKDEPT' => 'A05',
             'STATUS' => 1,
         ]);
     }
@@ -356,6 +368,72 @@ class PeopleEmployeePermissionsTest extends TestCase
         ]);
     }
 
+    public function test_people_modal_auto_recommends_team_kpi_for_department_manager_in_coach_dept(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openCreateEmployeeModal')
+            ->set('createJob', 'Department Manager')
+            ->set('createWorkDept', 'A05')
+            ->set('createStatus', '1')
+            ->assertSet('createCoachTeamKpi', true);
+    }
+
+    public function test_people_modal_rejects_team_kpi_when_ineligible(): void
+    {
+        Notification::fake();
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openCreateEmployeeModal')
+            ->set('createEmpNo', 'E992')
+            ->set('createKoreanName', '권한불가')
+            ->set('createEnglishName', 'Not Eligible')
+            ->set('createJob', 'Department Manager')
+            ->set('createEmail', 'not-eligible@example.com')
+            ->set('createPhone', '010-4444-1111')
+            ->set('createWorkDept', 'A01')
+            ->set('createStatus', '1')
+            ->set('createCoachTeamKpi', true)
+            ->call('createEmployee')
+            ->assertHasErrors(['createCoachTeamKpi']);
+
+        $this->assertDatabaseMissing('users', [
+            'email' => 'not-eligible@example.com',
+        ]);
+    }
+
+    public function test_people_modal_can_assign_team_kpi_when_eligible(): void
+    {
+        Notification::fake();
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openCreateEmployeeModal')
+            ->set('createEmpNo', 'E991')
+            ->set('createKoreanName', '권한가능')
+            ->set('createEnglishName', 'Eligible')
+            ->set('createJob', 'Department Manager')
+            ->set('createEmail', 'eligible@example.com')
+            ->set('createPhone', '010-4444-2222')
+            ->set('createWorkDept', 'A05')
+            ->set('createStatus', '1')
+            ->set('createCoachTeamKpi', true)
+            ->call('createEmployee')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'eligible@example.com',
+            'is_coach_team_lead' => true,
+        ]);
+    }
+
     public function test_admin_can_register_employee_via_setup(): void
     {
         Notification::fake();
@@ -443,6 +521,57 @@ class PeopleEmployeePermissionsTest extends TestCase
         $newUser = User::query()->where('email', 'brochure.admin@example.com')->first();
         $this->assertNotNull($newUser);
         $this->assertTrue((bool) $newUser->is_gs_brochure_admin);
+    }
+
+    public function test_register_employee_via_setup_can_assign_coach_team_kpi_when_eligible(): void
+    {
+        Notification::fake();
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(SetupEmployeeCreate::class)
+            ->set('empNo', 'E887')
+            ->set('koreanName', '팀장권한')
+            ->set('englishName', 'Team Lead')
+            ->set('job', 'Department Manager')
+            ->set('email', 'team.lead@example.com')
+            ->set('phone', '010-1212-3434')
+            ->set('workDept', 'A05')
+            ->set('status', '1')
+            ->set('coachTeamKpi', true)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'team.lead@example.com',
+            'is_coach_team_lead' => true,
+        ]);
+    }
+
+    public function test_register_employee_via_setup_rejects_coach_team_kpi_when_ineligible(): void
+    {
+        Notification::fake();
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(SetupEmployeeCreate::class)
+            ->set('empNo', 'E886')
+            ->set('koreanName', '권한거부')
+            ->set('englishName', 'Rejected Lead')
+            ->set('job', 'Department Manager')
+            ->set('email', 'rejected.lead@example.com')
+            ->set('phone', '010-5656-7878')
+            ->set('workDept', 'A01')
+            ->set('status', '1')
+            ->set('coachTeamKpi', true)
+            ->call('save')
+            ->assertHasErrors(['coachTeamKpi']);
+
+        $this->assertDatabaseMissing('users', [
+            'email' => 'rejected.lead@example.com',
+        ]);
     }
 
     public function test_admin_can_open_edit_modal_for_linked_employee_without_changing_gs_brochure_when_gate_disabled(): void
@@ -574,6 +703,31 @@ class PeopleEmployeePermissionsTest extends TestCase
             'is_active' => false,
             'is_admin' => true,
             'is_gs_brochure_admin' => true,
+        ]);
+    }
+
+    public function test_people_edit_modal_rejects_team_kpi_checkbox_when_employee_is_ineligible(): void
+    {
+        $linkedUser = User::factory()->create([
+            'employee_empno' => 'E001',
+            'email' => 'e001@example.com',
+            'is_active' => true,
+            'is_admin' => false,
+            'is_coach_team_lead' => false,
+        ]);
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openEditModal', 'E001')
+            ->set('editCoachTeamKpi', true)
+            ->call('saveEmployee')
+            ->assertHasErrors(['editCoachTeamKpi']);
+
+        $this->assertDatabaseHas('users', [
+            'id' => $linkedUser->id,
+            'is_coach_team_lead' => false,
         ]);
     }
 

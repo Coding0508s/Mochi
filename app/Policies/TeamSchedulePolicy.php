@@ -14,7 +14,7 @@ class TeamSchedulePolicy
 
     public function view(User $user, TeamSchedule $teamSchedule): bool
     {
-        if ($user->hasFullAccess() || $teamSchedule->user_id === $user->id) {
+        if ($user->hasPlatformWideViewAccess() || $teamSchedule->user_id === $user->id) {
             return true;
         }
 

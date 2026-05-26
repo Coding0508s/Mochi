@@ -174,7 +174,7 @@ class SetupTeamManagement extends Component
 
     public function deleteTeam(): void
     {
-        Gate::authorize('manageTeamStructure');
+        Gate::authorize('deleteTeamStructure');
 
         $validated = $this->validate([
             'deleteDeptNo' => ['required', 'string', Rule::exists('department', 'DEPTNO')],

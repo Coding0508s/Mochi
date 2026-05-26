@@ -36,7 +36,7 @@ final class TeamMenuContext
         $fromAccount = mb_strtoupper(trim((string) $user->team));
         $fromWorkDept = self::inferUserTeamFromWorkDept((string) ($user->employee?->WORKDEPT ?? ''));
 
-        if ($user->hasFullAccess()) {
+        if ($user->hasPlatformWideViewAccess()) {
             return $fromAccount !== '' ? $fromAccount : ($fromWorkDept ?? '');
         }
 
@@ -77,7 +77,7 @@ final class TeamMenuContext
             return false;
         }
 
-        if ($user->hasFullAccess()) {
+        if ($user->hasPlatformWideViewAccess()) {
             return true;
         }
 
@@ -108,7 +108,7 @@ final class TeamMenuContext
             return false;
         }
 
-        if ($user->hasFullAccess()) {
+        if ($user->hasPlatformWideViewAccess()) {
             return true;
         }
 
@@ -119,7 +119,7 @@ final class TeamMenuContext
 
     public static function showExclusiveCoachSidebar(?User $user): bool
     {
-        if ($user === null || $user->hasFullAccess()) {
+        if ($user === null || $user->hasPlatformWideViewAccess()) {
             return false;
         }
 
@@ -128,7 +128,7 @@ final class TeamMenuContext
 
     public static function showExclusiveCsSidebar(?User $user): bool
     {
-        if ($user === null || $user->hasFullAccess()) {
+        if ($user === null || $user->hasPlatformWideViewAccess()) {
             return false;
         }
 
@@ -233,9 +233,9 @@ final class TeamMenuContext
     public static function institutionSupportReportAssigneeLabel(?User $user = null, ?string $teamMenuOverride = null): string
     {
         return match (self::institutionSupportReportBrand($user, $teamMenuOverride)) {
-            'Coach Team' => 'Coach Team명',
-            'CS Team' => 'CS Team명',
-            'CO' => 'CO명',
+            'Coach Team' => '담당 Coach',
+            'CS Team' => '담당 CS ',
+            'CO' => '담당 CO',
             default => 'CO명',
         };
     }
