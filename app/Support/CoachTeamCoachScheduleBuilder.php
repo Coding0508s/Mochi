@@ -45,32 +45,41 @@ final class CoachTeamCoachScheduleBuilder
                     $planColumn = $cols[$planKey];
                     $planParsed = ExcelSerialDate::parse($teacher->getRawOriginal($planColumn));
 
-                    if ($planParsed === null) {
-                        continue;
-                    }
-
-                    if ($year !== null && $planParsed->year !== $year) {
-                        continue;
-                    }
-
                     $completedKey = $round['completed'];
+                    $completedColumn = $cols[$completedKey];
                     $planTypeKey = str_replace('plan_', 'plan_type_', $planKey);
                     $completedTypeKey = str_replace('completed_', 'type_', $completedKey);
 
-                    $completedRaw = $teacher->getRawOriginal($cols[$completedKey]);
-                    $completedParsed = ExcelSerialDate::parse($completedRaw);
-                    $completedFormatted = $completedParsed?->format('Y년 n월 j일');
-                    $completedInYear = $year === null || ($completedParsed !== null && $completedParsed->year === $year);
+                    $completedParsed = ExcelSerialDate::parse($teacher->getRawOriginal($completedColumn));
+
+                    if ($planParsed === null && $completedParsed === null) {
+                        continue;
+                    }
+
+                    $planInYear = $planParsed !== null
+                        && ($year === null || $planParsed->year === $year);
+                    $completedInYear = $completedParsed !== null
+                        && ($year === null || $completedParsed->year === $year);
+
+                    if ($year !== null && ! $planInYear && ! $completedInYear) {
+                        continue;
+                    }
 
                     $roundRows[] = [
                         'round_key' => $roundKey,
                         'label' => ($round['filter_round'] ?? '').'차',
-                        'plan_date' => $planParsed->format('Y년 n월 j일'),
-                        'plan_type' => trim((string) ($teacher->{$cols[$planTypeKey]} ?? '')),
-                        'completed_date' => $completedInYear && $completedFormatted !== null && $completedFormatted !== ''
-                            ? $completedFormatted
+                        'plan_date' => $planInYear && $planParsed !== null
+                            ? $planParsed->format('Y년 n월 j일')
                             : '—',
-                        'completed_type' => trim((string) ($teacher->{$cols[$completedTypeKey]} ?? '')),
+                        'plan_type' => $planInYear
+                            ? trim((string) ($teacher->{$cols[$planTypeKey]} ?? ''))
+                            : '',
+                        'completed_date' => $completedInYear && $completedParsed !== null
+                            ? $completedParsed->format('Y년 n월 j일')
+                            : '—',
+                        'completed_type' => $completedInYear
+                            ? trim((string) ($teacher->{$cols[$completedTypeKey]} ?? ''))
+                            : '',
                     ];
                 }
 

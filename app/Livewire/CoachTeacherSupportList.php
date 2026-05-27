@@ -20,6 +20,7 @@ use App\Models\Institution;
 use App\Models\SupportRecord;
 use App\Models\Teacher;
 use App\Support\CoachTeacherScope;
+use App\Support\CoachTeamKpiAggregator;
 use App\Support\ExcelSerialDate;
 use App\Support\InstitutionResolver;
 use App\Support\ManagerNameNormalizer;
@@ -1955,6 +1956,7 @@ class CoachTeacherSupportList extends Component
     public function render()
     {
         $baseQuery = $this->buildBaseQuery();
+        $this->applyDefaultYearScope($baseQuery);
 
         $kpiQuery = clone $baseQuery;
         $this->applyRoundFilter($kpiQuery);
@@ -2184,6 +2186,20 @@ class CoachTeacherSupportList extends Component
         $query->excludeRetired();
     }
 
+    /**
+     * KPI·월·차수·상태 필터가 없을 때 선택 연도에 계획 또는 완료가 있는 교사만 목록·KPI에 포함한다.
+     *
+     * @param  Builder<Teacher>  $query
+     */
+    private function applyDefaultYearScope(Builder $query): void
+    {
+        if ($this->kpiFilter !== '' || $this->filterRound !== '' || $this->filterMonth !== '') {
+            return;
+        }
+
+        CoachTeamKpiAggregator::applyAnySupportYearScope($query, $this->filterYear);
+    }
+
     private function applyKpiFilter(Builder $query): void
     {
         if ($this->kpiFilter === '') {
@@ -2224,8 +2240,10 @@ class CoachTeacherSupportList extends Component
         }
 
         $query->whereNotNull($planColumn)
-            ->whereYear($planColumn, $year)
-            ->whereMonth($planColumn, $month);
+            ->where(function (Builder $nested) use ($planColumn, $year, $month): void {
+                ExcelSerialDate::applyWhereYear($nested, $planColumn, $year);
+                $nested->whereMonth($planColumn, $month);
+            });
     }
 
     private function institutionDisplayName(?Institution $institution, ?string $schoolName = null): string

@@ -135,6 +135,7 @@ class TeacherSupportKpiCalculator
             return;
         }
 
-        $query->whereNotNull($planColumn)->whereYear($planColumn, $year);
+        $query->whereNotNull($planColumn);
+        ExcelSerialDate::applyWhereYear($query, $planColumn, $year);
     }
 }

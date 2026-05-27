@@ -761,9 +761,20 @@
         border-spacing: 0;
     }
 
+    .coach-teacher-support-table-scroll {
+        --coach-support-table-max-height: min(68vh, calc(100dvh - 17.5rem));
+        max-height: var(--coach-support-table-max-height);
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
     .coach-teacher-support-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 25;
         border: 0;
         border-bottom: 1px solid #cfd6df;
+        background-color: #e8e6d9;
     }
 
     .coach-teacher-support-table tbody td {
@@ -809,7 +820,8 @@
     }
 
     .coach-teacher-support-table .coach-support-sticky-sk--head {
-        z-index: 30;
+        top: 0;
+        z-index: 40;
         background-color: #e8e6d9;
         border-right: 1px solid #d5dcd6;
     }
@@ -836,7 +848,8 @@
     }
 
     .coach-teacher-support-table .coach-support-sticky-inst--head {
-        z-index: 31;
+        top: 0;
+        z-index: 41;
         background-color: #e8e6d9;
         border-right: 1px solid #d5dcd6;
         box-shadow: none;
@@ -855,7 +868,8 @@
     }
 
     .coach-teacher-support-table .coach-support-sticky-position--head {
-        z-index: 32;
+        top: 0;
+        z-index: 42;
         background-color: #e8e6d9;
         border-right: 1px solid #d5dcd6;
     }
@@ -877,7 +891,8 @@
     }
 
     .coach-teacher-support-table .coach-support-sticky-name--head {
-        z-index: 33;
+        top: 0;
+        z-index: 43;
         background-color: #e8e6d9;
         border-right: 1px solid #d5dcd6;
         box-shadow: none;
@@ -902,7 +917,8 @@
     }
 
     .coach-teacher-support-table .coach-support-sticky-plan1-date--head {
-        z-index: 34;
+        top: 0;
+        z-index: 44;
         background-color: #e8e6d9;
         border-right: none;
         box-shadow: inset -1px 0 0 #d5dcd6;

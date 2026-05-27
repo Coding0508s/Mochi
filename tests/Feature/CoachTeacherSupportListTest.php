@@ -787,6 +787,34 @@ class CoachTeacherSupportListTest extends TestCase
         $this->assertSame(0, $kpis['first_round']);
     }
 
+    public function test_filter_year_scopes_teacher_list_to_support_activity_in_selected_year(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createInstitution('SK002', '기관B', 'Coach B');
+
+        $this->createTeacher('SK001', '올해계획', [
+            'Plan_1st_Support_Date' => '2026-03-01',
+        ]);
+        $this->createTeacher('SK002', '올해완료만', [
+            'Plan_1st_Support_Date' => '2025-06-01',
+            '_1st_Support_Date' => '2026-01-15',
+        ]);
+        $this->createTeacher('SK003', '작년만', [
+            'Plan_1st_Support_Date' => '2025-06-01',
+            '_1st_Support_Date' => '2025-12-01',
+        ]);
+
+        $component = Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->set('filterYear', 2026);
+
+        $names = $component->viewData('teachers')->getCollection()->pluck('Name')->all();
+
+        $this->assertEqualsCanonicalizing(['올해계획', '올해완료만'], $names);
+    }
+
     public function test_hidden_institution_excluded(): void
     {
         $admin = $this->createAdminUser();
@@ -910,16 +938,19 @@ class CoachTeacherSupportListTest extends TestCase
         $this->createInstitution('SK001', '기관A', 'Coach A');
         $this->createTeacher('SK001', '수업참여완료', [
             'ClassInOut' => true,
-            '_1st_Support_Date' => "{$year}-03-01",
+            'Plan_1st_Support_Date' => "{$year}-03-01",
+            '_1st_Support_Date' => "{$year}-03-10",
         ]);
         $this->createTeacher('SK001', '수업미참여완료', [
             'ClassInOut' => false,
-            '_1st_Support_Date' => "{$year}-03-01",
+            'Plan_1st_Support_Date' => "{$year}-03-01",
+            '_1st_Support_Date' => "{$year}-03-10",
         ]);
         $this->createTeacher('SK001', '퇴직완료', [
             'Status' => '퇴직',
             'ClassInOut' => true,
-            '_1st_Support_Date' => "{$year}-03-01",
+            'Plan_1st_Support_Date' => "{$year}-03-01",
+            '_1st_Support_Date' => "{$year}-03-10",
         ]);
 
         Livewire::actingAs($admin)
@@ -1788,6 +1819,7 @@ class CoachTeacherSupportListTest extends TestCase
 
         $html = $component->html();
 
+        $this->assertStringContainsString('coach-teacher-support-table-scroll', $html);
         $this->assertStringContainsString('coach-support-schedule-cell', $html);
         $this->assertStringContainsString('coach-support-mobile-card', $html);
         $this->assertStringContainsString('wire:click="openEditModal(', $html);
@@ -1817,6 +1849,7 @@ class CoachTeacherSupportListTest extends TestCase
 
         $component = Livewire::actingAs($admin)
             ->test(CoachTeacherSupportList::class)
+            ->set('filterYear', 2025)
             ->call('openEditModal', $id)
             ->assertSet('showEditModal', true);
 

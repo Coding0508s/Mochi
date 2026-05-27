@@ -241,7 +241,7 @@
             @endforelse
         </div>
 
-        <div class="hidden md:block overflow-x-auto isolate">
+        <div class="coach-teacher-support-table-scroll hidden md:block isolate">
             <table class="coach-teacher-support-table w-full text-sm whitespace-nowrap">
                 <colgroup>
                     <col class="coach-support-col-sk">
@@ -327,7 +327,7 @@
                                 aria-label="{{ $teacher->Name }} 지원 일정 수정"
                             @endif>
                             <div class="inline-flex items-center gap-1.5">
-                                <span>{{ \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_1st']}) }}</span>
+                                <span>{{ \App\Support\ExcelSerialDate::formatPlanMonthForYear($teacher->getRawOriginal($cols['plan_1st']), $filterYear) }}</span>
                                 @if($canOpenEditModal)
                                     <svg class="h-3.5 w-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -342,7 +342,9 @@
                                 tabindex="0"
                                 aria-label="{{ $teacher->Name }} 지원 일정 수정"
                             @endif>
-                            {{ $teacher->{$cols['plan_type_1st']} }}
+                            @if(\App\Support\ExcelSerialDate::isInYear($teacher->getRawOriginal($cols['plan_1st']), $filterYear))
+                                {{ $teacher->{$cols['plan_type_1st']} }}
+                            @endif
                         </td>
                         <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
@@ -351,7 +353,7 @@
                                 tabindex="0"
                                 aria-label="{{ $teacher->Name }} 지원 일정 수정"
                             @endif>
-                            {{ \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_2nd']}) }}
+                            {{ \App\Support\ExcelSerialDate::formatPlanMonthForYear($teacher->getRawOriginal($cols['plan_2nd']), $filterYear) }}
                         </td>
                         <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
@@ -360,7 +362,9 @@
                                 tabindex="0"
                                 aria-label="{{ $teacher->Name }} 지원 일정 수정"
                             @endif>
-                            {{ $teacher->{$cols['plan_type_2nd']} }}
+                            @if(\App\Support\ExcelSerialDate::isInYear($teacher->getRawOriginal($cols['plan_2nd']), $filterYear))
+                                {{ $teacher->{$cols['plan_type_2nd']} }}
+                            @endif
                         </td>
                         @if($showExtendedColumns)
                             <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
@@ -370,7 +374,7 @@
                                     tabindex="0"
                                     aria-label="{{ $teacher->Name }} 지원 일정 수정"
                                 @endif>
-                                {{ \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_3rd']}) }}
+                                {{ \App\Support\ExcelSerialDate::formatPlanMonthForYear($teacher->getRawOriginal($cols['plan_3rd']), $filterYear) }}
                             </td>
                             <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                                 @if($canOpenEditModal)
@@ -379,7 +383,9 @@
                                     tabindex="0"
                                     aria-label="{{ $teacher->Name }} 지원 일정 수정"
                                 @endif>
-                                {{ $teacher->{$cols['plan_type_3rd']} }}
+                                @if(\App\Support\ExcelSerialDate::isInYear($teacher->getRawOriginal($cols['plan_3rd']), $filterYear))
+                                    {{ $teacher->{$cols['plan_type_3rd']} }}
+                                @endif
                             </td>
                             <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                                 @if($canOpenEditModal)
@@ -388,7 +394,7 @@
                                     tabindex="0"
                                     aria-label="{{ $teacher->Name }} 지원 일정 수정"
                                 @endif>
-                                {{ \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_4th']}) }}
+                                {{ \App\Support\ExcelSerialDate::formatPlanMonthForYear($teacher->getRawOriginal($cols['plan_4th']), $filterYear) }}
                             </td>
                             <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                                 @if($canOpenEditModal)
@@ -397,17 +403,19 @@
                                     tabindex="0"
                                     aria-label="{{ $teacher->Name }} 지원 일정 수정"
                                 @endif>
-                                {{ $teacher->{$cols['plan_type_4th']} }}
+                                @if(\App\Support\ExcelSerialDate::isInYear($teacher->getRawOriginal($cols['plan_4th']), $filterYear))
+                                    {{ $teacher->{$cols['plan_type_4th']} }}
+                                @endif
                             </td>
                         @endif
-                        <td class="px-3 py-2 coach-support-schedule-cell {{ $teacher->{$cols['completed_1st']} ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                        <td class="px-3 py-2 coach-support-schedule-cell {{ \App\Support\ExcelSerialDate::isInYear($teacher->getRawOriginal($cols['completed_1st']), $filterYear) ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
                                 wire:click="openEditModal({{ $teacher->ID }})"
                                 role="button"
                                 tabindex="0"
                                 aria-label="{{ $teacher->Name }} 지원 일정 수정"
                             @endif>
-                            {{ \App\Support\ExcelSerialDate::toStorageString($teacher->getRawOriginal($cols['completed_1st'])) }}
+                            {{ \App\Support\ExcelSerialDate::toStorageStringForYear($teacher->getRawOriginal($cols['completed_1st']), $filterYear) }}
                         </td>
                         <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
@@ -416,16 +424,18 @@
                                 tabindex="0"
                                 aria-label="{{ $teacher->Name }} 지원 일정 수정"
                             @endif>
-                            {{ $teacher->{$cols['type_1st']} }}
+                            @if(\App\Support\ExcelSerialDate::isInYear($teacher->getRawOriginal($cols['completed_1st']), $filterYear))
+                                {{ $teacher->{$cols['type_1st']} }}
+                            @endif
                         </td>
-                        <td class="px-3 py-2 coach-support-schedule-cell {{ $teacher->{$cols['completed_2nd']} ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                        <td class="px-3 py-2 coach-support-schedule-cell {{ \App\Support\ExcelSerialDate::isInYear($teacher->getRawOriginal($cols['completed_2nd']), $filterYear) ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
                                 wire:click="openEditModal({{ $teacher->ID }})"
                                 role="button"
                                 tabindex="0"
                                 aria-label="{{ $teacher->Name }} 지원 일정 수정"
                             @endif>
-                            {{ \App\Support\ExcelSerialDate::toStorageString($teacher->getRawOriginal($cols['completed_2nd'])) }}
+                            {{ \App\Support\ExcelSerialDate::toStorageStringForYear($teacher->getRawOriginal($cols['completed_2nd']), $filterYear) }}
                         </td>
                         <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
@@ -434,7 +444,9 @@
                                 tabindex="0"
                                 aria-label="{{ $teacher->Name }} 지원 일정 수정"
                             @endif>
-                            {{ $teacher->{$cols['type_2nd']} }}
+                            @if(\App\Support\ExcelSerialDate::isInYear($teacher->getRawOriginal($cols['completed_2nd']), $filterYear))
+                                {{ $teacher->{$cols['type_2nd']} }}
+                            @endif
                         </td>
                         @if($showExtendedColumns)
                             <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
@@ -444,7 +456,7 @@
                                     tabindex="0"
                                     aria-label="{{ $teacher->Name }} 지원 일정 수정"
                                 @endif>
-                                {{ \App\Support\ExcelSerialDate::toStorageString($teacher->getRawOriginal($cols['completed_3rd'])) }}
+                                {{ \App\Support\ExcelSerialDate::toStorageStringForYear($teacher->getRawOriginal($cols['completed_3rd']), $filterYear) }}
                             </td>
                             <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                                 @if($canOpenEditModal)
@@ -453,7 +465,7 @@
                                     tabindex="0"
                                     aria-label="{{ $teacher->Name }} 지원 일정 수정"
                                 @endif>
-                                {{ \App\Support\ExcelSerialDate::toStorageString($teacher->getRawOriginal($cols['completed_4th'])) }}
+                                {{ \App\Support\ExcelSerialDate::toStorageStringForYear($teacher->getRawOriginal($cols['completed_4th']), $filterYear) }}
                             </td>
                             <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                                 @if($canOpenEditModal)
@@ -462,7 +474,7 @@
                                     tabindex="0"
                                     aria-label="{{ $teacher->Name }} 지원 일정 수정"
                                 @endif>
-                                {{ \App\Support\ExcelSerialDate::toStorageString($teacher->getRawOriginal($cols['essentials_gs'])) }}
+                                {{ \App\Support\ExcelSerialDate::toStorageStringForYear($teacher->getRawOriginal($cols['essentials_gs']), $filterYear) }}
                             </td>
                             <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                                 @if($canOpenEditModal)
@@ -471,7 +483,7 @@
                                     tabindex="0"
                                     aria-label="{{ $teacher->Name }} 지원 일정 수정"
                                 @endif>
-                                {{ \App\Support\ExcelSerialDate::toStorageString($teacher->getRawOriginal($cols['essentials_ls'])) }}
+                                {{ \App\Support\ExcelSerialDate::toStorageStringForYear($teacher->getRawOriginal($cols['essentials_ls']), $filterYear) }}
                             </td>
                         @endif
                     </tr>

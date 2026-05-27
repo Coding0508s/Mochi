@@ -70,4 +70,24 @@ class ExcelSerialDateTest extends TestCase
             'empty' => [null, null],
         ];
     }
+
+    public function test_date_to_serial_round_trip(): void
+    {
+        $parsed = ExcelSerialDate::parse('45809');
+
+        $this->assertNotNull($parsed);
+        $this->assertSame(45809, ExcelSerialDate::dateToSerial($parsed));
+    }
+
+    public function test_is_in_year_and_year_scoped_formatters(): void
+    {
+        $date = '2026-03-01';
+
+        $this->assertTrue(ExcelSerialDate::isInYear($date, 2026));
+        $this->assertFalse(ExcelSerialDate::isInYear($date, 2025));
+        $this->assertSame('2026년 3월', ExcelSerialDate::formatPlanMonthForYear($date, 2026));
+        $this->assertSame('', ExcelSerialDate::formatPlanMonthForYear($date, 2025));
+        $this->assertSame('2026-03-01', ExcelSerialDate::toStorageStringForYear($date, 2026));
+        $this->assertNull(ExcelSerialDate::toStorageStringForYear($date, 2025));
+    }
 }

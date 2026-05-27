@@ -76,14 +76,16 @@ class CoachTeamSupportKpiTest extends CoachTeacherSupportListTest
             ->call('openCoachScheduleModal', 'Coach A')
             ->assertSet('showCoachScheduleModal', true)
             ->assertSee('계획교사')
-            ->assertDontSee('미계획교사')
+            ->assertSee('미계획교사')
             ->assertSee($year.'년 3월 1일')
+            ->assertSee($year.'년 3월 10일')
             ->assertSee('지원 완료 차수 집계')
             ->assertSee('계획 일정 집계')
             ->assertSee('1차')
             ->assertSee('계획일')
-            ->assertViewHas('coachScheduleSummary', fn (array $summary): bool => $summary['teacher_count'] === 1
-                && $summary['planned_round_count'] === 1
+            ->assertViewHas('coachScheduleSummary', fn (array $summary): bool => $summary['teacher_count'] === 2
+                && $summary['planned_round_count'] === 2
+                && $summary['completed_count'] === 1
                 && $summary['pending_count'] === 1)
             ->call('closeCoachScheduleModal')
             ->assertSet('showCoachScheduleModal', false);
@@ -164,29 +166,74 @@ class CoachTeamSupportKpiTest extends CoachTeacherSupportListTest
             ->call('openCoachScheduleModal', 'Coach A')
             ->assertSet('showCoachScheduleModal', true)
             ->assertViewHas('coachScheduleRows', function (array $rows) use ($year): bool {
-                if (count($rows) !== 2) {
+                if (count($rows) !== 3) {
                     return false;
                 }
 
                 $mixed = collect($rows)->firstWhere('teacher_name', '혼합교사');
+                $lastYearPlan = collect($rows)->firstWhere('teacher_name', '작년교사');
                 $crossYear = collect($rows)->firstWhere('teacher_name', '연도교차교사');
 
-                if ($mixed === null || $crossYear === null) {
+                if ($mixed === null || $lastYearPlan === null || $crossYear === null) {
                     return false;
                 }
 
                 $mixedOk = ($mixed['rounds'][0]['label'] ?? '') === '2차'
                     && ($mixed['rounds'][0]['completed_date'] ?? '') === $year.'년 3월 15일';
 
+                $lastYearPlanOk = ($lastYearPlan['rounds'][0]['label'] ?? '') === '1차'
+                    && ($lastYearPlan['rounds'][0]['plan_date'] ?? '') === '—'
+                    && ($lastYearPlan['rounds'][0]['completed_date'] ?? '') === $year.'년 2월 1일';
+
                 $crossYearOk = ($crossYear['rounds'][0]['label'] ?? '') === '3차'
                     && ($crossYear['rounds'][0]['completed_date'] ?? '') === '—';
 
-                return $mixedOk && $crossYearOk;
+                return $mixedOk && $lastYearPlanOk && $crossYearOk;
             })
-            ->assertViewHas('coachScheduleSummary', fn (array $summary): bool => $summary['teacher_count'] === 2
-                && $summary['planned_round_count'] === 2
-                && $summary['completed_count'] === 1
+            ->assertViewHas('coachScheduleSummary', fn (array $summary): bool => $summary['teacher_count'] === 3
+                && $summary['planned_round_count'] === 3
+                && $summary['completed_count'] === 2
                 && $summary['pending_count'] === 1);
+    }
+
+    public function test_schedule_modal_shows_round_with_completion_only_in_selected_year(): void
+    {
+        $year = now()->year;
+        $lead = User::factory()->coachTeamLead()->create();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '완료만교사', [
+            '_3rd_Support_Date' => "{$year}-08-20",
+            '_4th_Support_Date' => "{$year}-10-15",
+        ]);
+
+        Livewire::actingAs($lead)
+            ->test(CoachTeamSupportKpiDashboard::class)
+            ->set('filterYear', $year)
+            ->call('openCoachScheduleModal', 'Coach A')
+            ->assertSet('showCoachScheduleModal', true)
+            ->assertSee('완료만교사')
+            ->assertViewHas('coachScheduleRows', function (array $rows) use ($year): bool {
+                $teacher = collect($rows)->firstWhere('teacher_name', '완료만교사');
+
+                if ($teacher === null || count($teacher['rounds'] ?? []) !== 2) {
+                    return false;
+                }
+
+                $third = collect($teacher['rounds'])->firstWhere('label', '3차');
+                $fourth = collect($teacher['rounds'])->firstWhere('label', '4차');
+
+                return $third !== null
+                    && ($third['plan_date'] ?? '') === '—'
+                    && ($third['completed_date'] ?? '') === $year.'년 8월 20일'
+                    && $fourth !== null
+                    && ($fourth['plan_date'] ?? '') === '—'
+                    && ($fourth['completed_date'] ?? '') === $year.'년 10월 15일';
+            })
+            ->assertViewHas('coachScheduleSummary', fn (array $summary): bool => $summary['teacher_count'] === 1
+                && $summary['planned_round_count'] === 2
+                && $summary['completed_count'] === 2
+                && $summary['pending_count'] === 0);
     }
 
     private function seedTeachersForKpi(int $year): void

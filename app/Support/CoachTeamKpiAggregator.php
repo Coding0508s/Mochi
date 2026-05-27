@@ -120,7 +120,7 @@ final class CoachTeamKpiAggregator
 
         if ($filterMonth === '') {
             if ($filterRound === '') {
-                self::applyAnyPlanYearScope($query, $year);
+                self::applyAnySupportYearScope($query, $year);
             }
 
             return;
@@ -135,8 +135,10 @@ final class CoachTeamKpiAggregator
         }
 
         $query->whereNotNull($planColumn)
-            ->whereYear($planColumn, $year)
-            ->whereMonth($planColumn, $month);
+            ->where(function (Builder $nested) use ($planColumn, $year, $month): void {
+                ExcelSerialDate::applyWhereYear($nested, $planColumn, $year);
+                $nested->whereMonth($planColumn, $month);
+            });
     }
 
     /**
@@ -144,18 +146,44 @@ final class CoachTeamKpiAggregator
      */
     public static function applyAnyPlanYearScope(Builder $query, int $year): void
     {
+        self::applyAnySupportYearScope($query, $year, planOnly: true);
+    }
+
+    /**
+     * 선택 연도에 계획 또는 완료가 하나라도 있는 교사(차수 기준).
+     *
+     * @param  Builder<Teacher>  $query
+     */
+    public static function applyAnySupportYearScope(Builder $query, int $year, bool $planOnly = false): void
+    {
         $cols = config('coach_teacher_support.columns');
         $rounds = config('coach_teacher_support.kpi_rounds', []);
 
-        $query->where(function (Builder $outer) use ($cols, $rounds, $year): void {
+        $query->where(function (Builder $outer) use ($cols, $rounds, $year, $planOnly): void {
             $first = true;
             foreach ($rounds as $round) {
                 $planCol = $cols[$round['plan']] ?? null;
+                $completedCol = $cols[$round['completed']] ?? null;
+
                 if ($planCol === null) {
                     continue;
                 }
 
-                $clause = fn (Builder $sub): Builder => $sub->whereNotNull($planCol)->whereYear($planCol, $year);
+                $clause = function (Builder $sub) use ($planCol, $completedCol, $year, $planOnly): void {
+                    $sub->where(function (Builder $inner) use ($planCol, $completedCol, $year, $planOnly): void {
+                        $inner->where(function (Builder $plan) use ($planCol, $year): void {
+                            $plan->whereNotNull($planCol);
+                            ExcelSerialDate::applyWhereYear($plan, $planCol, $year);
+                        });
+
+                        if (! $planOnly && $completedCol !== null) {
+                            $inner->orWhere(function (Builder $completed) use ($completedCol, $year): void {
+                                $completed->whereNotNull($completedCol);
+                                ExcelSerialDate::applyWhereYear($completed, $completedCol, $year);
+                            });
+                        }
+                    });
+                };
 
                 if ($first) {
                     $outer->where($clause);

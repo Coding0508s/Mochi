@@ -5,6 +5,8 @@ namespace App\Support;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use DateTimeInterface;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * 레거시 엑셀 일련번호(1900 날짜 체계) 날짜 변환.
@@ -91,6 +93,60 @@ final class ExcelSerialDate
         $parsed = self::parse($value);
 
         return $parsed === null ? '' : $parsed->format('Y년 n월');
+    }
+
+    public static function isInYear(mixed $value, int $year): bool
+    {
+        $parsed = self::parse($value);
+
+        return $parsed !== null && $parsed->year === $year;
+    }
+
+    public static function formatPlanMonthForYear(mixed $value, int $year): string
+    {
+        if (! self::isInYear($value, $year)) {
+            return '';
+        }
+
+        $parsed = self::parse($value);
+
+        return $parsed === null ? '' : $parsed->format('Y년 n월');
+    }
+
+    public static function toStorageStringForYear(mixed $value, int $year): ?string
+    {
+        return self::isInYear($value, $year) ? self::toStorageString($value) : null;
+    }
+
+    public static function dateToSerial(CarbonInterface $date): int
+    {
+        return (int) Carbon::parse(self::EPOCH)->startOfDay()->diffInDays($date->copy()->startOfDay());
+    }
+
+    /**
+     * @return array{0: int, 1: int}
+     */
+    public static function serialBoundsForYear(int $year): array
+    {
+        return [
+            self::dateToSerial(Carbon::create($year, 1, 1)->startOfDay()),
+            self::dateToSerial(Carbon::create($year, 12, 31)->startOfDay()),
+        ];
+    }
+
+    /**
+     * ISO 날짜·엑셀 serial(숫자) 혼재 컬럼에 연도 조건을 적용한다.
+     *
+     * @param  Builder<Model>  $query
+     */
+    public static function applyWhereYear(Builder $query, string $column, int $year): void
+    {
+        [$minSerial, $maxSerial] = self::serialBoundsForYear($year);
+
+        $query->where(function (Builder $nested) use ($column, $year, $minSerial, $maxSerial): void {
+            $nested->whereYear($column, $year)
+                ->orWhereBetween($column, [$minSerial, $maxSerial]);
+        });
     }
 
     /**
