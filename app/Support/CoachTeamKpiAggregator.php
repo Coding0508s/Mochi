@@ -119,6 +119,10 @@ final class CoachTeamKpiAggregator
         }
 
         if ($filterMonth === '') {
+            if ($filterRound === '') {
+                self::applyAnyPlanYearScope($query, $year);
+            }
+
             return;
         }
 
@@ -133,5 +137,33 @@ final class CoachTeamKpiAggregator
         $query->whereNotNull($planColumn)
             ->whereYear($planColumn, $year)
             ->whereMonth($planColumn, $month);
+    }
+
+    /**
+     * @param  Builder<Teacher>  $query
+     */
+    public static function applyAnyPlanYearScope(Builder $query, int $year): void
+    {
+        $cols = config('coach_teacher_support.columns');
+        $rounds = config('coach_teacher_support.kpi_rounds', []);
+
+        $query->where(function (Builder $outer) use ($cols, $rounds, $year): void {
+            $first = true;
+            foreach ($rounds as $round) {
+                $planCol = $cols[$round['plan']] ?? null;
+                if ($planCol === null) {
+                    continue;
+                }
+
+                $clause = fn (Builder $sub): Builder => $sub->whereNotNull($planCol)->whereYear($planCol, $year);
+
+                if ($first) {
+                    $outer->where($clause);
+                    $first = false;
+                } else {
+                    $outer->orWhere($clause);
+                }
+            }
+        });
     }
 }

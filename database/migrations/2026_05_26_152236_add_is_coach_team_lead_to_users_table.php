@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasColumn('users', 'is_coach_team_lead')) {
+            return;
+        }
+
         Schema::table('users', function (Blueprint $table): void {
             $table->boolean('is_coach_team_lead')->default(false)->after('can_manage_store_inventory');
         });
@@ -15,6 +19,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::hasColumn('users', 'is_coach_team_lead')) {
+            return;
+        }
+
         Schema::table('users', function (Blueprint $table): void {
             $table->dropColumn('is_coach_team_lead');
         });

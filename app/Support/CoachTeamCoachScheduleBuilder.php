@@ -27,7 +27,7 @@ final class CoachTeamCoachScheduleBuilder
      *     }>,
      * }>
      */
-    public static function fromQuery(Builder $query): Collection
+    public static function fromQuery(Builder $query, ?int $year = null): Collection
     {
         $cols = config('coach_teacher_support.columns');
         $rounds = config('coach_teacher_support.kpi_rounds', []);
@@ -37,7 +37,7 @@ final class CoachTeamCoachScheduleBuilder
             ->orderBy('School_Name')
             ->orderBy('Name')
             ->get()
-            ->flatMap(function (Teacher $teacher) use ($cols, $rounds): array {
+            ->flatMap(function (Teacher $teacher) use ($cols, $rounds, $year): array {
                 $roundRows = [];
 
                 foreach ($rounds as $roundKey => $round) {
@@ -49,19 +49,25 @@ final class CoachTeamCoachScheduleBuilder
                         continue;
                     }
 
+                    if ($year !== null && $planParsed->year !== $year) {
+                        continue;
+                    }
+
                     $completedKey = $round['completed'];
                     $planTypeKey = str_replace('plan_', 'plan_type_', $planKey);
                     $completedTypeKey = str_replace('completed_', 'type_', $completedKey);
 
                     $completedRaw = $teacher->getRawOriginal($cols[$completedKey]);
-                    $completedFormatted = ExcelSerialDate::toStorageString($completedRaw);
+                    $completedParsed = ExcelSerialDate::parse($completedRaw);
+                    $completedFormatted = $completedParsed?->format('Y년 n월 j일');
+                    $completedInYear = $year === null || ($completedParsed !== null && $completedParsed->year === $year);
 
                     $roundRows[] = [
                         'round_key' => $roundKey,
                         'label' => ($round['filter_round'] ?? '').'차',
-                        'plan_date' => ExcelSerialDate::formatPlanMonth($planParsed),
+                        'plan_date' => $planParsed->format('Y년 n월 j일'),
                         'plan_type' => trim((string) ($teacher->{$cols[$planTypeKey]} ?? '')),
-                        'completed_date' => $completedFormatted !== null && $completedFormatted !== ''
+                        'completed_date' => $completedInYear && $completedFormatted !== null && $completedFormatted !== ''
                             ? $completedFormatted
                             : '—',
                         'completed_type' => trim((string) ($teacher->{$cols[$completedTypeKey]} ?? '')),

@@ -148,7 +148,7 @@ class ContactListClassParticipationTest extends TestCase
             'ClassInOut' => null,
         ]);
 
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         Livewire::actingAs($user)
             ->test(ContactList::class)

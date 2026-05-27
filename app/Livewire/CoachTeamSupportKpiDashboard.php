@@ -118,7 +118,7 @@ class CoachTeamSupportKpiDashboard extends Component
             $this->filterRound,
         );
 
-        $schedules = CoachTeamCoachScheduleBuilder::fromQuery($query);
+        $schedules = CoachTeamCoachScheduleBuilder::fromQuery($query, $this->filterYear);
         $this->coachScheduleRows = $schedules->all();
         $this->coachScheduleKpis = TeacherSupportKpiCalculator::calculate(clone $query, $this->filterYear);
         $this->coachScheduleSummary = CoachTeamCoachScheduleBuilder::summaryFromSchedules($schedules);
