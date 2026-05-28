@@ -21,10 +21,11 @@
     <div class="mochi-summary-card">
         <div class="flex flex-wrap items-center gap-4 text-sm">
             <h2 class="text-base font-semibold text-mochi-header">기관리스트</h2>
+           <!--  <span class="text-xs text-gray-500">({{ $statusScopeLabel }} · Information+마스터)</span> -->
             <span class="text-gray-300">|</span>
             <button wire:click="$set('assignmentFilter', '')"
                     class="text-gray-600 hover:text-blue-700 transition-colors cursor-pointer">
-                전체 <span class="font-semibold text-blue-600">{{ $allInstitutionCount }}</span>
+                배정 전체 <span class="font-semibold text-blue-600">{{ $allInstitutionCount }}</span>
             </button>
             <button wire:click="$set('assignmentFilter', 'assigned')"
                     class="text-gray-600 hover:text-blue-700 transition-colors
@@ -57,8 +58,8 @@
                 <option value="all">전체</option>
             </select>
 
-            @if($search || $assignmentFilter || $statusFilter !== 'active')
-                <button wire:click="$set('search', ''); $set('assignmentFilter', ''); $set('statusFilter', 'active')"
+            @if($search || $assignmentFilter || $statusFilter !== 'all')
+                <button wire:click="$set('search', ''); $set('assignmentFilter', ''); $set('statusFilter', 'all')"
                         class="py-2 px-3 text-sm text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50">
                     초기화
                 </button>
@@ -102,11 +103,10 @@
                         </button>
                     </th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">CO</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold">Coach</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold">TR</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">CS</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold">GS번호</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold">구분</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">Type</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold">구분</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">기관장</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">연락처</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">기관연락처</th>
@@ -114,9 +114,10 @@
                 </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                @forelse($institutions as $index => $inst)
+                @forelse($institutions as $index => $account)
                     @php
-                        $customerType = (string) ($inst->accountInfo?->Customer_Type ?? '');
+                        $master = $account->institution;
+                        $customerType = (string) ($account->Customer_Type ?? '');
                         $isTerminated = str_contains($customerType, '해지');
                         $customerTypeWithoutTerminateBadge = $customerType;
                         if ($isTerminated) {
@@ -126,32 +127,26 @@
                             $customerTypeWithoutTerminateBadge = trim((string) preg_replace('/\s+/u', ' ', $customerTypeWithoutTerminateBadge));
                         }
                     @endphp
-                    <tr wire:key="institution-row-{{ $inst->ID }}"
-                        wire:click="openDetailModal({{ $inst->ID }})"
+                    <tr wire:key="institution-row-{{ $account->ID }}"
+                        wire:click="openDetailModal({{ $account->ID }})"
                         class="mochi-table-row-hover transition-colors cursor-pointer">
                         <td class="institution-sticky-no px-3 py-2 text-gray-500 text-xs">{{ $institutions->firstItem() + $index }}</td>
                         <td class="institution-sticky-sk px-3 py-2">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                                {{ $inst->SKcode ?? '-' }}
+                                {{ $account->SK_Code ?? '-' }}
                             </span>
                         </td>
-                        <td class="institution-sticky-name px-3 py-2 font-medium text-gray-900">
-                            {{ $inst->resolvedAccountName() ?: '-' }}
-                            @if($inst->EnglishName)
-                                <span class="block text-xs text-gray-400">{{ $inst->EnglishName }}</span>
+                        <td class="institution-sticky-name px-3 py-2 font-medium">
+                            <span class="text-blue-700 hover:underline">
+                                {{ $account->Account_Name ?: ($master?->AccountName ?? '-') }}
+                            </span>
+                            @if($master?->EnglishName)
+                                <span class="block text-xs text-gray-400">{{ $master->EnglishName }}</span>
                             @endif
                         </td>
-                        <td class="px-3 py-2 text-gray-600">{{ $inst->accountInfo?->CO ?? '-' }}</td>
-                        <td class="px-3 py-2 text-gray-600">{{ $inst->accountInfo?->TR ?? '-' }}</td>
-                        <td class="px-3 py-2 text-gray-600">{{ $inst->accountInfo?->CS ?? '-' }}</td>
-                        <td class="px-3 py-2 text-gray-600 font-mono text-xs">{{ $inst->resolvedGsNumber() ?: '-' }}</td>
-                        <td class="px-3 py-2">
-                            @if($inst->Gubun)
-                                <span class="text-xs text-gray-600">{{ $inst->Gubun }}</span>
-                            @else
-                                <span class="text-gray-400">-</span>
-                            @endif
-                        </td>
+                        <td class="px-3 py-2 text-gray-600">{{ $account->CO ?? '-' }}</td>
+                        <td class="px-3 py-2 text-gray-600">{{ $account->TR ?? '-' }}</td>
+                        <td class="px-3 py-2 text-gray-600">{{ $account->CS ?? '-' }}</td>
                         <td class="px-3 py-2 text-gray-600 max-w-[14rem] min-w-0">
                             @if($customerType === '')
                                 <span class="text-gray-400">-</span>
@@ -168,16 +163,23 @@
                                 </div>
                             @endif
                         </td>
-                        <td class="px-3 py-2 text-gray-600">{{ $inst->Director ?? '-' }}</td>
-                        <td class="px-3 py-2 text-gray-600">{{ $inst->Phone ?? '-' }}</td>
-                        <td class="px-3 py-2 text-gray-600">{{ $inst->AccountTel ?? '-' }}</td>
-                        <td class="px-3 py-2 text-gray-500 max-w-56 truncate" title="{{ $inst->Address }}">
-                            {{ $inst->Address ?? '-' }}
+                        <td class="px-3 py-2">
+                            @if($master?->Gubun)
+                                <span class="text-xs text-gray-600">{{ $master->Gubun }}</span>
+                            @else
+                                <span class="text-gray-400">-</span>
+                            @endif
+                        </td>
+                        <td class="px-3 py-2 text-gray-600">{{ $master?->Director ?? '-' }}</td>
+                        <td class="px-3 py-2 text-gray-600">{{ $master?->Phone ?? '-' }}</td>
+                        <td class="px-3 py-2 text-gray-600">{{ $master?->AccountTel ?? '-' }}</td>
+                        <td class="px-3 py-2 text-gray-500 max-w-56 truncate" title="{{ $account->Address ?: $master?->Address }}">
+                            {{ $account->Address ?: ($master?->Address ?? '-') }}
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="13" class="px-4 py-16 text-center text-gray-400">
+                        <td colspan="12" class="px-4 py-16 text-center text-gray-400">
                             <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                             </svg>

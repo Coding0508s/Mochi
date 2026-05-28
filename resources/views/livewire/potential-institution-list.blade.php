@@ -181,7 +181,7 @@
                                 @endif
                             </td>
                             <td class="px-1.5 py-2 text-center whitespace-nowrap">
-                                @if($target->IsContract)
+                                @if($target->IsContract || $target->Possibility === '계약')
                                     <span class="text-[11px] text-gray-500" title="계약 완료 처리됨">완료</span>
                                 @else
                                     <button type="button"

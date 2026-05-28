@@ -68,9 +68,7 @@ class UpdateSupportRecord
             'TO_Account' => filled($payload['to_account'] ?? null) ? trim((string) $payload['to_account']) : null,
             'TO_Depart' => filled($payload['to_depart'] ?? null) ? trim((string) $payload['to_depart']) : null,
             'Others' => filled($payload['others'] ?? null) ? trim((string) $payload['others']) : null,
-            'Status' => $completed ? '완료' : '진행중',
-            'CompletedDate' => $completed ? ($record->CompletedDate ?? now()) : null,
-        ]));
+        ] + SupportRecord::completionAttributes($completed, $record->CompletedDate)));
 
         return $record->fresh() ?? $record;
     }

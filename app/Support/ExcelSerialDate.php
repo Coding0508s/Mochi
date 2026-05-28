@@ -7,6 +7,7 @@ use Carbon\CarbonInterface;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * 레거시 엑셀 일련번호(1900 날짜 체계) 날짜 변환.
@@ -88,7 +89,7 @@ final class ExcelSerialDate
         return $parsed?->format('Y-m-d');
     }
 
-    public static function formatPlanMonth(?CarbonInterface $value): string
+    public static function formatPlanMonth(mixed $value): string
     {
         $parsed = self::parse($value);
 
@@ -102,6 +103,21 @@ final class ExcelSerialDate
         return $parsed !== null && $parsed->year === $year;
     }
 
+    public static function matchesFilterYear(mixed $value, ?int $year): bool
+    {
+        $parsed = self::parse($value);
+
+        if ($parsed === null) {
+            return false;
+        }
+
+        if ($year === null) {
+            return true;
+        }
+
+        return $parsed->year === $year;
+    }
+
     public static function formatPlanMonthForYear(mixed $value, int $year): string
     {
         if (! self::isInYear($value, $year)) {
@@ -113,9 +129,27 @@ final class ExcelSerialDate
         return $parsed === null ? '' : $parsed->format('Y년 n월');
     }
 
+    public static function displayPlanMonth(mixed $value, ?int $year): string
+    {
+        if ($year === null) {
+            return self::formatPlanMonth($value);
+        }
+
+        return self::formatPlanMonthForYear($value, $year);
+    }
+
     public static function toStorageStringForYear(mixed $value, int $year): ?string
     {
         return self::isInYear($value, $year) ? self::toStorageString($value) : null;
+    }
+
+    public static function displayStorageString(mixed $value, ?int $year): ?string
+    {
+        if ($year === null) {
+            return self::toStorageString($value);
+        }
+
+        return self::toStorageStringForYear($value, $year);
     }
 
     public static function dateToSerial(CarbonInterface $date): int
@@ -141,12 +175,35 @@ final class ExcelSerialDate
      */
     public static function applyWhereYear(Builder $query, string $column, int $year): void
     {
+        $query->where(function (Builder $nested) use ($column, $year): void {
+            $nested->whereRaw(self::sqlColumnInYear($column, $year));
+        });
+    }
+
+    /**
+     * ISO 날짜·엑셀 serial 혼재 컬럼이 특정 연도에 속하는지 여부 (집계용 raw SQL).
+     */
+    public static function sqlColumnInYear(string $column, int $year): string
+    {
         [$minSerial, $maxSerial] = self::serialBoundsForYear($year);
 
-        $query->where(function (Builder $nested) use ($column, $year, $minSerial, $maxSerial): void {
-            $nested->whereYear($column, $year)
-                ->orWhereBetween($column, [$minSerial, $maxSerial]);
-        });
+        return "({$column} IS NOT NULL AND (".self::sqlYearEquals($column, $year)." OR ({$column} >= {$minSerial} AND {$column} <= {$maxSerial})))";
+    }
+
+    public static function sqlYearEquals(string $column, int $year): string
+    {
+        return match (Schema::getConnection()->getDriverName()) {
+            'sqlite' => "(CAST(strftime('%Y', {$column}) AS INTEGER) = {$year})",
+            default => "(YEAR({$column}) = {$year})",
+        };
+    }
+
+    public static function sqlYearNotEquals(string $column, int $year): string
+    {
+        return match (Schema::getConnection()->getDriverName()) {
+            'sqlite' => "(CAST(strftime('%Y', {$column}) AS INTEGER) != {$year})",
+            default => "(YEAR({$column}) != {$year})",
+        };
     }
 
     /**

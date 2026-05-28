@@ -25,9 +25,7 @@ class SupportList extends Component
 
     public string $filterTr = '';   // 담당자 필터
 
-    public string $filterSkCode = '';   // 기관 필터
-
-    public string $search = '';   // 키워드 검색
+    public string $search = '';   // 키워드 검색 (기관명·SK코드·이슈·소통내용)
 
     // ─── 보고서 작성 모달 상태 ────────────────────────────────────
     public bool $showModal = false;
@@ -102,11 +100,6 @@ class SupportList extends Component
     }
 
     public function updatingFilterTr(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatingFilterSkCode(): void
     {
         $this->resetPage();
     }
@@ -522,7 +515,7 @@ class SupportList extends Component
         $this->formSupportType = $record->Support_Type ?? '전화';
         $this->formTarget = $record->Target ?? '';
         $this->formToAccount = $record->TO_Account ?? '';
-        $this->formCompleted = ! is_null($record->CompletedDate);
+        $this->formCompleted = $record->isCompleted();
     }
 
     private function resetForm(): void
@@ -566,9 +559,8 @@ class SupportList extends Component
                 'Support_Type' => $this->formSupportType,
                 'Target' => $this->formTarget,
                 'TO_Account' => $this->formToAccount,
-                'Status' => $this->formCompleted ? '완료' : '진행중',
-                'CompletedDate' => $this->formCompleted ? now() : null,
                 'CreatedDate' => now(),
+                ...SupportRecord::completionAttributes($this->formCompleted),
             ]);
 
             SupportRecord::where('ID', $this->editingId)->update($data);
@@ -583,7 +575,7 @@ class SupportList extends Component
     {
         $record = SupportRecord::query()->findOrFail($id);
         Gate::authorize('updateSupportRecord', $record);
-        $record->toggleComplete(is_null($record->CompletedDate));
+        $record->toggleComplete(! $record->isCompleted());
     }
 
     /**
@@ -609,7 +601,6 @@ class SupportList extends Component
         $records = SupportRecord::query()
             ->ofYear($this->filterYear ? (int) $this->filterYear : null)
             ->ofTr($this->filterTr)
-            ->ofInstitution($this->filterSkCode)
             ->keyword($this->search)
             ->withInstitutionWhenPossible()
             ->orderedForList()

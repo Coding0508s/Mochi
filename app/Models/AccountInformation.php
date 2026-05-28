@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\ManagerNameNormalizer;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -64,5 +66,72 @@ class AccountInformation extends Model
     {
         return $this->belongsTo(Institution::class, 'SK_Code', 'SKcode');
         // "S_AccountName 테이블에서 SKcode = 이 행의 SK_Code 인 기관을 가져와"
+    }
+
+    /**
+     * 기관명·SK코드·담당자·주소 등 S_Account_Information 컬럼 기준 검색.
+     */
+    public function scopeSearch(Builder $query, ?string $keyword): Builder
+    {
+        if (blank($keyword)) {
+            return $query;
+        }
+
+        $normalizedKeyword = preg_replace('/\s+/u', '', (string) $keyword) ?? '';
+        if ($normalizedKeyword === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $accountQuery) use ($normalizedKeyword): void {
+            foreach (['SK_Code', 'Account_Name', 'CO', 'TR', 'CS', 'Customer_Type', 'Affiliate', 'Address'] as $column) {
+                $accountQuery->orWhereRaw("REPLACE({$column}, ' ', '') like ?", ["%{$normalizedKeyword}%"]);
+            }
+
+            $accountQuery->orWhereHas('institution', function (Builder $institutionQuery) use ($normalizedKeyword): void {
+                $institutionQuery->where(function (Builder $masterQuery) use ($normalizedKeyword): void {
+                    foreach (['AccountName', 'SKcode', 'Director', 'Address', 'EnglishName'] as $column) {
+                        $masterQuery->orWhereRaw("REPLACE({$column}, ' ', '') like ?", ["%{$normalizedKeyword}%"]);
+                    }
+                });
+            });
+        });
+    }
+
+    public function scopeActiveCustomers(Builder $query): Builder
+    {
+        return $query->where(function (Builder $statusQuery): void {
+            $statusQuery->whereNull('Customer_Type')
+                ->orWhere('Customer_Type', '')
+                ->orWhere('Customer_Type', 'not like', '%해지%');
+        });
+    }
+
+    public function scopeTerminatedCustomers(Builder $query): Builder
+    {
+        return $query->where('Customer_Type', 'like', '%해지%');
+    }
+
+    public function scopeWhereManagerAssigned(Builder $query, string $column): Builder
+    {
+        return $query->whereNotNull($column)
+            ->where($column, '!=', '');
+    }
+
+    /**
+     * @param  list<string>  $aliases
+     */
+    public function scopeWhereManagerMatches(Builder $query, string $column, array $aliases): Builder
+    {
+        if ($aliases === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $sqlNormalized = ManagerNameNormalizer::sqlColumnExpression($column);
+
+        return $query->where(function (Builder $managerQuery) use ($aliases, $sqlNormalized): void {
+            foreach ($aliases as $alias) {
+                $managerQuery->orWhereRaw("{$sqlNormalized} = ?", [$alias]);
+            }
+        });
     }
 }

@@ -56,19 +56,49 @@ final class CoachTeamKpiAggregator
      */
     public static function byCoach(Builder $baseQuery, int $year, string $filterMonth = '', string $filterRound = ''): Collection
     {
-        return self::distinctCoachTrNames($baseQuery)
-            ->map(function (string $coach) use ($baseQuery, $year, $filterMonth, $filterRound): array {
-                $query = clone $baseQuery;
-                self::applyCoachTrFilter($query, $coach);
-                self::applyScheduleFilters($query, $year, $filterMonth, $filterRound);
+        $cols = config('coach_teacher_support.columns');
+        $selectColumns = collect(array_values($cols))
+            ->merge(['Teachers.ID', 'Teachers.SK_Code'])
+            ->unique()
+            ->values()
+            ->all();
 
-                $kpis = TeacherSupportKpiCalculator::calculate($query, $year);
+        $query = clone $baseQuery;
+        self::applyScheduleFilters($query, $year, $filterMonth, $filterRound);
+
+        $teachers = $query
+            ->with([
+                'institution.accountInfo' => static fn ($sub) => $sub->select(['ID', 'SK_Code', 'TR']),
+            ])
+            ->get($selectColumns);
+
+        return $teachers
+            ->map(function (Teacher $teacher): ?array {
+                $rawCoach = trim((string) ($teacher->institution?->accountInfo?->TR ?? ''));
+                if ($rawCoach === '') {
+                    return null;
+                }
+
+                return [
+                    'normalized' => ManagerNameNormalizer::normalize($rawCoach),
+                    'coach' => $rawCoach,
+                    'teacher' => $teacher,
+                ];
+            })
+            ->filter()
+            ->groupBy('normalized')
+            ->sortKeys()
+            ->map(function (Collection $rows) use ($year): array {
+                $coach = (string) ($rows->first()['coach'] ?? '');
+                $teacherRows = $rows->pluck('teacher');
+                $kpis = TeacherSupportKpiCalculator::calculateFromTeachers($teacherRows, $year);
 
                 return array_merge([
                     'coach' => $coach,
-                    'teacher_count' => (clone $query)->count(),
+                    'teacher_count' => $teacherRows->count(),
                 ], $kpis);
-            });
+            })
+            ->values();
     }
 
     /**

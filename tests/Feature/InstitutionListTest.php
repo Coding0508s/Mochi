@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Jobs\SyncInstitutionOutboundJob;
 use App\Livewire\InstitutionList;
+use App\Models\AccountInformation;
 use App\Models\GsNumber;
 use App\Models\Institution;
 use App\Models\SupportRecord;
@@ -44,6 +45,7 @@ class InstitutionListTest extends TestCase
             $table->increments('ID');
             $table->string('SKcode', 100)->unique();
             $table->string('AccountName', 255);
+            $table->timestamp('FGC_CreateDate')->nullable();
             $table->string('EnglishName', 255)->nullable();
             $table->string('PortalAccountName', 255)->nullable();
             $table->string('PortalCampusID', 100)->nullable();
@@ -67,6 +69,7 @@ class InstitutionListTest extends TestCase
             $table->string('Customer_Type', 255)->nullable();
             $table->string('Affiliate', 255)->nullable();
             $table->string('Address', 255)->nullable();
+            $table->timestamp('FGC_CreateDate')->nullable();
         });
 
         Schema::create('S_GSNumber', function (Blueprint $table): void {
@@ -137,6 +140,30 @@ class InstitutionListTest extends TestCase
             $table->timestamp('applied_at')->nullable();
             $table->timestamps();
         });
+    }
+
+    public function test_institution_list_is_driven_by_account_information_table(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-ONLY-MASTER',
+            'AccountName' => '마스터만 있는 기관',
+        ]);
+
+        AccountInformation::query()->create([
+            'SK_Code' => 'SK1894',
+            'Account_Name' => '수원 장안 성민유치원',
+            'TR' => 'Jeanie Park',
+            'CS' => 'Bella Joo',
+            'CO' => 'Daniel Kim',
+            'Customer_Type' => 'GTS 13 기존',
+        ]);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(InstitutionList::class)
+            ->assertSee('수원 장안 성민유치원')
+            ->assertSee('Jeanie Park')
+            ->assertSee('Daniel Kim')
+            ->assertSee('마스터만 있는 기관');
     }
 
     public function test_detail_modal_shows_support_report_create_link_for_active_institution(): void
@@ -417,6 +444,15 @@ class InstitutionListTest extends TestCase
         Institution::query()->create([
             'SKcode' => 'SK-HIDDEN-1',
             'AccountName' => '숨김 기관',
+        ]);
+
+        AccountInformation::query()->create([
+            'SK_Code' => 'SK-VISIBLE-1',
+            'Account_Name' => '표시 기관',
+        ]);
+        AccountInformation::query()->create([
+            'SK_Code' => 'SK-HIDDEN-1',
+            'Account_Name' => '숨김 기관',
         ]);
 
         DB::table('institution_visibility_overrides')->insert([
@@ -740,6 +776,107 @@ class InstitutionListTest extends TestCase
         ]);
     }
 
+    public function test_catalog_includes_master_only_institutions_for_total_count(): void
+    {
+        $user = User::factory()->create();
+
+        Institution::query()->create([
+            'SKcode' => 'SK-ONLY-MASTER',
+            'AccountName' => '마스터만 있는 기관',
+        ]);
+
+        AccountInformation::query()->create([
+            'SK_Code' => 'SK-WITH-INFO',
+            'Account_Name' => '정보 테이블 기관',
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->set('statusFilter', 'all');
+
+        $this->assertSame(2, $component->viewData('allInstitutionCount'));
+        $this->assertSame(2, $component->viewData('institutions')->total());
+    }
+
+    public function test_all_status_filter_count_matches_account_information_rows(): void
+    {
+        $user = User::factory()->create();
+
+        DB::table('S_Account_Information')->insert([
+            [
+                'SK_Code' => 'SK-ACTIVE',
+                'Account_Name' => '운영 기관',
+                'Customer_Type' => 'GTS 13 기존',
+                'FGC_CreateDate' => '2024-01-11 18:18:51',
+            ],
+            [
+                'SK_Code' => 'SK-TERM',
+                'Account_Name' => '해지 기관',
+                'Customer_Type' => 'GTS 16 Conversion 해지',
+                'FGC_CreateDate' => '2024-01-11 18:18:52',
+            ],
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->set('statusFilter', 'all');
+
+        $this->assertSame(2, $component->viewData('allInstitutionCount'));
+        $this->assertSame(2, $component->viewData('institutions')->total());
+        $this->assertSame('전체 기관', $component->viewData('statusScopeLabel'));
+    }
+
+    public function test_active_status_filter_excludes_terminated_rows(): void
+    {
+        $user = User::factory()->create();
+
+        DB::table('S_Account_Information')->insert([
+            [
+                'SK_Code' => 'SK-ACTIVE',
+                'Account_Name' => '운영 기관',
+                'Customer_Type' => 'GTS 13 기존',
+            ],
+            [
+                'SK_Code' => 'SK-TERM',
+                'Account_Name' => '해지 기관',
+                'Customer_Type' => 'GTS 16 Conversion 해지',
+            ],
+        ]);
+
+        $component = Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->set('statusFilter', 'active');
+
+        $this->assertSame(1, $component->viewData('allInstitutionCount'));
+        $this->assertSame(1, $component->viewData('institutions')->total());
+        $this->assertSame('운영 기관', $component->viewData('statusScopeLabel'));
+    }
+
+    public function test_default_sort_orders_by_fgc_create_date_ascending(): void
+    {
+        $user = User::factory()->create();
+
+        DB::table('S_Account_Information')->insert([
+            [
+                'SK_Code' => 'SK-NEWER',
+                'Account_Name' => '나중 생성',
+                'FGC_CreateDate' => '2024-01-11 18:18:56',
+            ],
+            [
+                'SK_Code' => 'SK-OLDER',
+                'Account_Name' => '먼저 생성',
+                'FGC_CreateDate' => '2024-01-11 18:18:51',
+            ],
+        ]);
+
+        $institutions = Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->viewData('institutions');
+
+        $this->assertSame('SK-OLDER', $institutions->first()->SK_Code);
+        $this->assertSame('SK-NEWER', $institutions->last()->SK_Code);
+    }
+
     public function test_sorting_by_account_name_uses_account_information_name_first(): void
     {
         $user = User::factory()->create();
@@ -770,8 +907,8 @@ class InstitutionListTest extends TestCase
             ->set('sortDirection', 'asc');
 
         $institutions = $component->viewData('institutions');
-        $this->assertSame('SK-SORT-NAME-1', $institutions->first()->SKcode);
-        $this->assertSame('SK-SORT-NAME-2', $institutions->last()->SKcode);
+        $this->assertSame('SK-SORT-NAME-1', $institutions->first()->SK_Code);
+        $this->assertSame('SK-SORT-NAME-2', $institutions->last()->SK_Code);
     }
 
     public function test_search_matches_s_account_information_assignees(): void
@@ -870,7 +1007,7 @@ class InstitutionListTest extends TestCase
             ->assertDontSee('타 담당 기관');
     }
 
-    public function test_list_prefers_gs_number_from_s_gs_number_table(): void
+    public function test_detail_modal_prefers_gs_number_from_s_gs_number_table(): void
     {
         $user = User::factory()->create();
 
@@ -886,8 +1023,14 @@ class InstitutionListTest extends TestCase
             'GSnumber' => '1.14',
         ]);
 
+        $acct = AccountInformation::query()->create([
+            'SK_Code' => 'SK-GS-LIST-1',
+            'Account_Name' => 'GS 표시 기관',
+        ]);
+
         Livewire::actingAs($user)
             ->test(InstitutionList::class)
+            ->call('openDetailModal', $acct->ID)
             ->assertSee('1.14')
             ->assertDontSee('9.99');
     }

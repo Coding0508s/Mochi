@@ -379,9 +379,8 @@ class SupportCreateForm extends Component
                         'Issue' => null,
                         'TO_Account' => $this->formToAccount,
                         'TO_Depart' => $this->formToDepart,
-                        'Status' => $this->formCompleted ? '완료' : '진행중',
-                        'CompletedDate' => $this->formCompleted ? now() : null,
                         'CreatedDate' => now(),
+                        ...SupportRecord::completionAttributes($this->formCompleted),
                     ])
                 );
 

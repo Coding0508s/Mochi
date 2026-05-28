@@ -531,10 +531,8 @@ class PotentialInstitutionList extends Component
                         'Issue' => null,
                         'TO_Account' => $validated['newSupportReportToAccount'] ?: null,
                         'TO_Depart' => $validated['newSupportReportToDepart'] ?: null,
-                        'Status' => ! empty($validated['newSupportReportCompleted']) ? '완료' : '진행중',
-                        'CompletedDate' => ! empty($validated['newSupportReportCompleted']) ? now() : null,
                         'CreatedDate' => now(),
-                    ];
+                    ] + SupportRecord::completionAttributes(! empty($validated['newSupportReportCompleted']));
 
                     foreach (array_keys($supportPayload) as $column) {
                         if (! Schema::hasColumn('S_SupportInfo_Account', $column)) {
@@ -787,7 +785,7 @@ class PotentialInstitutionList extends Component
                     'target' => $record->Target ?? '-',
                     'to_account' => $record->TO_Account ?? '-',
                     'status' => $record->Status ?? '-',
-                    'completed' => ! is_null($record->CompletedDate),
+                    'completed' => $record->isCompleted(),
                 ];
             })
             ->toArray();

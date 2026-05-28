@@ -111,7 +111,7 @@ class TeacherSupportHistoryDetailResolver
                 'others' => $record->Others,
                 'support_date' => $record->Support_Date?->format('Y-m-d'),
                 'support_time' => $record->Meet_Time,
-                'status' => $record->CompletedDate ? '완료' : '진행중',
+                'status' => $record->isCompleted() ? SupportRecord::STATUS_COMPLETED : SupportRecord::STATUS_IN_PROGRESS,
                 'created_date' => $record->CreatedDate?->format('Y-m-d H:i'),
                 'completed_date' => $record->CompletedDate?->format('Y-m-d H:i'),
                 default => null,

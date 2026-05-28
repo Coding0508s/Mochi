@@ -815,6 +815,26 @@ class CoachTeacherSupportListTest extends TestCase
         $this->assertEqualsCanonicalizing(['올해계획', '올해완료만'], $names);
     }
 
+    public function test_year_filter_defaults_to_all_and_shows_multiple_years(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '올해교사', [
+            'Plan_1st_Support_Date' => '2026-03-01',
+        ]);
+        $this->createTeacher('SK002', '작년교사', [
+            '_1st_Support_Date' => '2025-12-01',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->assertSet('filterYear', '')
+            ->assertSee('전체')
+            ->assertSee('올해교사')
+            ->assertSee('작년교사');
+    }
+
     public function test_hidden_institution_excluded(): void
     {
         $admin = $this->createAdminUser();

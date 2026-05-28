@@ -194,7 +194,7 @@ class TeacherSupportHistoryFormLoader
             'action' => $action,
             'teacher_id' => (int) $teacher->ID,
             'form' => $form,
-            'mark_completed' => filled($record->CompletedDate),
+            'mark_completed' => $record->isCompleted(),
         ];
     }
 

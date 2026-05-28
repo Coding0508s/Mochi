@@ -43,6 +43,10 @@ use Illuminate\Support\Facades\Schema;
  */
 class SupportRecord extends Model
 {
+    public const STATUS_COMPLETED = '완료';
+
+    public const STATUS_IN_PROGRESS = '진행중';
+
     // ─── 테이블 설정 ──────────────────────────────────────────────────
     protected $table = 'S_SupportInfo_Account';
 
@@ -312,11 +316,7 @@ class SupportRecord extends Model
      */
     public function scopeCompleted(Builder $query): Builder
     {
-        if (! static::tableHasColumn('CompletedDate')) {
-            return $query->whereRaw('1 = 0');
-        }
-
-        return $query->whereNotNull('CompletedDate');
+        return static::applyCompletedScope($query);
     }
 
     /**
@@ -327,11 +327,93 @@ class SupportRecord extends Model
      */
     public function scopeInProgress(Builder $query): Builder
     {
-        if (! static::tableHasColumn('CompletedDate')) {
+        return static::applyInProgressScope($query);
+    }
+
+    /**
+     * 레거시(Status)와 MOCHI(CompletedDate) 완료 기준을 통일합니다.
+     */
+    public function isCompleted(): bool
+    {
+        if (static::tableHasColumn('CompletedDate') && $this->CompletedDate !== null) {
+            return true;
+        }
+
+        if (static::tableHasColumn('Status')) {
+            return (string) ($this->Status ?? '') === self::STATUS_COMPLETED;
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function completionAttributes(bool $completed, ?\DateTimeInterface $completedAt = null): array
+    {
+        $attributes = [];
+
+        if (static::tableHasColumn('Status')) {
+            $attributes['Status'] = $completed ? self::STATUS_COMPLETED : self::STATUS_IN_PROGRESS;
+        }
+
+        if (static::tableHasColumn('CompletedDate')) {
+            $attributes['CompletedDate'] = $completed ? ($completedAt ?? now()) : null;
+        }
+
+        return $attributes;
+    }
+
+    public static function applyCompletedScope(Builder $query): Builder
+    {
+        $hasCompletedDate = static::tableHasColumn('CompletedDate');
+        $hasStatus = static::tableHasColumn('Status');
+
+        if (! $hasCompletedDate && ! $hasStatus) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($hasCompletedDate && ! $hasStatus) {
+            return $query->whereNotNull('CompletedDate');
+        }
+
+        if (! $hasCompletedDate && $hasStatus) {
+            return $query->where('Status', self::STATUS_COMPLETED);
+        }
+
+        return $query->where(function (Builder $completedQuery): void {
+            $completedQuery->whereNotNull('CompletedDate')
+                ->orWhere('Status', self::STATUS_COMPLETED);
+        });
+    }
+
+    public static function applyInProgressScope(Builder $query): Builder
+    {
+        $hasCompletedDate = static::tableHasColumn('CompletedDate');
+        $hasStatus = static::tableHasColumn('Status');
+
+        if (! $hasCompletedDate && ! $hasStatus) {
             return $query;
         }
 
-        return $query->whereNull('CompletedDate');
+        if ($hasCompletedDate && ! $hasStatus) {
+            return $query->whereNull('CompletedDate');
+        }
+
+        if (! $hasCompletedDate && $hasStatus) {
+            return $query->where(function (Builder $inProgressQuery): void {
+                $inProgressQuery->whereNull('Status')
+                    ->orWhere('Status', '!=', self::STATUS_COMPLETED);
+            });
+        }
+
+        return $query->where(function (Builder $inProgressQuery): void {
+            $inProgressQuery->whereNull('CompletedDate')
+                ->where(function (Builder $statusQuery): void {
+                    $statusQuery->whereNull('Status')
+                        ->orWhere('Status', '!=', self::STATUS_COMPLETED);
+                });
+        });
     }
 
     /**
@@ -377,8 +459,8 @@ class SupportRecord extends Model
     /**
      * PRD 4.3 "완료처리" 토글 스위치 동작
      * ─────────────────────────────────
-     * true  → CompletedDate에 지금 시각 기록 (완료)
-     * false → CompletedDate를 null로 초기화 (완료 취소)
+     * true  → Status·CompletedDate를 함께 완료로 맞춤
+     * false → Status·CompletedDate를 함께 진행중으로 맞춤
      *
      * 사용 예:
      *   $record->toggleComplete(true)   // 완료 처리
@@ -386,11 +468,18 @@ class SupportRecord extends Model
      */
     public function toggleComplete(bool $done): void
     {
-        if (! static::tableHasColumn('CompletedDate')) {
+        if (! static::tableHasColumn('CompletedDate') && ! static::tableHasColumn('Status')) {
             return;
         }
 
-        $this->CompletedDate = $done ? now() : null;
+        $this->applyCompletionState($done);
         $this->save();
+    }
+
+    public function applyCompletionState(bool $done): void
+    {
+        foreach (static::completionAttributes($done, $this->CompletedDate) as $column => $value) {
+            $this->setAttribute($column, $value);
+        }
     }
 }

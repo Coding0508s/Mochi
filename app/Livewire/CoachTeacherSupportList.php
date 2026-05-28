@@ -41,7 +41,7 @@ class CoachTeacherSupportList extends Component
 {
     use WithPagination;
 
-    public int $filterYear;
+    public string $filterYear = '';
 
     public string $filterRound = '';
 
@@ -178,9 +178,7 @@ class CoachTeacherSupportList extends Component
     public function mount(): void
     {
         $year = request()->query('filterYear');
-        $this->filterYear = is_numeric($year)
-            ? (int) $year
-            : (int) (config('coach_teacher_support.default_year') ?? now()->year);
+        $this->filterYear = is_numeric($year) ? (string) (int) $year : '';
 
         $coach = request()->query('filterCoach');
         if (is_string($coach) && filled($coach)) {
@@ -225,7 +223,7 @@ class CoachTeacherSupportList extends Component
         try {
             $this->institutionSupportHistory = SupportRecord::query()
                 ->whereIn('SK_Code', $candidateSkCodes)
-                ->where('Status', '완료')
+                ->completed()
                 ->orderByDesc('Support_Date')
                 ->limit(10)
                 ->get(['ID', 'TR_Name', 'Support_Date', 'Support_Type', 'Issue', 'Status'])
@@ -1828,6 +1826,16 @@ class CoachTeacherSupportList extends Component
     public function updatedFilterYear(): void
     {
         $this->resetPage();
+
+        if ($this->filterYear === '') {
+            return;
+        }
+
+        $maxYear = now()->year;
+        $minYear = $maxYear - 10;
+        $year = (int) $this->filterYear;
+
+        $this->filterYear = (string) max($minYear, min($maxYear, $year));
     }
 
     public function updatedFilterRound(): void
@@ -1860,6 +1868,7 @@ class CoachTeacherSupportList extends Component
     public function resetFilters(): void
     {
         $this->search = '';
+        $this->filterYear = '';
         $this->filterRound = '';
         $this->filterMonth = '';
         $this->filterCoach = '';
@@ -1962,7 +1971,7 @@ class CoachTeacherSupportList extends Component
         $this->applyRoundFilter($kpiQuery);
         $this->applyMonthFilter($kpiQuery);
 
-        $kpis = TeacherSupportKpiCalculator::calculate($kpiQuery, $this->filterYear);
+        $kpis = TeacherSupportKpiCalculator::calculate($kpiQuery, $this->resolvedFilterYear());
 
         $teachers = (clone $baseQuery)
             ->tap(fn (Builder $q) => $this->applyKpiFilter($q))
@@ -1996,7 +2005,17 @@ class CoachTeacherSupportList extends Component
             'openClassConfig' => config('coach_teacher_open_class'),
             'unit21PlusConfig' => config('coach_teacher_unit21_plus'),
             'unit31PlusConfig' => config('coach_teacher_unit31_plus'),
+            'displayYear' => $this->resolvedFilterYear(),
         ]);
+    }
+
+    private function resolvedFilterYear(): ?int
+    {
+        if ($this->filterYear === '') {
+            return null;
+        }
+
+        return (int) $this->filterYear;
     }
 
     /**
@@ -2197,7 +2216,12 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
-        CoachTeamKpiAggregator::applyAnySupportYearScope($query, $this->filterYear);
+        $year = $this->resolvedFilterYear();
+        if ($year === null) {
+            return;
+        }
+
+        CoachTeamKpiAggregator::applyAnySupportYearScope($query, $year);
     }
 
     private function applyKpiFilter(Builder $query): void
@@ -2206,7 +2230,13 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
-        $year = $this->filterYear;
+        $year = $this->resolvedFilterYear();
+
+        if ($year === null) {
+            TeacherSupportKpiCalculator::applyKpiFilterWithoutYear($query, $this->kpiFilter);
+
+            return;
+        }
 
         match ($this->kpiFilter) {
             'completed' => TeacherSupportKpiCalculator::applyAllRoundsCompletedScope($query, $year),
@@ -2221,7 +2251,17 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
-        TeacherSupportKpiCalculator::applyPlanRoundScope($query, $this->filterRound, $this->filterYear);
+        $year = $this->resolvedFilterYear();
+        if ($year === null) {
+            $planColumn = TeacherSupportKpiCalculator::planColumnForFilterRound($this->filterRound);
+            if ($planColumn !== null) {
+                $query->whereNotNull($planColumn);
+            }
+
+            return;
+        }
+
+        TeacherSupportKpiCalculator::applyPlanRoundScope($query, $this->filterRound, $year);
     }
 
     private function applyMonthFilter(Builder $query): void
@@ -2231,7 +2271,7 @@ class CoachTeacherSupportList extends Component
         }
 
         $month = (int) $this->filterMonth;
-        $year = $this->filterYear;
+        $year = $this->resolvedFilterYear();
         $planRound = $this->filterRound !== '' ? $this->filterRound : '1';
         $planColumn = TeacherSupportKpiCalculator::planColumnForFilterRound($planRound);
 
@@ -2241,7 +2281,10 @@ class CoachTeacherSupportList extends Component
 
         $query->whereNotNull($planColumn)
             ->where(function (Builder $nested) use ($planColumn, $year, $month): void {
-                ExcelSerialDate::applyWhereYear($nested, $planColumn, $year);
+                if ($year !== null) {
+                    ExcelSerialDate::applyWhereYear($nested, $planColumn, $year);
+                }
+
                 $nested->whereMonth($planColumn, $month);
             });
     }
