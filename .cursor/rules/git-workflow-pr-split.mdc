@@ -1,5 +1,5 @@
 ---
-description: 
+description: Git 브랜치·커밋·PR 분할 원칙과 PR 본문 템플릿(한 PR=한 의도, diff 가드레일)
 alwaysApply: true
 ---
 
