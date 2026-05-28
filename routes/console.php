@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ProcessAssignmentChangeRequestsJob;
 use App\Jobs\ProcessSkCodeRequestsJob;
 use App\Jobs\PullInstitutionFromPartnerJob;
 use App\Models\StoreInventorySku;
@@ -22,6 +23,11 @@ Schedule::job(new PullInstitutionFromPartnerJob)
 
 Schedule::job(new ProcessSkCodeRequestsJob)
     ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::job(new ProcessAssignmentChangeRequestsJob)
+    ->cron((string) config('services.assignment_sync.schedule', '0 * * * *'))
+    ->when(fn (): bool => (bool) config('services.assignment_sync.enabled', false))
     ->withoutOverlapping();
 
 Artisan::command(

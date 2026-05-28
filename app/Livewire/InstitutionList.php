@@ -6,6 +6,7 @@ use App\Enums\SyncOrigin;
 use App\Jobs\SyncInstitutionOutboundJob;
 use App\Livewire\Concerns\ManagesInstitutionSupportDetailEdit;
 use App\Models\AccountInformation;
+use App\Models\AssignmentChangeRequest;
 use App\Models\Employee;
 use App\Models\GsNumber;
 use App\Models\Institution;
@@ -371,8 +372,11 @@ class InstitutionList extends Component
         $newSk = trim($this->editDetailSkCode);
         $trimmedGs = trim($this->editGsNo);
         $accountName = trim($this->editDetailInstitutionName);
+        $beforeAccountInfo = AccountInformation::query()
+            ->where('SK_Code', $newSk)
+            ->first();
 
-        DB::transaction(function () use ($institution, $oldSk, $newSk, $accountName, $trimmedGs): void {
+        DB::transaction(function () use ($institution, $oldSk, $newSk, $accountName, $trimmedGs, $beforeAccountInfo): void {
             if ($oldSk !== $newSk) {
                 if (Schema::hasTable('Teachers')) {
                     Teacher::query()->where('SK_Code', $oldSk)->update(['SK_Code' => $newSk]);
@@ -424,6 +428,15 @@ class InstitutionList extends Component
                 'tr' => trim($this->editDetailTr) ?: null,
                 'cs' => trim($this->editDetailCs) ?: null,
             ]);
+            $this->enqueueAssignmentChangeRequestIfNeeded(
+                $newSk,
+                $beforeAccountInfo,
+                [
+                    'co' => trim($this->editDetailCo) ?: null,
+                    'tr' => trim($this->editDetailTr) ?: null,
+                    'cs' => trim($this->editDetailCs) ?: null,
+                ]
+            );
 
             if (Schema::hasTable('S_GSNumber')) {
                 GsNumber::query()->updateOrCreate(
@@ -603,7 +616,7 @@ class InstitutionList extends Component
 
         $accountName = trim($this->editInstitutionName);
 
-        DB::transaction(function () use ($accountName, $co, $tr, $cs): void {
+        DB::transaction(function () use ($accountName, $co, $tr, $cs, $existing): void {
             Institution::query()
                 ->where('SKcode', $this->editSkCode)
                 ->update(['AccountName' => $accountName]);
@@ -631,6 +644,11 @@ class InstitutionList extends Component
                 'tr' => $tr,
                 'cs' => $cs,
             ]);
+            $this->enqueueAssignmentChangeRequestIfNeeded(
+                $this->editSkCode,
+                $existing,
+                ['co' => $co, 'tr' => $tr, 'cs' => $cs]
+            );
 
             DB::afterCommit(function (): void {
                 SyncInstitutionOutboundJob::dispatchIf(
@@ -1034,6 +1052,61 @@ class InstitutionList extends Component
             'updated_at' => $syncedAt,
         ]));
         $request->timestamps = true;
+    }
+
+    private function enqueueAssignmentChangeRequestIfNeeded(
+        string $skCode,
+        ?AccountInformation $before,
+        array $after
+    ): void {
+        if (! (bool) config('services.assignment_sync.enabled', false)) {
+            return;
+        }
+
+        $beforeValues = [
+            'co' => $this->normalizeManagerValue($before?->CO),
+            'tr' => $this->normalizeManagerValue($before?->TR),
+            'cs' => $this->normalizeManagerValue($before?->CS),
+        ];
+        $afterValues = [
+            'co' => $this->normalizeManagerValue($after['co'] ?? null),
+            'tr' => $this->normalizeManagerValue($after['tr'] ?? null),
+            'cs' => $this->normalizeManagerValue($after['cs'] ?? null),
+        ];
+
+        $patch = [];
+        foreach (['co', 'tr', 'cs'] as $key) {
+            if ($beforeValues[$key] === $afterValues[$key]) {
+                continue;
+            }
+
+            $patch[$key] = $afterValues[$key];
+        }
+
+        if ($patch === []) {
+            return;
+        }
+
+        AssignmentChangeRequest::query()->create([
+            'sk_code' => $skCode,
+            'co' => $patch['co'] ?? null,
+            'tr' => $patch['tr'] ?? null,
+            'cs' => $patch['cs'] ?? null,
+            'origin' => AssignmentChangeRequest::ORIGIN_LOCAL,
+            'status' => AssignmentChangeRequest::STATUS_PENDING,
+            'requested_at' => now(),
+        ]);
+    }
+
+    private function normalizeManagerValue(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $normalized = trim((string) $value);
+
+        return $normalized === '' ? null : $normalized;
     }
 
     private function applyStatusFilter(Builder $query): void

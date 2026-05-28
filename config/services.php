@@ -59,6 +59,14 @@ return [
     ],
 
     /*
+    | 담당자 변경 브릿지 테이블(assignment_change_requests) 동기화
+    */
+    'assignment_sync' => [
+        'enabled' => env('ASSIGNMENT_SYNC_ENABLED', false),
+        'schedule' => env('ASSIGNMENT_SYNC_SCHEDULE', '0 * * * *'),
+    ],
+
+    /*
     | 상대 DB → 기관 마스터(S_AccountName) 직접 풀링 연동
     */
     'partner_institutions' => [

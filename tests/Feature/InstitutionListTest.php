@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\ProcessAssignmentChangeRequestsJob;
 use App\Jobs\SyncInstitutionOutboundJob;
 use App\Livewire\InstitutionList;
 use App\Models\AccountInformation;
+use App\Models\AssignmentChangeRequest;
 use App\Models\GsNumber;
 use App\Models\Institution;
 use App\Models\SupportRecord;
@@ -1248,6 +1250,92 @@ class InstitutionListTest extends TestCase
         Queue::assertPushed(SyncInstitutionOutboundJob::class, function (SyncInstitutionOutboundJob $job): bool {
             return $job->sk === 'SK-MANAGER-SYNC-1';
         });
+    }
+
+    public function test_save_managers_creates_local_assignment_change_request_with_origin_a(): void
+    {
+        Config::set('services.assignment_sync.enabled', true);
+        $user = User::factory()->admin()->create();
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-ASSIGN-A-1',
+            'AccountName' => '담당자 변경 A 테스트',
+        ]);
+
+        AccountInformation::query()->create([
+            'SK_Code' => 'SK-ASSIGN-A-1',
+            'Account_Name' => '담당자 변경 A 테스트',
+            'CO' => 'Old CO',
+            'TR' => 'Old TR',
+            'CS' => 'Old CS',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openManagerModal', $institution->ID)
+            ->set('editCo', 'New CO')
+            ->set('editTr', 'Old TR')
+            ->set('editCs', 'Old CS')
+            ->call('saveManagers')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('assignment_change_requests', [
+            'sk_code' => 'SK-ASSIGN-A-1',
+            'origin' => AssignmentChangeRequest::ORIGIN_LOCAL,
+            'status' => AssignmentChangeRequest::STATUS_PENDING,
+            'co' => 'New CO',
+            'tr' => null,
+            'cs' => null,
+        ]);
+    }
+
+    public function test_process_assignment_change_requests_job_applies_k_origin_to_account_information(): void
+    {
+        Config::set('services.assignment_sync.enabled', true);
+
+        Institution::query()->create([
+            'SKcode' => 'SK-ASSIGN-K-1',
+            'AccountName' => '담당자 변경 K 테스트',
+        ]);
+
+        AccountInformation::query()->create([
+            'SK_Code' => 'SK-ASSIGN-K-1',
+            'Account_Name' => '담당자 변경 K 테스트',
+            'CO' => 'Old CO',
+            'TR' => 'Old TR',
+            'CS' => 'Old CS',
+        ]);
+
+        AssignmentChangeRequest::query()->create([
+            'sk_code' => 'SK-ASSIGN-K-1',
+            'co' => 'New CO',
+            'tr' => 'Old TR',
+            'cs' => 'Old CS',
+            'origin' => AssignmentChangeRequest::ORIGIN_EXTERNAL,
+            'status' => AssignmentChangeRequest::STATUS_PENDING,
+            'requested_at' => now(),
+        ]);
+
+        (new ProcessAssignmentChangeRequestsJob)->handle();
+
+        $this->assertDatabaseHas('S_Account_Information', [
+            'SK_Code' => 'SK-ASSIGN-K-1',
+            'CO' => 'New CO',
+            'TR' => 'Old TR',
+            'CS' => 'Old CS',
+        ]);
+
+        $this->assertDatabaseHas('assignment_change_requests', [
+            'sk_code' => 'SK-ASSIGN-K-1',
+            'origin' => AssignmentChangeRequest::ORIGIN_EXTERNAL,
+            'status' => AssignmentChangeRequest::STATUS_APPLIED,
+        ]);
+
+        $this->assertDatabaseHas('external_assignment_inbound_logs', [
+            'sk_code' => 'SK-ASSIGN-K-1',
+            'co' => 'New CO',
+            'status' => 'applied',
+        ]);
     }
 
     public function test_save_detail_fields_queues_outbound_when_enabled(): void
