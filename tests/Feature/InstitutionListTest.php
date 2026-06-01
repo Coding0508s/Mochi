@@ -1255,7 +1255,7 @@ class InstitutionListTest extends TestCase
     public function test_save_managers_creates_local_assignment_change_request_with_origin_a(): void
     {
         Config::set('services.assignment_sync.enabled', true);
-        $user = User::factory()->admin()->create();
+        $user = User::factory()->admin()->create(['name' => 'Manager Owner']);
 
         $institution = Institution::query()->create([
             'SKcode' => 'SK-ASSIGN-A-1',
@@ -1286,6 +1286,7 @@ class InstitutionListTest extends TestCase
             'co' => 'New CO',
             'tr' => null,
             'cs' => null,
+            'changed_by' => 'Manager Owner',
         ]);
     }
 
@@ -1336,6 +1337,114 @@ class InstitutionListTest extends TestCase
             'co' => 'New CO',
             'status' => 'applied',
         ]);
+    }
+
+    public function test_detail_modal_shows_latest_manager_changed_at_by_role(): void
+    {
+        $user = User::factory()->admin()->create();
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-ASSIGN-DATE-1',
+            'AccountName' => '변경일 표시 테스트',
+        ]);
+
+        AccountInformation::query()->create([
+            'SK_Code' => 'SK-ASSIGN-DATE-1',
+            'Account_Name' => '변경일 표시 테스트',
+            'CO' => 'Current CO',
+            'TR' => 'Current TR',
+            'CS' => 'Current CS',
+        ]);
+
+        AssignmentChangeRequest::query()->create([
+            'sk_code' => 'SK-ASSIGN-DATE-1',
+            'co' => 'Older CO',
+            'changed_by' => 'Old Owner',
+            'origin' => AssignmentChangeRequest::ORIGIN_LOCAL,
+            'status' => AssignmentChangeRequest::STATUS_APPLIED,
+            'requested_at' => '2026-01-05 10:00:00',
+            'applied_at' => '2026-01-05 11:00:00',
+        ]);
+        AssignmentChangeRequest::query()->create([
+            'sk_code' => 'SK-ASSIGN-DATE-1',
+            'co' => 'Current CO',
+            'changed_by' => 'CO Owner',
+            'origin' => AssignmentChangeRequest::ORIGIN_LOCAL,
+            'status' => AssignmentChangeRequest::STATUS_APPLIED,
+            'requested_at' => '2026-03-01 10:00:00',
+            'applied_at' => '2026-03-01 11:00:00',
+        ]);
+        AssignmentChangeRequest::query()->create([
+            'sk_code' => 'SK-ASSIGN-DATE-1',
+            'tr' => 'Current TR',
+            'changed_by' => 'TR Owner',
+            'origin' => AssignmentChangeRequest::ORIGIN_LOCAL,
+            'status' => AssignmentChangeRequest::STATUS_APPLIED,
+            'requested_at' => '2026-02-10 10:00:00',
+            'applied_at' => '2026-02-10 11:00:00',
+        ]);
+        AssignmentChangeRequest::query()->create([
+            'sk_code' => 'SK-ASSIGN-DATE-1',
+            'cs' => 'Current CS',
+            'changed_by' => 'CS Owner',
+            'origin' => AssignmentChangeRequest::ORIGIN_LOCAL,
+            'status' => AssignmentChangeRequest::STATUS_APPLIED,
+            'requested_at' => '2026-02-20 10:00:00',
+            'applied_at' => '2026-02-20 11:00:00',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->assertSet('selectedInstitution.co_changed_at', '2026-03-01')
+            ->assertSet('selectedInstitution.tr_changed_at', '2026-02-10')
+            ->assertSet('selectedInstitution.cs_changed_at', '2026-02-20')
+            ->assertSet('selectedInstitution.co_changed_by', 'CO Owner')
+            ->assertSet('selectedInstitution.tr_changed_by', 'TR Owner')
+            ->assertSet('selectedInstitution.cs_changed_by', 'CS Owner')
+            ->assertSee('최근 변경')
+            ->assertSee('2026-03-01')
+            ->assertSee('CO Owner')
+            ->assertSee('2026-02-10')
+            ->assertSee('TR Owner')
+            ->assertSee('2026-02-20')
+            ->assertSee('CS Owner');
+    }
+
+    public function test_detail_modal_falls_back_to_requested_at_and_shows_dash_for_missing_role(): void
+    {
+        $user = User::factory()->admin()->create();
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-ASSIGN-DATE-2',
+            'AccountName' => '변경일 폴백 테스트',
+        ]);
+
+        AccountInformation::query()->create([
+            'SK_Code' => 'SK-ASSIGN-DATE-2',
+            'Account_Name' => '변경일 폴백 테스트',
+            'TR' => 'Current TR',
+        ]);
+
+        AssignmentChangeRequest::query()->create([
+            'sk_code' => 'SK-ASSIGN-DATE-2',
+            'tr' => 'Current TR',
+            'changed_by' => null,
+            'origin' => AssignmentChangeRequest::ORIGIN_LOCAL,
+            'status' => AssignmentChangeRequest::STATUS_PENDING,
+            'requested_at' => '2026-04-11 09:00:00',
+            'applied_at' => null,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->assertSet('selectedInstitution.co_changed_at', null)
+            ->assertSet('selectedInstitution.tr_changed_at', '2026-04-11')
+            ->assertSet('selectedInstitution.cs_changed_at', null)
+            ->assertSet('selectedInstitution.tr_changed_by', 'Internal Update')
+            ->assertSee('2026-04-11')
+            ->assertSee('Internal Update');
     }
 
     public function test_save_detail_fields_queues_outbound_when_enabled(): void

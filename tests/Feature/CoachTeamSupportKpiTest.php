@@ -117,6 +117,54 @@ class CoachTeamSupportKpiTest extends CoachTeacherSupportListTest
             ->assertDontSee('이교사');
     }
 
+    public function test_by_coach_does_not_double_count_teacher_when_sk_has_multiple_tr_rows(): void
+    {
+        $year = now()->year;
+        $lead = User::factory()->coachTeamLead()->create();
+
+        \DB::table('S_AccountName')->insert([
+            'SKcode' => 'SK-SPLIT-TR',
+            'AccountName' => '다중 TR 기관',
+        ]);
+        \DB::table('S_Account_Information')->insert([
+            ['SK_Code' => 'SK-SPLIT-TR', 'Account_Name' => '다중 TR A', 'TR' => 'Coach A'],
+            ['SK_Code' => 'SK-SPLIT-TR', 'Account_Name' => '다중 TR B', 'TR' => 'Coach B'],
+        ]);
+        $this->createTeacher('SK-SPLIT-TR', '단일교사', [
+            'Plan_1st_Support_Date' => "{$year}-03-01",
+        ]);
+
+        $component = Livewire::actingAs($lead)
+            ->test(CoachTeamSupportKpiDashboard::class)
+            ->set('filterYear', $year);
+
+        $teamKpis = $component->viewData('teamKpis');
+        $coachRows = $component->viewData('coachRows');
+
+        $this->assertSame(1, $teamKpis['unsupported']);
+        $this->assertSame(1, $coachRows->sum('unsupported'));
+        $this->assertSame(1, $coachRows->sum('teacher_count'));
+    }
+
+    public function test_team_kpis_match_sum_of_coach_row_metrics(): void
+    {
+        $year = now()->year;
+        $lead = User::factory()->coachTeamLead()->create();
+
+        $this->seedTeachersForKpi($year);
+
+        $component = Livewire::actingAs($lead)
+            ->test(CoachTeamSupportKpiDashboard::class)
+            ->set('filterYear', $year);
+
+        $teamKpis = $component->viewData('teamKpis');
+        $coachRows = $component->viewData('coachRows');
+
+        foreach (['first_round', 'second_round', 'third_round', 'fourth_round', 'completed', 'unsupported'] as $key) {
+            $this->assertSame($teamKpis[$key], $coachRows->sum($key), "팀 합계와 Coach 행 합이 {$key}에서 일치해야 합니다.");
+        }
+    }
+
     public function test_team_kpi_includes_third_and_fourth_round_counts(): void
     {
         $year = now()->year;

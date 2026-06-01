@@ -63,7 +63,7 @@ return [
     */
     'assignment_sync' => [
         'enabled' => env('ASSIGNMENT_SYNC_ENABLED', false),
-        'schedule' => env('ASSIGNMENT_SYNC_SCHEDULE', '0 * * * *'),
+        'schedule' => env('ASSIGNMENT_SYNC_SCHEDULE', '* * * * *'),
     ],
 
     /*

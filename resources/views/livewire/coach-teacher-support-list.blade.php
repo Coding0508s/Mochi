@@ -134,7 +134,7 @@
                           d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
                 </svg>
                 <input type="text"
-                       wire:model.live.debounce.300ms="search"
+                       wire:model.live.debounce.500ms="search"
                        placeholder="이름, 기관명, SK코드 검색"
                        class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
             </div>
@@ -1042,7 +1042,7 @@
                                     @if($teacherDetailInfo['description'])
                                         <tr>
                                             <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">비고</th>
-                                            <td colspan="3" class="px-3 py-2 text-gray-900 whitespace-pre-wrap">{{ $teacherDetailInfo['description'] }}</td>
+                                            <td colspan="3" class="px-3 py-2 text-gray-900 text-left whitespace-normal break-words">{{ $teacherDetailInfo['description'] }}</td>
                                         </tr>
                                     @endif
                                 </tbody>

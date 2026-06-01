@@ -3,10 +3,12 @@
 namespace App\Providers;
 
 use App\Models\SupportRecord;
+use App\Models\Teacher;
 use App\Models\TeamSchedule;
 use App\Models\User;
 use App\Policies\TeamSchedulePolicy;
 use App\Support\ManagerNameNormalizer;
+use App\Support\TeacherSupportReportEditAuthorization;
 use App\Support\TeamMenuContext;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -80,6 +82,44 @@ class AppServiceProvider extends ServiceProvider
             $userKey = ManagerNameNormalizer::normalize($user->nameForCoReports());
 
             return $authorKey !== '' && $userKey !== '' && $authorKey === $userKey;
+        });
+
+        /** MOCHI 교사 지원 보고서 수정 — 관리자 전체, 일반 사용자는 작성자(created_by/coach_name) + 담당 범위 */
+        Gate::define('updateTeacherSupportReport', function (?User $user, string $table, int $reportId): bool {
+            if ($user === null) {
+                return false;
+            }
+
+            if (TeacherSupportReportEditAuthorization::isLegacyTable($table)) {
+                $row = TeacherSupportReportEditAuthorization::findLegacyReport($table, $reportId);
+                if ($row === null) {
+                    return false;
+                }
+
+                $teacherId = TeacherSupportReportEditAuthorization::legacyTeacherIdFromRow($table, $row);
+                if ($teacherId === null) {
+                    return false;
+                }
+
+                $teacher = Teacher::query()->find($teacherId);
+                if ($teacher === null) {
+                    return false;
+                }
+
+                return TeacherSupportReportEditAuthorization::canUpdateLegacy($user, $row, $teacher);
+            }
+
+            $report = TeacherSupportReportEditAuthorization::findMochiReport($table, $reportId);
+            if ($report === null) {
+                return false;
+            }
+
+            $teacher = Teacher::query()->find((int) $report->getAttribute('teacher_id'));
+            if ($teacher === null) {
+                return false;
+            }
+
+            return TeacherSupportReportEditAuthorization::canUpdate($user, $report, $teacher);
         });
 
         /** 잠재기관 미팅/컨설팅 이력 삭제 — 관리자만 */

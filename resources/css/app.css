@@ -1237,6 +1237,17 @@
         -webkit-overflow-scrolling: touch;
     }
 
+    /* 미팅/지원 조회 박스: 줄바꿈 유지 + 항상 왼쪽 정렬 (짧은 제목 줄 가운데처럼 보이는 현상 방지) */
+    .mochi-multiline-readout {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        text-align: left !important;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
     .mochi-btn-primary {
         background: #2b78c5;
         color: #ffffff;

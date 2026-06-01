@@ -6,6 +6,8 @@ use App\Actions\UpdateTeacherSupport;
 use App\Livewire\CoachTeacherSupportList;
 use App\Models\Teacher;
 use App\Models\User;
+use App\Support\ExcelSerialDate;
+use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
@@ -104,6 +106,7 @@ class CoachTeacherSupportListTest extends TestCase
             $table->string('KOREANAME')->nullable();
             $table->string('ENGLISHNAME')->nullable();
             $table->string('EMAIL')->nullable();
+            $table->unsignedTinyInteger('STATUS')->default(1);
         });
 
         Schema::create('institution_visibility_overrides', function ($table): void {
@@ -157,10 +160,12 @@ class CoachTeacherSupportListTest extends TestCase
             $table->increments('ID');
             $table->string('TR_Name', 255)->nullable();
             $table->string('SK_Code', 100)->nullable();
+            $table->string('Account_Name', 255)->nullable();
             $table->string('Teacher', 255)->nullable();
             $table->unsignedInteger('TeacherId')->nullable();
             $table->dateTime('SupportDate')->nullable();
             $table->string('Status', 50)->nullable();
+            $table->text('Other')->nullable();
         });
 
         Schema::create('S_Support_OpenClass', function ($table): void {
@@ -538,6 +543,17 @@ class CoachTeacherSupportListTest extends TestCase
                 'Customer_Type' => $customerType,
             ]);
         }
+
+        if ($tr !== null) {
+            // Ensure employee exists for the TR so they appear in the filter
+            if (! \DB::table('employee')->where('ENGLISHNAME', $tr)->orWhere('KOREANAME', $tr)->exists()) {
+                \DB::table('employee')->insert([
+                    'EMPNO' => 'EMP'.rand(1000, 9999).uniqid(),
+                    'ENGLISHNAME' => $tr,
+                    'STATUS' => 1,
+                ]);
+            }
+        }
     }
 
     private function createAccountInformationOnly(
@@ -733,6 +749,31 @@ class CoachTeacherSupportListTest extends TestCase
         $this->assertSame(2, $kpis['third_round']);
         $this->assertSame(1, $kpis['fourth_round']);
         $this->assertSame(1, $kpis['completed']);
+    }
+
+    public function test_kpi_filter_unsupported_matches_excel_serial_plan_dates(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '엑셀미지원', [
+            'Plan_1st_Support_Date' => (string) ExcelSerialDate::dateToSerial(
+                Carbon::create($year, 6, 1),
+            ),
+        ]);
+
+        $component = Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->set('filterYear', $year);
+
+        $this->assertSame(1, $component->viewData('kpis')['unsupported']);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->set('filterYear', $year)
+            ->call('setKpiFilter', 'unsupported')
+            ->assertSee('엑셀미지원');
     }
 
     public function test_kpi_filter_click_filters_table(): void
@@ -1460,6 +1501,35 @@ class CoachTeacherSupportListTest extends TestCase
             ->assertDontSee('교사 테이블 학교명')
             ->call('openInstitutionModal', 'SK-NAME-PRIORITY')
             ->assertSet('institutionInfo.name', '마스터 기관명');
+    }
+
+    public function test_teacher_list_does_not_duplicate_rows_when_account_name_tables_have_multiple_records_per_sk(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        \DB::table('S_AccountName')->insert([
+            'SKcode' => 'SK-DUPLICATE',
+            'AccountName' => '레거시 기관명',
+        ]);
+
+        \DB::table('S_Account_Information')->insert([
+            ['SK_Code' => 'SK-DUPLICATE', 'Account_Name' => '마스터 기관명 A', 'TR' => 'Coach A'],
+            ['SK_Code' => 'SK-DUPLICATE', 'Account_Name' => '마스터 기관명 B', 'TR' => 'Coach A'],
+        ]);
+
+        $teacherId = $this->createTeacher('SK-DUPLICATE', '중복검증교사', [
+            'Plan_1st_Support_Date' => "{$year}-03-01",
+        ]);
+
+        $component = Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->assertSee('중복검증교사');
+
+        $teacherItems = collect($component->viewData('teachers')->items());
+
+        $this->assertCount(1, $teacherItems);
+        $this->assertSame([$teacherId], $teacherItems->pluck('ID')->all());
     }
 
     public function test_terminated_institution_shows_termination_badge(): void
@@ -2486,6 +2556,193 @@ class CoachTeacherSupportListTest extends TestCase
             'Target' => '홍길동',
             'Support_Type' => 'Unit 31+',
             'Status' => '완료',
+        ]);
+    }
+
+    public function test_mochi_support_history_allows_edit_for_author(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createTeacher('SK001', '홍길동');
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openOnsiteModal', $teacherId)
+            ->set('onsiteForm.support_date', '2026-05-19')
+            ->set('onsiteForm.other_notes', '초기 메모')
+            ->set('onsiteMarkCompleted', true)
+            ->call('saveOnsiteReport')
+            ->assertHasNoErrors();
+
+        $reportId = (int) \DB::table('teacher_onsite_support_reports')->max('id');
+        $detailKey = 'mochi:teacher_onsite_support_reports:'.$reportId;
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openTeacherModal', $teacherId)
+            ->call('openTeacherSupportHistoryDetail', $detailKey, $teacherId)
+            ->assertSet('supportReportViewMode', true)
+            ->assertSet('showOnsiteModal', true)
+            ->assertSet('viewingSupportReportDetailKey', $detailKey)
+            ->call('startSupportReportEdit')
+            ->assertSet('supportReportViewMode', false);
+    }
+
+    public function test_author_can_update_mochi_onsite_report_via_history(): void
+    {
+        $coach = $this->createCoachUser('Coach A');
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createTeacher('SK001', '홍길동');
+
+        \DB::table('teacher_onsite_support_reports')->insert([
+            'teacher_id' => $teacherId,
+            'sk_code' => 'SK001',
+            'coach_name' => 'Coach A',
+            'institution_name' => '기관A',
+            'teacher_name' => '홍길동',
+            'support_date' => '2026-05-19',
+            'other_notes' => '초기 메모',
+            'procedures' => json_encode([]),
+            'strength_areas' => json_encode([]),
+            'growth_areas' => json_encode([]),
+            'status' => '임시',
+            'created_by' => $coach->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $reportId = (int) \DB::table('teacher_onsite_support_reports')->max('id');
+        $detailKey = 'mochi:teacher_onsite_support_reports:'.$reportId;
+
+        Livewire::actingAs($coach)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openTeacherModal', $teacherId)
+            ->call('openTeacherSupportHistoryDetail', $detailKey, $teacherId)
+            ->call('startSupportReportEdit')
+            ->set('onsiteForm.other_notes', '수정된 메모')
+            ->set('onsiteMarkCompleted', false)
+            ->call('saveOnsiteReport')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('teacher_onsite_support_reports', [
+            'id' => $reportId,
+            'other_notes' => '수정된 메모',
+            'status' => '임시',
+        ]);
+    }
+
+    public function test_revert_completed_mochi_report_to_draft_keeps_support_record_in_progress(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createTeacher('SK001', '홍길동');
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openOnsiteModal', $teacherId)
+            ->set('onsiteForm.support_date', '2026-05-19')
+            ->set('onsiteForm.other_notes', '완료 메모')
+            ->set('onsiteMarkCompleted', true)
+            ->call('saveOnsiteReport')
+            ->assertHasNoErrors();
+
+        $reportId = (int) \DB::table('teacher_onsite_support_reports')->max('id');
+        $supportRecordId = (int) \DB::table('teacher_onsite_support_reports')->where('id', $reportId)->value('support_record_id');
+        $detailKey = 'mochi:teacher_onsite_support_reports:'.$reportId;
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openTeacherModal', $teacherId)
+            ->call('openTeacherSupportHistoryDetail', $detailKey, $teacherId)
+            ->call('startSupportReportEdit')
+            ->set('onsiteMarkCompleted', false)
+            ->call('saveOnsiteReport')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('teacher_onsite_support_reports', [
+            'id' => $reportId,
+            'status' => '임시',
+            'support_record_id' => $supportRecordId,
+        ]);
+
+        $this->assertDatabaseHas('S_SupportInfo_Account', [
+            'ID' => $supportRecordId,
+            'Status' => '진행중',
+        ]);
+
+        $this->assertNull(
+            \DB::table('S_SupportInfo_Account')->where('ID', $supportRecordId)->value('CompletedDate')
+        );
+    }
+
+    public function test_legacy_support_history_allows_edit_for_author(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createTeacher('SK001', '홍길동');
+
+        \DB::table('S_Support_OnSite')->insert([
+            'TR_Name' => 'Coach A',
+            'SK_Code' => 'SK001',
+            'Account_Name' => '기관A',
+            'Teacher' => '홍길동',
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2026-05-19 00:00:00',
+            'Status' => '완료',
+            'Other' => '초기 메모',
+        ]);
+
+        $legacyId = (int) \DB::table('S_Support_OnSite')->max('ID');
+        $detailKey = 'legacy:S_Support_OnSite:'.$legacyId;
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openTeacherModal', $teacherId)
+            ->call('openTeacherSupportHistoryDetail', $detailKey, $teacherId)
+            ->assertSet('supportReportViewMode', true)
+            ->assertSet('showOnsiteModal', true)
+            ->assertSet('viewingSupportReportDetailKey', $detailKey)
+            ->call('startSupportReportEdit')
+            ->assertSet('supportReportViewMode', false);
+    }
+
+    public function test_author_can_update_legacy_onsite_report_via_history(): void
+    {
+        $coach = $this->createCoachUser('Coach A');
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createTeacher('SK001', '홍길동');
+
+        \DB::table('S_Support_OnSite')->insert([
+            'TR_Name' => 'Coach A',
+            'SK_Code' => 'SK001',
+            'Account_Name' => '기관A',
+            'Teacher' => '홍길동',
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2026-05-19 00:00:00',
+            'Status' => '임시',
+            'Other' => '초기 메모',
+        ]);
+
+        $legacyId = (int) \DB::table('S_Support_OnSite')->max('ID');
+        $detailKey = 'legacy:S_Support_OnSite:'.$legacyId;
+
+        Livewire::actingAs($coach)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openTeacherModal', $teacherId)
+            ->call('openTeacherSupportHistoryDetail', $detailKey, $teacherId)
+            ->call('startSupportReportEdit')
+            ->set('onsiteForm.other_notes', '수정된 레거시 메모')
+            ->set('onsiteMarkCompleted', false)
+            ->call('saveOnsiteReport')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_Support_OnSite', [
+            'ID' => $legacyId,
+            'Other' => '수정된 레거시 메모',
+            'Status' => '임시',
         ]);
     }
 }

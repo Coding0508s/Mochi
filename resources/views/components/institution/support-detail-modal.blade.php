@@ -81,22 +81,22 @@
 
                         <div class="col-span-2">
                             <div class="text-xs text-gray-500 mb-1">이슈</div>
-                            <div class="font-medium text-gray-900 whitespace-pre-wrap">{{ $selectedSupportRecord['issue'] ?? '-' }}</div>
+                            <div class="text-left font-medium text-gray-900 whitespace-pre-wrap break-words">{{ $selectedSupportRecord['issue'] ?? '-' }}</div>
                         </div>
 
                         <div class="col-span-2">
                             <div class="text-xs text-gray-500 mb-1">기관과의 소통내용</div>
-                            <div class="font-medium text-gray-900 whitespace-pre-wrap">{{ $selectedSupportRecord['to_account'] ?? '-' }}</div>
+                            <div class="text-left font-medium text-gray-900 whitespace-pre-wrap break-words">{{ $selectedSupportRecord['to_account'] ?? '-' }}</div>
                         </div>
 
                         <div class="col-span-2">
                             <div class="text-xs text-gray-500 mb-1">본사/타 부서 공유 내용</div>
-                            <div class="font-medium text-gray-900 whitespace-pre-wrap">{{ $selectedSupportRecord['to_depart'] ?? '-' }}</div>
+                            <div class="text-left font-medium text-gray-900 whitespace-pre-wrap break-words">{{ $selectedSupportRecord['to_depart'] ?? '-' }}</div>
                         </div>
 
                         <div class="col-span-2">
                             <div class="text-xs text-gray-500 mb-1">기타</div>
-                            <div class="font-medium text-gray-900 whitespace-pre-wrap">{{ $selectedSupportRecord['others'] ?? '-' }}</div>
+                            <div class="text-left font-medium text-gray-900 whitespace-pre-wrap break-words">{{ $selectedSupportRecord['others'] ?? '-' }}</div>
                         </div>
 
                         <div>

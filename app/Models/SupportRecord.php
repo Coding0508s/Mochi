@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\NormalizedMultilineText;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -93,6 +94,10 @@ class SupportRecord extends Model
             'FGC_CreateDate' => 'datetime',
             'FGC_LastModifyDate' => 'datetime',
             'FGC_Rowversion' => 'datetime',
+            'Issue' => NormalizedMultilineText::class,
+            'TO_Account' => NormalizedMultilineText::class,
+            'TO_Depart' => NormalizedMultilineText::class,
+            'Others' => NormalizedMultilineText::class,
         ];
     }
 

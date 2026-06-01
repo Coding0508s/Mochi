@@ -334,6 +334,29 @@ class CoachRetiredTeacherListTest extends TestCase
             ->assertSee("{$year}-05-01");
     }
 
+    public function test_list_is_ordered_by_retirement_date_desc(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createInstitution('SK002', '기관B', 'Coach A');
+        $this->createInstitution('SK003', '기관C', 'Coach A');
+
+        $this->createMasterRecord(['Name' => '먼저퇴직', 'SK_Code' => 'SK001', 'RetirementDate' => '2026-01-10 00:00:00']);
+        $this->createMasterRecord(['Name' => '나중퇴직', 'SK_Code' => 'SK002', 'RetirementDate' => '2026-05-20 00:00:00']);
+        $this->createMasterRecord(['Name' => '중간퇴직', 'SK_Code' => 'SK003', 'RetirementDate' => '2026-03-15 00:00:00']);
+
+        $retirements = Livewire::actingAs($admin)
+            ->test(CoachRetiredTeacherList::class)
+            ->viewData('retirements');
+
+        $names = collect($retirements->items())
+            ->map(fn ($row): string => (string) $row->Name)
+            ->all();
+
+        $this->assertSame(['나중퇴직', '중간퇴직', '먼저퇴직'], $names);
+    }
+
     public function test_year_filter_all_shows_every_retired_year(): void
     {
         $admin = $this->createAdminUser();

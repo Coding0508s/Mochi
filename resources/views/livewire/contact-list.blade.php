@@ -356,13 +356,6 @@
                                     복직 처리
                                 </button>
                             @endif
-                            @if($editingId && ($canRetireCurrentTeacher ?? false))
-                                <button type="button"
-                                        wire:click="openRetireModal"
-                                        class="px-4 py-2 text-sm text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer">
-                                    퇴직 처리
-                                </button>
-                            @endif
                             @if($editingId)
                                 @can('deleteContactRecords')
                                     <button type="button"
@@ -383,40 +376,6 @@
                         </button>
                         </div>
                 </form>
-            </div>
-        </div>
-    @endif
-
-    {{-- 퇴직 확인 모달 --}}
-    @if($showRetireModal)
-        <div class="mochi-modal-overlay"
-             wire:click.self="closeRetireModal">
-            <div class="mochi-modal-shell max-w-md"
-                 wire:click.stop>
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h3 class="text-base font-semibold text-gray-900">퇴직 처리</h3>
-                </div>
-                <div class="px-6 py-5 space-y-4 text-sm text-gray-700">
-                    <p>
-                        <span class="font-semibold text-gray-900">{{ $retireTargetName }}</span> 교사를 퇴직 처리합니다.
-                        퇴직교사 리스트에 반영되며, 교사 지원 목록에서는 기본적으로 숨겨집니다.
-                    </p>
-                    @include('partials.admin.teacher-retire-recommendation-fields')
-                </div>
-                <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
-                    <button type="button" wire:click="closeRetireModal"
-                            class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer">
-                        취소
-                    </button>
-                    <button type="button"
-                            wire:click="retire"
-                            wire:loading.attr="disabled"
-                            wire:loading.class="opacity-70 cursor-not-allowed"
-                            class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 cursor-pointer">
-                        <span wire:loading.remove wire:target="retire">퇴직 확인</span>
-                        <span wire:loading wire:target="retire">처리 중...</span>
-                    </button>
-                </div>
             </div>
         </div>
     @endif
@@ -546,7 +505,7 @@
                                 </tr>
                                 <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">비고</th>
-                                    <td colspan="3" class="px-3 py-2 font-medium text-gray-900 whitespace-pre-wrap">{{ $selectedContact['description'] ?? '-' }}</td>
+                                    <td colspan="3" class="mochi-multiline-readout px-3 py-2 font-medium text-gray-900">{{ $selectedContact['description'] ?? '-' }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -570,7 +529,7 @@
     @endif
 
     <div wire:loading.delay
-         wire:target="save,delete,retire,reinstate,openDetailModal,openEditModal,openEditFromDetail,gotoPage,nextPage,previousPage"
+         wire:target="save,delete,reinstate,openDetailModal,openEditModal,openEditFromDetail,gotoPage,nextPage,previousPage"
          class="fixed bottom-6 right-6 z-50">
         <div class="bg-white rounded-xl px-4 py-3 shadow-lg border border-gray-200 flex items-center gap-2 text-sm text-gray-700">
             <svg class="animate-spin w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24">

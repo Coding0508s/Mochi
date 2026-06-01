@@ -1911,4 +1911,51 @@ class PotentialInstitutionListTest extends TestCase
             ->assertSee($name)
             ->assertSee('66');
     }
+
+    public function test_meeting_detail_description_is_normalized_for_display(): void
+    {
+        $accountName = '미팅정렬 QA '.uniqid('', true);
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-06',
+            'AccountManager' => 'Mgr',
+            'AccountCode' => null,
+            'AccountName' => $accountName,
+            'Address' => null,
+            'Director' => null,
+            'Phone' => null,
+            'Connected' => null,
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => null,
+        ]);
+
+        $detail = CoNewTargetDetail::query()->create([
+            'Year' => 2026,
+            'AccountName' => $accountName,
+            'AccountManager' => 'Mgr',
+            'MeetingDate' => '2026-04-10',
+            'MeetingTime' => '10:00',
+            'MeetingTime_End' => '11:00',
+            'Description' => "     1. 방문 목적     \n    ▶ 신규 도입 상담",
+            'ConsultingType' => '전화',
+            'Possibility' => 'A',
+        ]);
+
+        Livewire::test(PotentialInstitutionList::class)
+            ->call('openDetailModal', (int) $target->ID)
+            ->call('openMeetingDetailModal', (int) $detail->ID)
+            ->assertSet('selectedMeeting.description', "1. 방문 목적\n▶ 신규 도입 상담");
+    }
 }

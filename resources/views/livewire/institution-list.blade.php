@@ -394,7 +394,16 @@
                                                 <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                             @enderror
                                         @else
-                                            {{ $selectedInstitution['co'] ?? '-' }}
+                                            <div>{{ $selectedInstitution['co'] ?? '-' }}</div>
+                                            <p class="mt-1 text-[11px] text-gray-400">
+                                                최근 변경
+                                                @if(! empty($selectedInstitution['co_changed_at']))
+                                                    {{ $selectedInstitution['co_changed_at'] }}
+                                                    · {{ $selectedInstitution['co_changed_by'] ?? 'Internal Update' }}
+                                                @else
+                                                    -
+                                                @endif
+                                            </p>
                                         @endif
                                     </td>
                                 </tr>
@@ -413,7 +422,16 @@
                                                 <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                             @enderror
                                         @else
-                                            {{ $selectedInstitution['tr'] ?? '-' }}
+                                            <div>{{ $selectedInstitution['tr'] ?? '-' }}</div>
+                                            <p class="mt-1 text-[11px] text-gray-400">
+                                                최근 변경
+                                                @if(! empty($selectedInstitution['tr_changed_at']))
+                                                    {{ $selectedInstitution['tr_changed_at'] }}
+                                                    · {{ $selectedInstitution['tr_changed_by'] ?? 'Internal Update' }}
+                                                @else
+                                                    -
+                                                @endif
+                                            </p>
                                         @endif
                                     </td>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당 CS</th>
@@ -430,7 +448,16 @@
                                                 <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                             @enderror
                                         @else
-                                            {{ $selectedInstitution['cs'] ?? '-' }}
+                                            <div>{{ $selectedInstitution['cs'] ?? '-' }}</div>
+                                            <p class="mt-1 text-[11px] text-gray-400">
+                                                최근 변경
+                                                @if(! empty($selectedInstitution['cs_changed_at']))
+                                                    {{ $selectedInstitution['cs_changed_at'] }}
+                                                    · {{ $selectedInstitution['cs_changed_by'] ?? 'Internal Update' }}
+                                                @else
+                                                    -
+                                                @endif
+                                            </p>
                                         @endif
                                     </td>
                                 </tr>

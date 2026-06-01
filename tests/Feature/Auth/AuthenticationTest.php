@@ -17,6 +17,22 @@ class AuthenticationTest extends TestCase
         $response->assertStatus(200);
     }
 
+    public function test_login_screen_shows_forgot_password_link_below_password_field(): void
+    {
+        $response = $this->get('/login');
+
+        $response->assertStatus(200);
+        $response->assertSee(__('Forgot password?'), false);
+
+        $html = (string) $response->getContent();
+        $passwordFieldPos = strpos($html, 'id="password"');
+        $forgotPasswordPos = strpos($html, route('password.request'));
+
+        $this->assertNotFalse($passwordFieldPos);
+        $this->assertNotFalse($forgotPasswordPos);
+        $this->assertGreaterThan($passwordFieldPos, $forgotPasswordPos);
+    }
+
     public function test_users_can_authenticate_using_the_login_screen(): void
     {
         $user = User::factory()->create();

@@ -20,7 +20,7 @@
            class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ request()->routeIs('coach.teacher-support.*') ? 'sidebar-subitem-active' : '' }}"
            @if(request()->routeIs('coach.teacher-support.*')) aria-current="page" @endif>
             @include('partials.sidebar-menu-icon', ['name' => 'users', 'small' => true])
-            <span class="sidebar-subitem-label">교사 지원 현황</span>
+            <span class="sidebar-subitem-label">교사 지원 계획</span>
         </a>
         @can('viewCoachTeamKpi')
             <a href="{{ route('coach.team-kpi.index', ['team_menu' => 'coach']) }}"

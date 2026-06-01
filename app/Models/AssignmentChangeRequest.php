@@ -21,6 +21,7 @@ class AssignmentChangeRequest extends Model
         'co',
         'tr',
         'cs',
+        'changed_by',
         'origin',
         'status',
         'error_message',

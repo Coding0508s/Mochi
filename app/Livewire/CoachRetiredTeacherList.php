@@ -282,7 +282,7 @@ class CoachRetiredTeacherList extends Component
             ->tap(fn (Builder $query) => $this->applyYearFilter($query))
             ->tap(fn (Builder $query) => $this->applySearchFilter($query))
             ->when($this->listsFromTeachersStatus(), function (Builder $query): void {
-                $query->orderByDesc('ID');
+                $this->applyTeacherStatusRetirementDateOrder($query);
             })
             ->when($this->usingTeacherMaster() && ! $this->listsFromTeachersStatus(), function (Builder $query): void {
                 $retiredAtColumn = config('coach_retired_teachers.teacher_master.columns.retired_at', 'RetirementDate');
@@ -334,6 +334,57 @@ class CoachRetiredTeacherList extends Component
         $query->currentlyRetired();
 
         return $query;
+    }
+
+    /**
+     * Teachers.Status 기준 목록을 퇴직 처리일(최신순)로 정렬합니다.
+     *
+     * 퇴직일은 Teachers 테이블에 없고 S_TeacherMasterDB(우선) 또는
+     * S_RetirementList에 있으므로 상관 서브쿼리 + COALESCE로 정렬합니다.
+     *
+     * @param  Builder<Model>  $query
+     */
+    private function applyTeacherStatusRetirementDateOrder(Builder $query): void
+    {
+        $teacherTable = (new Teacher)->getTable();
+
+        $masterModel = new TeacherMasterDb;
+        $masterTable = $masterModel->getTable();
+        $masterRetiredAt = config('coach_retired_teachers.teacher_master.columns.retired_at', 'RetirementDate');
+
+        $retirementTable = (new RetirementList)->getTable();
+        $retirementTeacherId = config('coach_retired_teachers.columns.teacher_id', 'TearcherID');
+        $retirementRetiredAt = config('coach_retired_teachers.columns.retirement_date', 'RetirementDate');
+
+        $dateExpressions = [];
+
+        if (Schema::hasTable($masterTable) && Schema::hasColumn($masterTable, $masterRetiredAt)) {
+            $masterTeacherId = $masterModel->teacherIdColumn();
+
+            if (Schema::hasColumn($masterTable, $masterTeacherId)) {
+                $dateExpressions[] = "(SELECT {$masterRetiredAt} FROM {$masterTable} "
+                    ."WHERE {$masterTable}.{$masterTeacherId} = {$teacherTable}.ID "
+                    ."ORDER BY {$masterRetiredAt} DESC LIMIT 1)";
+            }
+        }
+
+        if (Schema::hasTable($retirementTable)
+            && Schema::hasColumn($retirementTable, $retirementRetiredAt)
+            && Schema::hasColumn($retirementTable, $retirementTeacherId)) {
+            $dateExpressions[] = "(SELECT {$retirementRetiredAt} FROM {$retirementTable} "
+                ."WHERE {$retirementTable}.{$retirementTeacherId} = {$teacherTable}.ID "
+                ."ORDER BY {$retirementRetiredAt} DESC LIMIT 1)";
+        }
+
+        if ($dateExpressions !== []) {
+            $retirementDateSql = count($dateExpressions) === 1
+                ? $dateExpressions[0]
+                : 'COALESCE('.implode(', ', $dateExpressions).')';
+
+            $query->orderByRaw("{$retirementDateSql} DESC");
+        }
+
+        $query->orderByDesc('ID');
     }
 
     /**

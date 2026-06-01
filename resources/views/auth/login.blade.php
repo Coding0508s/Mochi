@@ -58,17 +58,6 @@
             {{-- 비밀번호 --}}
             <div>
                 <label for="password" class="sr-only">{{ __('Password') }}</label>
-                <div class="mb-1 flex justify-end">
-                    @if (Route::has('password.request'))
-                        <a
-                            href="{{ route('password.request') }}"
-                            rel="prefetch"
-                            class="text-xs font-medium text-mochi-header transition-colors duration-200 ease-out hover:text-mochi-excel focus:outline-none focus:underline"
-                        >
-                            {{ __('Forgot password?') }}
-                        </a>
-                    @endif
-                </div>
                 <x-ui.mochi-floating-input
                     name="password"
                     id="password"
@@ -85,6 +74,17 @@
                     </x-slot>
                 </x-ui.mochi-floating-input>
                 <x-input-error :messages="$errors->get('password')" class="mt-2 text-sm" />
+                @if (Route::has('password.request'))
+                    <div class="mt-2 flex justify-end">
+                        <a
+                            href="{{ route('password.request') }}"
+                            rel="prefetch"
+                            class="text-xs font-medium text-mochi-header transition-colors duration-200 ease-out hover:text-mochi-excel focus:outline-none focus:underline"
+                        >
+                            {{ __('Forgot password?') }}
+                        </a>
+                    </div>
+                @endif
             </div>
 
             <div class="flex items-center">

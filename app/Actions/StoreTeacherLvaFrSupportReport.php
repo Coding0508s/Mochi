@@ -77,6 +77,15 @@ class StoreTeacherLvaFrSupportReport
         });
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public function validatedPayload(array $data): array
+    {
+        return $this->validate($data);
+    }
+
     private function authorize(Teacher $teacher, User $user): void
     {
         if ($user->hasFullAccess()) {

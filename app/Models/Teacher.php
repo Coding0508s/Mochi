@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Casts\LegacyDateTimeCast;
+use App\Casts\NormalizedMultilineText;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -124,6 +125,7 @@ class Teacher extends Model
             'Certi_Delivery' => 'boolean',
             'ClassInOut' => 'boolean',
             'NewSenior' => 'boolean',
+            'Description' => NormalizedMultilineText::class,
         ];
     }
 

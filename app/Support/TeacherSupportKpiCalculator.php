@@ -2,7 +2,10 @@
 
 namespace App\Support;
 
+use App\Models\Teacher;
+use Illuminate\Contracts\Database\Query\Expression;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class TeacherSupportKpiCalculator
 {
@@ -43,32 +46,124 @@ class TeacherSupportKpiCalculator
             return self::calculateWithoutYearFilter($baseQuery);
         }
 
-        $cols = config('coach_teacher_support.columns');
-        $rounds = config('coach_teacher_support.kpi_rounds', []);
+        return self::calculateAggregated($baseQuery, $year);
+    }
+
+    /**
+     * 연도별 KPI를 단일 SELECT 로 집계한다 (엑셀 serial·ISO 날짜 혼재 대응).
+     *
+     * @return array<string, int>
+     */
+    public static function calculateAggregated(Builder $baseQuery, int $year): array
+    {
+        $teacherTable = (new Teacher)->getTable();
+        $teacherIdColumn = "{$teacherTable}.ID";
+        $columnPrefix = "{$teacherTable}.";
+
+        $query = clone $baseQuery;
+        $selects = array_values(self::aggregateSelectExpressions($teacherIdColumn, $columnPrefix, $year));
+        $row = $query->select($selects)->toBase()->first();
+
         $result = [];
-
-        foreach ($rounds as $key => $round) {
-            $completedCol = $cols[$round['completed']];
-            $result[$key] = (clone $baseQuery)
-                ->whereNotNull($completedCol)
-                ->whereYear($completedCol, $year)
-                ->count();
+        foreach (array_merge(self::roundKpiKeys(), ['completed', 'unsupported']) as $key) {
+            $result[$key] = (int) ($row?->{$key} ?? 0);
         }
-
-        $completedQuery = clone $baseQuery;
-        foreach ($rounds as $round) {
-            $completedCol = $cols[$round['completed']];
-            $completedQuery
-                ->whereNotNull($completedCol)
-                ->whereYear($completedCol, $year);
-        }
-        $result['completed'] = $completedQuery->count();
-
-        $unsupportedQuery = clone $baseQuery;
-        self::applyUnsupportedScope($unsupportedQuery, $year);
-        $result['unsupported'] = $unsupportedQuery->count();
 
         return $result;
+    }
+
+    /**
+     * TR·팀 합계 GROUP BY 집계용 SELECT 식.
+     *
+     * @return array<string, Expression>
+     */
+    public static function aggregateSelectExpressions(string $teacherIdColumn, string $columnPrefix, int $year): array
+    {
+        $cols = config('coach_teacher_support.columns');
+        $rounds = config('coach_teacher_support.kpi_rounds', []);
+        $expressions = [
+            'teacher_count' => DB::raw(
+                self::sqlCountDistinctTeachersWhen($teacherIdColumn, '1 = 1').' as teacher_count'
+            ),
+        ];
+
+        foreach ($rounds as $key => $round) {
+            $completedCol = $columnPrefix.$cols[$round['completed']];
+            $expressions[$key] = DB::raw(
+                self::sqlCountDistinctTeachersWhen(
+                    $teacherIdColumn,
+                    self::sqlColumnCompletedInYear($completedCol, $year),
+                ).' as '.$key
+            );
+        }
+
+        $completedColumns = array_map(
+            fn (array $round): string => $columnPrefix.$cols[$round['completed']],
+            $rounds,
+        );
+        $expressions['completed'] = DB::raw(
+            self::sqlCountDistinctTeachersWhen(
+                $teacherIdColumn,
+                self::sqlAllRoundsCompletedInYear($completedColumns, $year),
+            ).' as completed'
+        );
+
+        $expressions['unsupported'] = DB::raw(
+            self::sqlCountDistinctTeachersWhen(
+                $teacherIdColumn,
+                self::sqlAnyRoundUnsupportedInYear($columnPrefix, $year),
+            ).' as unsupported'
+        );
+
+        return $expressions;
+    }
+
+    private static function sqlColumnCompletedInYear(string $qualifiedColumn, int $year): string
+    {
+        return ExcelSerialDate::sqlColumnInYear($qualifiedColumn, $year);
+    }
+
+    /**
+     * @param  list<string>  $qualifiedCompletedColumns
+     */
+    private static function sqlAllRoundsCompletedInYear(array $qualifiedCompletedColumns, int $year): string
+    {
+        if ($qualifiedCompletedColumns === []) {
+            return '0 = 1';
+        }
+
+        $parts = array_map(
+            fn (string $column): string => self::sqlColumnCompletedInYear($column, $year),
+            $qualifiedCompletedColumns,
+        );
+
+        return '('.implode(' AND ', $parts).')';
+    }
+
+    private static function sqlAnyRoundUnsupportedInYear(string $columnPrefix, int $year): string
+    {
+        $cols = config('coach_teacher_support.columns');
+        $rounds = config('coach_teacher_support.kpi_rounds', []);
+        $clauses = [];
+
+        foreach ($rounds as $round) {
+            $planCol = $columnPrefix.$cols[$round['plan']];
+            $completedCol = $columnPrefix.$cols[$round['completed']];
+            $planInYear = ExcelSerialDate::sqlColumnInYear($planCol, $year);
+            $completedInYear = ExcelSerialDate::sqlColumnInYear($completedCol, $year);
+            $clauses[] = "({$planInYear} AND ({$completedCol} IS NULL OR NOT ({$completedInYear})))";
+        }
+
+        if ($clauses === []) {
+            return '0 = 1';
+        }
+
+        return '('.implode(' OR ', $clauses).')';
+    }
+
+    private static function sqlCountDistinctTeachersWhen(string $teacherIdColumn, string $conditionSql): string
+    {
+        return "COUNT(DISTINCT CASE WHEN {$conditionSql} THEN {$teacherIdColumn} END)";
     }
 
     /**
@@ -211,45 +306,33 @@ class TeacherSupportKpiCalculator
         }
 
         $cols = config('coach_teacher_support.columns');
-        $completedCol = $cols[$rounds[$kpiKey]['completed']];
-        $query->whereNotNull($completedCol)->whereYear($completedCol, $year);
+        $completedCol = self::qualifiedTeacherColumn($cols[$rounds[$kpiKey]['completed']]);
+        $query->whereRaw(self::sqlColumnCompletedInYear($completedCol, $year));
     }
 
     public static function applyAllRoundsCompletedScope(Builder $query, int $year): void
     {
         $cols = config('coach_teacher_support.columns');
-        foreach (config('coach_teacher_support.kpi_rounds', []) as $round) {
-            $completedCol = $cols[$round['completed']];
-            $query->whereNotNull($completedCol)->whereYear($completedCol, $year);
-        }
+        $completedColumns = array_map(
+            fn (array $round): string => self::qualifiedTeacherColumn($cols[$round['completed']]),
+            config('coach_teacher_support.kpi_rounds', []),
+        );
+        $query->whereRaw(self::sqlAllRoundsCompletedInYear($completedColumns, $year));
     }
 
     public static function applyUnsupportedScope(Builder $query, int $year): void
     {
-        $cols = config('coach_teacher_support.columns');
-        $rounds = config('coach_teacher_support.kpi_rounds', []);
+        $query->whereRaw(self::sqlAnyRoundUnsupportedInYear(self::teacherColumnPrefix(), $year));
+    }
 
-        $query->where(function (Builder $outer) use ($cols, $rounds, $year): void {
-            $first = true;
-            foreach ($rounds as $round) {
-                $planCol = $cols[$round['plan']];
-                $completedCol = $cols[$round['completed']];
-                $clause = function (Builder $sub) use ($planCol, $completedCol, $year): void {
-                    $sub->whereNotNull($planCol)
-                        ->where(function (Builder $inner) use ($completedCol, $year): void {
-                            $inner->whereNull($completedCol)
-                                ->orWhereYear($completedCol, '!=', $year);
-                        });
-                };
+    private static function teacherColumnPrefix(): string
+    {
+        return (new Teacher)->getTable().'.';
+    }
 
-                if ($first) {
-                    $outer->where($clause);
-                    $first = false;
-                } else {
-                    $outer->orWhere($clause);
-                }
-            }
-        });
+    private static function qualifiedTeacherColumn(string $column): string
+    {
+        return self::teacherColumnPrefix().$column;
     }
 
     public static function planColumnForFilterRound(string $filterRound): ?string

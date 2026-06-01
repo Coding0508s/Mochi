@@ -3,9 +3,11 @@
 namespace App\Support;
 
 use App\Models\AccountInformation;
+use App\Models\Institution;
 use App\Models\Teacher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Coach 팀 KPI — 담당 Coach(TR)별 지원 완료 차수 집계.
@@ -48,7 +50,7 @@ final class CoachTeamKpiAggregator
         $query = clone $baseQuery;
         self::applyScheduleFilters($query, $year, $filterMonth, $filterRound);
 
-        return TeacherSupportKpiCalculator::calculate($query, $year);
+        return TeacherSupportKpiCalculator::calculateAggregated($query, $year);
     }
 
     /**
@@ -56,47 +58,57 @@ final class CoachTeamKpiAggregator
      */
     public static function byCoach(Builder $baseQuery, int $year, string $filterMonth = '', string $filterRound = ''): Collection
     {
-        $cols = config('coach_teacher_support.columns');
-        $selectColumns = collect(array_values($cols))
-            ->merge(['Teachers.ID', 'Teachers.SK_Code'])
-            ->unique()
-            ->values()
-            ->all();
-
         $query = clone $baseQuery;
         self::applyScheduleFilters($query, $year, $filterMonth, $filterRound);
 
-        $teachers = $query
-            ->with([
-                'institution.accountInfo' => static fn ($sub) => $sub->select(['ID', 'SK_Code', 'TR']),
-            ])
-            ->get($selectColumns);
+        $teacherTable = (new Teacher)->getTable();
+        $institutionTable = (new Institution)->getTable();
+        $accountTable = (new AccountInformation)->getTable();
+        $sqlNormalizedTr = ManagerNameNormalizer::sqlColumnExpression('team_kpi_ai.TR');
+        $teacherIdColumn = "{$teacherTable}.ID";
 
-        return $teachers
-            ->map(function (Teacher $teacher): ?array {
-                $rawCoach = trim((string) ($teacher->institution?->accountInfo?->TR ?? ''));
-                if ($rawCoach === '') {
-                    return null;
+        $accountBySkSubquery = DB::table($accountTable)
+            ->selectRaw('SK_Code, MAX(TR) as TR')
+            ->whereNotNull('TR')
+            ->where('TR', '!=', '')
+            ->groupBy('SK_Code');
+
+        $query
+            ->join($institutionTable.' as team_kpi_inst', "{$teacherTable}.SK_Code", '=', 'team_kpi_inst.SKcode')
+            ->joinSub($accountBySkSubquery, 'team_kpi_ai', 'team_kpi_inst.SKcode', '=', 'team_kpi_ai.SK_Code');
+
+        $aggregates = TeacherSupportKpiCalculator::aggregateSelectExpressions(
+            $teacherIdColumn,
+            "{$teacherTable}.",
+            $year,
+        );
+
+        $selects = [
+            DB::raw("{$sqlNormalizedTr} as normalized_tr"),
+            DB::raw('MIN(team_kpi_ai.TR) as coach'),
+            ...array_values($aggregates),
+        ];
+
+        return $query
+            ->select($selects)
+            ->groupBy(DB::raw($sqlNormalizedTr))
+            ->orderBy('coach')
+            ->toBase()
+            ->get()
+            ->map(static function ($row): array {
+                $mapped = [
+                    'coach' => (string) $row->coach,
+                    'teacher_count' => (int) $row->teacher_count,
+                ];
+
+                foreach (TeacherSupportKpiCalculator::roundKpiKeys() as $key) {
+                    $mapped[$key] = (int) ($row->{$key} ?? 0);
                 }
 
-                return [
-                    'normalized' => ManagerNameNormalizer::normalize($rawCoach),
-                    'coach' => $rawCoach,
-                    'teacher' => $teacher,
-                ];
-            })
-            ->filter()
-            ->groupBy('normalized')
-            ->sortKeys()
-            ->map(function (Collection $rows) use ($year): array {
-                $coach = (string) ($rows->first()['coach'] ?? '');
-                $teacherRows = $rows->pluck('teacher');
-                $kpis = TeacherSupportKpiCalculator::calculateFromTeachers($teacherRows, $year);
+                $mapped['completed'] = (int) ($row->completed ?? 0);
+                $mapped['unsupported'] = (int) ($row->unsupported ?? 0);
 
-                return array_merge([
-                    'coach' => $coach,
-                    'teacher_count' => $teacherRows->count(),
-                ], $kpis);
+                return $mapped;
             })
             ->values();
     }

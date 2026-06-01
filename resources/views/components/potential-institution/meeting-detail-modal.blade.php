@@ -86,9 +86,7 @@
 
                     <div>
                         <h4 class="text-sm font-semibold text-gray-700 mb-2">미팅내용</h4>
-                        <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 leading-6 whitespace-pre-wrap break-words">
-                            {{ $selectedMeeting['description'] ?? '-' }}
-                        </div>
+                        <div class="mochi-multiline-readout rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 leading-6">{{ $selectedMeeting['description'] ?? '-' }}</div>
                     </div>
                 @else
                     <form wire:submit="saveMeetingDetailEdit" class="space-y-3">

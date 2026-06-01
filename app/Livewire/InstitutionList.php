@@ -168,6 +168,7 @@ class InstitutionList extends Component
             $institution->accountInfo?->CS,
             $this->managerOptionsForDept(self::DEPT_CS),
         );
+        $managerChangeMeta = $this->resolveLatestManagerChangeMetaByRole((string) ($institution->SKcode ?? ''));
 
         $this->selectedInstitution = [
             'id' => $institution->ID,
@@ -185,6 +186,12 @@ class InstitutionList extends Component
             'co' => $aliasedCo !== '' ? $aliasedCo : null,
             'tr' => $aliasedTr !== '' ? $aliasedTr : null,
             'cs' => $aliasedCs !== '' ? $aliasedCs : null,
+            'co_changed_at' => $managerChangeMeta['co_changed_at'],
+            'tr_changed_at' => $managerChangeMeta['tr_changed_at'],
+            'cs_changed_at' => $managerChangeMeta['cs_changed_at'],
+            'co_changed_by' => $managerChangeMeta['co_changed_by'],
+            'tr_changed_by' => $managerChangeMeta['tr_changed_by'],
+            'cs_changed_by' => $managerChangeMeta['cs_changed_by'],
             'customer_type' => $institution->accountInfo?->Customer_Type,
             'gs_no' => ($resolvedGs = $institution->resolvedGsNumber()) !== '' ? $resolvedGs : null,
             'teacher_count' => $institution->teachers_count,
@@ -1092,6 +1099,7 @@ class InstitutionList extends Component
             'co' => $patch['co'] ?? null,
             'tr' => $patch['tr'] ?? null,
             'cs' => $patch['cs'] ?? null,
+            'changed_by' => auth()->user()?->nameForCoReports(),
             'origin' => AssignmentChangeRequest::ORIGIN_LOCAL,
             'status' => AssignmentChangeRequest::STATUS_PENDING,
             'requested_at' => now(),
@@ -1107,6 +1115,84 @@ class InstitutionList extends Component
         $normalized = trim((string) $value);
 
         return $normalized === '' ? null : $normalized;
+    }
+
+    /**
+     * @return array{
+     *     co_changed_at: ?string,
+     *     tr_changed_at: ?string,
+     *     cs_changed_at: ?string,
+     *     co_changed_by: ?string,
+     *     tr_changed_by: ?string,
+     *     cs_changed_by: ?string
+     * }
+     */
+    private function resolveLatestManagerChangeMetaByRole(string $skCode): array
+    {
+        $empty = [
+            'co_changed_at' => null,
+            'tr_changed_at' => null,
+            'cs_changed_at' => null,
+            'co_changed_by' => null,
+            'tr_changed_by' => null,
+            'cs_changed_by' => null,
+        ];
+
+        if ($skCode === '' || ! Schema::hasTable('assignment_change_requests')) {
+            return $empty;
+        }
+
+        /** @var Collection<int, AssignmentChangeRequest> $requests */
+        $requests = AssignmentChangeRequest::query()
+            ->where('sk_code', $skCode)
+            ->where('status', '!=', AssignmentChangeRequest::STATUS_FAILED)
+            ->orderByDesc(DB::raw('COALESCE(applied_at, requested_at)'))
+            ->get(['co', 'tr', 'cs', 'changed_by', 'origin', 'applied_at', 'requested_at']);
+
+        if ($requests->isEmpty()) {
+            return $empty;
+        }
+
+        $latestChangeMeta = $empty;
+        foreach ($requests as $request) {
+            $changedAt = $request->applied_at ?? $request->requested_at;
+            if ($changedAt === null) {
+                continue;
+            }
+
+            $formatted = $changedAt->format('Y-m-d');
+            $changedBy = $this->resolveManagerChangedByLabel($request);
+            foreach (['co', 'tr', 'cs'] as $role) {
+                if ($latestChangeMeta["{$role}_changed_at"] !== null) {
+                    continue;
+                }
+
+                if (filled($request->getAttribute($role))) {
+                    $latestChangeMeta["{$role}_changed_at"] = $formatted;
+                    $latestChangeMeta["{$role}_changed_by"] = $changedBy;
+                }
+            }
+
+            if ($latestChangeMeta['co_changed_at'] !== null
+                && $latestChangeMeta['tr_changed_at'] !== null
+                && $latestChangeMeta['cs_changed_at'] !== null) {
+                break;
+            }
+        }
+
+        return $latestChangeMeta;
+    }
+
+    private function resolveManagerChangedByLabel(AssignmentChangeRequest $request): string
+    {
+        $changedBy = trim((string) ($request->changed_by ?? ''));
+        if ($changedBy !== '') {
+            return $changedBy;
+        }
+
+        return $request->origin === AssignmentChangeRequest::ORIGIN_EXTERNAL
+            ? 'External Sync'
+            : 'Internal Update';
     }
 
     private function applyStatusFilter(Builder $query): void

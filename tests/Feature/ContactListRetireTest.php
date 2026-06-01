@@ -103,167 +103,45 @@ class ContactListRetireTest extends TestCase
         ], $extra))->ID;
     }
 
-    public function test_contact_list_retire_writes_retirement_list_and_teacher_status(): void
+    /**
+     * 교사를 퇴직 상태로 만들고 S_RetirementList 행을 함께 생성합니다.
+     *
+     * 퇴직 처리는 더 이상 연락처 화면에서 수행하지 않으므로(교사 지원 현황 전용),
+     * 복직/삭제 테스트는 이미 퇴직된 상태를 직접 준비합니다.
+     */
+    private function createRetiredTeacherWithRecord(string $skCode, string $name): int
     {
-        $admin = User::factory()->create(['is_admin' => true]);
-
-        $this->createInstitution('SK001', '기관A', 'Coach A');
-        $teacherId = $this->createTeacher('SK001', '퇴직대상');
-
-        Livewire::actingAs($admin)
-            ->test(ContactList::class)
-            ->call('openEditModal', $teacherId)
-            ->call('openRetireModal')
-            ->set('retireRecommendChoice', 'no')
-            ->call('retire')
-            ->assertHasNoErrors();
-
-        $this->assertDatabaseHas('Teachers', [
-            'ID' => $teacherId,
+        $teacherId = $this->createTeacher($skCode, $name, [
             'Status' => '퇴직',
             'ClassInOut' => false,
         ]);
 
-        $this->assertDatabaseHas('S_RetirementList', [
+        RetirementList::query()->create([
             'TearcherID' => $teacherId,
-            'Name' => '퇴직대상',
-            'SK_Code' => 'SK001',
+            'Name' => $name,
+            'SK_Code' => $skCode,
+            'Account_Name' => '기관A',
+            'TR_Name' => 'Coach A',
+            'RetirementDate' => now(),
             'Status' => '퇴직',
-            'RecommendYN' => 0,
-            'RecommendDescription' => '해당사항없음',
+            'RecommendYN' => false,
         ]);
 
-        $this->assertSame(1, RetirementList::query()->where('TearcherID', $teacherId)->count());
+        return $teacherId;
     }
 
-    public function test_contact_list_retire_requires_recommend_description_when_yes(): void
+    public function test_contact_list_does_not_offer_retire_action(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
-        $teacherId = $this->createTeacher('SK001', '추천필수');
+        $teacherId = $this->createTeacher('SK001', '재직교사');
 
         Livewire::actingAs($admin)
             ->test(ContactList::class)
             ->call('openEditModal', $teacherId)
-            ->call('openRetireModal')
-            ->set('retireRecommendChoice', 'yes')
-            ->set('retireRecommendDescription', '')
-            ->call('retire')
-            ->assertHasErrors(['retireRecommendDescription']);
-    }
-
-    public function test_contact_list_retire_stores_recommendation_when_yes(): void
-    {
-        $admin = User::factory()->create(['is_admin' => true]);
-
-        $this->createInstitution('SK001', '기관A', 'Coach A');
-        $teacherId = $this->createTeacher('SK001', '추천교사');
-
-        Livewire::actingAs($admin)
-            ->test(ContactList::class)
-            ->call('openEditModal', $teacherId)
-            ->call('openRetireModal')
-            ->set('retireRecommendChoice', 'yes')
-            ->set('retireRecommendDescription', '높은 GrapeSEED 이해도')
-            ->call('retire')
-            ->assertHasNoErrors();
-
-        $this->assertDatabaseHas('S_RetirementList', [
-            'TearcherID' => $teacherId,
-            'RecommendYN' => 1,
-            'RecommendDescription' => '높은 GrapeSEED 이해도',
-        ]);
-    }
-
-    public function test_contact_list_retire_does_not_set_inactive_status(): void
-    {
-        $admin = User::factory()->create(['is_admin' => true]);
-
-        $this->createInstitution('SK002', '기관B', 'Coach B');
-        $teacherId = $this->createTeacher('SK002', '상태검증');
-
-        Livewire::actingAs($admin)
-            ->test(ContactList::class)
-            ->call('openEditModal', $teacherId)
-            ->call('openRetireModal')
-            ->set('retireRecommendChoice', 'no')
-            ->call('retire');
-
-        $teacher = Teacher::find($teacherId);
-        $this->assertSame('퇴직', $teacher->Status);
-        $this->assertNotSame('비활성화', $teacher->Status);
-    }
-
-    public function test_coach_without_tr_scope_cannot_retire_from_contact_list(): void
-    {
-        $coach = User::factory()->create([
-            'name' => 'Coach A',
-            'email' => 'coacha@example.com',
-            'team' => 'TR',
-            'is_admin' => false,
-        ]);
-
-        $this->createInstitution('SK001', '기관A', 'Coach A');
-        $this->createInstitution('SK002', '기관B', 'Coach B');
-        $teacherId = $this->createTeacher('SK002', '다른TR교사');
-
-        Livewire::actingAs($coach)
-            ->test(ContactList::class)
-            ->call('openEditModal', $teacherId)
-            ->call('openRetireModal')
-            ->set('retireRecommendChoice', 'no')
-            ->call('retire')
-            ->assertHasNoErrors();
-
-        $this->assertDatabaseHas('Teachers', [
-            'ID' => $teacherId,
-            'Status' => '활성화',
-        ]);
-
-        $this->assertSame(0, RetirementList::query()->where('TearcherID', $teacherId)->count());
-    }
-
-    public function test_coach_can_retire_own_tr_teacher_from_contact_list(): void
-    {
-        $coach = User::factory()->create([
-            'name' => 'Coach A',
-            'email' => 'coacha@example.com',
-            'team' => 'TR',
-            'is_admin' => false,
-        ]);
-
-        $this->createInstitution('SK001', '기관A', 'Coach A');
-        $teacherId = $this->createTeacher('SK001', '내TR교사');
-
-        Livewire::actingAs($coach)
-            ->test(ContactList::class)
-            ->call('openEditModal', $teacherId)
-            ->assertSee('퇴직 처리')
-            ->call('openRetireModal')
-            ->set('retireRecommendChoice', 'no')
-            ->call('retire');
-
-        $this->assertDatabaseHas('Teachers', [
-            'ID' => $teacherId,
-            'Status' => '퇴직',
-        ]);
-    }
-
-    public function test_retire_button_hidden_for_already_retired_teacher(): void
-    {
-        $admin = User::factory()->create(['is_admin' => true]);
-
-        $this->createInstitution('SK001', '기관A', 'Coach A');
-        $teacherId = $this->createTeacher('SK001', '이미퇴직', [
-            'Status' => '퇴직',
-            'ClassInOut' => false,
-        ]);
-
-        Livewire::actingAs($admin)
-            ->test(ContactList::class)
-            ->call('openEditModal', $teacherId)
-            ->assertDontSee('퇴직 처리');
+            ->assertDontSee('퇴직 처리')
+            ->assertDontSeeHtml('wire:click="openRetireModal"');
     }
 
     public function test_delete_removes_teacher_without_retirement_record(): void
@@ -289,14 +167,10 @@ class ContactListRetireTest extends TestCase
         $admin = User::factory()->create(['is_admin' => true]);
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
-        $teacherId = $this->createTeacher('SK001', '퇴직후삭제');
+        $teacherId = $this->createRetiredTeacherWithRecord('SK001', '퇴직후삭제');
 
         Livewire::actingAs($admin)
             ->test(ContactList::class)
-            ->call('openEditModal', $teacherId)
-            ->call('openRetireModal')
-            ->set('retireRecommendChoice', 'no')
-            ->call('retire')
             ->call('openEditModal', $teacherId)
             ->call('confirmDelete', $teacherId)
             ->call('delete')
@@ -314,14 +188,10 @@ class ContactListRetireTest extends TestCase
         $admin = User::factory()->create(['is_admin' => true]);
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
-        $teacherId = $this->createTeacher('SK001', '복직대상');
+        $teacherId = $this->createRetiredTeacherWithRecord('SK001', '복직대상');
 
         Livewire::actingAs($admin)
             ->test(ContactList::class)
-            ->call('openEditModal', $teacherId)
-            ->call('openRetireModal')
-            ->set('retireRecommendChoice', 'no')
-            ->call('retire')
             ->call('openEditModal', $teacherId)
             ->assertSee('복직 처리')
             ->call('openReinstateModal')

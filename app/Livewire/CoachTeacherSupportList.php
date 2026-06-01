@@ -13,12 +13,15 @@ use App\Actions\StoreTeacherOpenClassSupportReport;
 use App\Actions\StoreTeacherProConSupportReport;
 use App\Actions\StoreTeacherUnit21PlusSupportReport;
 use App\Actions\StoreTeacherUnit31PlusSupportReport;
+use App\Actions\UpdateLegacyTeacherSupportReport;
 use App\Actions\UpdateTeacherProfile;
 use App\Actions\UpdateTeacherSupport;
+use App\Actions\UpdateTeacherSupportReport;
 use App\Models\AccountInformation;
 use App\Models\Institution;
 use App\Models\SupportRecord;
 use App\Models\Teacher;
+use App\Models\User;
 use App\Support\CoachTeacherScope;
 use App\Support\CoachTeamKpiAggregator;
 use App\Support\ExcelSerialDate;
@@ -30,10 +33,15 @@ use App\Support\TeacherSupportHistoryAggregator;
 use App\Support\TeacherSupportHistoryDetailResolver;
 use App\Support\TeacherSupportHistoryFormLoader;
 use App\Support\TeacherSupportKpiCalculator;
+use App\Support\TeacherSupportReportEditAuthorization;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
+use InvalidArgumentException;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -84,6 +92,11 @@ class CoachTeacherSupportList extends Component
     public ?array $selectedTeacherSupportHistoryDetail = null;
 
     public bool $supportReportViewMode = false;
+
+    public ?string $viewingSupportReportDetailKey = null;
+
+    /** @var array<int, bool>|null */
+    private ?array $editModalAllowedByTeacherId = null;
 
     public bool $teacherModalEditMode = false;
 
@@ -385,6 +398,7 @@ class CoachTeacherSupportList extends Component
                 $loaded['teacher_id'],
                 $loaded['form'],
                 $loaded['mark_completed'],
+                $detailKey,
             );
 
             return;
@@ -422,8 +436,14 @@ class CoachTeacherSupportList extends Component
     /**
      * @param  array<string, mixed>  $form
      */
-    private function openSupportReportView(string $action, int $teacherId, array $form, bool $markCompleted = true): void
-    {
+    private function openSupportReportView(
+        string $action,
+        int $teacherId,
+        array $form,
+        bool $markCompleted = true,
+        ?string $detailKey = null,
+    ): void {
+        $this->viewingSupportReportDetailKey = $detailKey;
         $this->supportReportViewMode = true;
 
         match ($action) {
@@ -443,7 +463,134 @@ class CoachTeacherSupportList extends Component
 
     private function endSupportReportViewMode(): void
     {
+        $this->clearSupportReportViewContext();
+    }
+
+    private function clearSupportReportViewContext(): void
+    {
+        $this->viewingSupportReportDetailKey = null;
         $this->supportReportViewMode = false;
+    }
+
+    public function canEditViewingSupportReport(): bool
+    {
+        if ($this->viewingSupportReportDetailKey === null) {
+            return false;
+        }
+
+        $parsed = TeacherSupportReportEditAuthorization::parseEditableDetailKey($this->viewingSupportReportDetailKey);
+        if ($parsed === null) {
+            return false;
+        }
+
+        $user = auth()->user();
+        if ($user === null) {
+            return false;
+        }
+
+        return Gate::allows('updateTeacherSupportReport', [$parsed['table'], $parsed['id']]);
+    }
+
+    public function startSupportReportEdit(): void
+    {
+        if (! $this->canEditViewingSupportReport()) {
+            return;
+        }
+
+        $this->supportReportViewMode = false;
+    }
+
+    public function cancelSupportReportEdit(): void
+    {
+        if ($this->viewingSupportReportDetailKey === null) {
+            return;
+        }
+
+        $detailKey = $this->viewingSupportReportDetailKey;
+        $parsed = TeacherSupportReportEditAuthorization::parseEditableDetailKey($detailKey);
+        if ($parsed === null) {
+            return;
+        }
+
+        $teacherId = (int) ($this->teacherDetailInfo['id'] ?? 0);
+        $expectedTeacherId = $teacherId > 0 ? $teacherId : null;
+        $expectedSkCode = $this->expectedSupportHistorySkCode();
+
+        $loaded = app(TeacherSupportHistoryFormLoader::class)->load(
+            $detailKey,
+            $expectedTeacherId,
+            $expectedSkCode,
+        );
+
+        if ($loaded === null) {
+            return;
+        }
+
+        $this->closeOpenSupportReportModals();
+        $this->openSupportReportView(
+            $loaded['action'],
+            $loaded['teacher_id'],
+            $loaded['form'],
+            $loaded['mark_completed'],
+            $detailKey,
+        );
+    }
+
+    private function closeOpenSupportReportModals(): void
+    {
+        $this->showDemoLessonModal = false;
+        $this->showLvaFrModal = false;
+        $this->showLvaFbModal = false;
+        $this->showLsOnsiteLvaModal = false;
+        $this->showLittleseedConModal = false;
+        $this->showOnsiteModal = false;
+        $this->showProConModal = false;
+        $this->showOpenClassModal = false;
+        $this->showUnit21PlusModal = false;
+        $this->showUnit31PlusModal = false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function updateViewingSupportReportIfEditing(array $payload, User $user): bool
+    {
+        $parsed = $this->viewingSupportReportDetailKey !== null
+            ? TeacherSupportReportEditAuthorization::parseEditableDetailKey($this->viewingSupportReportDetailKey)
+            : null;
+
+        if ($parsed === null) {
+            return false;
+        }
+
+        try {
+            if ($parsed['source'] === 'legacy') {
+                app(UpdateLegacyTeacherSupportReport::class)->execute($parsed['table'], $parsed['id'], $payload, $user);
+            } else {
+                app(UpdateTeacherSupportReport::class)->execute($parsed['table'], $parsed['id'], $payload, $user);
+            }
+        } catch (AuthorizationException|InvalidArgumentException $exception) {
+            $this->addError('supportReportEdit', $exception->getMessage());
+
+            return true;
+        }
+
+        session()->flash('success', '교사 지원 보고서를 수정했습니다.');
+
+        return true;
+    }
+
+    /**
+     * @param  callable(): void  $closeModal
+     */
+    private function finishSupportReportPersistence(int $teacherId, callable $closeModal): void
+    {
+        $closeModal();
+        $this->closeTeacherModal();
+
+        if ($teacherId > 0) {
+            $this->openTeacherModal($teacherId);
+        }
     }
 
     /**
@@ -758,6 +905,8 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
+        $this->clearSupportReportViewContext();
+
         $institution = $teacher->institution;
         if (! $institution) {
             $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
@@ -807,6 +956,16 @@ class CoachTeacherSupportList extends Component
         $payload = array_merge($this->demoLessonForm, [
             'mark_completed' => $this->demoLessonMarkCompleted,
         ]);
+
+        if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
+            if ($this->getErrorBag()->isNotEmpty()) {
+                return;
+            }
+
+            $this->finishSupportReportPersistence((int) $this->demoLessonTeacherId, fn () => $this->closeDemoLessonModal());
+
+            return;
+        }
 
         $action = new StoreTeacherDemoLessonSupportReport;
         $action->execute($this->demoLessonTeacherId, $payload, $user);
@@ -864,6 +1023,8 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
+        $this->clearSupportReportViewContext();
+
         $institution = $teacher->institution;
         if (! $institution) {
             $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
@@ -913,6 +1074,16 @@ class CoachTeacherSupportList extends Component
         $payload = array_merge($this->lvaFrForm, [
             'mark_completed' => $this->lvaFrMarkCompleted,
         ]);
+
+        if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
+            if ($this->getErrorBag()->isNotEmpty()) {
+                return;
+            }
+
+            $this->finishSupportReportPersistence((int) $this->lvaFrTeacherId, fn () => $this->closeLvaFrModal());
+
+            return;
+        }
 
         $action = new StoreTeacherLvaFrSupportReport;
         $action->execute($this->lvaFrTeacherId, $payload, $user);
@@ -972,6 +1143,8 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
+        $this->clearSupportReportViewContext();
+
         $institution = $teacher->institution;
         if (! $institution) {
             $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
@@ -1021,6 +1194,16 @@ class CoachTeacherSupportList extends Component
         $payload = array_merge($this->lvaFbForm, [
             'mark_completed' => $this->lvaFbMarkCompleted,
         ]);
+
+        if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
+            if ($this->getErrorBag()->isNotEmpty()) {
+                return;
+            }
+
+            $this->finishSupportReportPersistence((int) $this->lvaFbTeacherId, fn () => $this->closeLvaFbModal());
+
+            return;
+        }
 
         $action = new StoreTeacherLvaFbSupportReport;
         $action->execute($this->lvaFbTeacherId, $payload, $user);
@@ -1080,6 +1263,8 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
+        $this->clearSupportReportViewContext();
+
         $institution = $teacher->institution;
         if (! $institution) {
             $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
@@ -1129,6 +1314,16 @@ class CoachTeacherSupportList extends Component
         $payload = array_merge($this->lsOnsiteLvaForm, [
             'mark_completed' => $this->lsOnsiteLvaMarkCompleted,
         ]);
+
+        if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
+            if ($this->getErrorBag()->isNotEmpty()) {
+                return;
+            }
+
+            $this->finishSupportReportPersistence((int) $this->lsOnsiteLvaTeacherId, fn () => $this->closeLsOnsiteLvaModal());
+
+            return;
+        }
 
         $action = new StoreTeacherLsOnsiteLvaSupportReport;
         $action->execute($this->lsOnsiteLvaTeacherId, $payload, $user);
@@ -1190,6 +1385,8 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
+        $this->clearSupportReportViewContext();
+
         $institution = $teacher->institution;
         if (! $institution) {
             $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
@@ -1239,6 +1436,16 @@ class CoachTeacherSupportList extends Component
         $payload = array_merge($this->littleseedConForm, [
             'mark_completed' => $this->littleseedConMarkCompleted,
         ]);
+
+        if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
+            if ($this->getErrorBag()->isNotEmpty()) {
+                return;
+            }
+
+            $this->finishSupportReportPersistence((int) $this->littleseedConTeacherId, fn () => $this->closeLittleseedConModal());
+
+            return;
+        }
 
         $action = new StoreTeacherLittleseedConSupportReport;
         $action->execute($this->littleseedConTeacherId, $payload, $user);
@@ -1293,6 +1500,8 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
+        $this->clearSupportReportViewContext();
+
         $institution = $teacher->institution;
         if (! $institution) {
             $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
@@ -1342,6 +1551,16 @@ class CoachTeacherSupportList extends Component
         $payload = array_merge($this->openClassForm, [
             'mark_completed' => $this->openClassMarkCompleted,
         ]);
+
+        if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
+            if ($this->getErrorBag()->isNotEmpty()) {
+                return;
+            }
+
+            $this->finishSupportReportPersistence((int) $this->openClassTeacherId, fn () => $this->closeOpenClassModal());
+
+            return;
+        }
 
         $action = new StoreTeacherOpenClassSupportReport;
         $action->execute($this->openClassTeacherId, $payload, $user);
@@ -1398,6 +1617,8 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
+        $this->clearSupportReportViewContext();
+
         $institution = $teacher->institution;
         if (! $institution) {
             $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
@@ -1447,6 +1668,16 @@ class CoachTeacherSupportList extends Component
         $payload = array_merge($this->unit21PlusForm, [
             'mark_completed' => $this->unit21PlusMarkCompleted,
         ]);
+
+        if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
+            if ($this->getErrorBag()->isNotEmpty()) {
+                return;
+            }
+
+            $this->finishSupportReportPersistence((int) $this->unit21PlusTeacherId, fn () => $this->closeUnit21PlusModal());
+
+            return;
+        }
 
         $action = new StoreTeacherUnit21PlusSupportReport;
         $action->execute($this->unit21PlusTeacherId, $payload, $user);
@@ -1506,6 +1737,8 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
+        $this->clearSupportReportViewContext();
+
         $institution = $teacher->institution;
         if (! $institution) {
             $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
@@ -1555,6 +1788,16 @@ class CoachTeacherSupportList extends Component
         $payload = array_merge($this->unit31PlusForm, [
             'mark_completed' => $this->unit31PlusMarkCompleted,
         ]);
+
+        if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
+            if ($this->getErrorBag()->isNotEmpty()) {
+                return;
+            }
+
+            $this->finishSupportReportPersistence((int) $this->unit31PlusTeacherId, fn () => $this->closeUnit31PlusModal());
+
+            return;
+        }
 
         $action = new StoreTeacherUnit31PlusSupportReport;
         $action->execute($this->unit31PlusTeacherId, $payload, $user);
@@ -1614,6 +1857,8 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
+        $this->clearSupportReportViewContext();
+
         $institution = $teacher->institution;
         if (! $institution) {
             $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
@@ -1663,6 +1908,16 @@ class CoachTeacherSupportList extends Component
         $payload = array_merge($this->proConForm, [
             'mark_completed' => $this->proConMarkCompleted,
         ]);
+
+        if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
+            if ($this->getErrorBag()->isNotEmpty()) {
+                return;
+            }
+
+            $this->finishSupportReportPersistence((int) $this->proConTeacherId, fn () => $this->closeProConModal());
+
+            return;
+        }
 
         $action = new StoreTeacherProConSupportReport;
         $action->execute($this->proConTeacherId, $payload, $user);
@@ -1717,6 +1972,8 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
+        $this->clearSupportReportViewContext();
+
         $institution = $teacher->institution;
         if (! $institution) {
             $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
@@ -1766,6 +2023,16 @@ class CoachTeacherSupportList extends Component
         $payload = array_merge($this->onsiteForm, [
             'mark_completed' => $this->onsiteMarkCompleted,
         ]);
+
+        if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
+            if ($this->getErrorBag()->isNotEmpty()) {
+                return;
+            }
+
+            $this->finishSupportReportPersistence((int) $this->onsiteTeacherId, fn () => $this->closeOnsiteModal());
+
+            return;
+        }
 
         $action = new StoreTeacherOnsiteSupportReport;
         $action->execute($this->onsiteTeacherId, $payload, $user);
@@ -1954,6 +2221,10 @@ class CoachTeacherSupportList extends Component
 
     public function canOpenEditModal(int $id): bool
     {
+        if ($this->editModalAllowedByTeacherId !== null) {
+            return $this->editModalAllowedByTeacherId[$id] ?? false;
+        }
+
         $teacher = Teacher::find($id);
         if (! $teacher) {
             return false;
@@ -1964,6 +2235,8 @@ class CoachTeacherSupportList extends Component
 
     public function render()
     {
+        $this->editModalAllowedByTeacherId = null;
+
         $baseQuery = $this->buildBaseQuery();
         $this->applyDefaultYearScope($baseQuery);
 
@@ -1973,20 +2246,33 @@ class CoachTeacherSupportList extends Component
 
         $kpis = TeacherSupportKpiCalculator::calculate($kpiQuery, $this->resolvedFilterYear());
 
+        $accountNameSortSubquery = DB::table('S_AccountName')
+            ->selectRaw('SKcode, MAX(AccountName) as AccountName')
+            ->groupBy('SKcode');
+
+        $accountInfoSortSubquery = DB::table('S_Account_Information')
+            ->selectRaw('SK_Code, MAX(Account_Name) as Account_Name')
+            ->groupBy('SK_Code');
+
         $teachers = (clone $baseQuery)
             ->tap(fn (Builder $q) => $this->applyKpiFilter($q))
             ->tap(fn (Builder $q) => $this->applyRoundFilter($q))
             ->tap(fn (Builder $q) => $this->applyMonthFilter($q))
             ->with(CoachTeacherScope::eagerLoads())
-            ->leftJoin('S_AccountName', 'Teachers.SK_Code', '=', 'S_AccountName.SKcode')
-            ->leftJoin('S_Account_Information', 'Teachers.SK_Code', '=', 'S_Account_Information.SK_Code')
-            ->orderByRaw('COALESCE(NULLIF(S_Account_Information.Account_Name, ""), NULLIF(S_AccountName.AccountName, ""), Teachers.School_Name) ASC')
+            ->leftJoinSub($accountNameSortSubquery, 'sorted_account_names', function ($join): void {
+                $join->on('Teachers.SK_Code', '=', 'sorted_account_names.SKcode');
+            })
+            ->leftJoinSub($accountInfoSortSubquery, 'sorted_account_information', function ($join): void {
+                $join->on('Teachers.SK_Code', '=', 'sorted_account_information.SK_Code');
+            })
+            ->orderByRaw('COALESCE(NULLIF(sorted_account_information.Account_Name, ""), NULLIF(sorted_account_names.AccountName, ""), Teachers.School_Name) ASC')
             ->orderBy('Teachers.SK_Code')
             ->orderBy('Teachers.Name')
             ->select('Teachers.*')
             ->paginate(50);
 
         $this->hydrateTeacherInstitutions($teachers);
+        $this->editModalAllowedByTeacherId = $this->buildEditModalAllowedMap($teachers->getCollection());
 
         return view('livewire.coach-teacher-support-list', [
             'teachers' => $teachers,
@@ -2182,13 +2468,25 @@ class CoachTeacherSupportList extends Component
             CoachTeacherScope::apply($scopedTeacherQuery, $user);
         }
 
-        return AccountInformation::query()
+        $query = AccountInformation::query()
             ->whereIn('SK_Code', $scopedTeacherQuery->select('SK_Code'))
             ->whereNotNull('TR')
             ->where('TR', '!=', '')
-            ->distinct()
-            ->orderBy('TR')
-            ->pluck('TR');
+            ->distinct();
+
+        if (Schema::hasTable('employee')) {
+            $query->whereExists(function (\Illuminate\Database\Query\Builder $subQuery) {
+                $subQuery->select(DB::raw(1))
+                    ->from('employee')
+                    ->where('STATUS', 1)
+                    ->where(function (\Illuminate\Database\Query\Builder $nameQuery) {
+                        $nameQuery->whereColumn('employee.ENGLISHNAME', 'S_Account_Information.TR')
+                            ->orWhereColumn('employee.KOREANAME', 'S_Account_Information.TR');
+                    });
+            });
+        }
+
+        return $query->orderBy('TR')->pluck('TR');
     }
 
     /**
@@ -2325,7 +2623,10 @@ class CoachTeacherSupportList extends Component
             return false;
         }
 
-        $institution = InstitutionResolver::resolveForTeacher($teacher);
+        $institution = $teacher->relationLoaded('institution')
+            ? $teacher->institution
+            : InstitutionResolver::resolveForTeacher($teacher);
+
         if ($institution?->isTerminatedCustomer()) {
             return false;
         }
@@ -2335,6 +2636,70 @@ class CoachTeacherSupportList extends Component
         }
 
         return $this->canEditTeacher($teacher);
+    }
+
+    /**
+     * 목록 행마다 canOpenEditModal()을 호출하면 Teacher::find·exists가 N번 발생한다.
+     * 현재 페이지 교사 ID만 모아 1~2회 쿼리로 권한 맵을 만든다.
+     *
+     * @param  Collection<int, Teacher>  $teachers
+     * @return array<int, bool>
+     */
+    private function buildEditModalAllowedMap(Collection $teachers): array
+    {
+        $user = auth()->user();
+        if (! $user || $teachers->isEmpty()) {
+            return [];
+        }
+
+        $ids = $teachers->pluck('ID')->unique()->values()->all();
+        if ($ids === []) {
+            return [];
+        }
+
+        $viewableQuery = Teacher::query()->whereIn('ID', $ids);
+        $this->applyTeacherListVisibilityFilter($viewableQuery);
+        if (! $user->hasPlatformWideViewAccess()) {
+            CoachTeacherScope::apply($viewableQuery, $user);
+        }
+        $viewableIds = array_fill_keys($viewableQuery->pluck('ID')->all(), true);
+
+        $editableIds = $viewableIds;
+        if (! $user->hasFullAccess()) {
+            $editableQuery = Teacher::query()->whereIn('ID', $ids);
+            $this->applyTeacherListVisibilityFilter($editableQuery);
+            CoachTeacherScope::apply($editableQuery, $user);
+            $editableIds = array_fill_keys($editableQuery->pluck('ID')->all(), true);
+        }
+
+        $map = [];
+        foreach ($teachers as $teacher) {
+            if (! isset($viewableIds[$teacher->ID])) {
+                $map[$teacher->ID] = false;
+
+                continue;
+            }
+
+            $institution = $teacher->relationLoaded('institution')
+                ? $teacher->institution
+                : InstitutionResolver::resolveForTeacher($teacher);
+
+            if ($institution?->isTerminatedCustomer()) {
+                $map[$teacher->ID] = false;
+
+                continue;
+            }
+
+            if ($user->hasFullAccess()) {
+                $map[$teacher->ID] = true;
+
+                continue;
+            }
+
+            $map[$teacher->ID] = isset($editableIds[$teacher->ID]);
+        }
+
+        return $map;
     }
 
     /**

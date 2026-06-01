@@ -341,7 +341,9 @@ class PotentialInstitutionView extends Component
                     'account_manager' => $detail->AccountManager ?? '-',
                     'consulting_type' => $detail->ConsultingType ?? '-',
                     'possibility' => $detail->Possibility ?? '-',
-                    'description' => $detail->Description ?? '-',
+                    'description' => filled($detail->Description)
+                        ? (string) $detail->Description
+                        : '-',
                 ];
             })
             ->toArray();

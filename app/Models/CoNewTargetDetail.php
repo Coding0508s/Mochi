@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\NormalizedMultilineText;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
@@ -29,6 +30,7 @@ class CoNewTargetDetail extends Model
     {
         return [
             'MeetingDate' => 'datetime',
+            'Description' => NormalizedMultilineText::class,
         ];
     }
 
