@@ -100,6 +100,10 @@ Route::middleware(['auth'])->group(function () {
         return view('pages.schedules.index');
     })->name('schedules.index');
 
+    Route::get('/shared-supplies', function () {
+        return view('pages.shared-supplies.index');
+    })->name('shared-supplies.index');
+
     Route::get('/coach/teacher-support', function () {
         return view('pages.coach.teacher-support.index');
     })->name('coach.teacher-support.index');

@@ -2,10 +2,13 @@
 
 namespace App\Providers;
 
+use App\Models\SharedSupply;
 use App\Models\SupportRecord;
 use App\Models\Teacher;
 use App\Models\TeamSchedule;
 use App\Models\User;
+use App\Observers\SharedSupplyObserver;
+use App\Policies\SharedSupplyPolicy;
 use App\Policies\TeamSchedulePolicy;
 use App\Support\ManagerNameNormalizer;
 use App\Support\TeacherSupportReportEditAuthorization;
@@ -54,6 +57,8 @@ class AppServiceProvider extends ServiceProvider
         /** Coach Team 지원 KPI 대시보드 — 팀장·관리자 */
         Gate::define('viewCoachTeamKpi', fn (?User $user): bool => (bool) $user?->canViewCoachTeamKpi());
         Gate::policy(TeamSchedule::class, TeamSchedulePolicy::class);
+        Gate::policy(SharedSupply::class, SharedSupplyPolicy::class);
+        SharedSupply::observe(SharedSupplyObserver::class);
 
         Gate::define('accessCoTeamFeatures', fn (?User $user): bool => TeamMenuContext::canAccessCoOnlyFeatures($user));
 

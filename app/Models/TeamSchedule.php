@@ -22,6 +22,8 @@ class TeamSchedule extends Model
         'location',
         'recurrence_rule',
         'recurrence_parent_id',
+        'source_type',
+        'source_id',
         'created_by',
         'updated_by',
     ];

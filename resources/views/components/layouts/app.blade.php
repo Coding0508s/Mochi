@@ -18,8 +18,7 @@
         || request()->is('salesforce-files*')
         || request()->is('store/*')
         || request()->is('co/*')
-        || request()->is('coach/*')
-        || request()->is('schedules*');
+        || request()->is('coach/*');
     $sidebarUser = auth()->user();
     $activeTeamMenu = \App\Support\TeamMenuContext::activeMenu($sidebarUser);
     $showCoTeamMenu = \App\Support\TeamMenuContext::showCoTeamSidebar($sidebarUser);
@@ -33,6 +32,7 @@
      x-data="{
         sidebarOpen: false,
          openPeople: {{ request()->routeIs('people.*') ? 'true' : 'false' }},
+         openScheduleManagement: {{ request()->routeIs('schedules.*', 'shared-supplies.*') ? 'true' : 'false' }},
          openTeams: true,
         openCS: {{ $isCoTeamRoute && ($activeTeamMenu === 'cs' || ($activeTeamMenu === null && auth()->user()?->isCsTeam())) ? 'true' : 'false' }},
         openCoach: {{ $isCoTeamRoute && ($activeTeamMenu === 'coach' || ($activeTeamMenu === null && auth()->user()?->isCoachTeam())) ? 'true' : 'false' }},
@@ -215,6 +215,39 @@
                 </div>
             </div>
 
+            {{-- ── 일정 관리 ── --}}
+            <div class="sidebar-group">
+                <button type="button"
+                        @click="openScheduleManagement = !openScheduleManagement"
+                        class="sidebar-item sidebar-focusable
+                               {{ request()->routeIs('schedules.*', 'shared-supplies.*') ? 'sidebar-item-active' : 'sidebar-item-default' }}">
+                    <span class="sidebar-item-lead">
+                        @include('partials.sidebar-menu-icon', ['name' => 'calendar'])
+                        <span class="font-medium">일정 관리</span>
+                    </span>
+                    <svg class="sidebar-chevron transition-transform duration-200"
+                         :class="openScheduleManagement ? 'rotate-90' : ''"
+                         fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+
+                <div x-show="openScheduleManagement" class="sidebar-sublist">
+                    <a href="{{ route('schedules.index') }}"
+                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable
+                              {{ request()->routeIs('schedules.*') ? 'sidebar-subitem-active' : '' }}"
+                       @if(request()->routeIs('schedules.*')) aria-current="page" @endif>
+                        <span class="sidebar-subitem-label">일정 캘린더</span>
+                    </a>
+                    <a href="{{ route('shared-supplies.index') }}"
+                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable
+                              {{ request()->routeIs('shared-supplies.*') ? 'sidebar-subitem-active' : '' }}"
+                       @if(request()->routeIs('shared-supplies.*')) aria-current="page" @endif>
+                        <span class="sidebar-subitem-label">공용품 관리</span>
+                    </a>
+                </div>
+            </div>
+
             {{-- ── Teams (열고 닫기 가능) ── --}}
             <div class="sidebar-group">
                 <button type="button"
@@ -235,16 +268,25 @@
                 <div x-show="openTeams" class="sidebar-sublist">
 
                     @php
-                        $isSidebarMenuActive = static function (array $menu): bool {
+                        $isSidebarMenuActive = static function (array $menu, ?string $expectedTeamMenu = null): bool {
                             if (! empty($menu['routeIs'] ?? null)) {
-                                return request()->routeIs($menu['routeIs']);
+                                $active = request()->routeIs($menu['routeIs']);
+                            } elseif (! empty($menu['route'] ?? null)) {
+                                $active = request()->routeIs($menu['route'].'.*');
+                            } else {
+                                $active = false;
                             }
 
-                            if (! empty($menu['route'] ?? null)) {
-                                return request()->routeIs($menu['route'].'.*');
+                            if (! $active || $expectedTeamMenu === null) {
+                                return $active;
                             }
 
-                            return false;
+                            $activeTeamMenu = request()->query('team_menu');
+                            if (! is_string($activeTeamMenu) || $activeTeamMenu === '') {
+                                $activeTeamMenu = \App\Support\TeamMenuContext::activeMenu(auth()->user());
+                            }
+
+                            return $activeTeamMenu === $expectedTeamMenu;
                         };
                     @endphp
 
@@ -299,7 +341,6 @@
                                     ['label' => '기관리스트',     'path' => '/institutions', 'route' => 'institutions', 'icon' => 'building'],
                                     ['label' => '교직원 연락처보기', 'path' => '/contacts',     'route' => 'contacts',     'icon' => 'phone'],
                                     ['label' => '기관지원보고서', 'path' => '/supports',     'route' => 'supports',     'icon' => 'document'],
-                                    ['label' => '일정 관리', 'path' => route('schedules.index'), 'route' => '', 'routeIs' => 'schedules.index', 'icon' => 'calendar'],
                                     ['label' => '잠재기관 등록하기', 'path' => route('potential-institutions.index'), 'route' => '', 'routeIs' => 'potential-institutions.index', 'icon' => 'calendar'],
                                     ['label' => '잠재기관 목록보기',   'path' => route('potential-institutions.view'), 'route' => '', 'routeIs' => 'potential-institutions.view', 'icon' => 'eye'],
                                     ['label' => 'GS Brochure', 'path' => route('co.gs-brochure'), 'route' => '', 'routeIs' => 'co.gs-brochure*', 'icon' => 'document'],
@@ -316,8 +357,8 @@
                                    @if(! empty($menu['blank'] ?? false))
                                        target="_blank" rel="noopener noreferrer"
                                    @endif
-                                   class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ $isSidebarMenuActive($menu) ? 'sidebar-subitem-active' : '' }}"
-                                   @if($isSidebarMenuActive($menu)) aria-current="page" @endif>
+                                   class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ $isSidebarMenuActive($menu, 'co') ? 'sidebar-subitem-active' : '' }}"
+                                   @if($isSidebarMenuActive($menu, 'co')) aria-current="page" @endif>
                                     @include('partials.sidebar-menu-icon', ['name' => $menu['icon'], 'small' => true])
                                     <span class="sidebar-subitem-label">{{ $menu['label'] }}</span>
                                 </a>
