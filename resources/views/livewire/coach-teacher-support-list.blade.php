@@ -243,13 +243,17 @@
         </div>
 
         <div class="coach-teacher-support-table-scroll hidden md:block isolate">
-            <table class="coach-teacher-support-table w-full text-sm whitespace-nowrap">
+            <table @class([
+                'coach-teacher-support-table w-full text-sm whitespace-nowrap',
+                'coach-teacher-support-table--extended' => $showExtendedColumns,
+            ])>
                 <colgroup>
                     <col class="coach-support-col-sk">
                     <col class="coach-support-col-institution">
                     <col class="coach-support-col-position">
                     <col class="coach-support-col-name">
-                    <col class="coach-support-col-plan1-date">
+                    <col class="coach-support-col-essentials-gs">
+                    <col class="coach-support-col-essentials-ls">
                 </colgroup>
                 <thead class="mochi-table-head">
                 <tr class="text-gray-700">
@@ -257,15 +261,17 @@
                     <th class="coach-support-sticky-inst coach-support-sticky-inst--head px-3 py-2 text-center">기관명</th>
                     <th class="coach-support-sticky-position coach-support-sticky-position--head px-3 py-2 text-left">직급</th>
                     <th class="coach-support-sticky-name coach-support-sticky-name--head px-3 py-2 text-left">이름</th>
-                    <th class="coach-support-sticky-plan1-date coach-support-sticky-plan1-date--head px-3 py-2 text-left">1차 지원 계획일자</th>
-                    <th class="px-3 py-2 text-left">1차 지원 계획타입</th>
-                    <th class="px-3 py-2 text-left">2차 지원 계획일자</th>
-                    <th class="px-3 py-2 text-left">2차 지원 계획타입</th>
+                    <th class="coach-support-sticky-essentials-gs coach-support-sticky-essentials-gs--head px-3 py-2 text-left">GS Essentials</th>
+                    <th class="coach-support-sticky-essentials-ls coach-support-sticky-essentials-ls--head px-3 py-2 text-left">LS Essentials</th>
+                    <th class="coach-support-col-plan-12-hidden px-3 py-2 text-left coach-support-col-plan1-date">1차 지원 계획일자</th>
+                    <th class="coach-support-col-plan-12-hidden px-3 py-2 text-left">1차 지원 계획타입</th>
+                    <th class="coach-support-col-plan-12-hidden px-3 py-2 text-left">2차 지원 계획일자</th>
+                    <th class="coach-support-col-plan-12-hidden px-3 py-2 text-left">2차 지원 계획타입</th>
                     @if($showExtendedColumns)
-                        <th class="px-3 py-2 text-left">3차 지원 계획일자</th>
-                        <th class="px-3 py-2 text-left">3차 지원 계획타입</th>
-                        <th class="px-3 py-2 text-left">4차 지원 계획일자</th>
-                        <th class="px-3 py-2 text-left">4차 지원 계획타입</th>
+                        <th class="coach-support-col-plan-34-hidden px-3 py-2 text-left">3차 지원 계획일자</th>
+                        <th class="coach-support-col-plan-34-hidden px-3 py-2 text-left">3차 지원 계획타입</th>
+                        <th class="coach-support-col-plan-34-hidden px-3 py-2 text-left">4차 지원 계획일자</th>
+                        <th class="coach-support-col-plan-34-hidden px-3 py-2 text-left">4차 지원 계획타입</th>
                     @endif
                     <th class="px-3 py-2 text-left">1차 지원 완료일</th>
                     <th class="px-3 py-2 text-left">1차 완료 타입</th>
@@ -274,8 +280,6 @@
                     @if($showExtendedColumns)
                         <th class="px-3 py-2 text-left">3차 완료</th>
                         <th class="px-3 py-2 text-left">4차 완료</th>
-                        <th class="px-3 py-2 text-left">GS Essentials</th>
-                        <th class="px-3 py-2 text-left">LS Essentials</th>
                     @endif
                 </tr>
                 </thead>
@@ -320,7 +324,25 @@
                                     {{ $teacher->Name }}
                             </button>
                         </td>
-                        <td class="coach-support-sticky-plan1-date px-3 py-2 align-middle coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                        <td class="coach-support-sticky-essentials-gs px-3 py-2 align-middle coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                            @if($canOpenEditModal)
+                                wire:click="openEditModal({{ $teacher->ID }})"
+                                role="button"
+                                tabindex="0"
+                                aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                            @endif>
+                            {{ \App\Support\ExcelSerialDate::displayStorageString($teacher->getRawOriginal($cols['essentials_gs']), $displayYear) }}
+                        </td>
+                        <td class="coach-support-sticky-essentials-ls px-3 py-2 align-middle coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                            @if($canOpenEditModal)
+                                wire:click="openEditModal({{ $teacher->ID }})"
+                                role="button"
+                                tabindex="0"
+                                aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                            @endif>
+                            {{ \App\Support\ExcelSerialDate::displayStorageString($teacher->getRawOriginal($cols['essentials_ls']), $displayYear) }}
+                        </td>
+                        <td class="coach-support-col-plan-12-hidden px-3 py-2 align-middle coach-support-col-plan1-date coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
                                 wire:click="openEditModal({{ $teacher->ID }})"
                                 role="button"
@@ -336,7 +358,7 @@
                                 @endif
                             </div>
                         </td>
-                        <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                        <td class="coach-support-col-plan-12-hidden px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
                                 wire:click="openEditModal({{ $teacher->ID }})"
                                 role="button"
@@ -347,7 +369,7 @@
                                 {{ $teacher->{$cols['plan_type_1st']} }}
                             @endif
                         </td>
-                        <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                        <td class="coach-support-col-plan-12-hidden px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
                                 wire:click="openEditModal({{ $teacher->ID }})"
                                 role="button"
@@ -356,7 +378,7 @@
                             @endif>
                             {{ \App\Support\ExcelSerialDate::displayPlanMonth($teacher->getRawOriginal($cols['plan_2nd']), $displayYear) }}
                         </td>
-                        <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                        <td class="coach-support-col-plan-12-hidden px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
                                 wire:click="openEditModal({{ $teacher->ID }})"
                                 role="button"
@@ -368,7 +390,7 @@
                             @endif
                         </td>
                         @if($showExtendedColumns)
-                            <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                            <td class="coach-support-col-plan-34-hidden px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                                 @if($canOpenEditModal)
                                     wire:click="openEditModal({{ $teacher->ID }})"
                                     role="button"
@@ -377,7 +399,7 @@
                                 @endif>
                                 {{ \App\Support\ExcelSerialDate::displayPlanMonth($teacher->getRawOriginal($cols['plan_3rd']), $displayYear) }}
                             </td>
-                            <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                            <td class="coach-support-col-plan-34-hidden px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                                 @if($canOpenEditModal)
                                     wire:click="openEditModal({{ $teacher->ID }})"
                                     role="button"
@@ -388,7 +410,7 @@
                                     {{ $teacher->{$cols['plan_type_3rd']} }}
                                 @endif
                             </td>
-                            <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                            <td class="coach-support-col-plan-34-hidden px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                                 @if($canOpenEditModal)
                                     wire:click="openEditModal({{ $teacher->ID }})"
                                     role="button"
@@ -397,7 +419,7 @@
                                 @endif>
                                 {{ \App\Support\ExcelSerialDate::displayPlanMonth($teacher->getRawOriginal($cols['plan_4th']), $displayYear) }}
                             </td>
-                            <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                            <td class="coach-support-col-plan-34-hidden px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                                 @if($canOpenEditModal)
                                     wire:click="openEditModal({{ $teacher->ID }})"
                                     role="button"
@@ -468,29 +490,11 @@
                                 @endif>
                                 {{ \App\Support\ExcelSerialDate::displayStorageString($teacher->getRawOriginal($cols['completed_4th']), $displayYear) }}
                             </td>
-                            <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
-                                @if($canOpenEditModal)
-                                    wire:click="openEditModal({{ $teacher->ID }})"
-                                    role="button"
-                                    tabindex="0"
-                                    aria-label="{{ $teacher->Name }} 지원 일정 수정"
-                                @endif>
-                                {{ \App\Support\ExcelSerialDate::displayStorageString($teacher->getRawOriginal($cols['essentials_gs']), $displayYear) }}
-                            </td>
-                            <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
-                                @if($canOpenEditModal)
-                                    wire:click="openEditModal({{ $teacher->ID }})"
-                                    role="button"
-                                    tabindex="0"
-                                    aria-label="{{ $teacher->Name }} 지원 일정 수정"
-                                @endif>
-                                {{ \App\Support\ExcelSerialDate::displayStorageString($teacher->getRawOriginal($cols['essentials_ls']), $displayYear) }}
-                            </td>
                         @endif
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ $showExtendedColumns ? 20 : 12 }}" class="px-4 py-12 text-center text-gray-400">
+                        <td colspan="{{ $showExtendedColumns ? 20 : 14 }}" class="px-4 py-12 text-center text-gray-400">
                             <div class="flex flex-col items-center gap-2">
                                 <svg class="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
@@ -1093,7 +1097,7 @@
 
                     {{-- 새 지원 Pill (지원 내역 유무·수업 O/X와 무관 — 퇴직·수정 모드만 제외) --}}
                     @if(!$teacherModalEditMode)
-                        <div>
+                        <div class="coach-teacher-support-create-hidden">
                             <h4 class="text-sm font-semibold text-gray-700 mb-2">교사 지원 신규 작성:</h4>
                             @unless($teacherDetailInfo['class_in_out'])
                                 <p class="text-xs text-gray-500 mb-2">수업 미참여(수업 X) 교사도 지원 보고서를 작성할 수 있습니다.</p>

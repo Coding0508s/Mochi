@@ -66,6 +66,8 @@ class SupportCreateForm extends Component
     /** 작성 화면 진입 시 팀 메뉴(cs|coach|co) — 저장·메일 라벨에 동일 적용 */
     public ?string $formTeamMenu = null;
 
+    public string $reportMode = 'institution';
+
     protected array $rules = [
         'formSkCode' => ['nullable', 'required_without:formPotentialTargetId'],
         'formPotentialTargetId' => ['nullable', 'integer', 'required_without:formSkCode'],
@@ -92,12 +94,17 @@ class SupportCreateForm extends Component
 
     public function mount(?int $potentialTargetId = null): void
     {
-        $this->formTeamMenu = TeamMenuContext::activeMenu();
-
         $user = auth()->user();
         $this->formCoName = $user !== null ? $user->nameForCoReports() : '';
         $this->formSupportDate = now()->format('Y-m-d');
         $this->formSupportTime = now()->format('H:i');
+        $requestedTeamMenu = request()->query('team_menu');
+        $this->formTeamMenu = in_array($requestedTeamMenu, ['co', 'coach', 'cs'], true)
+            ? (string) $requestedTeamMenu
+            : (TeamMenuContext::activeMenu($user) ?? 'co');
+        if (! $this->canUseTeacherReportMode()) {
+            $this->reportMode = 'institution';
+        }
 
         $prefillId = $potentialTargetId ?? request()->integer('potential_target_id');
         if ($prefillId > 0) {
@@ -131,6 +138,26 @@ class SupportCreateForm extends Component
         if ($prefillSupportType !== '') {
             $this->formSupportType = $prefillSupportType;
         }
+    }
+
+    public function canUseTeacherReportMode(): bool
+    {
+        return $this->formTeamMenu !== 'co';
+    }
+
+    public function setReportMode(string $mode): void
+    {
+        if (! in_array($mode, ['institution', 'teacher'], true)) {
+            return;
+        }
+
+        if ($mode === 'teacher' && ! $this->canUseTeacherReportMode()) {
+            $this->reportMode = 'institution';
+
+            return;
+        }
+
+        $this->reportMode = $mode;
     }
 
     private function applyInstitutionSkPrefill(string $skCode): void

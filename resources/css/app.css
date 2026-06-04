@@ -743,17 +743,19 @@
         background: #e8e6d9;
     }
 
-    /* 교사 지원 현황: SK~1차 계획일 고정열 (1차 계획타입부터 가로 스크롤) */
+    /* 교사 지원 현황: SK~LS Essentials 고정열 (1차 지원 계획일자부터 가로 스크롤) */
     .coach-teacher-support-table {
         --coach-support-sk-width: 5.75rem;
         --coach-support-inst-width: 13rem;
         --coach-support-position-width: 5.5rem;
         --coach-support-name-width: 9rem;
+        --coach-support-essentials-gs-width: 6.5rem;
+        --coach-support-essentials-ls-width: 6.5rem;
         --coach-support-plan1-date-width: 8.5rem;
         --coach-support-sticky-width: calc(
             var(--coach-support-sk-width) + var(--coach-support-inst-width) +
                 var(--coach-support-position-width) + var(--coach-support-name-width) +
-                var(--coach-support-plan1-date-width)
+                var(--coach-support-essentials-gs-width) + var(--coach-support-essentials-ls-width)
         );
         --coach-support-row-border: #e8ecf1;
         --coach-support-zone-divider: rgba(207, 214, 223, 0.9);
@@ -766,6 +768,19 @@
         max-height: var(--coach-support-table-max-height);
         overflow: auto;
         -webkit-overflow-scrolling: touch;
+    }
+
+    /* 1~4차 지원 계획일/타입: 목록 UI만 숨김 (마크업·편집 모달·데이터 로직 유지) */
+    .coach-teacher-support-table .coach-support-col-plan-12-hidden,
+    .coach-teacher-support-table .coach-support-col-plan-34-hidden,
+    .coach-support-mobile-card .coach-support-col-plan-12-hidden,
+    .coach-support-mobile-card .coach-support-col-plan-34-hidden {
+        display: none !important;
+    }
+
+    /* 교사 지원 계획 페이지: 신규 작성 UI는 숨김(기능/로직은 유지) */
+    .coach-teacher-support-create-hidden {
+        display: none !important;
     }
 
     .coach-teacher-support-table thead th {
@@ -801,7 +816,18 @@
         min-width: var(--coach-support-name-width);
     }
 
-    .coach-teacher-support-table .coach-support-col-plan1-date {
+    .coach-teacher-support-table .coach-support-col-essentials-gs {
+        width: var(--coach-support-essentials-gs-width);
+        min-width: var(--coach-support-essentials-gs-width);
+    }
+
+    .coach-teacher-support-table .coach-support-col-essentials-ls {
+        width: var(--coach-support-essentials-ls-width);
+        min-width: var(--coach-support-essentials-ls-width);
+    }
+
+    .coach-teacher-support-table th.coach-support-col-plan1-date,
+    .coach-teacher-support-table td.coach-support-col-plan1-date {
         width: var(--coach-support-plan1-date-width);
         min-width: var(--coach-support-plan1-date-width);
     }
@@ -898,16 +924,39 @@
         box-shadow: none;
     }
 
-    .coach-teacher-support-table .coach-support-sticky-plan1-date {
+    .coach-teacher-support-table .coach-support-sticky-essentials-gs {
         position: sticky;
         left: calc(
             var(--coach-support-sk-width) + var(--coach-support-inst-width) +
                 var(--coach-support-position-width) + var(--coach-support-name-width)
         );
+        z-index: 23;
+        width: var(--coach-support-essentials-gs-width);
+        min-width: var(--coach-support-essentials-gs-width);
+        max-width: var(--coach-support-essentials-gs-width);
+        background-color: #ffffff;
+        background-clip: padding-box;
+        border-right: 1px solid var(--coach-support-row-border);
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-essentials-gs--head {
+        top: 0;
+        z-index: 43;
+        background-color: #e8e6d9;
+        border-right: 1px solid #d5dcd6;
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-essentials-ls {
+        position: sticky;
+        left: calc(
+            var(--coach-support-sk-width) + var(--coach-support-inst-width) +
+                var(--coach-support-position-width) + var(--coach-support-name-width) +
+                var(--coach-support-essentials-gs-width)
+        );
         z-index: 24;
-        width: var(--coach-support-plan1-date-width);
-        min-width: var(--coach-support-plan1-date-width);
-        max-width: var(--coach-support-plan1-date-width);
+        width: var(--coach-support-essentials-ls-width);
+        min-width: var(--coach-support-essentials-ls-width);
+        max-width: var(--coach-support-essentials-ls-width);
         background-color: #ffffff;
         background-clip: padding-box;
         border-right: none;
@@ -916,9 +965,9 @@
             6px 0 12px -8px rgba(15, 23, 42, 0.07);
     }
 
-    .coach-teacher-support-table .coach-support-sticky-plan1-date--head {
+    .coach-teacher-support-table .coach-support-sticky-essentials-ls--head {
         top: 0;
-        z-index: 44;
+        z-index: 45;
         background-color: #e8e6d9;
         border-right: none;
         box-shadow: inset -1px 0 0 #d5dcd6;
@@ -971,11 +1020,12 @@
 
     .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-position,
     .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-name,
-    .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-plan1-date {
+    .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-essentials-gs,
+    .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-essentials-ls {
         background-color: #eef5ff;
     }
 
-    .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-plan1-date.coach-support-schedule-cell.cursor-pointer:hover {
+    .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-essentials-ls.coach-support-schedule-cell.cursor-pointer:hover {
         background-color: #eaf3ff;
     }
 

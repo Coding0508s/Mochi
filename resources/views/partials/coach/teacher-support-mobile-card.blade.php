@@ -34,7 +34,7 @@
         @endphp
 
         <button type="button"
-                class="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-2 text-left {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                class="coach-support-col-plan-12-hidden rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-2 text-left {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                 @if($canOpenEditModal)
                     wire:click="openEditModal({{ $teacher->ID }})"
                 @endif>
@@ -44,7 +44,7 @@
         </button>
 
         <button type="button"
-                class="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-2 text-left {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                class="coach-support-col-plan-12-hidden rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-2 text-left {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                 @if($canOpenEditModal)
                     wire:click="openEditModal({{ $teacher->ID }})"
                 @endif>
@@ -55,7 +55,7 @@
 
         @if($showExtendedColumns)
             <button type="button"
-                    class="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-2 text-left {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                    class="coach-support-col-plan-34-hidden rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-2 text-left {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                     @if($canOpenEditModal)
                         wire:click="openEditModal({{ $teacher->ID }})"
                     @endif>
@@ -65,7 +65,7 @@
             </button>
 
             <button type="button"
-                    class="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-2 text-left {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                    class="coach-support-col-plan-34-hidden rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-2 text-left {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                     @if($canOpenEditModal)
                         wire:click="openEditModal({{ $teacher->ID }})"
                     @endif>

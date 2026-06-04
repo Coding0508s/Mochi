@@ -52,6 +52,7 @@
                                 <div class="flex gap-2">
                                     <select wire:model="littleseedConForm.session_number"
                                             class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
+                                        <option value="">차수 선택</option>
                                         @foreach($littleseedConConfig['session_options'] ?? [] as $session)
                                             <option value="{{ $session }}">{{ $session }} 차</option>
                                         @endforeach

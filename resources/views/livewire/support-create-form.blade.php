@@ -11,9 +11,27 @@
 
     <div class="mochi-table-card max-w-5xl">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-            <div>
-                <h2 class="text-base font-semibold text-gray-900">{{ \App\Support\TeamMenuContext::institutionSupportReportFormHeading(null, $formTeamMenu) }}</h2>
-                <p class="text-xs text-gray-400 mt-0.5">{{ \App\Support\TeamMenuContext::institutionSupportReportFormSubtitle(null, $formTeamMenu) }}</p>
+            <div class="w-full flex items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-base font-semibold text-gray-900">{{ \App\Support\TeamMenuContext::institutionSupportReportFormHeading(null, $formTeamMenu) }}</h2>
+                    <p class="text-xs text-gray-400 mt-0.5">
+                        {{ $reportMode === 'teacher' ? '교사 지원 보고서' : \App\Support\TeamMenuContext::institutionSupportReportFormSubtitle(null, $formTeamMenu) }}
+                    </p>
+                </div>
+                <div class="inline-flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+                    <button type="button"
+                            wire:click="setReportMode('institution')"
+                            class="px-3 py-1.5 text-sm rounded-md transition-colors {{ $reportMode === 'institution' ? 'bg-white text-gray-900 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-700' }}">
+                        기관 지원 보고서
+                    </button>
+                    @if($this->canUseTeacherReportMode())
+                        <button type="button"
+                                wire:click="setReportMode('teacher')"
+                                class="px-3 py-1.5 text-sm rounded-md transition-colors {{ $reportMode === 'teacher' ? 'bg-white text-gray-900 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-700' }}">
+                            교사 지원 보고서
+                        </button>
+                    @endif
+                </div>
             </div>
         </div>
 

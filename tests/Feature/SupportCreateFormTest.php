@@ -197,6 +197,47 @@ class SupportCreateFormTest extends TestCase
             ->assertDontSee('CO 기관지원보고서 작성');
     }
 
+    public function test_save_redirect_preserves_coach_team_menu(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-COACH-1',
+            'AccountName' => 'Coach 팀 저장',
+        ]);
+
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'coach'])
+            ->test(SupportCreateForm::class)
+            ->assertSet('formTeamMenu', 'coach')
+            ->call('selectInstitution', 'SK-COACH-1')
+            ->set('formToAccount', 'Coach 기관 소통')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertRedirect(route('supports.index', ['team_menu' => 'coach']));
+    }
+
+    public function test_mount_uses_active_team_menu_when_query_missing(): void
+    {
+        $user = User::factory()->create(['team' => 'COACH']);
+
+        Livewire::actingAs($user)
+            ->test(SupportCreateForm::class)
+            ->assertSet('formTeamMenu', 'coach');
+    }
+
+    public function test_co_team_cannot_switch_to_teacher_report_mode(): void
+    {
+        $user = User::factory()->create(['team' => 'CO']);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'co'])
+            ->test(SupportCreateForm::class)
+            ->assertSet('reportMode', 'institution')
+            ->call('setReportMode', 'teacher')
+            ->assertSet('reportMode', 'institution');
+    }
+
     public function test_save_sends_mail_when_support_report_notify_addresses_configured(): void
     {
         Mail::fake();
@@ -572,7 +613,7 @@ class SupportCreateFormTest extends TestCase
             ->set('formSupportType', '전화')
             ->set('formToAccount', '소통 내용')
             ->call('save')
-            ->assertRedirect(route('institutions.index'));
+            ->assertRedirect(route('institutions.index', ['team_menu' => 'co']));
 
         $this->assertDatabaseHas('S_SupportInfo_Account', [
             'SK_Code' => 'SK-RETURN',

@@ -53,7 +53,6 @@ class AppServiceProvider extends ServiceProvider
 
         /** Coach Team 지원 KPI 대시보드 — 팀장·관리자 */
         Gate::define('viewCoachTeamKpi', fn (?User $user): bool => (bool) $user?->canViewCoachTeamKpi());
-
         Gate::policy(TeamSchedule::class, TeamSchedulePolicy::class);
 
         Gate::define('accessCoTeamFeatures', fn (?User $user): bool => TeamMenuContext::canAccessCoOnlyFeatures($user));
