@@ -31,13 +31,16 @@ class StoreTeacherLvaFrSupportReport
             $supportRecordId = null;
 
             if ($markCompleted) {
+                $interviewTime = $validated['interview_time'] ?? '00:00';
+                $meetTime = strlen($interviewTime) === 5 ? $interviewTime.':00' : $interviewTime;
+
                 $supportRecord = SupportRecord::query()->create([
                     'Year' => (int) date('Y', strtotime($validated['support_date'])),
                     'SK_Code' => $validated['sk_code'],
                     'Account_Name' => $validated['institution_name'],
                     'TR_Name' => $validated['coach_name'],
                     'Support_Date' => $validated['support_date'],
-                    'Meet_Time' => ($validated['interview_time'] ?? '00:00').':00',
+                    'Meet_Time' => $meetTime,
                     'Target' => $validated['teacher_name'],
                     'Support_Type' => config('coach_teacher_lva_fr.support_type_label'),
                     'Issue' => $validated['other_notes'] ?? null,

@@ -2167,6 +2167,32 @@ class CoachTeacherSupportListTest extends TestCase
         ]);
     }
 
+    public function test_save_lva_fr_report_does_not_double_append_seconds_to_meet_time(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $id = $this->createTeacher('SK001', '홍길동');
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openLvaFrModal', $id)
+            ->set('lvaFrForm.support_date', '2026-05-19')
+            ->set('lvaFrForm.interview_date', '2026-05-19')
+            ->set('lvaFrForm.interview_time', '14:30:00')
+            ->set('lvaFrMarkCompleted', true)
+            ->call('saveLvaFrReport')
+            ->assertHasNoErrors();
+
+        $meetTime = (string) \Illuminate\Support\Facades\DB::table('S_SupportInfo_Account')
+            ->where('SK_Code', 'SK001')
+            ->where('Target', '홍길동')
+            ->value('Meet_Time');
+
+        $this->assertNotSame('14:30:00:00', $meetTime);
+        $this->assertStringContainsString('14:30', $meetTime);
+    }
+
     public function test_lva_fb_modal_opens_from_teacher_detail(): void
     {
         $admin = $this->createAdminUser();
