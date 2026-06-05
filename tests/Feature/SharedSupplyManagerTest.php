@@ -399,7 +399,8 @@ class SharedSupplyManagerTest extends TestCase
             ->html();
 
         $this->assertStringContainsString('rowspan="2"', $html);
-        $this->assertSame(1, substr_count($html, '2026/06/06'));
+        // 모바일 카드(건당 1회) + 데스크톱 병합 셀(1회) = 같은 날짜 3회 표시
+        $this->assertSame(3, substr_count($html, '2026/06/06'));
     }
 
     public function test_title_selection_filters_supply_item_list_in_modal(): void

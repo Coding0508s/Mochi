@@ -1,70 +1,77 @@
-<div class="space-y-4" x-data @shared-supply-show-alert.window="alert($event.detail.message)">
+<div class="mochi-page" x-data @shared-supply-show-alert.window="alert($event.detail.message)">
     @if(session('success'))
         <div class="px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm" data-mochi-flash-dismiss="3000" role="status">
             {{ session('success') }}
         </div>
     @endif
 
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 px-5 py-4">
-        <div class="flex flex-nowrap items-center gap-2 overflow-x-auto">
-            <h2 class="shrink-0 whitespace-nowrap text-base font-semibold text-[#2b78c5]">공용품관리</h2>
-
-            <div class="ml-2 flex flex-nowrap items-center gap-2">
+    <div class="mochi-summary-card">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <h2 class="text-base font-semibold text-[#2b78c5]">공용품관리</h2>
+            <span class="hidden sm:inline text-gray-300" aria-hidden="true">|</span>
+            <div class="mochi-toggle-group flex-wrap">
                 <button type="button"
                         wire:click="toggleReservationView('reservation')"
-                        class="shrink-0 whitespace-nowrap px-3 py-1.5 text-sm rounded-full {{ $reservationView === 'reservation' ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100' }}">
+                        class="mochi-toggle-btn {{ $reservationView === 'reservation' ? 'mochi-toggle-btn--active !bg-indigo-600 !text-white !border-indigo-600' : '' }}">
                     예약형(공용품)
                 </button>
                 <button type="button"
                         wire:click="toggleReservationView('personal')"
-                        class="shrink-0 whitespace-nowrap px-3 py-1.5 text-sm rounded-full {{ $reservationView === 'personal' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' }}">
+                        class="mochi-toggle-btn {{ $reservationView === 'personal' ? 'mochi-toggle-btn--active !bg-emerald-600 !text-white !border-emerald-600' : '' }}">
                     일반(개인 일정)
                 </button>
             </div>
+        </div>
 
-            <div class="ml-auto flex flex-nowrap items-center gap-2">
-                <div class="shrink-0 flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1">
-                    <input type="date"
-                           wire:model.live="dateFrom"
-                           class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <span class="text-sm text-gray-500">~</span>
-                    <input type="date"
-                           wire:model.live="dateTo"
-                           class="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
+        <div class="mt-3 flex flex-wrap items-end gap-2 border-t border-gray-100 pt-3">
+            <div class="grid w-full grid-cols-1 gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 sm:flex sm:w-auto sm:items-center sm:gap-1">
+                <input type="date"
+                       wire:model.live="dateFrom"
+                       class="h-9 w-full min-w-0 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:h-8 sm:w-auto">
+                <span class="hidden text-center text-sm text-gray-500 sm:inline">~</span>
+                <span class="text-center text-xs text-gray-500 sm:hidden">~</span>
+                <input type="date"
+                       wire:model.live="dateTo"
+                       class="h-9 w-full min-w-0 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:h-8 sm:w-auto">
             </div>
+
             <input type="text"
                    wire:model.defer="search"
                    wire:keydown.enter.prevent="applySearch"
                    placeholder="라벨 / 공용품코드 / 물품명 / 사용자명 / 제목 검색"
-                   class="w-[260px] md:w-[320px] lg:w-[400px] shrink-0 whitespace-nowrap rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <button type="button"
-                    wire:click="applySearch"
-                    class="shrink-0 whitespace-nowrap px-3 py-2 text-sm rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50">
-                검색
-            </button>
-            <button type="button"
-                    wire:click="openCreateModal"
-                    class="shrink-0 whitespace-nowrap px-3 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700">
-                일정 등록
-            </button>
+                   class="w-full min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:min-w-[12rem] lg:max-w-md">
+
+            <div class="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:shrink-0">
+                <button type="button"
+                        wire:click="applySearch"
+                        class="rounded-lg border border-blue-200 px-3 py-2 text-sm text-blue-700 hover:bg-blue-50">
+                    검색
+                </button>
+                <button type="button"
+                        wire:click="openCreateModal"
+                        class="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700">
+                    일정 등록
+                </button>
+            </div>
         </div>
         @if (auth()->user()?->hasFullAccess())
-            <div class="mt-2 flex flex-wrap items-center gap-2">
+            <div class="mt-3 flex flex-col gap-2 border-t border-gray-100 pt-3 sm:flex-row sm:flex-wrap sm:items-center">
                 <input type="file"
                        wire:model="importFile"
                        accept=".xls,.xlsx"
-                       class="w-full md:w-auto rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white">
-                <button type="button"
-                        wire:click="importFromExcel"
-                        class="px-3 py-2 text-sm rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50">
-                    엑셀 업로드
-                </button>
-                <button type="button"
-                        wire:click="openResetModal"
-                        class="px-3 py-2 text-sm rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50">
-                    초기화 실행
-                </button>
+                       class="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm sm:w-auto sm:max-w-xs">
+                <div class="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+                    <button type="button"
+                            wire:click="importFromExcel"
+                            class="rounded-lg border border-indigo-200 px-3 py-2 text-sm text-indigo-700 hover:bg-indigo-50">
+                        엑셀 업로드
+                    </button>
+                    <button type="button"
+                            wire:click="openResetModal"
+                            class="rounded-lg border border-rose-300 px-3 py-2 text-sm text-rose-700 hover:bg-rose-50">
+                        초기화 실행
+                    </button>
+                </div>
             </div>
         @endif
         @error('importFile') <p class="mt-2 text-xs text-red-600">{{ $message }}</p> @enderror
@@ -108,9 +115,9 @@
         @endif
     </div>
 
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="mochi-table-card overflow-hidden">
         @if($activeTab === 'monthly')
-            <div class="grid gap-3 p-4 md:grid-cols-4">
+            <div class="grid gap-3 p-4 grid-cols-2 md:grid-cols-4">
                 <div class="rounded-lg border border-blue-100 bg-blue-50 p-3">
                     <p class="text-xs text-blue-700">총 일정</p>
                     <p class="mt-1 text-xl font-semibold text-blue-900">{{ $monthlySummary['total_count'] }}</p>
@@ -221,16 +228,70 @@
                 @endforelse
             </div>
         @else
-            <div class="overflow-x-auto overflow-y-auto max-h-[60vh] lg:max-h-[70vh]">
+            <div class="md:hidden space-y-3 p-3">
+                @forelse($supplies as $supply)
+                    @php
+                        $reservationCategoryBadge = $supply->reservationCategoryBadgeLabel();
+                        $vehicleRowStatus = $supply->vehicleRowStatus();
+                        $vehiclePrimaryRemark = $vehicleRowStatus !== null ? $supply->vehicleRowPrimaryRemark() : '';
+                        $vehicleSecondaryRemark = $vehicleRowStatus !== null ? $supply->vehicleRowSecondaryRemark() : '';
+                    @endphp
+                    <button type="button"
+                            wire:key="shared-supply-mobile-{{ $activeTab }}-{{ $supply->id }}"
+                            wire:click="openEditModal({{ $supply->id }})"
+                            class="w-full rounded-lg border border-gray-200 bg-white p-3 text-left transition hover:border-blue-200 hover:bg-blue-50/30">
+                        <div class="flex items-start justify-between gap-2">
+                            <p class="text-xs font-semibold text-gray-600">{{ $supply->starts_at->format('Y/m/d (D)') }}</p>
+                            <p class="shrink-0 text-xs text-gray-500">{{ $supply->starts_at->format('H:i') }} ~ {{ $supply->ends_at->format('H:i') }}</p>
+                        </div>
+                        <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                            <span class="font-medium text-sm text-gray-900">{{ $supply->title }}</span>
+                            @if($reservationCategoryBadge === '차량 배차')
+                                <span class="rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">차량 배차</span>
+                            @elseif($reservationCategoryBadge === '회의실')
+                                <span class="rounded-md bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">회의실</span>
+                            @endif
+                            @if($vehicleRowStatus === 'pending_post_use')
+                                <span class="rounded-md bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700">예약 및 사용중</span>
+                            @elseif($vehicleRowStatus === 'complete')
+                                <span class="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">사용 완료</span>
+                            @endif
+                        </div>
+                        <dl class="mt-2 grid grid-cols-[4.5rem_1fr] gap-x-2 gap-y-1 text-xs">
+                            <dt class="text-gray-500">물품</dt>
+                            <dd class="font-medium text-gray-800">{{ $supply->item?->name ?? '-' }}</dd>
+                            <dt class="text-gray-500">사용자</dt>
+                            <dd class="font-medium text-gray-800">{{ $supply->user?->name ?? 'User' }}</dd>
+                            <dt class="text-gray-500">적요</dt>
+                            <dd class="text-gray-700">
+                                @if($vehicleRowStatus !== null)
+                                    <span class="font-medium text-gray-800">{{ $vehiclePrimaryRemark !== '' ? $vehiclePrimaryRemark : '-' }}</span>
+                                    @if($vehicleSecondaryRemark !== '')
+                                        <span class="mt-0.5 block text-gray-500">{{ $vehicleSecondaryRemark }}</span>
+                                    @endif
+                                @else
+                                    {{ $supply->purpose !== '' ? $supply->purpose : '-' }}
+                                @endif
+                            </dd>
+                        </dl>
+                    </button>
+                @empty
+                    <div class="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-400">
+                        등록된 공용품 사용 내역이 없습니다.
+                    </div>
+                @endforelse
+            </div>
+
+            <div class="hidden md:block overflow-x-auto overflow-y-auto max-h-[60vh] lg:max-h-[70vh]">
                 <table class="min-w-full border-collapse text-sm">
                     <thead class="mochi-table-head text-gray-700 sticky top-0 z-10">
                         <tr>
                             <th class="px-3 py-2 text-left whitespace-nowrap">일자</th>
                             <th class="px-3 py-2 text-left whitespace-nowrap">시간</th>
-                            <th class="px-3 py-2 text-left whitespace-nowrap">제목</th>
-                            <th class="px-3 py-2 text-left whitespace-nowrap">물품 및 일정명</th>
+                            <th class="px-3 py-2 text-left whitespace-nowrap min-w-[10rem]">제목</th>
+                            <th class="hidden lg:table-cell px-3 py-2 text-left whitespace-nowrap">물품 및 일정명</th>
                             <th class="px-3 py-2 text-left whitespace-nowrap">사용자명</th>
-                            <th class="hidden sm:table-cell px-3 py-2 text-left whitespace-nowrap">적요</th>
+                            <th class="hidden xl:table-cell px-3 py-2 text-left whitespace-nowrap">적요</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
@@ -270,9 +331,9 @@
                                 @else
                                     <td class="px-3 py-2 whitespace-nowrap {{ $dateSeparatorClass }}">{{ $supply->starts_at->format('Y/m/d (D)') }}</td>
                                 @endif
-                                <td class="px-3 py-2 whitespace-nowrap text-gray-700 {{ $dateSeparatorClass }}">{{ $supply->starts_at->format('H:i') }} ~ {{ $supply->ends_at->format('H:i') }}</td>
-                                <td class="px-3 py-2 whitespace-nowrap {{ $dateSeparatorClass }}">
-                                    <div class="flex flex-nowrap items-center gap-2">
+                                <td class="px-3 py-2 text-gray-700 {{ $dateSeparatorClass }}">{{ $supply->starts_at->format('H:i') }} ~ {{ $supply->ends_at->format('H:i') }}</td>
+                                <td class="px-3 py-2 {{ $dateSeparatorClass }}">
+                                    <div class="flex flex-wrap items-center gap-1.5">
                                         <span class="font-medium text-gray-900">{{ $supply->title }}</span>
                                         @if($reservationCategoryBadge === '차량 배차')
                                             <span class="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">차량 배차</span>
@@ -285,10 +346,11 @@
                                             <span class="shrink-0 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">사용 완료</span>
                                         @endif
                                     </div>
+                                    <p class="mt-1 text-xs text-gray-500 lg:hidden">{{ $supply->item?->name ?? '-' }}</p>
                                 </td>
-                                <td class="px-3 py-2 whitespace-nowrap font-medium text-gray-800 {{ $dateSeparatorClass }}">{{ $supply->item?->name ?? '-' }}</td>
-                                <td class="px-3 py-2 whitespace-nowrap font-medium text-gray-800 {{ $dateSeparatorClass }}">{{ $supply->user?->name ?? 'User' }}</td>
-                                <td class="hidden sm:table-cell px-3 py-2 text-sm {{ $dateSeparatorClass }}">
+                                <td class="hidden lg:table-cell px-3 py-2 font-medium text-gray-800 {{ $dateSeparatorClass }}">{{ $supply->item?->name ?? '-' }}</td>
+                                <td class="px-3 py-2 font-medium text-gray-800 {{ $dateSeparatorClass }}">{{ $supply->user?->name ?? 'User' }}</td>
+                                <td class="hidden xl:table-cell px-3 py-2 text-sm {{ $dateSeparatorClass }}">
                                     @if($vehicleRowStatus !== null)
                                         <div class="font-medium text-gray-800">{{ $vehiclePrimaryRemark !== '' ? $vehiclePrimaryRemark : '-' }}</div>
                                         @if($vehicleSecondaryRemark !== '')
@@ -334,14 +396,14 @@
 
     @if($showFormModal)
         <div class="mochi-modal-overlay" wire:click.self="closeFormModal">
-            <div class="mochi-modal-shell flex w-full max-w-2xl max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex-col" wire:click.stop>
-                <div class="flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-4">
+            <div class="mochi-modal-shell mx-3 flex w-full max-w-2xl max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex-col sm:mx-0" wire:click.stop>
+                <div class="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
                     <h3 class="text-lg font-semibold text-gray-900">{{ $viewOnly ? '공용품 사용 상세' : ($editingSupplyId ? '공용품 사용 수정' : '공용품 사용 등록') }}</h3>
                     <button type="button" wire:click="closeFormModal" class="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100">✕</button>
                 </div>
 
                 <form wire:submit.prevent="save" class="flex min-h-0 flex-1 flex-col">
-                    <div class="mochi-modal-body-scroll space-y-4 px-6 py-5">
+                    <div class="mochi-modal-body-scroll space-y-4 px-4 py-4 sm:px-6 sm:py-5">
                     <div class="grid gap-3 md:grid-cols-3">
                         <div>
                             <label class="mb-1 block text-sm font-medium text-gray-700">일자</label>
@@ -489,13 +551,13 @@
                     </div>
                     </div>
 
-                    <div class="flex shrink-0 items-center justify-between border-t border-gray-200 bg-white px-6 py-4">
-                        <div>
+                    <div class="flex shrink-0 flex-col-reverse gap-2 border-t border-gray-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
+                        <div class="flex justify-start">
                             @if($editingSupplyId && ! $viewOnly)
-                                <button type="button" wire:click="delete" wire:confirm="이 내역을 삭제할까요?" class="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600 hover:bg-red-50">삭제</button>
+                                <button type="button" wire:click="delete" wire:confirm="이 내역을 삭제할까요?" class="w-full rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600 hover:bg-red-50 sm:w-auto">삭제</button>
                             @endif
                         </div>
-                        <div class="flex gap-2">
+                        <div class="grid grid-cols-2 gap-2 sm:flex sm:gap-2">
                             <button type="button" wire:click="closeFormModal" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">닫기</button>
                             @unless($viewOnly)
                                 <button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">저장</button>
