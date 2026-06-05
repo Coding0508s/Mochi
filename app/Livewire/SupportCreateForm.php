@@ -10,6 +10,8 @@ use App\Models\Institution;
 use App\Models\SalesforceAccount;
 use App\Models\SalesforceFile;
 use App\Models\SupportRecord;
+use App\Models\Teacher;
+use App\Support\SkCodeNormalizer;
 use App\Support\TeamMenuContext;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -68,6 +70,10 @@ class SupportCreateForm extends Component
 
     public string $reportMode = 'institution';
 
+    public ?int $formTeacherId = null;
+
+    public ?string $formCoachTeacherCreateAction = null;
+
     protected array $rules = [
         'formSkCode' => ['nullable', 'required_without:formPotentialTargetId'],
         'formPotentialTargetId' => ['nullable', 'integer', 'required_without:formSkCode'],
@@ -88,6 +94,7 @@ class SupportCreateForm extends Component
         'formSupportDate.date' => '올바른 날짜 형식이 아닙니다.',
         'formSupportTime.required' => '지원 시간을 입력해 주세요.',
         'formSupportTime.regex' => '지원 시간은 HH:MM 형식으로 입력해 주세요.',
+        'formTarget.required' => '교사명을 입력해 주세요.',
         'sfUpload.max' => '파일 크기는 20MB 이하여야 합니다.',
         'sfUpload.mimes' => '허용 형식: PDF, 이미지, Word, Excel',
     ];
@@ -104,6 +111,8 @@ class SupportCreateForm extends Component
             : (TeamMenuContext::activeMenu($user) ?? 'co');
         if (! $this->canUseTeacherReportMode()) {
             $this->reportMode = 'institution';
+        } elseif (request()->query('report_mode') === 'teacher') {
+            $this->reportMode = 'teacher';
         }
 
         $prefillId = $potentialTargetId ?? request()->integer('potential_target_id');
@@ -132,6 +141,10 @@ class SupportCreateForm extends Component
         $prefillTeacherName = trim((string) request()->query('teacher_name', ''));
         if ($prefillTeacherName !== '') {
             $this->formTarget = $prefillTeacherName;
+            if ($this->canUseTeacherReportMode()) {
+                $this->reportMode = 'teacher';
+            }
+            $this->syncFormTeacherIdFromTargetName();
         }
 
         $prefillSupportType = trim((string) request()->query('support_type', ''));
@@ -143,6 +156,13 @@ class SupportCreateForm extends Component
     public function canUseTeacherReportMode(): bool
     {
         return $this->formTeamMenu !== 'co';
+    }
+
+    public function usesCoachTypedTeacherSupportCreate(): bool
+    {
+        return $this->formTeamMenu === 'coach'
+            && $this->reportMode === 'teacher'
+            && blank($this->formCoachTeacherCreateAction);
     }
 
     public function setReportMode(string $mode): void
@@ -157,7 +177,77 @@ class SupportCreateForm extends Component
             return;
         }
 
+        $previousMode = $this->reportMode;
         $this->reportMode = $mode;
+
+        if ($previousMode !== $this->reportMode) {
+            $this->syncCommunicationTemplatesOnModeChange($previousMode);
+            $this->formTeacherId = null;
+            $this->formCoachTeacherCreateAction = null;
+        }
+    }
+
+    public function startCoachTeacherSupportCreate(string $action): void
+    {
+        if (! $this->usesCoachTypedTeacherSupportCreate()) {
+            return;
+        }
+
+        if (! in_array($action, $this->coachTeacherSupportCreateActions(), true)) {
+            return;
+        }
+
+        if (blank($this->formSkCode)) {
+            $this->addError('formSkCode', '기관을 먼저 선택해 주세요.');
+
+            return;
+        }
+
+        if ($this->formTeacherId === null || $this->formTeacherId <= 0) {
+            $this->addError('formTeacherId', '교사를 선택해 주세요.');
+
+            return;
+        }
+
+        $selectedType = collect(config('coach_teacher_support_create.types', []))
+            ->map(function (array|string $pill): ?array {
+                if (! is_array($pill)) {
+                    return null;
+                }
+
+                $label = isset($pill['label']) ? trim((string) $pill['label']) : '';
+                $typeAction = isset($pill['action']) ? trim((string) $pill['action']) : '';
+
+                if ($label === '' || $typeAction === '') {
+                    return null;
+                }
+
+                return [
+                    'label' => $label,
+                    'action' => $typeAction,
+                ];
+            })
+            ->filter()
+            ->first(fn (array $pill): bool => $pill['action'] === $action);
+
+        if ($selectedType === null) {
+            return;
+        }
+
+        $this->formCoachTeacherCreateAction = $action;
+        $this->formSupportType = (string) $selectedType['label'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function coachTeacherSupportCreateActions(): array
+    {
+        return collect(config('coach_teacher_support_create.types', []))
+            ->map(fn (array|string $pill): ?string => is_array($pill) ? ($pill['action'] ?? null) : null)
+            ->filter(fn (?string $action): bool => filled($action))
+            ->values()
+            ->all();
     }
 
     private function applyInstitutionSkPrefill(string $skCode): void
@@ -250,6 +340,7 @@ class SupportCreateForm extends Component
             $this->formPotentialTargetId = null;
             $this->formIsPotential = false;
             $this->formPossibility = '';
+            $this->formTeacherId = null;
 
             return;
         }
@@ -287,6 +378,7 @@ class SupportCreateForm extends Component
         $this->formPotentialTargetId = null;
         $this->formIsPotential = false;
         $this->formPossibility = '';
+        $this->formTeacherId = null;
     }
 
     public function selectInstitution(string $skCode = '', bool $isPotential = false, ?int $potentialTargetId = null): void
@@ -327,7 +419,52 @@ class SupportCreateForm extends Component
             : null;
         $this->formIsPotential = $this->formPotentialTargetId !== null;
         $this->formPossibility = $this->formIsPotential ? (string) ($potential?->Possibility ?? '') : '';
+        $this->formCoachTeacherCreateAction = null;
+        $this->formTeacherId = null;
+        $this->syncFormTeacherIdFromTargetName();
         $this->applyDefaultCommunicationTemplatesIfEmpty();
+    }
+
+    public function updatedFormTeacherId(?int $value): void
+    {
+        if ($value === null || $value <= 0) {
+            $this->formTarget = '';
+            $this->formCoachTeacherCreateAction = null;
+
+            return;
+        }
+
+        $teacher = Teacher::query()->find($value);
+        $this->formTarget = $teacher !== null ? (string) $teacher->Name : '';
+    }
+
+    private function syncFormTeacherIdFromTargetName(): void
+    {
+        if (! $this->usesCoachTypedTeacherSupportCreate() || blank($this->formSkCode) || blank($this->formTarget)) {
+            return;
+        }
+
+        $teacher = Teacher::query()
+            ->whereIn('SK_Code', SkCodeNormalizer::candidates($this->formSkCode))
+            ->where('Name', $this->formTarget)
+            ->first();
+
+        $this->formTeacherId = $teacher !== null ? (int) $teacher->ID : null;
+    }
+
+    /**
+     * @return Collection<int, Teacher>
+     */
+    private function institutionTeachers(): Collection
+    {
+        if (blank($this->formSkCode)) {
+            return collect();
+        }
+
+        return Teacher::query()
+            ->whereIn('SK_Code', SkCodeNormalizer::candidates($this->formSkCode))
+            ->orderBy('Name')
+            ->get(['ID', 'Name']);
     }
 
     /**
@@ -340,17 +477,28 @@ class SupportCreateForm extends Component
         }
 
         if ($this->formToAccount === '') {
-            $this->formToAccount = (string) config('support_report_defaults.to_account_template', '');
+            $this->formToAccount = $this->communicationTemplate('to_account', $this->reportMode);
         }
 
         if ($this->formToDepart === '') {
-            $this->formToDepart = (string) config('support_report_defaults.to_depart_template', '');
+            $this->formToDepart = $this->communicationTemplate('to_depart', $this->reportMode);
         }
     }
 
     public function save(): void
     {
-        $this->validate();
+        if ($this->usesCoachTypedTeacherSupportCreate()) {
+            $this->addError('formTeacherId', '아래에서 교사 지원 유형을 선택해 주세요.');
+
+            return;
+        }
+
+        $rules = $this->rules;
+        if ($this->reportMode === 'teacher') {
+            $rules['formTarget'] = ['required', 'string', 'max:255'];
+        }
+
+        $this->validate($rules);
 
         if ($this->formPotentialTargetId !== null && ! config('potential_institutions.show_support_report_ui')) {
             $this->addError('formSkCode', '잠재기관에서는 기관 지원 보고서 작성 기능을 사용하지 않습니다.');
@@ -478,7 +626,12 @@ class SupportCreateForm extends Component
         }
 
         $this->sfUpload = null;
-        session()->flash('success', '지원 보고서가 저장되었습니다.');
+        session()->flash(
+            'success',
+            $this->reportMode === 'teacher'
+                ? '교사 지원 보고서가 저장되었습니다.'
+                : '지원 보고서가 저장되었습니다.',
+        );
         $this->redirect(
             TeamMenuContext::route($this->afterSaveRouteName, [], null, $this->formTeamMenu),
             navigate: true,
@@ -526,8 +679,9 @@ class SupportCreateForm extends Component
             $target->save();
         }
 
+        $accountBlockLabel = $this->reportMode === 'teacher' ? '[교사 소통내용]' : '[기관 소통내용]';
         $descriptionBlocks = array_filter([
-            filled($this->formToAccount) ? '[기관 소통내용]'.PHP_EOL.$this->formToAccount : null,
+            filled($this->formToAccount) ? $accountBlockLabel.PHP_EOL.$this->formToAccount : null,
             filled($this->formToDepart) ? '[본사/타 부서 공유]'.PHP_EOL.$this->formToDepart : null,
         ]);
 
@@ -599,7 +753,45 @@ class SupportCreateForm extends Component
 
         return view('livewire.support-create-form', [
             'institutionSuggestions' => $mergedSuggestions,
+            'supportTypeOptions' => $this->supportTypeOptions(),
+            'institutionTeachers' => $this->institutionTeachers(),
+            'coachTeacherSupportCreateTypes' => config('coach_teacher_support_create.types', []),
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function supportTypeOptions(): array
+    {
+        $configKey = $this->reportMode === 'teacher'
+            ? 'support_report_defaults.teacher_support_types'
+            : 'support_report_defaults.institution_support_types';
+
+        $options = config($configKey);
+
+        return is_array($options) ? array_values($options) : [];
+    }
+
+    private function communicationTemplate(string $field, string $mode): string
+    {
+        $configKey = $mode === 'teacher'
+            ? "support_report_defaults.teacher_{$field}_template"
+            : "support_report_defaults.{$field}_template";
+
+        return (string) config($configKey, '');
+    }
+
+    private function syncCommunicationTemplatesOnModeChange(string $previousMode): void
+    {
+        foreach (['to_account' => 'formToAccount', 'to_depart' => 'formToDepart'] as $field => $property) {
+            $current = $this->{$property};
+            $previousTemplate = $this->communicationTemplate($field, $previousMode);
+
+            if ($current === '' || $current === $previousTemplate) {
+                $this->{$property} = $this->communicationTemplate($field, $this->reportMode);
+            }
+        }
     }
 
     private function findPotentialBySkCode(string $skCode): ?CoNewTarget

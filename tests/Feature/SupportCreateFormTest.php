@@ -33,6 +33,7 @@ class SupportCreateFormTest extends TestCase
         Schema::dropIfExists('S_CO_NewTarget_Detail');
         Schema::dropIfExists('S_CO_NewTarget');
         Schema::dropIfExists('S_SupportInfo_Account');
+        Schema::dropIfExists('Teachers');
         Schema::dropIfExists('S_Account_Information');
         Schema::dropIfExists('S_AccountName');
 
@@ -66,6 +67,13 @@ class SupportCreateFormTest extends TestCase
             $table->string('Status', 50)->nullable();
             $table->timestamp('CompletedDate')->nullable();
             $table->timestamp('CreatedDate')->nullable();
+        });
+
+        Schema::create('Teachers', function (Blueprint $table): void {
+            $table->increments('ID');
+            $table->string('SK_Code', 100)->nullable();
+            $table->string('School_Name', 255)->nullable();
+            $table->string('Name', 255)->nullable();
         });
 
         Schema::create('S_CO_NewTarget', function (Blueprint $table): void {
@@ -236,6 +244,112 @@ class SupportCreateFormTest extends TestCase
             ->assertSet('reportMode', 'institution')
             ->call('setReportMode', 'teacher')
             ->assertSet('reportMode', 'institution');
+    }
+
+    public function test_coach_team_teacher_report_mode_stays_on_support_form_page(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-COACH-TYPES',
+            'AccountName' => 'Coach 유형 선택 기관',
+        ]);
+
+        $teacherId = (int) DB::table('Teachers')->insertGetId([
+            'SK_Code' => 'SK-COACH-TYPES',
+            'Name' => '김교사',
+        ]);
+
+        $user = User::factory()->create(['team' => 'COACH']);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'coach'])
+            ->test(SupportCreateForm::class)
+            ->call('setReportMode', 'teacher')
+            ->assertSet('reportMode', 'teacher')
+            ->assertSee('Coach Team 교사지원보고서 작성')
+            ->assertSee('교사 지원 유형 선택')
+            ->call('selectInstitution', 'SK-COACH-TYPES')
+            ->set('formTeacherId', $teacherId)
+            ->call('startCoachTeacherSupportCreate', 'pro_con')
+            ->assertNoRedirect()
+            ->assertSet('formSupportType', 'Pro Con')
+            ->assertSet('formCoachTeacherCreateAction', 'pro_con')
+            ->assertDontSee('교사 지원 유형 선택')
+            ->assertSee('교사 이슈 및 논의 사항')
+            ->assertSee('교사와의 소통내용')
+            ->assertSee('교사명')
+            ->assertSet('formTarget', '김교사');
+    }
+
+    public function test_coach_teacher_report_mode_requires_support_type_selection_before_save(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-COACH-REQ',
+            'AccountName' => 'Coach 필수 기관',
+        ]);
+
+        $user = User::factory()->create(['team' => 'COACH']);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'coach', 'report_mode' => 'teacher'])
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-COACH-REQ')
+            ->set('formToAccount', '교사 소통 본문')
+            ->call('save')
+            ->assertHasErrors(['formTeacherId'])
+            ->assertSee('아래에서 교사 지원 유형을 선택해 주세요.');
+    }
+
+    public function test_coach_team_teacher_report_mode_shows_teacher_labels_and_pamphlet_option(): void
+    {
+        $user = User::factory()->create(['team' => 'CS']);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'cs'])
+            ->test(SupportCreateForm::class)
+            ->call('setReportMode', 'teacher')
+            ->assertSet('reportMode', 'teacher')
+            ->assertSee('CS Team 교사지원보고서 작성')
+            ->assertSee('교사 이슈 및 논의 사항')
+            ->assertSee('교사와의 소통내용')
+            ->assertSee('교사명')
+            ->assertSee('팜플렛')
+            ->assertDontSee('기관 이슈 및 논의 사항');
+    }
+
+    public function test_teacher_report_mode_requires_teacher_name_on_save(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-TEACHER-1',
+            'AccountName' => '교사 지원 테스트 기관',
+        ]);
+
+        $user = User::factory()->create(['team' => 'CS']);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'cs'])
+            ->test(SupportCreateForm::class)
+            ->call('setReportMode', 'teacher')
+            ->call('selectInstitution', 'SK-TEACHER-1')
+            ->set('formToAccount', '교사 소통 본문')
+            ->call('save')
+            ->assertHasErrors(['formTarget' => 'required']);
+    }
+
+    public function test_teacher_report_mode_uses_teacher_communication_template_on_institution_select(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-TEACHER-TPL',
+            'AccountName' => '교사 템플릿 기관',
+        ]);
+
+        $user = User::factory()->create(['team' => 'CS']);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'cs', 'report_mode' => 'teacher'])
+            ->test(SupportCreateForm::class)
+            ->assertSet('reportMode', 'teacher')
+            ->call('selectInstitution', 'SK-TEACHER-TPL')
+            ->assertSet('formToAccount', config('support_report_defaults.teacher_to_account_template'));
     }
 
     public function test_save_sends_mail_when_support_report_notify_addresses_configured(): void
