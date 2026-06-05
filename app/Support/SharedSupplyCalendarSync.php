@@ -32,7 +32,7 @@ class SharedSupplyCalendarSync
 
         TeamSchedule::query()->updateOrCreate(
             [
-                'source_type' => 'shared_supply',
+                'source_type' => TeamSchedule::SOURCE_TYPE_SHARED_SUPPLY,
                 'source_id' => (int) $sharedSupply->id,
             ],
             $payload + [
@@ -48,7 +48,7 @@ class SharedSupplyCalendarSync
         }
 
         TeamSchedule::query()
-            ->where('source_type', 'shared_supply')
+            ->where('source_type', TeamSchedule::SOURCE_TYPE_SHARED_SUPPLY)
             ->where('source_id', (int) $sharedSupply->id)
             ->delete();
     }

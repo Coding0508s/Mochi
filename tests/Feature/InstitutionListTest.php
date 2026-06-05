@@ -7,10 +7,12 @@ use App\Jobs\SyncInstitutionOutboundJob;
 use App\Livewire\InstitutionList;
 use App\Models\AccountInformation;
 use App\Models\AssignmentChangeRequest;
+use App\Models\ContractDocument;
 use App\Models\GsNumber;
 use App\Models\Institution;
 use App\Models\SupportRecord;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
@@ -36,6 +38,7 @@ class InstitutionListTest extends TestCase
 
     private function createAccountTables(): void
     {
+        Schema::dropIfExists('teacher_onsite_support_reports');
         Schema::dropIfExists('S_SupportInfo_Account');
         Schema::dropIfExists('Teachers');
         Schema::dropIfExists('S_GSNumber');
@@ -86,7 +89,9 @@ class InstitutionListTest extends TestCase
 
         Schema::create('Teachers', function (Blueprint $table): void {
             $table->increments('ID');
+            $table->string('Name', 255)->nullable();
             $table->string('SK_Code', 100)->nullable();
+            $table->string('Status', 100)->nullable();
         });
 
         Schema::create('S_SupportInfo_Account', function (Blueprint $table): void {
@@ -105,6 +110,16 @@ class InstitutionListTest extends TestCase
             $table->text('Others')->nullable();
             $table->string('Status', 50)->nullable();
             $table->timestamp('CompletedDate')->nullable();
+        });
+
+        Schema::create('teacher_onsite_support_reports', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedInteger('teacher_id');
+            $table->string('coach_name')->nullable();
+            $table->string('teacher_name')->nullable();
+            $table->timestamp('support_date')->nullable();
+            $table->string('status')->nullable();
+            $table->unsignedInteger('support_record_id')->nullable();
         });
 
         Schema::create('employee', function (Blueprint $table): void {
@@ -166,6 +181,186 @@ class InstitutionListTest extends TestCase
             ->assertSee('Jeanie Park')
             ->assertSee('Daniel Kim')
             ->assertSee('마스터만 있는 기관');
+    }
+
+    public function test_timeline_tab_loads_merged_events_with_default_six_month_range(): void
+    {
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-TIMELINE-1',
+            'AccountName' => '통합 타임라인 기관',
+        ]);
+
+        AccountInformation::query()->create([
+            'SK_Code' => 'SK-TIMELINE-1',
+            'Account_Name' => '통합 타임라인 기관',
+            'CO' => 'CO 담당자',
+            'TR' => 'TR 담당자',
+            'CS' => 'CS 담당자',
+        ]);
+
+        SupportRecord::query()->create([
+            'Year' => (int) now()->year,
+            'SK_Code' => 'SK-TIMELINE-1',
+            'Account_Name' => '통합 타임라인 기관',
+            'TR_Name' => '지원 담당자',
+            'Support_Date' => now()->subMonths(2),
+            'Meet_Time' => '10:00:00',
+            'Support_Type' => '방문',
+            'Issue' => '최근 지원 이슈',
+            'Status' => '완료',
+        ]);
+
+        SupportRecord::query()->create([
+            'Year' => (int) now()->subMonths(8)->year,
+            'SK_Code' => 'SK-TIMELINE-1',
+            'Account_Name' => '통합 타임라인 기관',
+            'TR_Name' => '오래된 담당자',
+            'Support_Date' => now()->subMonths(8),
+            'Meet_Time' => '09:00:00',
+            'Support_Type' => '전화',
+            'Issue' => '오래된 이슈',
+            'Status' => '완료',
+        ]);
+
+        AssignmentChangeRequest::query()->create([
+            'sk_code' => 'SK-TIMELINE-1',
+            'co' => '변경 CO',
+            'changed_by' => '관리자A',
+            'origin' => AssignmentChangeRequest::ORIGIN_LOCAL,
+            'status' => AssignmentChangeRequest::STATUS_APPLIED,
+            'requested_at' => now()->subMonth(),
+            'applied_at' => now()->subMonth(),
+        ]);
+
+        ContractDocument::query()->create([
+            'sk_code' => 'SK-TIMELINE-1',
+            'account_name' => '통합 타임라인 기관',
+            'document_date' => now()->subMonths(3)->toDateString(),
+            'document_time' => '15:20',
+            'consultant' => '컨설턴트A',
+            'original_filename' => 'contract.pdf',
+            'stored_disk' => 'local',
+            'stored_path' => 'contracts/contract.pdf',
+        ]);
+
+        Livewire::actingAs(User::factory()->admin()->create())
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->call('setDetailTab', 'timeline')
+            ->assertSet('timelineRangeFilter', '6m')
+            ->assertSet('timelineTypeTotals.support', 1)
+            ->assertSet('timelineTypeTotals.assignment_change', 1)
+            ->assertSet('timelineTypeTotals.contract_document', 1)
+            ->assertSet('timelineTypeTotals.all', 3)
+            ->assertCount('timelineVisibleItems', 3)
+            ->assertSee('통합 타임라인')
+            ->assertSee('계약 문서');
+    }
+
+    public function test_timeline_type_filter_changes_visible_events(): void
+    {
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-TIMELINE-2',
+            'AccountName' => '필터 기관',
+        ]);
+
+        AccountInformation::query()->create([
+            'SK_Code' => 'SK-TIMELINE-2',
+            'Account_Name' => '필터 기관',
+            'TR' => '필터 담당자',
+        ]);
+
+        SupportRecord::query()->create([
+            'Year' => (int) now()->year,
+            'SK_Code' => 'SK-TIMELINE-2',
+            'Account_Name' => '필터 기관',
+            'TR_Name' => '필터 담당자',
+            'Support_Date' => Carbon::now()->subDays(10),
+            'Support_Type' => '방문',
+            'Issue' => '지원 이슈',
+            'Status' => '완료',
+        ]);
+
+        AssignmentChangeRequest::query()->create([
+            'sk_code' => 'SK-TIMELINE-2',
+            'co' => '변경 CO',
+            'changed_by' => '관리자B',
+            'origin' => AssignmentChangeRequest::ORIGIN_LOCAL,
+            'status' => AssignmentChangeRequest::STATUS_APPLIED,
+            'requested_at' => now()->subDays(7),
+        ]);
+
+        Livewire::actingAs(User::factory()->admin()->create())
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->call('setDetailTab', 'timeline')
+            ->set('timelineTypeFilter', 'support')
+            ->assertSet('timelineTypeTotals.all', 1)
+            ->assertSet('timelineTypeTotals.support', 1)
+            ->assertCount('timelineVisibleItems', 1)
+            ->assertSee('지원 내역');
+    }
+
+    public function test_timeline_includes_coach_and_cs_support_events(): void
+    {
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-TIMELINE-3',
+            'AccountName' => '코치CS 포함 기관',
+        ]);
+
+        AccountInformation::query()->create([
+            'SK_Code' => 'SK-TIMELINE-3',
+            'Account_Name' => '코치CS 포함 기관',
+        ]);
+
+        DB::table('employee')->insert([
+            'EMPNO' => 'E-CS-001',
+            'WORKDEPT' => 'A03',
+            'KOREANAME' => '김CS',
+            'ENGLISHNAME' => 'Cs Manager',
+            'STATUS' => 1,
+        ]);
+
+        User::factory()->create([
+            'name' => 'Cs Manager',
+            'employee_empno' => 'E-CS-001',
+            'team' => 'CS',
+        ]);
+
+        SupportRecord::query()->create([
+            'Year' => (int) now()->year,
+            'SK_Code' => 'SK-TIMELINE-3',
+            'Account_Name' => '코치CS 포함 기관',
+            'TR_Name' => 'Cs Manager',
+            'Support_Date' => now()->subDays(3),
+            'Support_Type' => '전화',
+            'Issue' => 'CS 지원 이슈',
+            'Status' => '완료',
+        ]);
+
+        DB::table('Teachers')->insert([
+            'ID' => 9001,
+            'Name' => '교사A',
+            'SK_Code' => 'SK-TIMELINE-3',
+            'Status' => '재직',
+        ]);
+
+        DB::table('teacher_onsite_support_reports')->insert([
+            'teacher_id' => 9001,
+            'coach_name' => 'Coach Kim',
+            'teacher_name' => '교사A',
+            'support_date' => now()->subDays(2),
+            'status' => '완료',
+        ]);
+
+        Livewire::actingAs(User::factory()->admin()->create())
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->call('setDetailTab', 'timeline')
+            ->assertSet('timelineTypeTotals.support_cs', 1)
+            ->assertSet('timelineTypeTotals.support_coach', 1)
+            ->assertSee('CS 기관 지원')
+            ->assertSee('코치 교사 지원');
     }
 
     public function test_detail_modal_shows_support_report_create_link_for_active_institution(): void

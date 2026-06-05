@@ -2,11 +2,15 @@
 
 namespace App\Livewire;
 
+use App\Actions\SetTemporaryUserPassword;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\User;
 use App\Support\CoachTeamLeadEligibility;
+use App\Support\DepartmentCodeGenerator;
 use App\Support\DepartmentDisplay;
+use App\Support\EmployeeExcelImporter;
+use App\Support\EmployeeImportRollback;
 use App\Support\EmployeeSex;
 use App\Support\TeamMenuContext;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -18,17 +22,22 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 class PeopleEmployeesList extends Component
 {
+    use WithFileUploads;
     use WithPagination;
+
+    public const IMPORT_RESET_CONFIRMATION_PHRASE = '엑셀 초기화';
 
     public string $search = '';
 
     public string $searchType = 'name'; // name | email | department
 
-    public string $filterStatus = '';   // '', '1', '0', ...
+    public string $filterStatus = '1';   // '1' 재직(기본), '0' 비활성, '' 전체
 
     public string $filterDept = '';
 
@@ -73,6 +82,22 @@ class PeopleEmployeesList extends Component
     /** 'send_only' (계정 있음 → 메일만) | 'create_and_send' (계정 없음 → 생성 후 메일) */
     public string $resetTargetMode = 'send_only';
 
+    public bool $showTempPasswordConfirmModal = false;
+
+    public bool $showTempPasswordResultModal = false;
+
+    public string $tempPasswordTargetEmpNo = '';
+
+    public string $tempPasswordTargetName = '';
+
+    public string $tempPasswordTargetEmail = '';
+
+    public string $issuedTempPassword = '';
+
+    public bool $tempPasswordPrivilegedConfirm = false;
+
+    public bool $tempPasswordTargetIsPrivileged = false;
+
     public bool $showCreateEmployeeModal = false;
 
     public string $createEmpNo = '';
@@ -94,6 +119,21 @@ class PeopleEmployeesList extends Component
     public ?string $createHireDate = null;
 
     public string $createSex = '';
+
+    /** @var TemporaryUploadedFile|null */
+    public $importFile = null;
+
+    /** @var array<string, mixed>|null */
+    public ?array $importPreview = null;
+
+    public ?string $importNotice = null;
+
+    /** @var array<int, string> */
+    public array $importErrors = [];
+
+    public bool $showImportResetModal = false;
+
+    public string $importResetConfirmationText = '';
 
     public bool $createIsGsBrochureAdmin = false;
 
@@ -117,6 +157,7 @@ class PeopleEmployeesList extends Component
 
     protected array $queryString = [
         'filterDept' => ['as' => 'team', 'except' => ''],
+        'filterStatus' => ['as' => 'status', 'except' => '1'],
     ];
 
     public function updatingSearch(): void
@@ -697,7 +738,7 @@ class PeopleEmployeesList extends Component
             'newDeptName.max' => '팀명은 25자 이하로 입력해 주세요.',
         ]);
 
-        $newDeptNo = $this->nextDeptNo();
+        $newDeptNo = DepartmentCodeGenerator::next();
 
         Department::query()->create([
             'DEPTNO' => $newDeptNo,
@@ -895,6 +936,118 @@ class PeopleEmployeesList extends Component
         $this->openSendResetModal($this->editingEmpNo);
     }
 
+    public function openTempPasswordModal(string $empNo): void
+    {
+        Gate::authorize('manageUserAccounts');
+
+        $employee = Employee::query()->where('EMPNO', $empNo)->first();
+        if (! $employee) {
+            session()->flash('error', '대상 직원을 찾을 수 없습니다.');
+
+            return;
+        }
+
+        $linkedUser = $this->resolveLinkedUser($employee);
+        if ($linkedUser === null) {
+            session()->flash('error', '연결된 로그인 계정이 없습니다.');
+
+            return;
+        }
+
+        if (! (bool) $linkedUser->is_active) {
+            session()->flash('error', '비활성 계정에는 임시 비밀번호를 발급할 수 없습니다. 먼저 계정을 활성화해 주세요.');
+
+            return;
+        }
+
+        if ($linkedUser->id === auth()->id()) {
+            session()->flash('error', '본인 계정에는 임시 비밀번호를 발급할 수 없습니다.');
+
+            return;
+        }
+
+        $this->tempPasswordTargetEmpNo = (string) $employee->EMPNO;
+        $this->tempPasswordTargetName = (string) ($employee->KOREANAME ?? '');
+        $this->tempPasswordTargetEmail = (string) $linkedUser->email;
+        $this->tempPasswordTargetIsPrivileged = app(SetTemporaryUserPassword::class)
+            ->targetRequiresPrivilegedConfirmation($linkedUser);
+        $this->tempPasswordPrivilegedConfirm = false;
+        $this->issuedTempPassword = '';
+        $this->showTempPasswordResultModal = false;
+        $this->showTempPasswordConfirmModal = true;
+    }
+
+    public function openTempPasswordModalFromEdit(): void
+    {
+        if ($this->editingEmpNo === '') {
+            return;
+        }
+
+        $this->openTempPasswordModal($this->editingEmpNo);
+    }
+
+    public function closeTempPasswordConfirmModal(): void
+    {
+        $this->showTempPasswordConfirmModal = false;
+        $this->tempPasswordTargetEmpNo = '';
+        $this->tempPasswordTargetName = '';
+        $this->tempPasswordTargetEmail = '';
+        $this->tempPasswordPrivilegedConfirm = false;
+        $this->tempPasswordTargetIsPrivileged = false;
+    }
+
+    public function issueTemporaryPassword(): void
+    {
+        Gate::authorize('manageUserAccounts');
+
+        $employee = Employee::query()->where('EMPNO', $this->tempPasswordTargetEmpNo)->first();
+        if (! $employee) {
+            session()->flash('error', '대상 직원을 찾을 수 없습니다.');
+            $this->closeTempPasswordConfirmModal();
+
+            return;
+        }
+
+        $linkedUser = $this->resolveLinkedUser($employee);
+        if ($linkedUser === null) {
+            session()->flash('error', '연결된 로그인 계정이 없습니다.');
+            $this->closeTempPasswordConfirmModal();
+
+            return;
+        }
+
+        try {
+            $plainPassword = app(SetTemporaryUserPassword::class)->execute(
+                $linkedUser,
+                auth()->user(),
+                $this->tempPasswordPrivilegedConfirm,
+            );
+        } catch (ValidationException $e) {
+            $message = collect($e->errors())->flatten()->first() ?: '임시 비밀번호를 발급할 수 없습니다.';
+            session()->flash('error', (string) $message);
+            $this->closeTempPasswordConfirmModal();
+
+            return;
+        }
+
+        $targetName = $this->tempPasswordTargetName;
+        $this->showTempPasswordConfirmModal = false;
+        $this->tempPasswordPrivilegedConfirm = false;
+        $this->issuedTempPassword = $plainPassword;
+        $this->showTempPasswordResultModal = true;
+        session()->flash('success', ($targetName !== '' ? $targetName : '직원').'님에게 임시 비밀번호를 발급했습니다.');
+    }
+
+    public function closeTempPasswordResultModal(): void
+    {
+        $this->showTempPasswordResultModal = false;
+        $this->issuedTempPassword = '';
+        $this->tempPasswordTargetEmpNo = '';
+        $this->tempPasswordTargetName = '';
+        $this->tempPasswordTargetEmail = '';
+        $this->tempPasswordTargetIsPrivileged = false;
+    }
+
     /**
      * "계정 없음 + 재직" 직원에게 최소 권한으로 로그인 계정을 생성합니다.
      * 권한은 모두 false, 활성은 true, 비밀번호는 임시 난수.
@@ -1076,6 +1229,10 @@ class PeopleEmployeesList extends Component
             'canManageEmployees' => Gate::allows('editEmployeeProfile'),
             'canManageEmployeeDepartment' => Gate::allows('manageEmployeeDepartment'),
             'canManageUserAccounts' => Gate::allows('manageUserAccounts'),
+            'hasLastEmployeeImportRollback' => EmployeeImportRollback::hasPending(),
+            'lastEmployeeImportRollbackSummary' => ($snapshot = EmployeeImportRollback::get()) !== null
+                ? EmployeeImportRollback::summaryLabel($snapshot)
+                : null,
             'isPeopleModalAccountEditEnabled' => (bool) config('features.people_modal_account_edit_enabled', true),
             'coachDeptCode' => TeamMenuContext::DEPT_COACH,
         ]);
@@ -1111,6 +1268,10 @@ class PeopleEmployeesList extends Component
 
     private function resolveCurrentTeamLabel($deptOptions): string
     {
+        if ($this->filterDept === '' && $this->filterStatus === '0') {
+            return '비활성화 직원';
+        }
+
         if ($this->filterDept === '') {
             return '전체';
         }
@@ -1231,15 +1392,175 @@ class PeopleEmployeesList extends Component
         }
     }
 
-    private function nextDeptNo(): string
+    public function previewEmployeeImport(): void
     {
-        $maxNumber = (int) (Department::query()
-            ->whereRaw("DEPTNO REGEXP '^A[0-9]{2,}$'")
-            ->selectRaw('MAX(CAST(SUBSTRING(DEPTNO, 2) AS UNSIGNED)) as max_number')
-            ->value('max_number') ?? 0);
+        Gate::authorize('manageEmployeeDepartment');
 
-        $nextNumber = $maxNumber + 1;
+        $this->importNotice = null;
+        $this->importErrors = [];
 
-        return 'A'.str_pad((string) $nextNumber, 2, '0', STR_PAD_LEFT);
+        $validated = $this->validate([
+            'importFile' => ['required', 'file', 'mimes:xls,xlsx', 'max:20480'],
+        ], [
+            'importFile.required' => '업로드할 엑셀 파일을 선택해 주세요.',
+            'importFile.mimes' => '엑셀 파일(xls, xlsx)만 업로드할 수 있습니다.',
+            'importFile.max' => '파일 크기는 20MB 이하여야 합니다.',
+        ]);
+
+        /** @var TemporaryUploadedFile $file */
+        $file = $validated['importFile'];
+        $result = app(EmployeeExcelImporter::class)->importFromFile(
+            $file->getRealPath(),
+            (int) auth()->id(),
+            dryRun: true,
+        );
+
+        $this->importPreview = $result;
+        $this->importErrors = $result['errors'];
+        $this->importNotice = sprintf(
+            '미리보기: 신규 %d건, 수정 %d건, 재활성 %d건, 숨김 %d건, 신규 부서 %d건, 건너뜀 %d건',
+            (int) $result['inserted'],
+            (int) $result['updated'],
+            (int) $result['reactivated'],
+            (int) $result['hidden'],
+            (int) $result['departments_created'],
+            (int) $result['skipped'],
+        );
+    }
+
+    public function applyEmployeeImport(): void
+    {
+        Gate::authorize('manageEmployeeDepartment');
+
+        if ($this->importPreview === null) {
+            $this->addError('importFile', '먼저 미리보기를 실행해 주세요.');
+
+            return;
+        }
+
+        $validated = $this->validate([
+            'importFile' => ['required', 'file', 'mimes:xls,xlsx', 'max:20480'],
+        ], [
+            'importFile.required' => '적용할 엑셀 파일을 다시 선택해 주세요.',
+            'importFile.mimes' => '엑셀 파일(xls, xlsx)만 업로드할 수 있습니다.',
+            'importFile.max' => '파일 크기는 20MB 이하여야 합니다.',
+        ]);
+
+        /** @var TemporaryUploadedFile $file */
+        $file = $validated['importFile'];
+        $result = app(EmployeeExcelImporter::class)->importFromFile(
+            $file->getRealPath(),
+            (int) auth()->id(),
+            dryRun: false,
+        );
+
+        $this->importPreview = null;
+        $this->importErrors = $result['errors'];
+        $this->importFile = null;
+        $this->resetPage();
+
+        $summary = sprintf(
+            '엑셀 반영 완료: 신규 %d건, 수정 %d건, 재활성 %d건, 숨김 %d건, 신규 부서 %d건, 건너뜀 %d건',
+            (int) $result['inserted'],
+            (int) $result['updated'],
+            (int) $result['reactivated'],
+            (int) $result['hidden'],
+            (int) $result['departments_created'],
+            (int) $result['skipped'],
+        );
+
+        if ((int) $result['reset_emails_sent'] > 0) {
+            $summary .= ', 비밀번호 메일 '.(int) $result['reset_emails_sent'].'건 발송';
+        }
+
+        if ((int) $result['reset_emails_failed'] > 0) {
+            $summary .= ', 메일 실패 '.(int) $result['reset_emails_failed'].'건';
+        }
+
+        $this->importNotice = $summary;
+        session()->flash('success', $summary);
+
+        if ((int) $result['reset_emails_failed'] > 0) {
+            session()->flash('error', '일부 신규 계정의 비밀번호 설정 메일 발송에 실패했습니다. 메일 설정을 확인해 주세요.');
+        }
+
+        if (isset($result['rollback']) && is_array($result['rollback'])) {
+            EmployeeImportRollback::save($result['rollback']);
+        }
+    }
+
+    public function openImportResetModal(): void
+    {
+        Gate::authorize('manageEmployeeDepartment');
+
+        if (! EmployeeImportRollback::hasPending()) {
+            $this->addError('importResetConfirmationText', '되돌릴 마지막 엑셀 반영 기록이 없습니다.');
+
+            return;
+        }
+
+        $this->resetValidation('importResetConfirmationText');
+        $this->importResetConfirmationText = '';
+        $this->showImportResetModal = true;
+    }
+
+    public function closeImportResetModal(): void
+    {
+        $this->showImportResetModal = false;
+        $this->resetValidation('importResetConfirmationText');
+        $this->importResetConfirmationText = '';
+    }
+
+    public function resetLastEmployeeImport(): void
+    {
+        Gate::authorize('manageEmployeeDepartment');
+
+        $snapshot = EmployeeImportRollback::get();
+        if ($snapshot === null || ! EmployeeImportRollback::hasChanges($snapshot)) {
+            $this->addError('importResetConfirmationText', '되돌릴 마지막 엑셀 반영 기록이 없습니다.');
+
+            return;
+        }
+
+        $this->validate([
+            'importResetConfirmationText' => ['required', Rule::in([self::IMPORT_RESET_CONFIRMATION_PHRASE])],
+        ], [
+            'importResetConfirmationText.required' => '초기화 확인 문구를 입력해 주세요.',
+            'importResetConfirmationText.in' => '확인 문구가 일치하지 않습니다. "엑셀 초기화"를 정확히 입력해 주세요.',
+        ]);
+
+        $result = app(EmployeeExcelImporter::class)->rollback($snapshot);
+
+        EmployeeImportRollback::clear();
+
+        $this->importResetConfirmationText = '';
+        $this->showImportResetModal = false;
+        $this->importPreview = null;
+        $this->importFile = null;
+        $this->importErrors = $result['errors'];
+        $this->resetPage();
+
+        $summary = sprintf(
+            '엑셀 초기화 완료: 신규 삭제 %d건(계정 %d건), 수정 복원 %d건, 숨김 복원 %d건, 부서 삭제 %d건',
+            (int) $result['deleted_employees'],
+            (int) $result['deleted_users'],
+            (int) $result['restored_updates'],
+            (int) $result['restored_hidden'],
+            (int) $result['deleted_departments'],
+        );
+
+        $this->importNotice = $summary;
+        session()->flash('success', $summary);
+    }
+
+    public function cancelEmployeeImport(): void
+    {
+        Gate::authorize('manageEmployeeDepartment');
+
+        $this->importPreview = null;
+        $this->importNotice = null;
+        $this->importErrors = [];
+        $this->importFile = null;
+        $this->resetValidation('importFile');
     }
 }

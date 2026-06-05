@@ -78,8 +78,8 @@
                        class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
             </div>
 
-            @if($search || $filterStatus !== '' || $filterDept !== '')
-                <button wire:click="$set('search', ''); $set('filterStatus', ''); $set('filterDept', '')"
+            @if($search || $filterStatus !== '1' || $filterDept !== '')
+                <button wire:click="$set('search', ''); $set('filterStatus', '1'); $set('filterDept', '')"
                         class="py-2 px-3 text-sm text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
                     초기화
                 </button>
@@ -109,6 +109,79 @@
                 </button>
             @endcan
         </div>
+
+        @if($canManageEmployeeDepartment)
+            <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
+                <input type="file"
+                       wire:model="importFile"
+                       accept=".xls,.xlsx"
+                       class="w-full md:w-auto rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white">
+                <button type="button"
+                        wire:click="previewEmployeeImport"
+                        wire:loading.attr="disabled"
+                        wire:target="previewEmployeeImport,importFile"
+                        class="px-3 py-2 text-sm rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50 disabled:opacity-60">
+                    미리보기
+                </button>
+                @if($importPreview !== null)
+                    <button type="button"
+                            wire:click="applyEmployeeImport"
+                            wire:loading.attr="disabled"
+                            wire:target="applyEmployeeImport"
+                            class="px-3 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60">
+                        적용
+                    </button>
+                    <button type="button"
+                            wire:click="cancelEmployeeImport"
+                            class="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">
+                        취소
+                    </button>
+                @endif
+                @if($hasLastEmployeeImportRollback)
+                    <button type="button"
+                            wire:click="openImportResetModal"
+                            class="px-3 py-2 text-sm rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50">
+                        엑셀 초기화
+                    </button>
+                @endif
+            </div>
+            @error('importFile') <p class="mt-2 text-xs text-red-600">{{ $message }}</p> @enderror
+            @error('importResetConfirmationText') <p class="mt-2 text-xs text-red-600">{{ $message }}</p> @enderror
+
+            @if($hasLastEmployeeImportRollback && $lastEmployeeImportRollbackSummary !== null)
+                <p class="mt-2 text-xs text-rose-700">
+                    마지막 엑셀 반영 되돌리기 가능 — {{ $lastEmployeeImportRollbackSummary }}
+                </p>
+            @endif
+
+            @if($importNotice !== null || $importPreview !== null || $importErrors !== [])
+                <div class="mt-3 space-y-2">
+                    @if($importNotice !== null)
+                        <div class="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-indigo-800" role="status">
+                            {{ $importNotice }}
+                        </div>
+                    @endif
+
+                    @if($importPreview !== null)
+                        <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+                            미리보기 결과 — 신규 {{ $importPreview['inserted'] }}건 · 수정 {{ $importPreview['updated'] }}건 · 재활성 {{ $importPreview['reactivated'] }}건 · 숨김 {{ $importPreview['hidden'] }}건 · 신규 부서 {{ $importPreview['departments_created'] }}건 · 건너뜀 {{ $importPreview['skipped'] }}건
+                            <span class="block mt-1 text-xs text-amber-800">[적용]을 눌러야 DB에 반영됩니다.</span>
+                        </div>
+                    @endif
+
+                    @if($importErrors !== [])
+                        <div class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 space-y-1" role="alert">
+                            @foreach(array_slice($importErrors, 0, 10) as $error)
+                                <p>{{ $error }}</p>
+                            @endforeach
+                            @if(count($importErrors) > 10)
+                                <p>...외 {{ count($importErrors) - 10 }}건</p>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+            @endif
+        @endif
     </div>
 
     {{-- 리스트 --}}
@@ -147,7 +220,7 @@
                             <td class="px-3 py-2 text-gray-700">{{ $emp->DEPARTMENT_NAME ?: ($emp->WORKDEPT ?? '-') }}</td>
                             <td class="px-3 py-2 text-gray-700">{{ $emp->EMAIL ?? '-' }}</td>
                             <td class="px-3 py-2 text-gray-700">{{ $emp->PHONENO ?? '-' }}</td>
-                            <td class="px-3 py-2 text-gray-700">{{ $emp->HIREDATE ? \Illuminate\Support\Carbon::parse($emp->HIREDATE)->format('Y-m-d') : '-' }}</td>
+                            <td class="px-3 py-2 text-gray-700">{{ \App\Support\EmployeeHireDate::formatDisplay($emp->HIREDATE) }}</td>
                             <td class="px-3 py-2 text-center">
                                 @if((int) ($emp->STATUS ?? -1) === 1)
                                     <span class="text-xs text-green-700">재직</span>
@@ -544,6 +617,20 @@
                                         <p class="mt-1.5 text-[11px] text-gray-500">
                                             DB에 등록된 이메일로 발송됩니다. (수정 중인 이메일이 아닌 저장된 이메일)
                                         </p>
+                                        <div class="mt-3">
+                                            <button type="button"
+                                                    wire:click="openTempPasswordModalFromEdit"
+                                                    class="inline-flex items-center gap-2 px-3 py-2 text-sm text-amber-800 border border-amber-500 rounded-lg hover:bg-amber-50 cursor-pointer">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                          d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                                                </svg>
+                                                임시 비밀번호 발급
+                                            </button>
+                                            <p class="mt-1.5 text-[11px] text-gray-500">
+                                                즉시 로그인이 필요할 때 사용합니다. 발급된 비밀번호는 한 번만 표시되며, 사용자는 다음 로그인 시 새 비밀번호로 변경해야 합니다.
+                                            </p>
+                                        </div>
                                     @elseif($hasLinkedLoginAccount && ! $editUserIsActive)
                                         <p class="text-[11px] text-amber-700">
                                             비활성 계정에는 비밀번호 재설정 메일을 보낼 수 없습니다. 먼저 계정을 활성화한 뒤 발송해 주세요.
@@ -769,6 +856,152 @@
                             발송
                         @endif
                     </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if($showTempPasswordConfirmModal)
+        <div class="mochi-modal-overlay" wire:key="temp-password-confirm-modal">
+            <div class="mochi-modal-shell max-w-lg">
+                <x-admin.modal-header
+                    title="임시 비밀번호 발급"
+                    close-action="closeTempPasswordConfirmModal"
+                />
+
+                <div class="px-6 py-5 space-y-4">
+                    <p class="text-sm text-gray-700">
+                        다음 직원의 로그인 비밀번호를 <strong class="text-amber-800">임시로 재설정</strong>합니다.
+                        발급 후 비밀번호는 <strong>이 화면에서 한 번만</strong> 확인할 수 있습니다.
+                    </p>
+
+                    <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm space-y-1">
+                        <div>
+                            <span class="text-gray-500">이름</span>
+                            <span class="ml-2 font-medium text-gray-900">{{ $tempPasswordTargetName ?: '-' }}</span>
+                            <span class="ml-2 text-xs text-gray-400">(사번 {{ $tempPasswordTargetEmpNo }})</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">이메일</span>
+                            <span class="ml-2 font-medium text-gray-900">{{ $tempPasswordTargetEmail }}</span>
+                        </div>
+                    </div>
+
+                    <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800 leading-snug">
+                        임시 비밀번호는 관리자가 사용자에게 <strong>직접 전달</strong>해야 합니다.
+                        시스템은 임시 비밀번호를 메일로 보내지 않습니다.
+                        사용자는 다음 로그인 시 <strong>새 비밀번호로 변경</strong>해야 합니다.
+                    </div>
+
+                    @if($tempPasswordTargetIsPrivileged)
+                        <label class="flex items-start gap-2 cursor-pointer select-none">
+                            <input type="checkbox"
+                                   wire:model="tempPasswordPrivilegedConfirm"
+                                   class="mt-0.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"/>
+                            <span class="text-sm text-gray-700 leading-snug">
+                                이 계정은 관리자 권한을 가지고 있습니다. 임시 비밀번호 발급을 진행합니다.
+                            </span>
+                        </label>
+                        @error('tempPasswordPrivilegedConfirm') <p class="text-xs text-red-500">{{ $message }}</p> @enderror
+                    @endif
+                </div>
+
+                <div class="px-6 pb-5 flex items-center justify-end gap-2">
+                    <button type="button"
+                            wire:click="closeTempPasswordConfirmModal"
+                            class="px-4 py-2 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 cursor-pointer">
+                        취소
+                    </button>
+                    <button type="button"
+                            wire:click="issueTemporaryPassword"
+                            wire:loading.attr="disabled"
+                            wire:target="issueTemporaryPassword"
+                            @disabled($tempPasswordTargetIsPrivileged && ! $tempPasswordPrivilegedConfirm)
+                            class="px-4 py-2 text-sm text-white bg-amber-600 hover:bg-amber-700 rounded-lg cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
+                        발급
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if($showTempPasswordResultModal && $issuedTempPassword !== '')
+        <div class="mochi-modal-overlay" wire:key="temp-password-result-modal">
+            <div class="mochi-modal-shell max-w-lg">
+                <x-admin.modal-header
+                    title="임시 비밀번호가 발급되었습니다"
+                    close-action="closeTempPasswordResultModal"
+                />
+
+                <div class="px-6 py-5 space-y-4">
+                    <p class="text-sm text-gray-700">
+                        아래 비밀번호를 사용자에게 전달한 뒤, 이 창을 닫아 주세요.
+                        <strong class="text-amber-800">닫은 후에는 다시 확인할 수 없습니다.</strong>
+                    </p>
+
+                    <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                        <p class="text-xs text-amber-800 mb-1">임시 비밀번호</p>
+                        <div class="flex items-center gap-2">
+                            <code class="flex-1 text-base font-mono font-semibold text-gray-900 tracking-wide select-all">{{ $issuedTempPassword }}</code>
+                            <button type="button"
+                                    x-data
+                                    x-on:click="navigator.clipboard.writeText(@js($issuedTempPassword))"
+                                    class="shrink-0 px-2 py-1 text-xs border border-amber-400 text-amber-800 rounded hover:bg-amber-100 cursor-pointer">
+                                복사
+                            </button>
+                        </div>
+                    </div>
+
+                    <p class="text-[11px] text-gray-500">
+                        사용자 이메일: {{ $tempPasswordTargetEmail }}
+                    </p>
+                </div>
+
+                <div class="px-6 pb-5 flex items-center justify-end">
+                    <button type="button"
+                            wire:click="closeTempPasswordResultModal"
+                            class="px-4 py-2 text-sm text-white bg-mochi-header hover:bg-mochi-header/90 rounded-lg cursor-pointer">
+                        확인 (닫기)
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if($showImportResetModal)
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4" wire:click.self="closeImportResetModal">
+            <div class="w-full max-w-md rounded-2xl bg-white shadow-xl">
+                <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+                    <h3 class="text-lg font-semibold text-gray-900">엑셀 반영 초기화</h3>
+                    <button type="button" wire:click="closeImportResetModal" class="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100">✕</button>
+                </div>
+
+                <div class="space-y-4 px-6 py-5">
+                    <p class="text-sm text-rose-700">
+                        마지막 엑셀 [적용]으로 추가·수정·숨김·생성된 부서를 되돌립니다.
+                        @if($lastEmployeeImportRollbackSummary !== null)
+                            <span class="block mt-2 text-xs text-rose-800">대상: {{ $lastEmployeeImportRollbackSummary }}</span>
+                        @endif
+                    </p>
+
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">확인 문구 입력</label>
+                        <input type="text"
+                               wire:model.defer="importResetConfirmationText"
+                               placeholder="엑셀 초기화"
+                               class="w-full rounded-lg border border-rose-300 bg-white px-3 py-2 text-sm">
+                        @error('importResetConfirmationText') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div class="flex justify-end gap-2 border-t border-gray-200 pt-4">
+                        <button type="button" wire:click="closeImportResetModal" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">취소</button>
+                        <button type="button"
+                                wire:click="resetLastEmployeeImport"
+                                wire:confirm="정말 마지막 엑셀 반영을 되돌릴까요? 신규 직원·계정은 삭제됩니다."
+                                class="rounded-lg border border-rose-300 px-4 py-2 text-sm text-rose-700 hover:bg-rose-50">
+                            엑셀 초기화 실행
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

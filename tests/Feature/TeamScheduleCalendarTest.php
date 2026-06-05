@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\SharedSupplyManager;
 use App\Livewire\TeamScheduleCalendar;
+use App\Models\SharedSupplyItem;
 use App\Models\TeamSchedule;
 use App\Models\User;
+use App\Support\SharedSupplyExcelImporter;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -421,6 +424,265 @@ class TeamScheduleCalendarTest extends TestCase
 
         $this->assertDatabaseMissing('team_schedules', ['id' => $parent->id]);
         $this->assertDatabaseMissing('team_schedules', ['id' => $child->id]);
+    }
+
+    public function test_team_view_marks_schedules_created_by_viewer_with_owned_class(): void
+    {
+        $viewer = User::factory()->create([
+            'employee_empno' => 'EMP-VIEWER-OWNED',
+            'is_active' => true,
+        ]);
+
+        $teammate = User::factory()->create([
+            'employee_empno' => 'EMP-TEAMMATE-OWNED',
+            'is_active' => true,
+        ]);
+
+        $this->insertEmployee('EMP-VIEWER-OWNED', $viewer->email, 'DEPT-OWNED');
+        $this->insertEmployee('EMP-TEAMMATE-OWNED', $teammate->email, 'DEPT-OWNED');
+
+        TeamSchedule::query()->create([
+            'user_id' => $viewer->id,
+            'created_by' => $viewer->id,
+            'title' => '뷰어가 등록한 팀 일정',
+            'starts_at' => now()->startOfMonth()->addDays(2),
+            'visibility' => 'team',
+            'status' => 'planned',
+            'type' => 'meeting',
+        ]);
+
+        TeamSchedule::query()->create([
+            'user_id' => $teammate->id,
+            'created_by' => $teammate->id,
+            'title' => '동료가 등록한 팀 일정',
+            'starts_at' => now()->startOfMonth()->addDays(3),
+            'visibility' => 'team',
+            'status' => 'planned',
+            'type' => 'task',
+        ]);
+
+        Livewire::actingAs($viewer)
+            ->test(TeamScheduleCalendar::class)
+            ->set('viewMode', 'team')
+            ->assertSee('초록색 = 나와 관련된 팀 일정')
+            ->assertSeeHtml('mochi-calendar-event--owned-by-me');
+    }
+
+    public function test_team_view_does_not_mark_teammate_schedules_with_owned_class(): void
+    {
+        $viewer = User::factory()->create([
+            'employee_empno' => 'EMP-VIEWER-ONLY-TEAM',
+            'is_active' => true,
+        ]);
+
+        $teammate = User::factory()->create([
+            'employee_empno' => 'EMP-TEAMMATE-ONLY-TEAM',
+            'is_active' => true,
+        ]);
+
+        $this->insertEmployee('EMP-VIEWER-ONLY-TEAM', $viewer->email, 'DEPT-ONLY-TEAM');
+        $this->insertEmployee('EMP-TEAMMATE-ONLY-TEAM', $teammate->email, 'DEPT-ONLY-TEAM');
+
+        TeamSchedule::query()->create([
+            'user_id' => $teammate->id,
+            'created_by' => $teammate->id,
+            'title' => '동료만 등록한 팀 일정',
+            'starts_at' => now()->startOfMonth()->addDays(4),
+            'visibility' => 'team',
+            'status' => 'planned',
+            'type' => 'etc',
+        ]);
+
+        Livewire::actingAs($viewer)
+            ->test(TeamScheduleCalendar::class)
+            ->set('viewMode', 'team')
+            ->assertSee('동료만 등록한 팀 일정')
+            ->assertDontSeeHtml('mochi-calendar-event--owned-by-me');
+    }
+
+    public function test_team_view_marks_excel_imported_schedules_for_row_owner_with_owned_class(): void
+    {
+        if (! Schema::hasColumn('team_schedules', 'source_type')) {
+            $this->markTestSkipped('team_schedules.source_type column is required.');
+        }
+
+        $uploader = User::factory()->create([
+            'name' => '엑셀업로더',
+            'employee_empno' => 'EMP-EXCEL-UP',
+            'is_admin' => true,
+            'is_active' => true,
+        ]);
+
+        $rowOwner = User::factory()->create([
+            'name' => '엑셀담당자',
+            'employee_empno' => 'EMP-EXCEL-ROW',
+            'is_active' => true,
+        ]);
+
+        $this->insertEmployee('EMP-EXCEL-UP', $uploader->email, 'DEPT-EXCEL');
+        $this->insertEmployee('EMP-EXCEL-ROW', $rowOwner->email, 'DEPT-EXCEL');
+
+        $item = SharedSupplyItem::query()->where('code', '00008')->firstOrFail();
+        $rows = [
+            ['회사명 그레이프시드코리아 주식회사 2026/06/02 ~ 2026/06/30'],
+            ['일자', '시작시간', '종료시간', '물품명', '사용자명', '제목', '적요'],
+            ['2026/06/02', '09:00', '16:00', $item->name, '엑셀담당자', '[차량배차] 신청 및 예약', '엑셀 등록 테스트'],
+        ];
+
+        app(SharedSupplyExcelImporter::class)->importRows($rows, $uploader->id);
+
+        $this->assertDatabaseHas('team_schedules', [
+            'title' => '[차량배차] 신청 및 예약',
+            'user_id' => $rowOwner->id,
+            'created_by' => $uploader->id,
+            'source_type' => TeamSchedule::SOURCE_TYPE_SHARED_SUPPLY,
+        ]);
+
+        Livewire::actingAs($uploader)
+            ->test(TeamScheduleCalendar::class)
+            ->set('month', '2026-06')
+            ->set('viewMode', 'team')
+            ->assertSee('[차량배차] 신청 및 예약')
+            ->assertDontSeeHtml('mochi-calendar-event--owned-by-me');
+
+        Livewire::actingAs($rowOwner)
+            ->test(TeamScheduleCalendar::class)
+            ->set('month', '2026-06')
+            ->set('viewMode', 'team')
+            ->assertSee('[차량배차] 신청 및 예약')
+            ->assertSeeHtml('mochi-calendar-event--owned-by-me');
+    }
+
+    public function test_team_view_marks_manual_shared_supply_schedule_for_user_id_owner(): void
+    {
+        if (! Schema::hasColumn('team_schedules', 'source_type')) {
+            $this->markTestSkipped('team_schedules.source_type column is required.');
+        }
+
+        $owner = User::factory()->create([
+            'employee_empno' => 'EMP-SS-OWNER',
+            'is_active' => true,
+        ]);
+
+        $admin = User::factory()->create([
+            'employee_empno' => 'EMP-SS-ADMIN',
+            'is_active' => true,
+            'is_admin' => true,
+        ]);
+
+        $this->insertEmployee('EMP-SS-OWNER', $owner->email, 'DEPT-SS');
+        $this->insertEmployee('EMP-SS-ADMIN', $admin->email, 'DEPT-SS');
+
+        TeamSchedule::query()->create([
+            'user_id' => $owner->id,
+            'created_by' => $admin->id,
+            'title' => '공용품 담당 일정',
+            'starts_at' => now()->startOfMonth()->addDays(6),
+            'visibility' => 'team',
+            'status' => 'planned',
+            'type' => 'etc',
+            'source_type' => TeamSchedule::SOURCE_TYPE_SHARED_SUPPLY,
+            'source_id' => 1,
+        ]);
+
+        Livewire::actingAs($owner)
+            ->test(TeamScheduleCalendar::class)
+            ->set('viewMode', 'team')
+            ->assertSee('공용품 담당 일정')
+            ->assertSeeHtml('mochi-calendar-event--owned-by-me');
+
+        Livewire::actingAs($admin)
+            ->test(TeamScheduleCalendar::class)
+            ->set('viewMode', 'team')
+            ->assertSee('공용품 담당 일정')
+            ->assertDontSeeHtml('mochi-calendar-event--owned-by-me');
+    }
+
+    public function test_team_view_marks_ui_created_shared_supply_for_owner(): void
+    {
+        if (! Schema::hasColumn('team_schedules', 'source_type')) {
+            $this->markTestSkipped('team_schedules.source_type column is required.');
+        }
+
+        $user = User::factory()->create([
+            'employee_empno' => 'EMP-UI-SS',
+            'is_active' => true,
+        ]);
+
+        $this->insertEmployee('EMP-UI-SS', $user->email, 'DEPT-UI-SS');
+
+        $itemId = (int) SharedSupplyItem::query()->where('code', '00013')->value('id');
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class)
+            ->call('openCreateModal')
+            ->set('useDate', now()->startOfMonth()->addDays(7)->format('Y-m-d'))
+            ->set('startTime', '10:00')
+            ->set('endTime', '11:00')
+            ->set('title', '[회의실] UI 등록 테스트')
+            ->set('sharedSupplyItemId', $itemId)
+            ->set('purpose', '초록 테두리 테스트')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        Livewire::actingAs($user)
+            ->test(TeamScheduleCalendar::class)
+            ->set('viewMode', 'team')
+            ->assertSee('[회의실] UI 등록 테스트')
+            ->assertSeeHtml('mochi-calendar-event--owned-by-me');
+    }
+
+    public function test_mine_view_does_not_mark_owned_class(): void
+    {
+        $viewer = User::factory()->create([
+            'employee_empno' => 'EMP-VIEWER-MINE',
+            'is_active' => true,
+        ]);
+
+        $this->insertEmployee('EMP-VIEWER-MINE', $viewer->email, 'DEPT-MINE');
+
+        TeamSchedule::query()->create([
+            'user_id' => $viewer->id,
+            'created_by' => $viewer->id,
+            'title' => '내 일정 탭 일정',
+            'starts_at' => now()->startOfMonth()->addDays(5),
+            'visibility' => 'private',
+            'status' => 'planned',
+            'type' => 'personal',
+        ]);
+
+        Livewire::actingAs($viewer)
+            ->test(TeamScheduleCalendar::class)
+            ->set('viewMode', 'mine')
+            ->assertSee('내 일정 탭 일정')
+            ->assertDontSeeHtml('mochi-calendar-event--owned-by-me')
+            ->assertDontSee('초록 테두리 = 내가 등록한 일정');
+    }
+
+    public function test_team_view_done_schedule_keeps_owned_border_class(): void
+    {
+        $viewer = User::factory()->create([
+            'employee_empno' => 'EMP-VIEWER-DONE',
+            'is_active' => true,
+        ]);
+
+        $this->insertEmployee('EMP-VIEWER-DONE', $viewer->email, 'DEPT-DONE');
+
+        TeamSchedule::query()->create([
+            'user_id' => $viewer->id,
+            'created_by' => $viewer->id,
+            'title' => '완료된 내 팀 일정',
+            'starts_at' => now()->startOfMonth()->addDays(6),
+            'visibility' => 'team',
+            'status' => 'done',
+            'type' => 'meeting',
+        ]);
+
+        Livewire::actingAs($viewer)
+            ->test(TeamScheduleCalendar::class)
+            ->set('viewMode', 'team')
+            ->assertSeeHtml('mochi-calendar-event--done')
+            ->assertSeeHtml('mochi-calendar-event--owned-by-me');
     }
 
     private function createEmployeeTable(): void

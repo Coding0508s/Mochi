@@ -92,11 +92,11 @@
                 <thead class="mochi-table-head">
                 <tr class="text-gray-700">
                     <th class="contact-sticky-no contact-sticky-no--head px-3 py-2 text-left text-xs font-semibold">No</th>
+                    <th class="contact-sticky-sk contact-sticky-sk--head px-3 py-2 text-left text-xs font-semibold">기관코드</th>
+                    <th class="contact-sticky-institution contact-sticky-institution--head px-3 py-2 text-left text-xs font-semibold">기관명</th>
                     <th class="contact-sticky-name contact-sticky-name--head px-3 py-2 text-left text-xs font-semibold">이름</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">이메일</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">전화번호</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold">기관코드</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold">기관명</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">직급</th>
                     <th class="px-3 py-2 text-center text-xs font-semibold">상태</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">GrapeSEED Essentials</th>
@@ -114,10 +114,7 @@
                         wire:click="openDetailModal({{ $teacher->ID }})"
                         class="mochi-table-row-hover transition-colors cursor-pointer">
                         <td class="contact-sticky-no px-3 py-2.5 text-gray-400 text-xs">{{ $teachers->firstItem() + $index }}</td>
-                        <td class="contact-sticky-name px-3 py-2.5 font-medium text-gray-900">{{ $teacher->Name ?? '-' }}</td>
-                        <td class="px-3 py-2.5 text-gray-600 text-xs">{{ $teacher->Email ?? '-' }}</td>
-                        <td class="px-3 py-2.5 text-gray-600">{{ $teacher->Phone ?? '-' }}</td>
-                        <td class="px-3 py-2.5">
+                        <td class="contact-sticky-sk px-3 py-2.5">
                             @if($teacher->SK_Code)
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
                                     {{ $teacher->SK_Code }}
@@ -126,7 +123,10 @@
                                 <span class="text-gray-400">-</span>
                             @endif
                         </td>
-                        <td class="px-3 py-2.5 text-gray-700 max-w-36 truncate" title="{{ $teacher->School_Name }}">{{ $teacher->School_Name ?? '-' }}</td>
+                        <td class="contact-sticky-institution px-3 py-2.5 text-gray-700 max-w-36 truncate" title="{{ $teacher->School_Name }}">{{ $teacher->School_Name ?? '-' }}</td>
+                        <td class="contact-sticky-name px-3 py-2.5 font-medium text-gray-900">{{ $teacher->Name ?? '-' }}</td>
+                        <td class="px-3 py-2.5 text-gray-600 text-xs">{{ $teacher->Email ?? '-' }}</td>
+                        <td class="px-3 py-2.5 text-gray-600">{{ $teacher->Phone ?? '-' }}</td>
                         <td class="px-3 py-2.5">
                             @if($teacher->Position)
                                 <span class="text-xs text-gray-600">{{ $teacher->Position }}</span>

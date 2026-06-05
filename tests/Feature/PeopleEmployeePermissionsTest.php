@@ -260,6 +260,95 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->assertDontSee('직원 등록');
     }
 
+    public function test_people_sidebar_replaces_online_department_with_inactive_employees_submenu(): void
+    {
+        Department::query()->insert([
+            'DEPTNO' => 'A99',
+            'DEPTNAME' => 'Online Team',
+            'ADMRDEPT' => '',
+            'LOCATION' => '',
+        ]);
+
+        $admin = User::factory()->admin()->create();
+
+        $response = $this->actingAs($admin)
+            ->get(route('people.index'))
+            ->assertOk();
+
+        $response->assertSee('비활성화 직원', false);
+        $response->assertDontSee('>Online Team<', false);
+    }
+
+    public function test_people_sidebar_lists_ceo_before_board_of_directors(): void
+    {
+        Department::query()->insert([
+            ['DEPTNO' => 'Z01', 'DEPTNAME' => 'Coach', 'ADMRDEPT' => '', 'LOCATION' => ''],
+            ['DEPTNO' => 'Z02', 'DEPTNAME' => 'Board of Directors', 'ADMRDEPT' => '', 'LOCATION' => ''],
+            ['DEPTNO' => 'Z03', 'DEPTNAME' => 'CEO', 'ADMRDEPT' => '', 'LOCATION' => ''],
+        ]);
+
+        $admin = User::factory()->admin()->create();
+
+        $content = $this->actingAs($admin)
+            ->get(route('people.index'))
+            ->assertOk()
+            ->getContent();
+
+        $ceoPos = strpos($content, 'sidebar-subitem-label">CEO<');
+        $boardPos = strpos($content, 'sidebar-subitem-label">Board of Directors<');
+        $coachPos = strpos($content, 'sidebar-subitem-label">Coach<');
+
+        $this->assertNotFalse($ceoPos);
+        $this->assertNotFalse($boardPos);
+        $this->assertNotFalse($coachPos);
+        $this->assertLessThan($boardPos, $ceoPos);
+        $this->assertLessThan($coachPos, $boardPos);
+    }
+
+    public function test_inactive_employees_submenu_filters_status_zero(): void
+    {
+        Employee::query()->create([
+            'EMPNO' => 'E999',
+            'KOREANAME' => '비활성직원',
+            'ENGLISHNAME' => 'Inactive',
+            'JOB' => 'Staff',
+            'EMAIL' => 'inactive@example.com',
+            'PHONENO' => '010-9999-9999',
+            'WORKDEPT' => 'A01',
+            'STATUS' => 0,
+        ]);
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->withQueryParams(['status' => '0'])
+            ->test(PeopleEmployeesList::class)
+            ->assertSee('비활성직원')
+            ->assertDontSee('홍길동');
+    }
+
+    public function test_employees_list_defaults_to_active_status_filter(): void
+    {
+        Employee::query()->create([
+            'EMPNO' => 'E999',
+            'KOREANAME' => '비활성직원',
+            'ENGLISHNAME' => 'Inactive',
+            'JOB' => 'Staff',
+            'EMAIL' => 'inactive@example.com',
+            'PHONENO' => '010-9999-9999',
+            'WORKDEPT' => 'A01',
+            'STATUS' => 0,
+        ]);
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->assertSet('filterStatus', '1')
+            ->assertSee('홍길동')
+            ->assertDontSee('비활성직원');
+    }
+
     public function test_admin_can_open_employee_register_modal_from_people_page(): void
     {
         $admin = User::factory()->admin()->create();

@@ -171,12 +171,14 @@
             <div class="sidebar-group">
                 @php
                     $peopleTeams = \Illuminate\Support\Facades\Schema::hasTable('department')
-                        ? \App\Models\Department::query()
-                            ->select('DEPTNO', 'DEPTNAME')
-                            ->orderBy('DEPTNO')
-                            ->get()
+                        ? \App\Models\Department::sortForPeopleSidebar(
+                            \App\Models\Department::query()
+                                ->select('DEPTNO', 'DEPTNAME')
+                                ->get()
+                        )
                         : collect();
                     $activePeopleTeam = (string) request()->query('team', '');
+                    $activePeopleStatus = (string) request()->query('status', '');
                 @endphp
 
                 <button type="button"
@@ -197,21 +199,40 @@
                 <div x-show="openPeople" class="sidebar-sublist">
                     <a href="{{ route('people.index') }}"
                        class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                              {{ request()->routeIs('people.*') && $activePeopleTeam === ''
+                              {{ request()->routeIs('people.*') && $activePeopleTeam === '' && $activePeopleStatus === ''
                                   ? 'sidebar-subitem-active'
                                   : '' }}">
                         <span class="sidebar-subitem-label">전체 Employees</span>
                     </a>
 
+                    @php
+                        $hasInactiveEmployeesMenu = $peopleTeams->contains(
+                            fn ($team) => $team->showsInactiveEmployeesInSidebar()
+                        );
+                    @endphp
+
                     @foreach($peopleTeams as $team)
+                        @if($team->showsInactiveEmployeesInSidebar())
+                            @continue
+                        @endif
                         <a href="{{ route('people.index', ['team' => $team->DEPTNO]) }}"
                            class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                                  {{ request()->routeIs('people.*') && $activePeopleTeam === (string) $team->DEPTNO
+                                  {{ request()->routeIs('people.*') && $activePeopleTeam === (string) $team->DEPTNO && $activePeopleStatus === ''
                                       ? 'sidebar-subitem-active'
                                       : '' }}">
                             <span class="sidebar-subitem-label">{{ $team->displayName() }}</span>
                         </a>
                     @endforeach
+
+                    @if($hasInactiveEmployeesMenu)
+                        <a href="{{ route('people.index', ['status' => '0']) }}"
+                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable
+                                  {{ request()->routeIs('people.*') && $activePeopleStatus === '0'
+                                      ? 'sidebar-subitem-active'
+                                      : '' }}">
+                            <span class="sidebar-subitem-label">비활성화 직원</span>
+                        </a>
+                    @endif
                 </div>
             </div>
 

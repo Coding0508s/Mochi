@@ -6,7 +6,7 @@
     @endif
 
     @php
-        $eventClassFor = function ($schedule): string {
+        $eventClassFor = function ($schedule) use ($viewMode): string {
             $typeClasses = [
                 'meeting' => 'mochi-calendar-event--meeting',
                 'task' => 'mochi-calendar-event--task',
@@ -14,7 +14,11 @@
                 'etc' => 'mochi-calendar-event--etc',
             ][$schedule->type] ?? 'mochi-calendar-event--etc';
 
-            return trim($typeClasses.' '.($schedule->status === 'cancelled' ? 'mochi-calendar-event--cancelled' : '').' '.($schedule->status === 'done' ? 'mochi-calendar-event--done' : ''));
+            $ownedClass = $schedule->isOwnedHighlightFor(auth()->id(), $viewMode)
+                ? 'mochi-calendar-event--owned-by-me'
+                : '';
+
+            return trim($typeClasses.' '.($schedule->status === 'cancelled' ? 'mochi-calendar-event--cancelled' : '').' '.($schedule->status === 'done' ? 'mochi-calendar-event--done' : '').' '.$ownedClass);
         };
     @endphp
 
@@ -90,6 +94,13 @@
             </div>
         </div>
     </div>
+
+    @if($viewMode === 'team')
+        <p class="mb-2 flex items-center gap-2 text-xs text-gray-500">
+            <span class="inline-block h-3 w-3 rounded-sm border-l-[3px] border-l-green-600 bg-green-50" aria-hidden="true"></span>
+            초록색 = 나와 관련된 팀 일정
+        </p>
+    @endif
 
     @if($displayMode === 'calendar')
         <div class="mochi-calendar-card">

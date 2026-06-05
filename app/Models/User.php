@@ -14,7 +14,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Schema;
 
-#[Fillable(['name', 'email', 'employee_empno', 'password', 'is_admin', 'team', 'is_gs_brochure_admin', 'can_manage_store_inventory', 'is_coach_team_lead', 'is_deputy_admin', 'is_active'])]
+#[Fillable(['name', 'email', 'employee_empno', 'password', 'must_change_password', 'is_admin', 'team', 'is_gs_brochure_admin', 'can_manage_store_inventory', 'is_coach_team_lead', 'is_deputy_admin', 'is_active'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -152,6 +152,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'must_change_password' => 'boolean',
             'is_admin' => 'boolean',
             'is_gs_brochure_admin' => 'boolean',
             'can_manage_store_inventory' => 'boolean',

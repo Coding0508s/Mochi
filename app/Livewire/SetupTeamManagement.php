@@ -65,11 +65,11 @@ class SetupTeamManagement extends Component
     {
         Gate::authorize('manageTeamStructure');
 
-        $parentCodes = $this->parentDeptCodes();
+        $this->newAdmrDept = $this->normalizeOptionalParentDept($this->newAdmrDept);
 
         $validated = $this->validate([
             'newDeptName' => ['required', 'string', 'max:25'],
-            'newAdmrDept' => ['nullable', 'string', Rule::in($parentCodes)],
+            'newAdmrDept' => $this->optionalParentDeptRules(value: $this->newAdmrDept),
             'newLocation' => ['nullable', 'string', 'max:50'],
         ], [
             'newDeptName.required' => '팀명은 필수입니다.',
@@ -84,7 +84,7 @@ class SetupTeamManagement extends Component
             'DEPTNO' => $newDeptNo,
             'DEPTNAME' => trim($validated['newDeptName']),
             'MGRNO' => '',
-            'ADMRDEPT' => $validated['newAdmrDept'] ?? '',
+            'ADMRDEPT' => $this->normalizeOptionalParentDept($validated['newAdmrDept'] ?? null),
             'LOCATION' => trim((string) ($validated['newLocation'] ?? '')),
         ]);
 
@@ -103,7 +103,7 @@ class SetupTeamManagement extends Component
 
         $this->editDeptNo = (string) $team->DEPTNO;
         $this->editDeptName = (string) ($team->DEPTNAME ?? '');
-        $this->editAdmrDept = (string) ($team->ADMRDEPT ?? '');
+        $this->editAdmrDept = $this->resolveEditableParentDept($team);
         $this->editLocation = (string) ($team->LOCATION ?? '');
         $this->resetErrorBag();
         $this->resetValidation();
@@ -125,11 +125,11 @@ class SetupTeamManagement extends Component
     {
         Gate::authorize('manageTeamStructure');
 
-        $parentCodes = $this->parentDeptCodes();
+        $this->editAdmrDept = $this->normalizeOptionalParentDept($this->editAdmrDept);
 
         $validated = $this->validate([
             'editDeptName' => ['required', 'string', 'max:25'],
-            'editAdmrDept' => ['nullable', 'string', Rule::in($parentCodes)],
+            'editAdmrDept' => $this->optionalParentDeptRules(excludeDeptNo: $this->editDeptNo, value: $this->editAdmrDept),
             'editLocation' => ['nullable', 'string', 'max:50'],
         ], [
             'editDeptName.required' => '팀명은 필수입니다.',
@@ -146,7 +146,7 @@ class SetupTeamManagement extends Component
         }
 
         $team->DEPTNAME = trim($validated['editDeptName']);
-        $team->ADMRDEPT = $validated['editAdmrDept'] ?? '';
+        $team->ADMRDEPT = $this->normalizeOptionalParentDept($validated['editAdmrDept'] ?? null);
         $team->LOCATION = trim((string) ($validated['editLocation'] ?? ''));
         $team->save();
 
@@ -242,11 +242,47 @@ class SetupTeamManagement extends Component
         return 'A'.str_pad((string) ($maxNumber + 1), 2, '0', STR_PAD_LEFT);
     }
 
-    private function parentDeptCodes(): array
+    private function parentDeptCodes(?string $excludeDeptNo = null): array
     {
         return Department::query()
+            ->when(filled($excludeDeptNo), fn ($query) => $query->where('DEPTNO', '!=', $excludeDeptNo))
             ->pluck('DEPTNO')
             ->map(fn ($code) => (string) $code)
             ->all();
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    private function optionalParentDeptRules(?string $excludeDeptNo = null, ?string $value = null): array
+    {
+        $normalized = $this->normalizeOptionalParentDept($value);
+
+        return [
+            'nullable',
+            'string',
+            Rule::when(
+                filled($normalized),
+                Rule::in($this->parentDeptCodes($excludeDeptNo))
+            ),
+        ];
+    }
+
+    private function normalizeOptionalParentDept(?string $value): string
+    {
+        return trim((string) $value);
+    }
+
+    private function resolveEditableParentDept(Department $team): string
+    {
+        $parentDept = $this->normalizeOptionalParentDept($team->ADMRDEPT);
+
+        if ($parentDept === '') {
+            return '';
+        }
+
+        $validParentCodes = $this->parentDeptCodes(excludeDeptNo: (string) $team->DEPTNO);
+
+        return in_array($parentDept, $validParentCodes, true) ? $parentDept : '';
     }
 }

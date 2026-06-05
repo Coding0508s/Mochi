@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Enums\SyncOrigin;
 use App\Jobs\SyncInstitutionOutboundJob;
 use App\Livewire\Concerns\ManagesInstitutionSupportDetailEdit;
+use App\Livewire\Concerns\OpensTeacherSupportHistoryDetail;
 use App\Models\AccountInformation;
 use App\Models\AssignmentChangeRequest;
 use App\Models\Employee;
@@ -14,7 +15,12 @@ use App\Models\SkCodeRequest;
 use App\Models\SupportRecord;
 use App\Models\Teacher;
 use App\Support\InstitutionCatalog;
+use App\Support\InstitutionTeamSupportHistoryBuilder;
+use App\Support\InstitutionUnifiedTimelineBuilder;
 use App\Support\ManagerNameNormalizer;
+use App\Support\SupportAuthorTeamResolver;
+use App\Support\TeamMenuContext;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +32,7 @@ use Livewire\WithPagination;
 class InstitutionList extends Component
 {
     use ManagesInstitutionSupportDetailEdit;
+    use OpensTeacherSupportHistoryDetail;
     use WithPagination;
     // WithPagination: "다음 페이지", "이전 페이지" 기능을 자동으로 제공합니다.
 
@@ -58,7 +65,42 @@ class InstitutionList extends Component
 
     public ?array $selectedInstitution = null;
 
-    public array $supportHistory = [];
+    public string $activeSupportTeamTab = SupportAuthorTeamResolver::TEAM_CO;
+
+    /** @var array<string, mixed> */
+    public array $teamSupportHistory = [];
+
+    public bool $showUnknownSupportSection = false;
+
+    public string $activeDetailTab = 'overview';
+
+    public string $timelineTypeFilter = 'all';
+
+    public string $timelineRangeFilter = '6m';
+
+    public string $timelineAuthorFilter = '';
+
+    public int $timelineVisibleCount = 30;
+
+    /** @var list<array<string, mixed>> */
+    public array $timelineAllItems = [];
+
+    /** @var list<array<string, mixed>> */
+    public array $timelineVisibleItems = [];
+
+    public bool $timelineHasMore = false;
+
+    /** @var array{all: int, support: int, support_coach: int, support_cs: int, assignment_change: int, contract_document: int} */
+    public array $timelineTypeTotals = [
+        'all' => 0,
+        'support' => 0,
+        'support_coach' => 0,
+        'support_cs' => 0,
+        'assignment_change' => 0,
+        'contract_document' => 0,
+    ];
+
+    public int $timelineHealthScore = 0;
 
     public bool $showSupportDetailModal = false;
 
@@ -129,6 +171,27 @@ class InstitutionList extends Component
     public function updatingAssignmentFilter(): void
     {
         $this->resetPage();
+    }
+
+    public function updatedTimelineTypeFilter(): void
+    {
+        if ($this->showDetailModal && $this->activeDetailTab === 'timeline') {
+            $this->loadTimeline();
+        }
+    }
+
+    public function updatedTimelineRangeFilter(): void
+    {
+        if ($this->showDetailModal && $this->activeDetailTab === 'timeline') {
+            $this->loadTimeline();
+        }
+    }
+
+    public function updatedTimelineAuthorFilter(): void
+    {
+        if ($this->showDetailModal && $this->activeDetailTab === 'timeline') {
+            $this->loadTimeline();
+        }
     }
 
     // ─── 컬럼 헤더 클릭 시 정렬 전환 ────────────────────────────────
@@ -217,32 +280,11 @@ class InstitutionList extends Component
         $this->editDetailAccountTel = (string) ($institution->AccountTel ?? '');
         $this->editDetailAddress = (string) ($institution->Address ?? '');
 
-        // 최근 10년 이력(지원/소통) 조회
-        $startYear = now()->year - 9;
-        $this->supportHistory = SupportRecord::query()
-            ->where('SK_Code', $institution->SKcode)
-            ->where(function ($q) use ($startYear) {
-                $q->where('Year', '>=', $startYear)
-                    ->orWhereYear('Support_Date', '>=', $startYear);
-            })
-            ->orderByDesc('Support_Date')
-            ->orderByDesc('ID')
-            ->limit(300)
-            ->get()
-            ->map(function (SupportRecord $record) {
-                return [
-                    'id' => $record->ID,
-                    'support_date' => $record->Support_Date?->format('Y-m-d') ?? '-',
-                    'support_time' => $this->formatSupportMeetTime($record->Meet_Time),
-                    'tr_name' => $record->TR_Name ?? '-',
-                    'support_type' => $record->Support_Type ?? '-',
-                    'target' => $record->Target ?? '-',
-                    'issue' => $record->Issue ?? '-',
-                    'to_account' => $record->TO_Account ?? '-',
-                    'status' => $record->isCompleted() ? SupportRecord::STATUS_COMPLETED : SupportRecord::STATUS_IN_PROGRESS,
-                ];
-            })
-            ->toArray();
+        $this->teamSupportHistory = app(InstitutionTeamSupportHistoryBuilder::class)->build($institution);
+        $this->activeSupportTeamTab = $this->resolveDefaultSupportTeamTab($this->teamSupportHistory);
+        $this->showUnknownSupportSection = false;
+        $this->resetTimelineState();
+        $this->activeDetailTab = 'overview';
 
         $this->showDetailModal = true;
     }
@@ -251,7 +293,11 @@ class InstitutionList extends Component
     {
         $this->showDetailModal = false;
         $this->selectedInstitution = null;
-        $this->supportHistory = [];
+        $this->teamSupportHistory = [];
+        $this->activeSupportTeamTab = SupportAuthorTeamResolver::TEAM_CO;
+        $this->showUnknownSupportSection = false;
+        $this->resetTimelineState();
+        $this->activeDetailTab = 'overview';
         $this->isEditingDetail = false;
         $this->editCustomerType = '';
         $this->editGsNo = '';
@@ -271,6 +317,160 @@ class InstitutionList extends Component
         $this->editDetailAddress = '';
         $this->resetValidation();
         $this->closeSupportDetailModal();
+        $this->closeAllTeacherSupportReportModals();
+    }
+
+    public function setDetailTab(string $tab): void
+    {
+        if (! in_array($tab, ['overview', 'timeline'], true)) {
+            return;
+        }
+
+        $this->activeDetailTab = $tab;
+
+        if ($tab === 'timeline' && $this->timelineAllItems === []) {
+            $this->loadTimeline();
+        }
+    }
+
+    public function loadTimeline(): void
+    {
+        $skCode = trim((string) ($this->selectedInstitution['skcode'] ?? ''));
+        if ($skCode === '') {
+            $this->resetTimelineState();
+
+            return;
+        }
+
+        $timeline = app(InstitutionUnifiedTimelineBuilder::class)->build(
+            $skCode,
+            [
+                'type' => $this->timelineTypeFilter,
+                'range' => $this->timelineRangeFilter,
+                'author' => $this->timelineAuthorFilter,
+            ],
+            300
+        );
+
+        $this->timelineAllItems = $timeline['items'];
+        $this->timelineTypeTotals = $timeline['totals'];
+        $this->timelineVisibleCount = 30;
+        $this->refreshVisibleTimelineItems();
+        $this->timelineHealthScore = $this->resolveTimelineHealthScore();
+    }
+
+    public function loadMoreTimeline(): void
+    {
+        if (! $this->timelineHasMore) {
+            return;
+        }
+
+        $this->timelineVisibleCount += 30;
+        $this->refreshVisibleTimelineItems();
+    }
+
+    private function refreshVisibleTimelineItems(): void
+    {
+        $this->timelineVisibleItems = array_slice($this->timelineAllItems, 0, $this->timelineVisibleCount);
+        $this->timelineHasMore = count($this->timelineAllItems) > count($this->timelineVisibleItems);
+    }
+
+    private function resetTimelineState(): void
+    {
+        $this->timelineTypeFilter = 'all';
+        $this->timelineRangeFilter = '6m';
+        $this->timelineAuthorFilter = '';
+        $this->timelineVisibleCount = 30;
+        $this->timelineAllItems = [];
+        $this->timelineVisibleItems = [];
+        $this->timelineHasMore = false;
+        $this->timelineTypeTotals = [
+            'all' => 0,
+            'support' => 0,
+            'support_coach' => 0,
+            'support_cs' => 0,
+            'assignment_change' => 0,
+            'contract_document' => 0,
+        ];
+        $this->timelineHealthScore = 0;
+    }
+
+    private function resolveTimelineHealthScore(): int
+    {
+        $supportCount = (int) ($this->selectedInstitution['support_count'] ?? 0);
+        $teacherCount = (int) ($this->selectedInstitution['teacher_count'] ?? 0);
+        $hasCo = trim((string) ($this->selectedInstitution['co'] ?? '')) !== '';
+        $hasTr = trim((string) ($this->selectedInstitution['tr'] ?? '')) !== '';
+        $hasCs = trim((string) ($this->selectedInstitution['cs'] ?? '')) !== '';
+
+        $score = 35;
+        $score += min(25, $supportCount * 2);
+        $score += min(12, $teacherCount);
+        $score += $hasCo ? 8 : 0;
+        $score += $hasTr ? 8 : 0;
+        $score += $hasCs ? 8 : 0;
+
+        $latestSupportDate = trim((string) ($this->selectedInstitution['latest_support_date'] ?? ''));
+        if ($latestSupportDate !== '') {
+            try {
+                $days = Carbon::parse($latestSupportDate)->diffInDays(now());
+                if ($days <= 60) {
+                    $score += 16;
+                } elseif ($days <= 120) {
+                    $score += 8;
+                }
+            } catch (\Throwable) {
+                // ignore parse error for temporary MVP formula
+            }
+        }
+
+        return max(0, min(100, $score));
+    }
+
+    protected function expectedSupportHistorySkCodeForDetail(): ?string
+    {
+        $skCode = trim((string) ($this->selectedInstitution['skcode'] ?? ''));
+
+        return $skCode !== '' ? $skCode : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $teamSupportHistory
+     */
+    private function resolveDefaultSupportTeamTab(array $teamSupportHistory): string
+    {
+        $userTeam = match (TeamMenuContext::activeMenu()) {
+            TeamMenuContext::MENU_CO => SupportAuthorTeamResolver::TEAM_CO,
+            TeamMenuContext::MENU_COACH => SupportAuthorTeamResolver::TEAM_COACH,
+            TeamMenuContext::MENU_CS => SupportAuthorTeamResolver::TEAM_CS,
+            default => null,
+        };
+
+        if ($userTeam !== null && $this->teamBucketHasRecords($teamSupportHistory, $userTeam)) {
+            return $userTeam;
+        }
+
+        foreach ([
+            SupportAuthorTeamResolver::TEAM_CO,
+            SupportAuthorTeamResolver::TEAM_COACH,
+            SupportAuthorTeamResolver::TEAM_CS,
+        ] as $team) {
+            if ($this->teamBucketHasRecords($teamSupportHistory, $team)) {
+                return $team;
+            }
+        }
+
+        return SupportAuthorTeamResolver::TEAM_CO;
+    }
+
+    /**
+     * @param  array<string, mixed>  $teamSupportHistory
+     */
+    private function teamBucketHasRecords(array $teamSupportHistory, string $team): bool
+    {
+        $bucket = $teamSupportHistory[$team] ?? ['institution' => [], 'teacher' => []];
+
+        return count($bucket['institution'] ?? []) + count($bucket['teacher'] ?? []) > 0;
     }
 
     public function startDetailEdit(): void
@@ -754,6 +954,7 @@ class InstitutionList extends Component
             'canEditDetailTr' => $this->canEditInstitutionDetailTr(),
             'canEditDetailCs' => $this->canEditInstitutionDetailCs(),
             'canEditInstitutionDetail' => $this->canEditInstitutionDetail(),
+            ...$this->coachTeacherSupportReportModalConfigs(),
         ]);
     }
 

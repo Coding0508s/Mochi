@@ -2088,6 +2088,24 @@ class CoachTeacherSupportListTest extends TestCase
         $this->assertSame('기관A', $component->get('demoLessonForm.institution_name'));
     }
 
+    public function test_mount_opens_typed_create_modal_from_query_params(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $id = $this->createTeacher('SK001', '홍길동');
+
+        Livewire::actingAs($admin)
+            ->withQueryParams([
+                'teacher_id' => $id,
+                'create_action' => 'pro_con',
+                'sk_code' => 'SK001',
+            ])
+            ->test(CoachTeacherSupportList::class)
+            ->assertSet('showProConModal', true)
+            ->assertSet('proConForm.teacher_name', '홍길동');
+    }
+
     public function test_save_demo_lesson_report_creates_record_and_support_when_completed(): void
     {
         $admin = $this->createAdminUser();

@@ -69,25 +69,40 @@
         @endif
         @error('importFile') <p class="mt-2 text-xs text-red-600">{{ $message }}</p> @enderror
 
-        @if($importNotice !== null)
-            <div class="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
-                {{ $importNotice }}
-            </div>
-        @endif
+        @if($importNotice !== null || $importSummary !== null || $importErrors !== [])
+            <div x-data
+                 x-init="window.setTimeout(() => {
+                     $wire.set('importNotice', null);
+                     $wire.set('importSummary', null);
+                     $wire.set('importErrors', []);
+                 }, 3000)">
+                @if($importNotice !== null)
+                    <div class="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"
+                         data-mochi-flash-dismiss="3000"
+                         role="status">
+                        {{ $importNotice }}
+                    </div>
+                @endif
 
-        @if($importSummary !== null)
-            <div class="mt-3 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-indigo-800">
-                신규 {{ $importSummary['inserted'] }}건 · 업데이트 {{ $importSummary['updated'] }}건 · 삭제 {{ $importSummary['deleted'] ?? 0 }}건 · 건너뜀 {{ $importSummary['skipped'] }}건
-            </div>
-        @endif
+                @if($importSummary !== null)
+                    <div class="mt-3 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-indigo-800"
+                         data-mochi-flash-dismiss="3000"
+                         role="status">
+                        신규 {{ $importSummary['inserted'] }}건 · 업데이트 {{ $importSummary['updated'] }}건 · 삭제 {{ $importSummary['deleted'] ?? 0 }}건 · 건너뜀 {{ $importSummary['skipped'] }}건
+                    </div>
+                @endif
 
-        @if($importErrors !== [])
-            <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 space-y-1">
-                @foreach(array_slice($importErrors, 0, 10) as $error)
-                    <p>{{ $error }}</p>
-                @endforeach
-                @if(count($importErrors) > 10)
-                    <p>...외 {{ count($importErrors) - 10 }}건</p>
+                @if($importErrors !== [])
+                    <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 space-y-1"
+                         data-mochi-flash-dismiss="3000"
+                         role="alert">
+                        @foreach(array_slice($importErrors, 0, 10) as $error)
+                            <p>{{ $error }}</p>
+                        @endforeach
+                        @if(count($importErrors) > 10)
+                            <p>...외 {{ count($importErrors) - 10 }}건</p>
+                        @endif
+                    </div>
                 @endif
             </div>
         @endif

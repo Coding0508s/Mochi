@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TeamSchedule extends Model
 {
+    public const SOURCE_TYPE_SHARED_SUPPLY = 'shared_supply';
+
     protected $fillable = [
         'user_id',
         'title',
@@ -78,5 +80,18 @@ class TeamSchedule extends Model
                         });
                 });
         });
+    }
+
+    public function isOwnedHighlightFor(?int $viewerId, string $viewMode): bool
+    {
+        if ($viewMode !== 'team' || $viewerId === null) {
+            return false;
+        }
+
+        if ($this->source_type === self::SOURCE_TYPE_SHARED_SUPPLY) {
+            return (int) $this->user_id === $viewerId;
+        }
+
+        return (int) $this->created_by === $viewerId;
     }
 }

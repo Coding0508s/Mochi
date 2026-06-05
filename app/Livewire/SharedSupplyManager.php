@@ -330,8 +330,6 @@ class SharedSupplyManager extends Component
         $this->importNotice = $summaryMessage;
         $this->importFile = null;
         $this->resetVisibleSupplies();
-
-        session()->flash('success', $summaryMessage);
     }
 
     public function openResetModal(): void

@@ -708,12 +708,16 @@
 
     .contact-list-table {
         --contact-no-width: 3.25rem;
+        --contact-sk-width: 5.75rem;
+        --contact-institution-width: 13rem;
         --contact-name-width: 9rem;
         border-collapse: separate;
         border-spacing: 0;
     }
 
     .contact-list-table .contact-sticky-no,
+    .contact-list-table .contact-sticky-sk,
+    .contact-list-table .contact-sticky-institution,
     .contact-list-table .contact-sticky-name {
         position: sticky;
         background: #ffffff;
@@ -728,16 +732,34 @@
         border-right: 1px solid #e5e7eb;
     }
 
-    .contact-list-table .contact-sticky-name {
+    .contact-list-table .contact-sticky-sk {
         left: var(--contact-no-width);
+        width: var(--contact-sk-width);
+        min-width: var(--contact-sk-width);
+        z-index: 13;
+        border-right: 1px solid #e5e7eb;
+    }
+
+    .contact-list-table .contact-sticky-institution {
+        left: calc(var(--contact-no-width) + var(--contact-sk-width));
+        width: var(--contact-institution-width);
+        min-width: var(--contact-institution-width);
+        z-index: 14;
+        border-right: 1px solid #e5e7eb;
+    }
+
+    .contact-list-table .contact-sticky-name {
+        left: calc(var(--contact-no-width) + var(--contact-sk-width) + var(--contact-institution-width));
         width: var(--contact-name-width);
         min-width: var(--contact-name-width);
-        z-index: 13;
+        z-index: 15;
         border-right: 1px solid rgba(203, 213, 225, 0.95);
         box-shadow: 6px 0 12px -8px rgba(15, 23, 42, 0.08);
     }
 
     .contact-list-table .contact-sticky-no--head,
+    .contact-list-table .contact-sticky-sk--head,
+    .contact-list-table .contact-sticky-institution--head,
     .contact-list-table .contact-sticky-name--head {
         z-index: 16;
         background: #e8e6d9;
@@ -1156,6 +1178,13 @@
         color: #15803d;
         border-left-color: #22c55e;
         opacity: 0.75;
+    }
+
+    .mochi-calendar-event--owned-by-me {
+        background: #f0fdf4;
+        color: #15803d;
+        border-left-width: 3px;
+        border-left-color: #16a34a;
     }
 
     .mochi-calendar-overflow {

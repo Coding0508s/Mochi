@@ -218,16 +218,30 @@ final class TeamMenuContext
 
     public static function institutionSupportReportFormHeading(?User $user = null, ?string $teamMenuOverride = null): string
     {
-        $brand = self::institutionSupportReportBrand($user, $teamMenuOverride) ?? 'CO';
-
-        return $brand.' 기관지원보고서 작성';
+        return self::supportReportFormHeading($user, $teamMenuOverride, 'institution');
     }
 
     public static function institutionSupportReportFormSubtitle(?User $user = null, ?string $teamMenuOverride = null): string
     {
+        return self::supportReportFormSubtitle($user, $teamMenuOverride, 'institution');
+    }
+
+    public static function supportReportFormHeading(?User $user = null, ?string $teamMenuOverride = null, string $reportMode = 'institution'): string
+    {
         $brand = self::institutionSupportReportBrand($user, $teamMenuOverride) ?? 'CO';
 
-        return $brand.' 기관 지원 보고서';
+        return $reportMode === 'teacher'
+            ? $brand.' 교사지원보고서 작성'
+            : $brand.' 기관지원보고서 작성';
+    }
+
+    public static function supportReportFormSubtitle(?User $user = null, ?string $teamMenuOverride = null, string $reportMode = 'institution'): string
+    {
+        $brand = self::institutionSupportReportBrand($user, $teamMenuOverride) ?? 'CO';
+
+        return $reportMode === 'teacher'
+            ? $brand.' 교사 지원 보고서'
+            : $brand.' 기관 지원 보고서';
     }
 
     public static function institutionSupportReportAssigneeLabel(?User $user = null, ?string $teamMenuOverride = null): string

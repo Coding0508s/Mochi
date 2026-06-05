@@ -202,6 +202,48 @@ class CoachTeacherSupportList extends Component
         if (is_string($month) && $month !== '' && (int) $month >= 1 && (int) $month <= 12) {
             $this->filterMonth = (string) (int) $month;
         }
+
+        $this->maybeOpenCreateSupportFromQuery();
+    }
+
+    private function maybeOpenCreateSupportFromQuery(): void
+    {
+        $teacherId = request()->integer('teacher_id');
+        $action = request()->query('create_action');
+
+        if ($teacherId <= 0 || ! is_string($action) || $action === '') {
+            return;
+        }
+
+        $allowedActions = collect(config('coach_teacher_support_create.types', []))
+            ->map(fn (array|string $pill): ?string => is_array($pill) ? ($pill['action'] ?? null) : null)
+            ->filter(fn (?string $value): bool => filled($value))
+            ->values()
+            ->all();
+
+        if (! in_array($action, $allowedActions, true)) {
+            return;
+        }
+
+        $methodMap = [
+            'demo_lesson' => 'openDemoLessonModal',
+            'lva_fr' => 'openLvaFrModal',
+            'lva_fb' => 'openLvaFbModal',
+            'ls_onsite_lva' => 'openLsOnsiteLvaModal',
+            'littleseed_con' => 'openLittleseedConModal',
+            'onsite' => 'openOnsiteModal',
+            'pro_con' => 'openProConModal',
+            'open_class' => 'openOpenClassModal',
+            'unit21_plus' => 'openUnit21PlusModal',
+            'unit31_plus' => 'openUnit31PlusModal',
+        ];
+
+        $method = $methodMap[$action] ?? null;
+        if ($method === null || ! method_exists($this, $method)) {
+            return;
+        }
+
+        $this->{$method}($teacherId);
     }
 
     public function openInstitutionModal(string $skCode): void

@@ -27,4 +27,38 @@ EOT,
 
 EOT,
 
+    'teacher_to_account_template' => <<<'EOT'
+소통내역:
+
+1. 교사 현황
+▶ 
+
+2. 지원 내용
+▶ 
+EOT,
+
+    'teacher_to_depart_template' => <<<'EOT'
+소통내용:
+
+EOT,
+
+    'institution_support_types' => [
+        '전화',
+        '대면',
+        '화상',
+        '이메일',
+        '문자',
+        '기타',
+    ],
+
+    'teacher_support_types' => [
+        '전화',
+        '대면',
+        '화상',
+        '이메일',
+        '문자',
+        '팜플렛',
+        '기타',
+    ],
+
 ];

@@ -104,7 +104,7 @@
                         @error('newDeptName') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-500 mb-1">상위부서</label>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">상위부서 <span class="font-normal text-gray-400">(선택)</span></label>
                         <select wire:model.defer="newAdmrDept"
                                 class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                             <option value="">미지정</option>
@@ -164,11 +164,11 @@
                         @error('editDeptName') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-500 mb-1">상위부서</label>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">상위부서 <span class="font-normal text-gray-400">(선택)</span></label>
                         <select wire:model.defer="editAdmrDept"
                                 class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="">미지정</option>
-                            @foreach($parentOptions as $dept)
+                            @foreach($parentOptions->where('DEPTNO', '!=', $editDeptNo) as $dept)
                                 <option value="{{ $dept->DEPTNO }}">{{ $dept->displayName() }}</option>
                             @endforeach
                         </select>

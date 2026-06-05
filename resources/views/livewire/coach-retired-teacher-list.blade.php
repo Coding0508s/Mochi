@@ -64,8 +64,8 @@
             <table class="w-full min-w-[860px] text-sm border-collapse">
                 <thead>
                 <tr class="bg-[#f5f0e8] text-gray-700">
-                    <th class="px-3 py-2 text-left border border-gray-300">기관명</th>
                     <th class="px-3 py-2 text-left border border-gray-300">SK</th>
+                    <th class="px-3 py-2 text-left border border-gray-300">기관명</th>
                     <th class="px-3 py-2 text-left border border-gray-300">직급</th>
                     <th class="px-3 py-2 text-left border border-gray-300">교사명</th>
                     <th class="px-3 py-2 text-left border border-gray-300">퇴직일</th>
@@ -76,8 +76,8 @@
                 <tbody>
                 @forelse($retirements as $row)
                     <tr class="hover:bg-blue-50/40 border-b border-gray-200">
-                        <td class="px-3 py-2 border border-gray-200">{{ $row->displayAccountName() ?: '-' }}</td>
                         <td class="px-3 py-2 border border-gray-200">{{ $row->SK_Code }}</td>
+                        <td class="px-3 py-2 border border-gray-200">{{ $row->displayAccountName() ?: '-' }}</td>
                         <td class="px-3 py-2 border border-gray-200">
                             @if($position = $row->displayPosition())
                                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium

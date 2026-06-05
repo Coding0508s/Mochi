@@ -105,6 +105,10 @@ class TeamMenuContextTest extends TestCase
             TeamMenuContext::institutionSupportReportFormHeading()
         );
         $this->assertSame(
+            'Coach Team 교사지원보고서 작성',
+            TeamMenuContext::supportReportFormHeading(reportMode: 'teacher')
+        );
+        $this->assertSame(
             'Coach Team 기관 지원 보고서',
             TeamMenuContext::institutionSupportReportMailOpening()
         );
