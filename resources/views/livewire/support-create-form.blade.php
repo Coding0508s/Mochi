@@ -40,6 +40,7 @@
                 $institutionSelected = filled($formSkCode) || filled($formPotentialTargetId);
                 $sfUploadEnabled = $institutionSelected && filled($formSkCode);
                 $coachTypedTeacherCreate = $this->usesCoachTypedTeacherSupportCreate();
+                $coachTypedTeacherSupportForm = $this->usesCoachTypedTeacherSupportForm();
                 $teacherSelected = filled($formTeacherId);
                 $canPickSupportType = $coachTypedTeacherCreate && $institutionSelected && $teacherSelected;
             @endphp
@@ -122,7 +123,7 @@
                     </div>
                     @endif
 
-                    @unless($coachTypedTeacherCreate)
+                    @unless($coachTypedTeacherCreate || $coachTypedTeacherSupportForm)
                     {{-- CO명 --}}
                     <div class="w-44 shrink-0">
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ \App\Support\TeamMenuContext::institutionSupportReportAssigneeLabel(null, $formTeamMenu) }}</label>
@@ -172,7 +173,7 @@
 
                     <div class="border-t border-gray-100 pt-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-2">교사 지원 유형 선택</h3>
-                        <p class="text-xs text-gray-500 mb-3">기관과 교사를 선택한 뒤, 작성할 보고서 유형을 선택하면 해당 입력 화면으로 이동합니다.</p>
+                        <p class="text-xs text-gray-500 mb-3">기관과 교사를 선택한 뒤, 작성할 보고서 유형을 선택하면 해당 입력 화면이 열립니다.</p>
                         <div class="space-y-2">
                             <select
                                 wire:change="startCoachTeacherSupportCreate($event.target.value)"
@@ -196,7 +197,35 @@
                                     <option value="{{ $pillAction }}">{{ $pillLabel }}</option>
                                 @endforeach
                             </select>
-                            <p class="text-[11px] text-gray-400">유형을 선택하면 Coach Team 교사지원 입력 화면으로 이동합니다.</p>
+                            <p class="text-[11px] text-gray-400">유형을 선택하면 Coach Team 교사지원 전용 입력 화면이 열립니다.</p>
+                        </div>
+                    </div>
+                @elseif($coachTypedTeacherSupportForm)
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">담당 Coach</label>
+                            <input type="text" wire:model="formCoName" readonly
+                                   class="w-full py-2.5 px-3 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-700">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">교사명</label>
+                            <input type="text" wire:model="formTarget" readonly
+                                   class="w-full py-2.5 px-3 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-700">
+                        </div>
+                    </div>
+
+                    <div class="rounded-xl border border-blue-100 bg-blue-50/40 px-4 py-4">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-900">{{ $this->coachTypedTeacherSupportCreateLabel() }} 작성</p>
+                                <p class="mt-1 text-xs text-gray-600">{{ $formAccountName }} · {{ $formTarget }}</p>
+                                <p class="mt-2 text-xs text-gray-500">열린 입력 창에서 보고서를 작성한 뒤 저장해 주세요.</p>
+                            </div>
+                            <button type="button"
+                                    wire:click="resetCoachTeacherSupportCreate"
+                                    class="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
+                                유형 다시 선택
+                            </button>
                         </div>
                     </div>
                 @else
@@ -343,10 +372,16 @@
 
             <div class="px-8 py-5 bg-gray-50 border-t border-gray-200 flex items-center justify-between rounded-b-2xl">
                 @if($coachTypedTeacherCreate)
-                    <p class="text-xs text-gray-500">유형을 선택하면 Coach Team 교사지원 입력 화면으로 이동합니다.</p>
+                    <p class="text-xs text-gray-500">유형을 선택하면 Coach Team 교사지원 전용 입력 화면이 열립니다.</p>
                     <a href="{{ \App\Support\TeamMenuContext::route('supports.index', [], null, $formTeamMenu) }}"
                        class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-xl hover:bg-gray-100 transition-colors">
                         취소하기
+                    </a>
+                @elseif($coachTypedTeacherSupportForm)
+                    <p class="text-xs text-gray-500">입력 창을 닫거나 저장하면 이 화면으로 돌아옵니다.</p>
+                    <a href="{{ \App\Support\TeamMenuContext::route('supports.index', [], null, $formTeamMenu) }}"
+                       class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-xl hover:bg-gray-100 transition-colors">
+                        목록으로
                     </a>
                 @else
                 <label class="flex items-center gap-3 cursor-pointer">
@@ -385,4 +420,8 @@
             </div>
         </form>
     </div>
+
+    @if($formTeamMenu === 'coach' && $reportMode === 'teacher')
+        @include('partials.coach.support-create-typed-modals')
+    @endif
 </div>

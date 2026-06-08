@@ -2,6 +2,8 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\ManagesCoachTeacherSupportCreateModals;
+use App\Livewire\Concerns\OpensTeacherSupportHistoryDetail;
 use App\Mail\SupportReportStoredMail;
 use App\Models\CoNewTarget;
 use App\Models\CoNewTargetDetail;
@@ -27,6 +29,8 @@ use Livewire\WithFileUploads;
 
 class SupportCreateForm extends Component
 {
+    use ManagesCoachTeacherSupportCreateModals;
+    use OpensTeacherSupportHistoryDetail;
     use WithFileUploads;
 
     public string $formSkCode = '';
@@ -236,6 +240,94 @@ class SupportCreateForm extends Component
 
         $this->formCoachTeacherCreateAction = $action;
         $this->formSupportType = (string) $selectedType['label'];
+        $this->closeOpenSupportReportModals();
+        $this->openCoachTeacherSupportCreateModal($action, (int) $this->formTeacherId);
+    }
+
+    public function usesCoachTypedTeacherSupportForm(): bool
+    {
+        return $this->formTeamMenu === 'coach'
+            && $this->reportMode === 'teacher'
+            && filled($this->formCoachTeacherCreateAction);
+    }
+
+    public function resetCoachTeacherSupportCreate(): void
+    {
+        $this->closeAllTeacherSupportReportModals();
+        $this->formCoachTeacherCreateAction = null;
+    }
+
+    public function coachTypedTeacherSupportCreateLabel(): ?string
+    {
+        if (blank($this->formCoachTeacherCreateAction)) {
+            return null;
+        }
+
+        $selected = collect(config('coach_teacher_support_create.types', []))
+            ->map(function (array|string $pill): ?array {
+                if (! is_array($pill)) {
+                    return null;
+                }
+
+                $label = isset($pill['label']) ? trim((string) $pill['label']) : '';
+                $typeAction = isset($pill['action']) ? trim((string) $pill['action']) : '';
+
+                if ($label === '' || $typeAction === '') {
+                    return null;
+                }
+
+                return [
+                    'label' => $label,
+                    'action' => $typeAction,
+                ];
+            })
+            ->filter()
+            ->first(fn (array $pill): bool => $pill['action'] === $this->formCoachTeacherCreateAction);
+
+        return $selected['label'] ?? null;
+    }
+
+    protected function expectedSupportHistorySkCodeForDetail(): ?string
+    {
+        return filled($this->formSkCode) ? $this->formSkCode : null;
+    }
+
+    protected function findVisibleTeacherForSupportModal(int $teacherId): ?Teacher
+    {
+        if ($this->formTeacherId !== $teacherId || $teacherId <= 0 || blank($this->formSkCode)) {
+            return null;
+        }
+
+        $teacher = Teacher::query()
+            ->with(['institution.accountInfo'])
+            ->find($teacherId);
+
+        if ($teacher === null) {
+            return null;
+        }
+
+        $candidates = SkCodeNormalizer::candidates($this->formSkCode);
+        $teacherSk = SkCodeNormalizer::normalize((string) $teacher->SK_Code) ?? (string) $teacher->SK_Code;
+
+        if (! in_array((string) $teacher->SK_Code, $candidates, true)
+            && ! in_array($teacherSk, $candidates, true)) {
+            return null;
+        }
+
+        return $teacher;
+    }
+
+    protected function finalizeCoachTeacherSupportReportSave(int $teacherId, callable $closeModal): void
+    {
+        $closeModal();
+        $this->formCoachTeacherCreateAction = null;
+    }
+
+    protected function afterCoachTeacherSupportModalClosed(): void
+    {
+        if ($this->formTeamMenu === 'coach' && $this->reportMode === 'teacher') {
+            $this->formCoachTeacherCreateAction = null;
+        }
     }
 
     /**
@@ -487,7 +579,7 @@ class SupportCreateForm extends Component
 
     public function save(): void
     {
-        if ($this->usesCoachTypedTeacherSupportCreate()) {
+        if ($this->usesCoachTypedTeacherSupportCreate() || $this->usesCoachTypedTeacherSupportForm()) {
             $this->addError('formTeacherId', '아래에서 교사 지원 유형을 선택해 주세요.');
 
             return;
@@ -751,12 +843,12 @@ class SupportCreateForm extends Component
             ->values()
             ->map(fn (array $item): object => (object) $item);
 
-        return view('livewire.support-create-form', [
+        return view('livewire.support-create-form', array_merge([
             'institutionSuggestions' => $mergedSuggestions,
             'supportTypeOptions' => $this->supportTypeOptions(),
             'institutionTeachers' => $this->institutionTeachers(),
             'coachTeacherSupportCreateTypes' => config('coach_teacher_support_create.types', []),
-        ]);
+        ], $this->coachTeacherSupportReportModalConfigs()));
     }
 
     /**

@@ -203,6 +203,7 @@ trait OpensTeacherSupportHistoryDetail
         $this->demoLessonTeacherId = null;
         $this->demoLessonForm = [];
         $this->demoLessonMarkCompleted = true;
+        $this->afterCoachTeacherSupportModalClosed();
     }
 
     public function closeLvaFrModal(): void
@@ -212,6 +213,7 @@ trait OpensTeacherSupportHistoryDetail
         $this->lvaFrTeacherId = null;
         $this->lvaFrForm = [];
         $this->lvaFrMarkCompleted = true;
+        $this->afterCoachTeacherSupportModalClosed();
     }
 
     public function closeLvaFbModal(): void
@@ -221,6 +223,7 @@ trait OpensTeacherSupportHistoryDetail
         $this->lvaFbTeacherId = null;
         $this->lvaFbForm = [];
         $this->lvaFbMarkCompleted = true;
+        $this->afterCoachTeacherSupportModalClosed();
     }
 
     public function closeLsOnsiteLvaModal(): void
@@ -230,6 +233,7 @@ trait OpensTeacherSupportHistoryDetail
         $this->lsOnsiteLvaTeacherId = null;
         $this->lsOnsiteLvaForm = [];
         $this->lsOnsiteLvaMarkCompleted = true;
+        $this->afterCoachTeacherSupportModalClosed();
     }
 
     public function closeLittleseedConModal(): void
@@ -239,6 +243,7 @@ trait OpensTeacherSupportHistoryDetail
         $this->littleseedConTeacherId = null;
         $this->littleseedConForm = [];
         $this->littleseedConMarkCompleted = true;
+        $this->afterCoachTeacherSupportModalClosed();
     }
 
     public function closeOnsiteModal(): void
@@ -248,6 +253,7 @@ trait OpensTeacherSupportHistoryDetail
         $this->onsiteTeacherId = null;
         $this->onsiteForm = [];
         $this->onsiteMarkCompleted = true;
+        $this->afterCoachTeacherSupportModalClosed();
     }
 
     public function closeProConModal(): void
@@ -257,6 +263,7 @@ trait OpensTeacherSupportHistoryDetail
         $this->proConTeacherId = null;
         $this->proConForm = [];
         $this->proConMarkCompleted = true;
+        $this->afterCoachTeacherSupportModalClosed();
     }
 
     public function closeOpenClassModal(): void
@@ -266,6 +273,7 @@ trait OpensTeacherSupportHistoryDetail
         $this->openClassTeacherId = null;
         $this->openClassForm = [];
         $this->openClassMarkCompleted = true;
+        $this->afterCoachTeacherSupportModalClosed();
     }
 
     public function closeUnit21PlusModal(): void
@@ -275,6 +283,7 @@ trait OpensTeacherSupportHistoryDetail
         $this->unit21PlusTeacherId = null;
         $this->unit21PlusForm = [];
         $this->unit21PlusMarkCompleted = true;
+        $this->afterCoachTeacherSupportModalClosed();
     }
 
     public function closeUnit31PlusModal(): void
@@ -284,7 +293,10 @@ trait OpensTeacherSupportHistoryDetail
         $this->unit31PlusTeacherId = null;
         $this->unit31PlusForm = [];
         $this->unit31PlusMarkCompleted = true;
+        $this->afterCoachTeacherSupportModalClosed();
     }
+
+    protected function afterCoachTeacherSupportModalClosed(): void {}
 
     protected function allowsEditingViewingSupportReport(): bool
     {

@@ -273,10 +273,11 @@ class SupportCreateFormTest extends TestCase
             ->assertNoRedirect()
             ->assertSet('formSupportType', 'Pro Con')
             ->assertSet('formCoachTeacherCreateAction', 'pro_con')
+            ->assertSet('showProConModal', true)
             ->assertDontSee('교사 지원 유형 선택')
-            ->assertSee('교사 이슈 및 논의 사항')
-            ->assertSee('교사와의 소통내용')
-            ->assertSee('교사명')
+            ->assertSee('Pro Con 작성')
+            ->assertSee('TR 교사지원LSPConsulting')
+            ->assertDontSee('기관 이슈 및 논의 사항')
             ->assertSet('formTarget', '김교사');
     }
 
