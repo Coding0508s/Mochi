@@ -454,7 +454,7 @@
                                 <div>
                                     <label class="mb-1 block text-sm font-medium text-gray-700">사용자명</label>
                                     <input type="text"
-                                           value="{{ auth()->user()?->name ?? '' }}"
+                                           value="{{ $vehicleUserName }}"
                                            readonly
                                            class="w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700">
                                 </div>

@@ -339,6 +339,48 @@ class SharedSupplyManagerTest extends TestCase
 
     public function test_shared_supply_labels_are_seeded_from_migration(): void
     {
+    public function test_edit_modal_shows_supply_owner_name_instead_of_logged_in_user(): void
+    {
+        $owner = User::factory()->create([
+            'name' => '김영일',
+            'is_admin' => false,
+        ]);
+        $admin = User::factory()->create([
+            'name' => 'Test User',
+            'is_admin' => true,
+        ]);
+
+        $supply = SharedSupply::query()->create([
+            'user_id' => $owner->id,
+            'starts_at' => Carbon::parse('2026-06-08 08:20'),
+            'ends_at' => Carbon::parse('2026-06-08 08:30'),
+            'shared_supply_item_id' => $this->itemIdByCode('00003'),
+            'shared_supply_label_id' => $this->labelIdByCode('01'),
+            'title' => '[출장 차량배차] 신청 및 예약',
+            'purpose' => '일반업무',
+            'created_by' => $owner->id,
+            'updated_by' => $owner->id,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(SharedSupplyManager::class)
+            ->call('openEditModal', $supply->id)
+            ->assertSet('vehicleUserName', '김영일');
+    }
+
+    public function test_create_modal_shows_logged_in_user_name(): void
+    {
+        $user = User::factory()->create([
+            'name' => 'Test User',
+            'is_admin' => false,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class)
+            ->call('openCreateModal')
+            ->assertSet('vehicleUserName', 'Test User');
+    }
+
         $this->assertDatabaseHas('shared_supply_labels', [
             'code' => '01',
             'name' => '차량배차',

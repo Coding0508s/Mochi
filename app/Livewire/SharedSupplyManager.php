@@ -81,6 +81,8 @@ class SharedSupplyManager extends Component
     /** @var array{inserted:int,updated:int,skipped:int}|null */
     public ?array $importSummary = null;
 
+    public string $vehicleUserName = '';
+
     /** @var array<int, string> */
     public array $importErrors = [];
 
@@ -279,6 +281,7 @@ class SharedSupplyManager extends Component
         $this->sharedSupplyItemId = $supply->shared_supply_item_id;
         $this->sharedSupplyLabelId = $supply->shared_supply_label_id;
         $this->scheduleCategoryCode = (string) ($supply->schedule_category_code ?? '');
+        $this->vehicleUserName = (string) ($supply->user?->name ?? '');
         $this->title = (string) $supply->title;
         $this->purpose = (string) ($supply->purpose ?? '');
         $this->vehicleOdometerBefore = $vehicleLog?->odometer_before;
@@ -724,6 +727,7 @@ class SharedSupplyManager extends Component
             return $items->filter(fn (SharedSupplyItem $item): bool => $this->isVehicleItemName((string) $item->name))->values();
         }
 
+        $this->vehicleUserName = (string) (auth()->user()?->name ?? '');
         if ($this->shouldUseTitleAsItem()) {
             $item = $this->ensureItemByName($this->title);
 
