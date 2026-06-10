@@ -337,8 +337,6 @@ class SharedSupplyManagerTest extends TestCase
         ]);
     }
 
-    public function test_shared_supply_labels_are_seeded_from_migration(): void
-    {
     public function test_edit_modal_shows_supply_owner_name_instead_of_logged_in_user(): void
     {
         $owner = User::factory()->create([
@@ -381,6 +379,8 @@ class SharedSupplyManagerTest extends TestCase
             ->assertSet('vehicleUserName', 'Test User');
     }
 
+    public function test_shared_supply_labels_are_seeded_from_migration(): void
+    {
         $this->assertDatabaseHas('shared_supply_labels', [
             'code' => '01',
             'name' => '차량배차',
