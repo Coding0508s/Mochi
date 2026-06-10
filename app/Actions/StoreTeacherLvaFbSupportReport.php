@@ -8,6 +8,7 @@ use App\Models\TeacherLvaFbSupportReport;
 use App\Models\User;
 use App\Support\CoachTeacherScope;
 use App\Support\CoachTeacherSupportPayload;
+use App\Support\TeacherSupportSlotSync;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -49,6 +50,12 @@ class StoreTeacherLvaFbSupportReport
                     'CompletedDate' => now(),
                 ]);
                 $supportRecordId = $supportRecord->ID;
+
+                TeacherSupportSlotSync::apply(
+                    $teacher,
+                    isset($validated['support_round']) ? (int) $validated['support_round'] : null,
+                    (string) config('coach_teacher_lva_fb.support_type_label'),
+                );
             }
 
             return TeacherLvaFbSupportReport::query()->create([
@@ -133,6 +140,7 @@ class StoreTeacherLvaFbSupportReport
             'growth_areas' => ['nullable', 'array'],
             'growth_areas.*' => ['string'],
             'mark_completed' => ['nullable', 'boolean'],
+            'support_round' => ['nullable', 'integer', 'between:1,4'],
         ])->validate();
     }
 }

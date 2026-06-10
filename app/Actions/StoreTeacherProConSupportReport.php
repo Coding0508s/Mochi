@@ -8,6 +8,7 @@ use App\Models\TeacherProConSupportReport;
 use App\Models\User;
 use App\Support\CoachTeacherScope;
 use App\Support\CoachTeacherSupportPayload;
+use App\Support\TeacherSupportSlotSync;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -55,6 +56,12 @@ class StoreTeacherProConSupportReport
                     'CompletedDate' => now(),
                 ]);
                 $supportRecordId = $supportRecord->ID;
+
+                TeacherSupportSlotSync::apply(
+                    $teacher,
+                    isset($validated['support_round']) ? (int) $validated['support_round'] : null,
+                    (string) config('coach_teacher_pro_con.support_type_label'),
+                );
             }
 
             return TeacherProConSupportReport::query()->create([
@@ -127,6 +134,7 @@ class StoreTeacherProConSupportReport
             'discussion_content' => ['nullable', 'string', 'max:5000'],
             'solution_plan' => ['nullable', 'string', 'max:5000'],
             'mark_completed' => ['nullable', 'boolean'],
+            'support_round' => ['nullable', 'integer', 'between:1,4'],
         ])->validate();
     }
 }

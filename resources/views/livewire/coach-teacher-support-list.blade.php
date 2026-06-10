@@ -8,13 +8,25 @@
     {{-- Summary --}}
     <div class="mochi-summary-card">
         @php
-            $kpiToggleLabels = \App\Support\TeacherSupportKpiCalculator::toggleLabels();
+            $kpiToggleLabels = \App\Support\TeacherSupportKpiCalculator::visibleToggleLabels();
+            $totalSupportCount = \App\Support\TeacherSupportKpiCalculator::totalSupportCount($kpis);
+            $allKpiLabels = \App\Support\TeacherSupportKpiCalculator::toggleLabels();
         @endphp
 
         <div class="flex flex-wrap items-center gap-3 text-sm">
             <h2 class="text-base font-semibold text-[#2b78c5]">교사 지원 현황</h2>
             <span class="text-gray-300">|</span>
             <div class="mochi-toggle-group">
+                <span class="mochi-toggle-btn cursor-default pointer-events-none text-gray-700"
+                      aria-label="기관 수">
+                    기관 수
+                    <span class="font-semibold">{{ $kpis['institution_count'] ?? 0 }}</span>
+                </span>
+                <span class="mochi-toggle-btn cursor-default pointer-events-none text-gray-700"
+                      aria-label="교사 수">
+                    교사 수
+                    <span class="font-semibold">{{ $kpis['teacher_count'] ?? 0 }}</span>
+                </span>
                 @foreach($kpiToggleLabels as $kpiKey => $kpiLabel)
                     <button type="button"
                             wire:click="setKpiFilter('{{ $kpiKey }}')"
@@ -31,6 +43,11 @@
                         <span class="font-semibold">{{ $kpis[$kpiKey] ?? 0 }}</span>
                     </button>
                 @endforeach
+                <span class="mochi-toggle-btn cursor-default pointer-events-none text-gray-700"
+                      aria-label="총 지원 횟수">
+                    총 지원 횟수
+                    <span class="font-semibold">{{ $totalSupportCount }}</span>
+                </span>
             </div>
 
             <div class="ml-auto flex flex-wrap items-center gap-2">
@@ -41,7 +58,7 @@
                         <option value="{{ $y }}">{{ $y }}년</option>
                     @endfor
                 </select>
-                <a href="{{ \App\Support\TeamMenuContext::route('supports.index') }}"
+                <a href="{{ \App\Support\TeamMenuContext::route('supports.create') }}"
                    class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600">
                     기관지원보고서
                 </a>
@@ -55,7 +72,7 @@
             $activeFilterChips = [];
 
             if ($kpiFilter) {
-                $activeFilterChips[] = ['label' => '상태: '.($kpiToggleLabels[$kpiFilter] ?? $kpiFilter), 'action' => 'clearKpiFilter'];
+                $activeFilterChips[] = ['label' => '상태: '.($allKpiLabels[$kpiFilter] ?? $kpiFilter), 'action' => 'clearKpiFilter'];
             }
 
             if ($filterRound) {
@@ -153,20 +170,6 @@
                         </button>
                     </div>
                 </div>
-
-                <div class="flex items-center gap-2 text-sm">
-                    <span class="text-gray-500">컬럼</span>
-                    <div class="mochi-toggle-group">
-                        <button type="button" wire:click="$set('showExtendedColumns', false)"
-                                class="mochi-toggle-btn {{ ! $showExtendedColumns ? 'mochi-toggle-btn--active' : '' }}">
-                            기본
-                        </button>
-                        <button type="button" wire:click="$set('showExtendedColumns', true)"
-                                class="mochi-toggle-btn {{ $showExtendedColumns ? 'mochi-toggle-btn--active' : '' }}">
-                            확장
-                        </button>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -227,7 +230,9 @@
         <div class="md:hidden space-y-3 p-3">
             @forelse($items as $teacher)
                 @php
-                    $canOpenEditModal = $this->canOpenEditModal($teacher->ID);
+                    // 지원 일정 수정 모달 임시 비활성화. 복구 시 아래 주석을 해제할 것.
+                    // $canOpenEditModal = $this->canOpenEditModal($teacher->ID);
+                    $canOpenEditModal = false;
                 @endphp
                 @include('partials.coach.teacher-support-mobile-card', [
                     'teacher' => $teacher,
@@ -244,25 +249,26 @@
 
         <div class="coach-teacher-support-table-scroll hidden md:block isolate">
             <table @class([
-                'coach-teacher-support-table w-full text-sm whitespace-nowrap',
+                'coach-teacher-support-table w-full text-xs',
                 'coach-teacher-support-table--extended' => $showExtendedColumns,
             ])>
                 <colgroup>
                     <col class="coach-support-col-sk">
                     <col class="coach-support-col-institution">
-                    <col class="coach-support-col-position">
                     <col class="coach-support-col-name">
+                    <col class="coach-support-col-position">
                     <col class="coach-support-col-essentials-gs">
                     <col class="coach-support-col-essentials-ls">
+                    <col span="4" class="coach-support-col-completed">
                 </colgroup>
                 <thead class="mochi-table-head">
                 <tr class="text-gray-700">
-                    <th class="coach-support-sticky-sk coach-support-sticky-sk--head coach-support-sk-code px-3 py-2 text-center">SK_Code</th>
-                    <th class="coach-support-sticky-inst coach-support-sticky-inst--head px-3 py-2 text-center">기관명</th>
-                    <th class="coach-support-sticky-position coach-support-sticky-position--head px-3 py-2 text-left">직급</th>
-                    <th class="coach-support-sticky-name coach-support-sticky-name--head px-3 py-2 text-left">이름</th>
-                    <th class="coach-support-sticky-essentials-gs coach-support-sticky-essentials-gs--head px-3 py-2 text-left">GS Essentials</th>
-                    <th class="coach-support-sticky-essentials-ls coach-support-sticky-essentials-ls--head px-3 py-2 text-left">LS Essentials</th>
+                    <th class="coach-support-sticky-sk coach-support-sticky-sk--head coach-support-sk-code px-2 py-1.5 text-center">SK</th>
+                    <th class="coach-support-sticky-inst coach-support-sticky-inst--head px-2 py-1.5 text-center">기관명</th>
+                    <th class="coach-support-sticky-name coach-support-sticky-name--head px-2 py-1.5 text-left">이름</th>
+                    <th class="coach-support-sticky-position coach-support-sticky-position--head px-2 py-1.5 text-left">직급</th>
+                    <th class="coach-support-sticky-essentials-gs coach-support-sticky-essentials-gs--head px-2 py-1.5 text-left" title="GS Essentials">GS Ess.</th>
+                    <th class="coach-support-sticky-essentials-ls coach-support-sticky-essentials-ls--head px-2 py-1.5 text-left" title="LS Essentials">LS Ess.</th>
                     <th class="coach-support-col-plan-12-hidden px-3 py-2 text-left coach-support-col-plan1-date">1차 지원 계획일자</th>
                     <th class="coach-support-col-plan-12-hidden px-3 py-2 text-left">1차 지원 계획타입</th>
                     <th class="coach-support-col-plan-12-hidden px-3 py-2 text-left">2차 지원 계획일자</th>
@@ -273,14 +279,10 @@
                         <th class="coach-support-col-plan-34-hidden px-3 py-2 text-left">4차 지원 계획일자</th>
                         <th class="coach-support-col-plan-34-hidden px-3 py-2 text-left">4차 지원 계획타입</th>
                     @endif
-                    <th class="px-3 py-2 text-left">1차 지원 완료일</th>
-                    <th class="px-3 py-2 text-left">1차 완료 타입</th>
-                    <th class="px-3 py-2 text-left">2차 지원 완료일</th>
-                    <th class="px-3 py-2 text-left">2차 완료 타입</th>
-                    @if($showExtendedColumns)
-                        <th class="px-3 py-2 text-left">3차 완료</th>
-                        <th class="px-3 py-2 text-left">4차 완료</th>
-                    @endif
+                    <th class="coach-support-col-completed px-2 py-1.5 text-left" title="1차 지원 완료일">1차 완료</th>
+                    <th class="coach-support-col-completed px-2 py-1.5 text-left" title="2차 지원 완료일">2차 완료</th>
+                    <th class="coach-support-col-completed px-2 py-1.5 text-left" title="3차 지원 완료일">3차 완료</th>
+                    <th class="coach-support-col-completed px-2 py-1.5 text-left" title="4차 지원 완료일">4차 완료</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -288,7 +290,9 @@
                     @php
                         $isFirstInGroup = ($rowspans[$idx] ?? 0) > 0;
                         $span = $rowspans[$idx] ?? 0;
-                        $canOpenEditModal = $this->canOpenEditModal($teacher->ID);
+                        // 지원 일정 수정 모달 임시 비활성화. 복구 시 아래 주석을 해제할 것.
+                        // $canOpenEditModal = $this->canOpenEditModal($teacher->ID);
+                        $canOpenEditModal = false;
                     @endphp
                     <tr wire:key="teacher-{{ $teacher->ID }}"
                         class="mochi-table-row-hover">
@@ -309,6 +313,13 @@
                                 </button>
                             </td>
                         @endif
+                        <td class="coach-support-sticky-name px-3 py-2 align-middle">
+                            <button type="button"
+                                    class="coach-support-name-link cursor-pointer text-left text-mochi-header underline hover:text-mochi-header/80"
+                                    wire:click.stop="openTeacherModal({{ $teacher->ID }})">
+                                    {{ $teacher->Name }}
+                            </button>
+                        </td>
                         <td class="coach-support-sticky-position px-3 py-2 align-middle">
                             @if($teacher->Position)
                                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
@@ -316,13 +327,6 @@
                                     {{ $teacher->Position }}
                                 </span>
                             @endif
-                        </td>
-                        <td class="coach-support-sticky-name px-3 py-2 align-middle">
-                            <button type="button"
-                                    class="coach-support-name-link cursor-pointer text-left text-mochi-header underline hover:text-mochi-header/80"
-                                    wire:click.stop="openTeacherModal({{ $teacher->ID }})">
-                                    {{ $teacher->Name }}
-                            </button>
                         </td>
                         <td class="coach-support-sticky-essentials-gs px-3 py-2 align-middle coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
@@ -431,70 +435,62 @@
                                 @endif
                             </td>
                         @endif
-                        <td class="px-3 py-2 coach-support-schedule-cell {{ \App\Support\ExcelSerialDate::matchesFilterYear($teacher->getRawOriginal($cols['completed_1st']), $displayYear) ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\ExcelSerialDate::matchesFilterYear($teacher->getRawOriginal($cols['completed_1st']), $displayYear) ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
                                 wire:click="openEditModal({{ $teacher->ID }})"
                                 role="button"
                                 tabindex="0"
                                 aria-label="{{ $teacher->Name }} 지원 일정 수정"
                             @endif>
-                            {{ \App\Support\ExcelSerialDate::displayStorageString($teacher->getRawOriginal($cols['completed_1st']), $displayYear) }}
+                            @include('partials.coach.teacher-support-completed-cell', [
+                                'dateValue' => $teacher->getRawOriginal($cols['completed_1st']),
+                                'type' => $teacher->{$cols['type_1st']},
+                                'displayYear' => $displayYear,
+                            ])
                         </td>
-                        <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\ExcelSerialDate::matchesFilterYear($teacher->getRawOriginal($cols['completed_2nd']), $displayYear) ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
                                 wire:click="openEditModal({{ $teacher->ID }})"
                                 role="button"
                                 tabindex="0"
                                 aria-label="{{ $teacher->Name }} 지원 일정 수정"
                             @endif>
-                            @if(\App\Support\ExcelSerialDate::matchesFilterYear($teacher->getRawOriginal($cols['completed_1st']), $displayYear))
-                                {{ $teacher->{$cols['type_1st']} }}
-                            @endif
+                            @include('partials.coach.teacher-support-completed-cell', [
+                                'dateValue' => $teacher->getRawOriginal($cols['completed_2nd']),
+                                'type' => $teacher->{$cols['type_2nd']},
+                                'displayYear' => $displayYear,
+                            ])
                         </td>
-                        <td class="px-3 py-2 coach-support-schedule-cell {{ \App\Support\ExcelSerialDate::matchesFilterYear($teacher->getRawOriginal($cols['completed_2nd']), $displayYear) ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\ExcelSerialDate::matchesFilterYear($teacher->getRawOriginal($cols['completed_3rd']), $displayYear) ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
                                 wire:click="openEditModal({{ $teacher->ID }})"
                                 role="button"
                                 tabindex="0"
                                 aria-label="{{ $teacher->Name }} 지원 일정 수정"
                             @endif>
-                            {{ \App\Support\ExcelSerialDate::displayStorageString($teacher->getRawOriginal($cols['completed_2nd']), $displayYear) }}
+                            @include('partials.coach.teacher-support-completed-cell', [
+                                'dateValue' => $teacher->getRawOriginal($cols['completed_3rd']),
+                                'type' => $teacher->{$cols['type_3rd']},
+                                'displayYear' => $displayYear,
+                            ])
                         </td>
-                        <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\ExcelSerialDate::matchesFilterYear($teacher->getRawOriginal($cols['completed_4th']), $displayYear) ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
                                 wire:click="openEditModal({{ $teacher->ID }})"
                                 role="button"
                                 tabindex="0"
                                 aria-label="{{ $teacher->Name }} 지원 일정 수정"
                             @endif>
-                            @if(\App\Support\ExcelSerialDate::matchesFilterYear($teacher->getRawOriginal($cols['completed_2nd']), $displayYear))
-                                {{ $teacher->{$cols['type_2nd']} }}
-                            @endif
+                            @include('partials.coach.teacher-support-completed-cell', [
+                                'dateValue' => $teacher->getRawOriginal($cols['completed_4th']),
+                                'type' => $teacher->{$cols['type_4th']},
+                                'displayYear' => $displayYear,
+                            ])
                         </td>
-                        @if($showExtendedColumns)
-                            <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
-                                @if($canOpenEditModal)
-                                    wire:click="openEditModal({{ $teacher->ID }})"
-                                    role="button"
-                                    tabindex="0"
-                                    aria-label="{{ $teacher->Name }} 지원 일정 수정"
-                                @endif>
-                                {{ \App\Support\ExcelSerialDate::displayStorageString($teacher->getRawOriginal($cols['completed_3rd']), $displayYear) }}
-                            </td>
-                            <td class="px-3 py-2 coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
-                                @if($canOpenEditModal)
-                                    wire:click="openEditModal({{ $teacher->ID }})"
-                                    role="button"
-                                    tabindex="0"
-                                    aria-label="{{ $teacher->Name }} 지원 일정 수정"
-                                @endif>
-                                {{ \App\Support\ExcelSerialDate::displayStorageString($teacher->getRawOriginal($cols['completed_4th']), $displayYear) }}
-                            </td>
-                        @endif
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ $showExtendedColumns ? 20 : 14 }}" class="px-4 py-12 text-center text-gray-400">
+                        <td colspan="{{ $showExtendedColumns ? 18 : 14 }}" class="px-4 py-12 text-center text-gray-400">
                             <div class="flex flex-col items-center gap-2">
                                 <svg class="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
@@ -1002,24 +998,24 @@
                                     <tr>
                                         <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">이름</th>
                                         <td class="px-3 py-2 font-medium text-gray-900">{{ $teacherDetailInfo['name'] ?? '-' }}</td>
-                                        <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">GrapeSEED 이수</th>
-                                        <td class="px-3 py-2 text-gray-900">{{ $teacherDetailInfo['gs_essentials'] ?? '-' }}</td>
+                                        <th class="w-32 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">직급</th>
+                                        <td class="px-3 py-2 text-gray-900">{{ $teacherDetailInfo['position'] ?? '-' }}</td>
                                     </tr>
                                     <tr>
                                         <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">이메일</th>
                                         <td class="px-3 py-2 text-gray-900">{{ $teacherDetailInfo['email'] ?? '-' }}</td>
-                                        <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">LittleSEED 이수</th>
-                                        <td class="px-3 py-2 text-gray-900">{{ $teacherDetailInfo['ls_essentials'] ?? '-' }}</td>
+                                        <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">GrapeSEED 이수</th>
+                                        <td class="px-3 py-2 text-gray-900">{{ $teacherDetailInfo['gs_essentials'] ?? '-' }}</td>
                                     </tr>
                                     <tr>
                                         <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">전화</th>
                                         <td class="px-3 py-2 text-gray-900">{{ $teacherDetailInfo['phone'] ?? '-' }}</td>
-                                        <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당 Coach</th>
-                                        <td class="px-3 py-2 text-gray-900">{{ $teacherDetailInfo['tr'] ?? '-' }}</td>
+                                        <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">LittleSEED 이수</th>
+                                        <td class="px-3 py-2 text-gray-900">{{ $teacherDetailInfo['ls_essentials'] ?? '-' }}</td>
                                     </tr>
                                     <tr>
-                                        <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">직급</th>
-                                        <td class="px-3 py-2 text-gray-900">{{ $teacherDetailInfo['position'] ?? '-' }}</td>
+                                        <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당 Coach</th>
+                                        <td class="px-3 py-2 text-gray-900">{{ $teacherDetailInfo['tr'] ?? '-' }}</td>
                                         <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">CS</th>
                                         <td class="px-3 py-2 text-gray-900">{{ $teacherDetailInfo['cs'] ?? '-' }}</td>
                                     </tr>

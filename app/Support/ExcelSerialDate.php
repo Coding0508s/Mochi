@@ -152,6 +152,41 @@ final class ExcelSerialDate
         return self::toStorageStringForYear($value, $year);
     }
 
+    public static function displayCompletedWithType(mixed $dateValue, mixed $type, ?int $year): string
+    {
+        $date = self::displayStorageString($dateValue, $year) ?? '';
+        if ($date === '') {
+            return '';
+        }
+
+        if ($year !== null && ! self::matchesFilterYear($dateValue, $year)) {
+            return '';
+        }
+
+        $typeLabel = trim((string) ($type ?? ''));
+        if ($typeLabel === '') {
+            return $date;
+        }
+
+        return $date.' ('.$typeLabel.')';
+    }
+
+    /**
+     * @return array{date: string, type: string}
+     */
+    public static function completedDisplayParts(mixed $dateValue, mixed $type, ?int $year): array
+    {
+        $date = self::displayStorageString($dateValue, $year) ?? '';
+        if ($date === '' || ($year !== null && ! self::matchesFilterYear($dateValue, $year))) {
+            return ['date' => '', 'type' => ''];
+        }
+
+        return [
+            'date' => $date,
+            'type' => trim((string) ($type ?? '')),
+        ];
+    }
+
     public static function dateToSerial(CarbonInterface $date): int
     {
         return (int) Carbon::parse(self::EPOCH)->startOfDay()->diffInDays($date->copy()->startOfDay());

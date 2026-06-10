@@ -7,6 +7,7 @@ use App\Livewire\CoachTeacherSupportList;
 use App\Models\Teacher;
 use App\Models\User;
 use App\Support\ExcelSerialDate;
+use App\Support\TeacherSupportKpiCalculator;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -80,6 +81,7 @@ class CoachTeacherSupportListTest extends TestCase
             $table->text('Description')->nullable();
             $table->string('Status', 50)->nullable();
             $table->boolean('ClassInOut')->default(true);
+            $table->dateTime('Created_Date')->nullable();
             $table->date('Plan_1st_Support_Date')->nullable();
             $table->date('Plan_2nd_Support_Date')->nullable();
             $table->date('Plan_3rd_Support_Date')->nullable();
@@ -717,6 +719,13 @@ class CoachTeacherSupportListTest extends TestCase
         $this->assertSame(0, $kpis['fourth_round']);
         $this->assertSame(0, $kpis['completed']);
         $this->assertSame(2, $kpis['unsupported']);
+        $this->assertSame(3, TeacherSupportKpiCalculator::totalSupportCount($kpis));
+        $this->assertSame(1, $kpis['institution_count']);
+        $this->assertSame(3, $kpis['teacher_count']);
+
+        $component->assertSee('총 지원 횟수')
+            ->assertSee('기관 수')
+            ->assertSee('교사 수');
     }
 
     public function test_kpi_counts_third_and_fourth_round_completion(): void
@@ -1027,15 +1036,20 @@ class CoachTeacherSupportListTest extends TestCase
             ->assertRedirect();
     }
 
-    public function test_list_sorted_by_institution_name_korean(): void
+    public function test_list_sorted_by_created_date_desc(): void
     {
         $admin = $this->createAdminUser();
         $year = now()->year;
 
-        $this->createInstitution('SK002', '나나유치원', 'Coach A');
-        $this->createInstitution('SK001', '가가유치원', 'Coach A');
-        $this->createTeacher('SK002', '이교사', ['Plan_1st_Support_Date' => "{$year}-03-01"]);
-        $this->createTeacher('SK001', '김교사', ['Plan_1st_Support_Date' => "{$year}-04-01"]);
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '오래된교사', [
+            'Plan_1st_Support_Date' => "{$year}-03-01",
+            'Created_Date' => '2025-01-01 10:00:00',
+        ]);
+        $this->createTeacher('SK001', '최근교사', [
+            'Plan_1st_Support_Date' => "{$year}-04-01",
+            'Created_Date' => '2026-06-01 10:00:00',
+        ]);
 
         $component = Livewire::actingAs($admin)
             ->test(CoachTeacherSupportList::class);
@@ -1043,8 +1057,8 @@ class CoachTeacherSupportListTest extends TestCase
         $teachers = $component->viewData('teachers');
         $names = collect($teachers->items())->pluck('Name')->values()->all();
 
-        $this->assertSame('김교사', $names[0]);
-        $this->assertSame('이교사', $names[1]);
+        $this->assertSame('최근교사', $names[0]);
+        $this->assertSame('오래된교사', $names[1]);
     }
 
     public function test_month_filter_uses_first_plan_date_only(): void
@@ -1239,6 +1253,29 @@ class CoachTeacherSupportListTest extends TestCase
             ->assertSee("{$year}년 12월")
             ->assertSee('On-site')
             ->assertSee('LVA+FB');
+    }
+
+    public function test_list_displays_third_and_fourth_completion_columns_in_default_view(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '3차4차완료교사', [
+            '_3rd_Support_Date' => "{$year}-07-15",
+            '_3rd_Support_Type' => 'Open-Class',
+            '_4th_Support_Date' => "{$year}-12-10",
+            '_4th_Support_Type' => 'LVA + FB',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->assertSee('3차 완료')
+            ->assertSee('4차 완료')
+            ->assertSee("{$year}-07-15")
+            ->assertSee('Open-Class')
+            ->assertSee("{$year}-12-10")
+            ->assertSee('LVA + FB');
     }
 
     public function test_teacher_modal_shows_create_pills_when_no_history_and_class_out(): void
@@ -1912,7 +1949,9 @@ class CoachTeacherSupportListTest extends TestCase
         $this->assertStringContainsString('coach-teacher-support-table-scroll', $html);
         $this->assertStringContainsString('coach-support-schedule-cell', $html);
         $this->assertStringContainsString('coach-support-mobile-card', $html);
-        $this->assertStringContainsString('wire:click="openEditModal(', $html);
+        // 지원 일정 수정 모달 임시 비활성화 상태: 셀 클릭 트리거가 렌더링되지 않아야 한다.
+        // 모달 복구 시 assertStringContainsString 으로 되돌릴 것.
+        $this->assertStringNotContainsString('wire:click="openEditModal(', $html);
         $this->assertStringContainsString('wire:click.stop="openTeacherModal(', $html);
         $this->assertStringNotContainsString('>일정 수정<', $html);
     }
@@ -2259,6 +2298,30 @@ class CoachTeacherSupportListTest extends TestCase
             'Support_Type' => 'LVA + FB',
             'Status' => '완료',
         ]);
+
+        $this->assertDatabaseHas('Teachers', [
+            'ID' => $id,
+            '_1st_Support_Type' => 'LVA + FB',
+        ]);
+    }
+
+    public function test_save_lva_fb_report_rejects_recorded_support_round(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $id = $this->createTeacher('SK001', '홍길동', [
+            '_1st_Support_Date' => '2026-01-10',
+            '_1st_Support_Type' => '방문',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openLvaFbModal', $id)
+            ->set('supportRound', '1')
+            ->set('lvaFbMarkCompleted', true)
+            ->call('saveLvaFbReport')
+            ->assertHasErrors(['support_round']);
     }
 
     public function test_ls_onsite_lva_modal_opens_from_teacher_detail(): void
