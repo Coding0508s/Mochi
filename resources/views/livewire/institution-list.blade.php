@@ -17,55 +17,112 @@
         </div>
     @endif
 
-    {{-- 상단 요약 영역 (잠재기관 페이지와 동일 톤) --}}
+    {{-- 상단 요약 영역 (데스크톱: 한 줄 / 모바일: 제목+건수 후 배정 통계) --}}
     <div class="mochi-summary-card">
-        <div class="flex flex-wrap items-center gap-4 text-sm">
-            <h2 class="text-base font-semibold text-mochi-header">기관리스트</h2>
-           <!--  <span class="text-xs text-gray-500">({{ $statusScopeLabel }} · Information+마스터)</span> -->
-            <span class="text-gray-300">|</span>
+        <div class="hidden md:flex md:flex-nowrap md:items-center md:gap-4 text-sm">
+            <h2 class="shrink-0 text-base font-semibold text-mochi-header">기관리스트</h2>
+            <span class="shrink-0 text-gray-300">|</span>
             <button wire:click="$set('assignmentFilter', '')"
-                    class="text-gray-600 hover:text-blue-700 transition-colors cursor-pointer">
+                    class="shrink-0 whitespace-nowrap text-gray-600 hover:text-blue-700 transition-colors cursor-pointer">
                 배정 전체 <span class="font-semibold text-blue-600">{{ $allInstitutionCount }}</span>
             </button>
             <button wire:click="$set('assignmentFilter', 'assigned')"
-                    class="text-gray-600 hover:text-blue-700 transition-colors
+                    class="shrink-0 whitespace-nowrap text-gray-600 hover:text-blue-700 transition-colors
                            {{ $assignmentFilter === 'assigned' ? 'font-semibold text-green-700' : '' }} cursor-pointer">
                 담당자 배정 <span class="font-semibold text-green-600">{{ $assignedCoCount }}</span>
             </button>
             <button wire:click="$set('assignmentFilter', 'my_assigned')"
-                    class="text-gray-600 hover:text-blue-700 transition-colors
+                    class="shrink-0 whitespace-nowrap text-gray-600 hover:text-blue-700 transition-colors
                            {{ $assignmentFilter === 'my_assigned' ? 'font-semibold text-blue-700' : '' }} cursor-pointer">
                 내 담당 기관 <span class="font-semibold text-blue-600">{{ $myAssignedCoCount }}</span>
             </button>
             <button wire:click="$set('assignmentFilter', 'unassigned')"
-                    class="text-gray-600 hover:text-blue-700 transition-colors
+                    class="shrink-0 whitespace-nowrap text-gray-600 hover:text-blue-700 transition-colors
                            {{ $assignmentFilter === 'unassigned' ? 'font-semibold text-mochi-header' : '' }} cursor-pointer">
                 미배정 <span class="font-semibold text-gray-600">{{ $unassignedCoCount }}</span>
             </button>
-            <div class="ml-auto text-gray-500">
+            <div class="ml-auto shrink-0 whitespace-nowrap text-gray-500">
                 현재 조건 결과: <span class="font-semibold text-gray-700">{{ $institutions->total() }}</span>건
+            </div>
+        </div>
+
+        <div class="flex flex-nowrap items-center gap-2 text-xs md:hidden">
+            <h2 class="shrink-0 text-sm font-semibold text-mochi-header">기관리스트</h2>
+            <button wire:click="$set('assignmentFilter', '')"
+                    class="shrink-0 whitespace-nowrap text-gray-600 hover:text-blue-700 transition-colors cursor-pointer">
+                배정 <span class="font-semibold text-blue-600">{{ $allInstitutionCount }}</span>
+            </button>
+            <button wire:click="$set('assignmentFilter', 'assigned')"
+                    class="shrink-0 whitespace-nowrap text-gray-600 hover:text-blue-700 transition-colors
+                           {{ $assignmentFilter === 'assigned' ? 'font-semibold text-green-700' : '' }} cursor-pointer">
+                담당 <span class="font-semibold text-green-600">{{ $assignedCoCount }}</span>
+            </button>
+            <button wire:click="$set('assignmentFilter', 'my_assigned')"
+                    class="shrink-0 whitespace-nowrap text-gray-600 hover:text-blue-700 transition-colors
+                           {{ $assignmentFilter === 'my_assigned' ? 'font-semibold text-blue-700' : '' }} cursor-pointer">
+                내담당 <span class="font-semibold text-blue-600">{{ $myAssignedCoCount }}</span>
+            </button>
+            <button wire:click="$set('assignmentFilter', 'unassigned')"
+                    class="shrink-0 whitespace-nowrap text-gray-600 hover:text-blue-700 transition-colors
+                           {{ $assignmentFilter === 'unassigned' ? 'font-semibold text-mochi-header' : '' }} cursor-pointer">
+                미배정 <span class="font-semibold text-gray-600">{{ $unassignedCoCount }}</span>
+            </button>
+            <div class="ml-auto shrink-0 whitespace-nowrap text-gray-500">
+                <span class="font-semibold text-gray-700">{{ $institutions->total() }}</span>건
             </div>
         </div>
     </div>
 
     {{-- 필터 영역 --}}
     <div class="mochi-filter-card">
-        <div class="flex flex-wrap items-center gap-3">
+        @php
+            $statusLabelMap = [
+                'active' => '운영 기관',
+                'terminated' => '해지 기관',
+                'all' => '전체',
+            ];
+            $assignmentLabelMap = [
+                'assigned' => '담당자 배정',
+                'my_assigned' => '내 담당 기관',
+                'unassigned' => '미배정',
+            ];
+
+            $activeFilterChips = [];
+            if ($statusFilter !== 'all') {
+                $activeFilterChips[] = [
+                    'label' => '상태: '.($statusLabelMap[$statusFilter] ?? $statusFilter),
+                    'action' => 'clearStatusFilter',
+                ];
+            }
+            if ($assignmentFilter !== '') {
+                $activeFilterChips[] = [
+                    'label' => '배정: '.($assignmentLabelMap[$assignmentFilter] ?? $assignmentFilter),
+                    'action' => 'clearAssignmentFilter',
+                ];
+            }
+            if ($filterCo !== '') {
+                $activeFilterChips[] = ['label' => 'CO: '.$filterCo, 'action' => 'clearCoFilter'];
+            }
+            if ($filterTr !== '') {
+                $activeFilterChips[] = ['label' => 'Coach: '.$filterTr, 'action' => 'clearTrFilter'];
+            }
+            if ($filterCs !== '') {
+                $activeFilterChips[] = ['label' => 'CS: '.$filterCs, 'action' => 'clearCsFilter'];
+            }
+            if ($search !== '') {
+                $activeFilterChips[] = ['label' => '검색어: '.$search, 'action' => 'clearSearchFilter'];
+            }
+        @endphp
+
+        <div class="flex flex-wrap items-center gap-3 md:flex-nowrap">
             <select wire:model.live="statusFilter"
-                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                    class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                 <option value="active">운영 기관</option>
                 <option value="terminated">해지 기관</option>
                 <option value="all">전체</option>
             </select>
 
-            @if($search || $assignmentFilter || $statusFilter !== 'all')
-                <button wire:click="$set('search', ''); $set('assignmentFilter', ''); $set('statusFilter', 'all')"
-                        class="py-2 px-3 text-sm text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50">
-                    초기화
-                </button>
-            @endif
-
-            <div class="relative flex-1 min-w-56">
+            <div class="relative min-w-0 flex-1 max-md:min-w-[18rem]">
                 <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -73,10 +130,64 @@
                 </svg>
                 <input type="text"
                        wire:model.live.debounce.300ms="search"
-                       placeholder="기관명, SK코드, 원장명, 주소, CO·Coach·CS 검색"
+                       placeholder="기관명, SK코드, 원장명, 주소 검색"
                        class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
             </div>
+
+            @if($activeFilterChips !== [])
+                <button type="button"
+                        wire:click="clearListFilters"
+                        class="shrink-0 cursor-pointer rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-1">
+                    초기화
+                </button>
+            @endif
         </div>
+
+        <div class="mt-3 flex flex-nowrap items-center gap-3 border-t border-gray-100 pt-3 max-md:gap-2">
+            <span class="shrink-0 text-xs font-medium text-gray-500">담당자</span>
+            <select wire:model.live="filterCo"
+                    class="min-w-0 flex-1 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header max-md:px-2 max-md:text-xs">
+                <option value="">CO 전체</option>
+                @foreach($coManagerOptions as $managerName)
+                    <option value="{{ $managerName }}">{{ $managerName }}</option>
+                @endforeach
+            </select>
+
+            <select wire:model.live="filterTr"
+                    class="min-w-0 flex-1 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header max-md:px-2 max-md:text-xs">
+                <option value="">Coach 전체</option>
+                @foreach($trManagerOptions as $managerName)
+                    <option value="{{ $managerName }}">{{ $managerName }}</option>
+                @endforeach
+            </select>
+
+            <select wire:model.live="filterCs"
+                    class="min-w-0 flex-1 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header max-md:px-2 max-md:text-xs">
+                <option value="">CS 전체</option>
+                @foreach($csManagerOptions as $managerName)
+                    <option value="{{ $managerName }}">{{ $managerName }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        @if($activeFilterChips !== [])
+            <div class="mt-3 border-t border-gray-100 pt-3 text-xs">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-gray-400">적용 필터</span>
+                @foreach($activeFilterChips as $chip)
+                    <span class="inline-flex items-center gap-1 rounded-full border border-mochi-header/20 bg-mochi-header/10 px-2.5 py-1 font-medium text-mochi-header">
+                        {{ $chip['label'] }}
+                        <button type="button"
+                                wire:click="{{ $chip['action'] }}"
+                                class="ml-0.5 text-mochi-header/60 hover:text-mochi-header"
+                                aria-label="{{ $chip['label'] }} 필터 해제">
+                            ×
+                        </button>
+                    </span>
+                @endforeach
+                </div>
+            </div>
+        @endif
     </div>
 
     {{-- 메인 리스트 테이블 --}}

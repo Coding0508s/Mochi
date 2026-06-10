@@ -127,7 +127,7 @@ trait ManagesCoachTeacherSupportCreateModals
         $user = auth()->user();
         $coachName = $accountInfo?->TR ?? ($user?->nameForCoReports() ?? '');
 
-        $this->demoLessonTeacherId = $teacherId;
+        $this->demoLessonTeacherId = (int) $teacherId;
         $this->demoLessonMarkCompleted = true;
         $this->demoLessonForm = $this->defaultDemoLessonForm(
             skCode: SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
@@ -135,6 +135,7 @@ trait ManagesCoachTeacherSupportCreateModals
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showDemoLessonModal = true;
     }
 
@@ -151,7 +152,7 @@ trait ManagesCoachTeacherSupportCreateModals
 
         $payload = array_merge($this->demoLessonForm, [
             'mark_completed' => $this->demoLessonMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->demoLessonMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -170,7 +171,7 @@ trait ManagesCoachTeacherSupportCreateModals
             ? '신규 교사 시연 수업 지원 보고서가 저장되었습니다.'
             : '임시 저장되었습니다.');
 
-        $teacherId = (int) $this.demoLessonTeacherId;
+        $teacherId = (int) $this->demoLessonTeacherId;
         $this->finalizeCoachTeacherSupportReportSave($teacherId, fn () => $this->closeDemoLessonModal());
     }
 
@@ -239,6 +240,7 @@ trait ManagesCoachTeacherSupportCreateModals
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showLvaFrModal = true;
     }
 
@@ -255,7 +257,7 @@ trait ManagesCoachTeacherSupportCreateModals
 
         $payload = array_merge($this->lvaFrForm, [
             'mark_completed' => $this->lvaFrMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->lvaFrMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -274,7 +276,7 @@ trait ManagesCoachTeacherSupportCreateModals
             ? 'LVA+FR 지원 보고서가 저장되었습니다.'
             : '임시 저장되었습니다.');
 
-        $teacherId = (int) $this.lvaFrTeacherId;
+        $teacherId = (int) $this->lvaFrTeacherId;
         $this->finalizeCoachTeacherSupportReportSave($teacherId, fn () => $this->closeLvaFrModal());
     }
 
@@ -345,6 +347,7 @@ trait ManagesCoachTeacherSupportCreateModals
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showLvaFbModal = true;
     }
 
@@ -361,7 +364,7 @@ trait ManagesCoachTeacherSupportCreateModals
 
         $payload = array_merge($this->lvaFbForm, [
             'mark_completed' => $this->lvaFbMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->lvaFbMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -380,7 +383,7 @@ trait ManagesCoachTeacherSupportCreateModals
             ? 'LVA+FB 지원 보고서가 저장되었습니다.'
             : '임시 저장되었습니다.');
 
-        $teacherId = (int) $this.lvaFbTeacherId;
+        $teacherId = (int) $this->lvaFbTeacherId;
         $this->finalizeCoachTeacherSupportReportSave($teacherId, fn () => $this->closeLvaFbModal());
     }
 
@@ -451,6 +454,7 @@ trait ManagesCoachTeacherSupportCreateModals
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showLsOnsiteLvaModal = true;
     }
 
@@ -467,7 +471,7 @@ trait ManagesCoachTeacherSupportCreateModals
 
         $payload = array_merge($this->lsOnsiteLvaForm, [
             'mark_completed' => $this->lsOnsiteLvaMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->lsOnsiteLvaMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -486,7 +490,7 @@ trait ManagesCoachTeacherSupportCreateModals
             ? 'LS On-Site & LVA 지원 보고서가 저장되었습니다.'
             : '임시 저장되었습니다.');
 
-        $teacherId = (int) $this.lsOnsiteLvaTeacherId;
+        $teacherId = (int) $this->lsOnsiteLvaTeacherId;
         $this->finalizeCoachTeacherSupportReportSave($teacherId, fn () => $this->closeLsOnsiteLvaModal());
     }
 
@@ -559,6 +563,7 @@ trait ManagesCoachTeacherSupportCreateModals
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showLittleseedConModal = true;
     }
 
@@ -575,7 +580,7 @@ trait ManagesCoachTeacherSupportCreateModals
 
         $payload = array_merge($this->littleseedConForm, [
             'mark_completed' => $this->littleseedConMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->littleseedConMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -594,7 +599,7 @@ trait ManagesCoachTeacherSupportCreateModals
             ? 'LittleSEED Con 지원 보고서가 저장되었습니다.'
             : '임시 저장되었습니다.');
 
-        $teacherId = (int) $this.littleseedConTeacherId;
+        $teacherId = (int) $this->littleseedConTeacherId;
         $this->finalizeCoachTeacherSupportReportSave($teacherId, fn () => $this->closeLittleseedConModal());
     }
 
@@ -660,6 +665,7 @@ trait ManagesCoachTeacherSupportCreateModals
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showOpenClassModal = true;
     }
 
@@ -676,7 +682,7 @@ trait ManagesCoachTeacherSupportCreateModals
 
         $payload = array_merge($this->openClassForm, [
             'mark_completed' => $this->openClassMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->openClassMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -695,7 +701,7 @@ trait ManagesCoachTeacherSupportCreateModals
             ? 'Open-Class 지원 보고서가 저장되었습니다.'
             : '임시 저장되었습니다.');
 
-        $teacherId = (int) $this.openClassTeacherId;
+        $teacherId = (int) $this->openClassTeacherId;
         $this->finalizeCoachTeacherSupportReportSave($teacherId, fn () => $this->closeOpenClassModal());
     }
 
@@ -763,6 +769,7 @@ trait ManagesCoachTeacherSupportCreateModals
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showUnit21PlusModal = true;
     }
 
@@ -779,7 +786,7 @@ trait ManagesCoachTeacherSupportCreateModals
 
         $payload = array_merge($this->unit21PlusForm, [
             'mark_completed' => $this->unit21PlusMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->unit21PlusMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -798,7 +805,7 @@ trait ManagesCoachTeacherSupportCreateModals
             ? 'Unit 21+ 지원 보고서가 저장되었습니다.'
             : '임시 저장되었습니다.');
 
-        $teacherId = (int) $this.unit21PlusTeacherId;
+        $teacherId = (int) $this->unit21PlusTeacherId;
         $this->finalizeCoachTeacherSupportReportSave($teacherId, fn () => $this->closeUnit21PlusModal());
     }
 
@@ -869,6 +876,7 @@ trait ManagesCoachTeacherSupportCreateModals
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showUnit31PlusModal = true;
     }
 
@@ -885,7 +893,7 @@ trait ManagesCoachTeacherSupportCreateModals
 
         $payload = array_merge($this->unit31PlusForm, [
             'mark_completed' => $this->unit31PlusMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->unit31PlusMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -904,7 +912,7 @@ trait ManagesCoachTeacherSupportCreateModals
             ? 'Unit 31+ 지원 보고서가 저장되었습니다.'
             : '임시 저장되었습니다.');
 
-        $teacherId = (int) $this.unit31PlusTeacherId;
+        $teacherId = (int) $this->unit31PlusTeacherId;
         $this->finalizeCoachTeacherSupportReportSave($teacherId, fn () => $this->closeUnit31PlusModal());
     }
 
@@ -975,6 +983,7 @@ trait ManagesCoachTeacherSupportCreateModals
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showProConModal = true;
     }
 
@@ -991,7 +1000,7 @@ trait ManagesCoachTeacherSupportCreateModals
 
         $payload = array_merge($this->proConForm, [
             'mark_completed' => $this->proConMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->proConMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -1010,7 +1019,7 @@ trait ManagesCoachTeacherSupportCreateModals
             ? 'Pro Con 지원 보고서가 저장되었습니다.'
             : '임시 저장되었습니다.');
 
-        $teacherId = (int) $this.proConTeacherId;
+        $teacherId = (int) $this->proConTeacherId;
         $this->finalizeCoachTeacherSupportReportSave($teacherId, fn () => $this->closeProConModal());
     }
 
@@ -1076,6 +1085,7 @@ trait ManagesCoachTeacherSupportCreateModals
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showOnsiteModal = true;
     }
 
@@ -1092,7 +1102,7 @@ trait ManagesCoachTeacherSupportCreateModals
 
         $payload = array_merge($this->onsiteForm, [
             'mark_completed' => $this->onsiteMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->onsiteMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -1111,7 +1121,7 @@ trait ManagesCoachTeacherSupportCreateModals
             ? 'On-Site 지원 보고서가 저장되었습니다.'
             : '임시 저장되었습니다.');
 
-        $teacherId = (int) $this.onsiteTeacherId;
+        $teacherId = (int) $this->onsiteTeacherId;
         $this->finalizeCoachTeacherSupportReportSave($teacherId, fn () => $this->closeOnsiteModal());
     }
 

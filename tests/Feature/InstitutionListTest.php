@@ -1775,6 +1775,94 @@ class InstitutionListTest extends TestCase
         $this->assertSame(['김기획'], $coOptions);
     }
 
+    public function test_manager_column_filters_narrow_institution_list(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        $this->insertEmployee('E201', 'A02', 'Peter Kim', 1);
+        $this->insertEmployee('E202', 'A05', 'Coach Hong', 1);
+        $this->insertEmployee('E203', 'A03', 'CS Choi', 1);
+
+        DB::table('S_Account_Information')->insert([
+            [
+                'SK_Code' => 'SK-CO-1',
+                'Account_Name' => 'CO 담당 기관',
+                'CO' => 'Peter Kim',
+                'TR' => 'Coach Hong',
+                'CS' => 'CS Choi',
+            ],
+            [
+                'SK_Code' => 'SK-CO-2',
+                'Account_Name' => '다른 CO 기관',
+                'CO' => 'Other Co',
+                'TR' => 'Coach Hong',
+                'CS' => 'CS Choi',
+            ],
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(InstitutionList::class)
+            ->set('filterCo', 'Peter Kim')
+            ->assertSee('CO 담당 기관')
+            ->assertDontSee('다른 CO 기관')
+            ->set('filterCo', '')
+            ->set('filterTr', 'Coach Hong')
+            ->assertSee('CO 담당 기관')
+            ->assertSee('다른 CO 기관')
+            ->set('filterTr', '')
+            ->set('filterCs', 'CS Choi')
+            ->assertSee('CO 담당 기관')
+            ->assertSee('다른 CO 기관');
+    }
+
+    public function test_manager_column_filter_matches_dotted_name_variants(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        $this->insertEmployee('E301', 'A02', 'Peter Kim', 1);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-DOT-1',
+            'Account_Name' => '점 표기 기관',
+            'CO' => 'Peter.Kim',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(InstitutionList::class)
+            ->set('filterCo', 'Peter Kim')
+            ->assertSee('점 표기 기관');
+    }
+
+    public function test_clear_list_filters_resets_manager_filters(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        $this->insertEmployee('E401', 'A02', 'Peter Kim', 1);
+
+        DB::table('S_Account_Information')->insert([
+            [
+                'SK_Code' => 'SK-CLR-1',
+                'Account_Name' => '초기화 대상',
+                'CO' => 'Peter Kim',
+            ],
+            [
+                'SK_Code' => 'SK-CLR-2',
+                'Account_Name' => '초기화 유지',
+                'CO' => 'Other Co',
+            ],
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(InstitutionList::class)
+            ->set('filterCo', 'Peter Kim')
+            ->assertDontSee('초기화 유지')
+            ->call('clearListFilters')
+            ->assertSet('filterCo', '')
+            ->assertSet('filterTr', '')
+            ->assertSet('filterCs', '')
+            ->assertSee('초기화 유지');
+    }
+
     private function insertEmployee(string $empno, string $workdept, string $englishName, int $status): void
     {
         DB::table('employee')->insert([

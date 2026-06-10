@@ -95,9 +95,9 @@
                     <th class="contact-sticky-sk contact-sticky-sk--head px-3 py-2 text-left text-xs font-semibold">기관코드</th>
                     <th class="contact-sticky-institution contact-sticky-institution--head px-3 py-2 text-left text-xs font-semibold">기관명</th>
                     <th class="contact-sticky-name contact-sticky-name--head px-3 py-2 text-left text-xs font-semibold">이름</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold">직급</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">이메일</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">전화번호</th>
-                    <th class="px-3 py-2 text-left text-xs font-semibold">직급</th>
                     <th class="px-3 py-2 text-center text-xs font-semibold">상태</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">GrapeSEED Essentials</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">LittleSEED Essentials</th>
@@ -125,8 +125,6 @@
                         </td>
                         <td class="contact-sticky-institution px-3 py-2.5 text-gray-700 max-w-36 truncate" title="{{ $teacher->School_Name }}">{{ $teacher->School_Name ?? '-' }}</td>
                         <td class="contact-sticky-name px-3 py-2.5 font-medium text-gray-900">{{ $teacher->Name ?? '-' }}</td>
-                        <td class="px-3 py-2.5 text-gray-600 text-xs">{{ $teacher->Email ?? '-' }}</td>
-                        <td class="px-3 py-2.5 text-gray-600">{{ $teacher->Phone ?? '-' }}</td>
                         <td class="px-3 py-2.5">
                             @if($teacher->Position)
                                 <span class="text-xs text-gray-600">{{ $teacher->Position }}</span>
@@ -134,6 +132,8 @@
                                 <span class="text-gray-400">-</span>
                             @endif
                         </td>
+                        <td class="px-3 py-2.5 text-gray-600 text-xs">{{ $teacher->Email ?? '-' }}</td>
+                        <td class="px-3 py-2.5 text-gray-600">{{ $teacher->Phone ?? '-' }}</td>
                         <td class="px-3 py-2.5 text-center">
                             @if(trim((string) $teacher->Status) === '퇴직')
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">퇴직</span>
@@ -460,18 +460,18 @@
                                 <tr>
                                     <th class="w-28 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">이름</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['name'] ?? '-' }}</td>
-                                    <th class="w-28 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">상태</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['status'] ?? '-' }}</td>
+                                    <th class="w-28 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">직급</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['position'] ?? '-' }}</td>
                                 </tr>
                                 <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">이메일</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['email'] ?? '-' }}</td>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">상태</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['status'] ?? '-' }}</td>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">연락처</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['phone'] ?? '-' }}</td>
                                 </tr>
                                 <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">직급</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['position'] ?? '-' }}</td>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">이메일</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['email'] ?? '-' }}</td>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">기관코드</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['sk_code'] ?? '-' }}</td>
                                 </tr>

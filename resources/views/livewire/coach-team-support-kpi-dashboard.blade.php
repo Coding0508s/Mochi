@@ -1,10 +1,11 @@
 <div class="mochi-page">
     @php
-        $kpiToggleLabels = \App\Support\TeacherSupportKpiCalculator::toggleLabels();
+        $kpiToggleLabels = \App\Support\TeacherSupportKpiCalculator::visibleToggleLabels();
         $kpiRoundKeys = \App\Support\TeacherSupportKpiCalculator::roundKpiKeys();
+        $totalSupportCount = \App\Support\TeacherSupportKpiCalculator::totalSupportCount($teamKpis);
         $planMonthRound = $filterRound !== '' ? $filterRound : '1';
         $planMonthRoundLabel = $planMonthRound.'차';
-        $tableColumnCount = 2 + count($kpiRoundKeys) + 2;
+        $tableColumnCount = 2 + count($kpiRoundKeys);
     @endphp
 
     <div class="mochi-summary-card">
@@ -30,6 +31,16 @@
     <div class="mochi-filter-card">
         <div class="flex flex-wrap items-center gap-3">
             <div class="mochi-toggle-group flex-wrap">
+                <span class="mochi-toggle-btn cursor-default pointer-events-none text-gray-700"
+                      aria-label="기관 수">
+                    기관 수
+                    <span class="font-semibold">{{ $teamKpis['institution_count'] ?? 0 }}</span>
+                </span>
+                <span class="mochi-toggle-btn cursor-default pointer-events-none text-gray-700"
+                      aria-label="교사 수">
+                    교사 수
+                    <span class="font-semibold">{{ $teamKpis['teacher_count'] ?? 0 }}</span>
+                </span>
                 @foreach($kpiToggleLabels as $kpiKey => $kpiLabel)
                     <button type="button"
                             wire:click="setHighlightKpi('{{ $kpiKey }}')"
@@ -46,6 +57,11 @@
                         <span class="font-semibold">{{ $teamKpis[$kpiKey] ?? 0 }}</span>
                     </button>
                 @endforeach
+                <span class="mochi-toggle-btn cursor-default pointer-events-none text-gray-700"
+                      aria-label="총 지원 횟수">
+                    총 지원 횟수
+                    <span class="font-semibold">{{ $totalSupportCount }}</span>
+                </span>
             </div>
 
             <select wire:model.live="filterRound"
@@ -91,7 +107,7 @@
         @endif
 
         <p class="mt-3 border-t border-gray-100 pt-3 text-xs text-gray-500">
-            KPI는 선택 연도의 지원 완료일 기준입니다. 「전차 완료」는 1~4차 모두 완료한 교사 수입니다.
+            KPI는 선택 연도의 지원 완료일 기준입니다.
             월 필터는 선택한 차수의 지원 계획월입니다(차수 미선택 시 1차). 담당 Coach 이름을 클릭하면 교사별 계획·완료 일정을 모달로 볼 수 있습니다.
         </p>
     </div>
@@ -105,8 +121,6 @@
                 @foreach($kpiRoundKeys as $roundKey)
                     <th class="px-3 py-2 text-right">{{ $kpiToggleLabels[$roundKey] ?? $roundKey }}</th>
                 @endforeach
-                <th class="px-3 py-2 text-right">{{ $kpiToggleLabels['completed'] ?? '전차 완료' }}</th>
-                <th class="px-3 py-2 text-right">{{ $kpiToggleLabels['unsupported'] ?? '미지원' }}</th>
             </tr>
             </thead>
             <tbody>
@@ -123,8 +137,6 @@
                     @foreach($kpiRoundKeys as $roundKey)
                         <td class="px-3 py-2 text-right tabular-nums {{ $highlightKpi === $roundKey ? 'font-semibold text-mochi-header' : '' }}">{{ $row[$roundKey] ?? 0 }}</td>
                     @endforeach
-                    <td class="px-3 py-2 text-right tabular-nums {{ $highlightKpi === 'completed' ? 'font-semibold text-green-700' : '' }}">{{ $row['completed'] ?? 0 }}</td>
-                    <td class="px-3 py-2 text-right tabular-nums {{ $highlightKpi === 'unsupported' ? 'font-semibold text-red-600' : '' }}">{{ $row['unsupported'] ?? 0 }}</td>
                 </tr>
             @empty
                 <tr>
@@ -142,8 +154,6 @@
                     @foreach($kpiRoundKeys as $roundKey)
                         <td class="px-3 py-2 text-right tabular-nums">{{ $teamKpis[$roundKey] ?? 0 }}</td>
                     @endforeach
-                    <td class="px-3 py-2 text-right tabular-nums">{{ $teamKpis['completed'] ?? 0 }}</td>
-                    <td class="px-3 py-2 text-right tabular-nums">{{ $teamKpis['unsupported'] ?? 0 }}</td>
                 </tr>
                 </tfoot>
             @endif
@@ -168,23 +178,23 @@
 
                 <div class="mochi-modal-body-scroll px-6 py-4 space-y-4">
                     @php
-                        $modalKpiLabels = \App\Support\TeacherSupportKpiCalculator::toggleLabels();
+                        $modalKpiLabels = \App\Support\TeacherSupportKpiCalculator::visibleToggleLabels();
+                        $modalTotalSupportCount = \App\Support\TeacherSupportKpiCalculator::totalSupportCount($coachScheduleKpis);
                     @endphp
 
                     <div class="space-y-3 rounded-lg border border-gray-200 bg-gray-50/80 p-4">
                         <p class="text-xs font-medium text-gray-500">{{ $filterYear }}년 지원 완료 차수 집계</p>
                         <div class="flex flex-wrap gap-2">
                             @foreach($modalKpiLabels as $kpiKey => $kpiLabel)
-                                <span @class([
-                                    'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium',
-                                    'border-green-200 bg-green-50 text-green-800' => $kpiKey === 'completed',
-                                    'border-red-200 bg-red-50 text-red-700' => $kpiKey === 'unsupported',
-                                    'border-mochi-header/20 bg-white text-mochi-header' => ! in_array($kpiKey, ['completed', 'unsupported'], true),
-                                ])>
+                                <span class="inline-flex items-center gap-1 rounded-full border border-mochi-header/20 bg-white px-2.5 py-1 text-xs font-medium text-mochi-header">
                                     {{ $kpiLabel }}
                                     <span class="tabular-nums font-semibold">{{ $coachScheduleKpis[$kpiKey] ?? 0 }}</span>
                                 </span>
                             @endforeach
+                            <span class="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700">
+                                총 지원 횟수
+                                <span class="tabular-nums font-semibold">{{ $modalTotalSupportCount }}</span>
+                            </span>
                         </div>
 
                         @if(($coachScheduleSummary['teacher_count'] ?? 0) > 0)

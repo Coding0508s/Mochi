@@ -63,6 +63,8 @@
                 <div class="grid grid-cols-2 gap-2 sm:flex sm:items-center">
                     <button type="button"
                             wire:click="importFromExcel"
+                            wire:loading.attr="disabled"
+                            wire:target="importFromExcel"
                             class="rounded-lg border border-indigo-200 px-3 py-2 text-sm text-indigo-700 hover:bg-indigo-50">
                         엑셀 업로드
                     </button>
@@ -73,6 +75,9 @@
                     </button>
                 </div>
             </div>
+            <p wire:loading wire:target="importFromExcel" class="mt-1 text-xs text-indigo-600">
+                엑셀 파일을 업로드하는 중입니다. 잠시만 기다려 주세요.
+            </p>
         @endif
         @error('importFile') <p class="mt-2 text-xs text-red-600">{{ $message }}</p> @enderror
 
@@ -270,7 +275,7 @@
                                         <span class="mt-0.5 block text-gray-500">{{ $vehicleSecondaryRemark }}</span>
                                     @endif
                                 @else
-                                    {{ $supply->purpose !== '' ? $supply->purpose : '-' }}
+                                    {{ \App\Support\VehicleUsageLogRemark::forDisplay((string) $supply->purpose) !== '' ? \App\Support\VehicleUsageLogRemark::forDisplay((string) $supply->purpose) : '-' }}
                                 @endif
                             </dd>
                         </dl>
@@ -357,7 +362,7 @@
                                             <div class="mt-0.5 text-xs text-gray-500">{{ $vehicleSecondaryRemark }}</div>
                                         @endif
                                     @else
-                                        <span class="text-gray-500">{{ $supply->purpose }}</span>
+                                        <span class="text-gray-500">{{ \App\Support\VehicleUsageLogRemark::forDisplay((string) $supply->purpose) }}</span>
                                     @endif
                                 </td>
                             </tr>
@@ -565,6 +570,43 @@
                         </div>
                     </div>
                 </form>
+            </div>
+        </div>
+    @endif
+
+    @if($showSupportReportPrompt)
+        <div class="mochi-modal-overlay" wire:click.self="closeSupportReportPrompt">
+            <div class="mochi-modal-shell mx-3 flex w-full max-w-md min-h-0 flex-col sm:mx-0" wire:click.stop>
+                <div class="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
+                    <h3 class="text-lg font-semibold text-gray-900">차량 반납 처리 완료</h3>
+                    <button type="button" wire:click="closeSupportReportPrompt" class="h-8 w-8 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600">✕</button>
+                </div>
+
+                <div class="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+                    <p class="text-sm text-gray-700">
+                        운행 기록이 저장되었습니다. 이어서 지원 보고서를 작성하시겠습니까?
+                    </p>
+
+                    <div class="grid gap-2">
+                        <button type="button"
+                                wire:click="navigateToSupportCreate('institution')"
+                                class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                            기관 지원 보고서 작성
+                        </button>
+
+                        @if($supportReportPromptTeam === 'coach')
+                            <button type="button"
+                                    wire:click="navigateToSupportCreate('teacher')"
+                                    class="rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+                                교사 지원 보고서 작성
+                            </button>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="flex justify-end border-t border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
+                    <button type="button" wire:click="closeSupportReportPrompt" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">나중에</button>
+                </div>
             </div>
         </div>
     @endif

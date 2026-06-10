@@ -50,7 +50,7 @@
             </div>
         </section>
 
-        <div id="requestsContainer" class="space-y-6">
+        <div id="requestsContainer" class="space-y-3">
             <div class="empty-state text-center py-16 px-4 text-gray-500 dark:text-gray-400">
                 <span class="material-icons text-6xl mb-4 block opacity-50">person_search</span>
                 <p>기관명 또는 전화번호를 입력한 후 조회해 주세요.</p>
@@ -244,7 +244,7 @@
 
     function createRequestCard(request, groupIndex, requestIndex) {
         const card = document.createElement('div');
-        card.className = 'request-card bg-surface-light dark:bg-surface-dark rounded-xl shadow-sm border-2 border-primary/30 dark:border-primary/40 overflow-hidden';
+        card.className = 'request-card bg-surface-light dark:bg-surface-dark rounded-xl shadow-sm border border-border-light dark:border-border-dark overflow-hidden';
 
         let brochureListHtml = '';
         if (request.brochures && request.brochures.length > 0) {
@@ -271,8 +271,15 @@
         }
 
         const statusBadge = hasInvoices
-            ? '<span class="status-badge completed inline-block py-1.5 px-4 rounded-full text-xs font-semibold bg-green-500 text-white">배송완료</span>'
-            : '<span class="status-badge pending inline-block py-1.5 px-4 rounded-full text-xs font-semibold bg-amber-400 text-gray-900">배송 대기중</span>';
+            ? '<span class="status-badge completed inline-block py-1 px-3 rounded-full text-xs font-semibold bg-green-500 text-white whitespace-nowrap">배송완료</span>'
+            : '<span class="status-badge pending inline-block py-1 px-3 rounded-full text-xs font-semibold bg-amber-400 text-gray-900 whitespace-nowrap">배송 대기중</span>';
+
+        const brochureSummary = (request.brochures && request.brochures.length > 0)
+            ? (request.brochures.length === 1
+                ? request.brochures[0].brochureName
+                : `${request.brochures[0].brochureName} 외 ${request.brochures.length - 1}종`)
+            : '-';
+        const totalQuantity = (request.brochures || []).reduce((sum, b) => sum + (parseInt(b.quantity, 10) || 0), 0);
 
         const cardId = `card-${groupIndex}-${requestIndex}`;
         const isEditable = !hasInvoices && CAN_EDIT_REQUEST;
@@ -287,47 +294,62 @@
             : '';
 
         card.innerHTML = `
-            <div class="request-header flex flex-wrap justify-between items-start gap-4 p-6 pb-4 border-b-2 border-primary/20">
-                <div>
-                    <div class="request-title text-lg font-bold text-primary">${request.schoolname}</div>
-                    <div class="request-date text-sm text-gray-500 dark:text-gray-400 mt-1">신청일: ${formatDate(request.date)}</div>
-                </div>
+            <button type="button" class="accordion-toggle w-full flex flex-wrap items-center gap-3 px-4 py-3.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors" aria-expanded="false" aria-controls="${cardId}-details" onclick="toggleCard('${cardId}')">
+                <span class="material-icons accordion-chevron text-gray-400 transition-transform duration-200">expand_more</span>
+                <span class="flex-1 min-w-[120px] font-semibold text-gray-900 dark:text-white truncate">${request.schoolname}</span>
+                <span class="hidden md:block flex-1 text-sm text-gray-600 dark:text-gray-300 truncate">${brochureSummary} · 총 ${totalQuantity}권</span>
+                <span class="hidden sm:block text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">${formatDate(request.date)}</span>
                 ${statusBadge}
+            </button>
+            <div id="${cardId}-details" class="accordion-details hidden border-t border-gray-200 dark:border-gray-700">
+                <div class="request-info grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                    <div class="info-item space-y-1">
+                        <div class="info-label text-xs font-medium text-gray-500 dark:text-gray-400">기관명</div>
+                        <div class="info-value text-sm text-gray-900 dark:text-white" data-field="schoolname">${request.schoolname}</div>
+                    </div>
+                    <div class="info-item space-y-1">
+                        <div class="info-label text-xs font-medium text-gray-500 dark:text-gray-400">주소</div>
+                        <div class="info-value text-sm text-gray-900 dark:text-white" data-field="address">${request.address}</div>
+                    </div>
+                    <div class="info-item space-y-1">
+                        <div class="info-label text-xs font-medium text-gray-500 dark:text-gray-400">전화번호</div>
+                        <div class="info-value text-sm text-gray-900 dark:text-white" data-field="phone">${formatPhoneDisplay(request.phone)}</div>
+                    </div>
+                    <div class="info-item space-y-1">
+                        <div class="info-label text-xs font-medium text-gray-500 dark:text-gray-400">담당자</div>
+                        <div class="info-value text-sm text-gray-900 dark:text-white" data-field="contactName">${request.contactName || request.contact || '-'}</div>
+                    </div>
+                    <div class="info-item space-y-1">
+                        <div class="info-label text-xs font-medium text-gray-500 dark:text-gray-400">신청일</div>
+                        <div class="info-value text-sm text-gray-900 dark:text-white" data-field="date">${formatDate(request.date)}</div>
+                    </div>
+                </div>
+                <div class="brochure-list px-6 pb-4" data-brochures="${encodeURIComponent(JSON.stringify(request.brochures || []))}">
+                    <div class="info-label text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">신청 브로셔</div>
+                    <div class="brochure-items-container">${brochureListHtml}</div>
+                </div>
+                <div class="invoice-list px-6 pb-4">
+                    <div class="info-label text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">운송장 번호</div>
+                    ${invoiceListHtml}
+                </div>
+                ${editButton}
             </div>
-            <div class="request-info grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
-                <div class="info-item space-y-1">
-                    <div class="info-label text-xs font-medium text-gray-500 dark:text-gray-400">기관명</div>
-                    <div class="info-value text-sm text-gray-900 dark:text-white" data-field="schoolname">${request.schoolname}</div>
-                </div>
-                <div class="info-item space-y-1">
-                    <div class="info-label text-xs font-medium text-gray-500 dark:text-gray-400">주소</div>
-                    <div class="info-value text-sm text-gray-900 dark:text-white" data-field="address">${request.address}</div>
-                </div>
-                <div class="info-item space-y-1">
-                    <div class="info-label text-xs font-medium text-gray-500 dark:text-gray-400">전화번호</div>
-                    <div class="info-value text-sm text-gray-900 dark:text-white" data-field="phone">${formatPhoneDisplay(request.phone)}</div>
-                </div>
-                <div class="info-item space-y-1">
-                    <div class="info-label text-xs font-medium text-gray-500 dark:text-gray-400">담당자</div>
-                    <div class="info-value text-sm text-gray-900 dark:text-white" data-field="contactName">${request.contactName || request.contact || '-'}</div>
-                </div>
-                <div class="info-item space-y-1">
-                    <div class="info-label text-xs font-medium text-gray-500 dark:text-gray-400">신청일</div>
-                    <div class="info-value text-sm text-gray-900 dark:text-white" data-field="date">${formatDate(request.date)}</div>
-                </div>
-            </div>
-            <div class="brochure-list px-6 pb-4" data-brochures="${encodeURIComponent(JSON.stringify(request.brochures || []))}">
-                <div class="info-label text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">신청 브로셔</div>
-                <div class="brochure-items-container">${brochureListHtml}</div>
-            </div>
-            <div class="invoice-list px-6 pb-4">
-                <div class="info-label text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">운송장 번호</div>
-                ${invoiceListHtml}
-            </div>
-            ${editButton}
         `;
 
         return card;
+    }
+
+    function toggleCard(cardId) {
+        const card = document.getElementById(cardId);
+        if (!card) return;
+        const details = card.querySelector('.accordion-details');
+        const toggle = card.querySelector('.accordion-toggle');
+        const chevron = card.querySelector('.accordion-chevron');
+        if (!details) return;
+        const willOpen = details.classList.contains('hidden');
+        details.classList.toggle('hidden', !willOpen);
+        if (toggle) toggle.setAttribute('aria-expanded', String(willOpen));
+        if (chevron) chevron.classList.toggle('rotate-180', willOpen);
     }
 
     async function editRequest(cardId) {
@@ -338,6 +360,11 @@
         const requestIndex = parseInt(card.dataset.requestIndex);
         const request = filteredRequests[groupIndex]?.requests[requestIndex];
         if (!request) return;
+
+        const detailsPanel = card.querySelector('.accordion-details');
+        if (detailsPanel && detailsPanel.classList.contains('hidden')) {
+            toggleCard(cardId);
+        }
 
         try {
             const infoValues = card.querySelectorAll('.info-value');

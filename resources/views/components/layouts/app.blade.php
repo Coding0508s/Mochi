@@ -32,7 +32,7 @@
      x-data="{
         sidebarOpen: false,
          openPeople: {{ request()->routeIs('people.*') ? 'true' : 'false' }},
-         openScheduleManagement: {{ request()->routeIs('schedules.*', 'shared-supplies.*') ? 'true' : 'false' }},
+         openScheduleManagement: {{ request()->routeIs('schedules.*', 'shared-supplies.*', 'vehicle-usage-history.*') ? 'true' : 'false' }},
          openTeams: true,
         openCS: {{ $isCoTeamRoute && ($activeTeamMenu === 'cs' || ($activeTeamMenu === null && auth()->user()?->isCsTeam())) ? 'true' : 'false' }},
         openCoach: {{ $isCoTeamRoute && ($activeTeamMenu === 'coach' || ($activeTeamMenu === null && auth()->user()?->isCoachTeam())) ? 'true' : 'false' }},
@@ -241,7 +241,7 @@
                 <button type="button"
                         @click="openScheduleManagement = !openScheduleManagement"
                         class="sidebar-item sidebar-focusable
-                               {{ request()->routeIs('schedules.*', 'shared-supplies.*') ? 'sidebar-item-active' : 'sidebar-item-default' }}">
+                               {{ request()->routeIs('schedules.*', 'shared-supplies.*', 'vehicle-usage-history.*') ? 'sidebar-item-active' : 'sidebar-item-default' }}">
                     <span class="sidebar-item-lead">
                         @include('partials.sidebar-menu-icon', ['name' => 'calendar'])
                         <span class="font-medium">일정 관리</span>
@@ -265,6 +265,12 @@
                               {{ request()->routeIs('shared-supplies.*') ? 'sidebar-subitem-active' : '' }}"
                        @if(request()->routeIs('shared-supplies.*')) aria-current="page" @endif>
                         <span class="sidebar-subitem-label">공용품 관리</span>
+                    </a>
+                    <a href="{{ route('vehicle-usage-history.index') }}"
+                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable
+                              {{ request()->routeIs('vehicle-usage-history.*') ? 'sidebar-subitem-active' : '' }}"
+                       @if(request()->routeIs('vehicle-usage-history.*')) aria-current="page" @endif>
+                        <span class="sidebar-subitem-label">차량별 사용 내역</span>
                     </a>
                 </div>
             </div>

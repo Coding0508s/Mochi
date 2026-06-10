@@ -24,9 +24,40 @@ class TeacherSupportKpiCalculator
     /**
      * @return list<string>
      */
+    public static function hiddenToggleKeys(): array
+    {
+        return ['completed', 'unsupported'];
+    }
+
+    /**
+     * KPI 토글 UI에 표시할 라벨(전차 완료·미지원 제외).
+     *
+     * @return array<string, string>
+     */
+    public static function visibleToggleLabels(): array
+    {
+        return collect(self::toggleLabels())
+            ->except(self::hiddenToggleKeys())
+            ->all();
+    }
+
+    /**
+     * @return list<string>
+     */
     public static function roundKpiKeys(): array
     {
         return array_keys(config('coach_teacher_support.kpi_rounds', []));
+    }
+
+    /**
+     * 1~4차 완료 KPI 합계(총 지원 횟수).
+     *
+     * @param  array<string, int>  $kpis
+     */
+    public static function totalSupportCount(array $kpis): int
+    {
+        return collect(self::roundKpiKeys())
+            ->sum(fn (string $key): int => (int) ($kpis[$key] ?? 0));
     }
 
     /**
@@ -65,6 +96,9 @@ class TeacherSupportKpiCalculator
         $row = $query->select($selects)->toBase()->first();
 
         $result = [];
+        $result['teacher_count'] = (int) ($row?->teacher_count ?? 0);
+        $result['institution_count'] = (int) ($row?->institution_count ?? 0);
+
         foreach (array_merge(self::roundKpiKeys(), ['completed', 'unsupported']) as $key) {
             $result[$key] = (int) ($row?->{$key} ?? 0);
         }
@@ -84,6 +118,9 @@ class TeacherSupportKpiCalculator
         $expressions = [
             'teacher_count' => DB::raw(
                 self::sqlCountDistinctTeachersWhen($teacherIdColumn, '1 = 1').' as teacher_count'
+            ),
+            'institution_count' => DB::raw(
+                self::sqlCountDistinctInstitutionsWhen($columnPrefix.'SK_Code', '1 = 1').' as institution_count'
             ),
         ];
 
@@ -166,6 +203,13 @@ class TeacherSupportKpiCalculator
         return "COUNT(DISTINCT CASE WHEN {$conditionSql} THEN {$teacherIdColumn} END)";
     }
 
+    private static function sqlCountDistinctInstitutionsWhen(string $skCodeColumn, string $conditionSql): string
+    {
+        $normalizedSk = "NULLIF(TRIM({$skCodeColumn}), '')";
+
+        return "COUNT(DISTINCT CASE WHEN {$conditionSql} AND {$normalizedSk} IS NOT NULL THEN {$normalizedSk} END)";
+    }
+
     /**
      * @return array<string, int>
      */
@@ -173,7 +217,14 @@ class TeacherSupportKpiCalculator
     {
         $cols = config('coach_teacher_support.columns');
         $rounds = config('coach_teacher_support.kpi_rounds', []);
-        $result = [];
+        $result = [
+            'teacher_count' => (clone $baseQuery)->count(),
+            'institution_count' => (clone $baseQuery)
+                ->whereNotNull('SK_Code')
+                ->where('SK_Code', '!=', '')
+                ->distinct()
+                ->count('SK_Code'),
+        ];
 
         foreach ($rounds as $key => $round) {
             $completedCol = $cols[$round['completed']];
@@ -259,7 +310,14 @@ class TeacherSupportKpiCalculator
         $rows = collect($teachers)->values();
         $cols = config('coach_teacher_support.columns');
         $rounds = config('coach_teacher_support.kpi_rounds', []);
-        $result = [];
+        $result = [
+            'teacher_count' => $rows->count(),
+            'institution_count' => $rows
+                ->pluck('SK_Code')
+                ->filter(fn ($skCode): bool => trim((string) $skCode) !== '')
+                ->unique()
+                ->count(),
+        ];
 
         foreach ($rounds as $key => $round) {
             $completedCol = $cols[$round['completed']];

@@ -59,6 +59,13 @@
             </span>
 
             <div class="w-full lg:w-auto lg:ml-auto flex flex-wrap shrink-0 items-center justify-end gap-2 whitespace-nowrap">
+                <button type="button"
+                        wire:click="$toggle('filterUrgentOnly')"
+                        class="flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors
+                               {{ $filterUrgentOnly ? 'bg-orange-100 text-orange-800 border border-orange-300' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50' }}">
+                    긴급 이슈만 보기
+                </button>
+
                 <a href="{{ \App\Support\TeamMenuContext::route('supports.create') }}"
                    class="flex items-center justify-center gap-2 px-4 py-2 bg-mochi-header hover:bg-mochi-header/90
                           text-white text-sm font-medium rounded-lg transition-colors">
@@ -93,6 +100,7 @@
                 <tr>
                     <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">No</th>
                     <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">SK코드</th>
+                    <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">긴급</th>
                     <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">기관명</th>
                     <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">담당자</th>
                     <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">지원일</th>
@@ -115,6 +123,7 @@
                     <tr wire:key="support-row-{{ $record->ID }}"
                         wire:click="openDetailModal({{ $record->ID }})"
                         class="cursor-pointer mochi-table-row-hover transition-colors
+                               {{ ($record->is_urgent ?? false) ? 'bg-red-50/40' : '' }}
                                {{ $record->isCompleted() ? 'opacity-70' : '' }}">
 
                         {{-- No --}}
@@ -129,8 +138,19 @@
                             </span>
                         </td>
 
+                        {{-- 긴급 --}}
+                        <td class="px-3 py-2.5">
+                            @if($record->is_urgent ?? false)
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700">
+                                    긴급
+                                </span>
+                            @else
+                                <span class="text-xs text-gray-300">-</span>
+                            @endif
+                        </td>
+
                         {{-- 기관명 --}}
-                        <td class="px-3 py-2.5 font-medium text-gray-900 max-w-40 truncate" title="{{ $record->Account_Name }}">
+                        <td class="px-3 py-2.5 font-medium text-gray-900 max-w-40 truncate {{ ($record->is_urgent ?? false) ? 'text-red-700' : '' }}" title="{{ $record->Account_Name }}">
                             {{ $record->Account_Name ?? '-' }}
                         </td>
 
@@ -230,7 +250,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ \Illuminate\Support\Facades\Gate::allows('deleteSupportRecords') ? 14 : 13 }}" class="px-4 py-16 text-center text-gray-400">
+                        <td colspan="{{ \Illuminate\Support\Facades\Gate::allows('deleteSupportRecords') ? 15 : 14 }}" class="px-4 py-16 text-center text-gray-400">
                             <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>

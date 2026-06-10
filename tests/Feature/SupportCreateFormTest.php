@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Livewire\SupportCreateForm;
 use App\Mail\SupportReportStoredMail;
+use App\Mail\UrgentSupportNotificationMail;
 use App\Models\CoNewTarget;
 use App\Models\Institution;
 use App\Models\User;
@@ -47,6 +48,9 @@ class SupportCreateFormTest extends TestCase
             $table->increments('ID');
             $table->string('SK_Code', 100);
             $table->string('Account_Name', 255)->nullable();
+            $table->string('CO', 255)->nullable();
+            $table->string('TR', 255)->nullable();
+            $table->string('CS', 255)->nullable();
             $table->string('Customer_Type', 255)->nullable();
         });
 
@@ -67,6 +71,22 @@ class SupportCreateFormTest extends TestCase
             $table->string('Status', 50)->nullable();
             $table->timestamp('CompletedDate')->nullable();
             $table->timestamp('CreatedDate')->nullable();
+            $table->boolean('is_urgent')->default(false);
+        });
+
+        Schema::dropIfExists('urgent_support_notifications');
+        Schema::create('urgent_support_notifications', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedInteger('support_record_id');
+            $table->unsignedBigInteger('recipient_user_id');
+            $table->unsignedBigInteger('sender_user_id');
+            $table->string('sk_code', 20)->nullable();
+            $table->string('account_name')->nullable();
+            $table->text('message')->nullable();
+            $table->boolean('is_read')->default(false);
+            $table->timestamp('read_at')->nullable();
+            $table->timestamp('dismissed_at')->nullable();
+            $table->timestamps();
         });
 
         Schema::create('Teachers', function (Blueprint $table): void {
@@ -74,6 +94,39 @@ class SupportCreateFormTest extends TestCase
             $table->string('SK_Code', 100)->nullable();
             $table->string('School_Name', 255)->nullable();
             $table->string('Name', 255)->nullable();
+            $table->string('_1st_Support_Date')->nullable();
+            $table->string('_1st_Support_Type')->nullable();
+        });
+
+        Schema::dropIfExists('teacher_lva_fb_support_reports');
+
+        Schema::create('teacher_lva_fb_support_reports', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedInteger('teacher_id');
+            $table->string('sk_code', 100);
+            $table->string('coach_name', 255);
+            $table->string('institution_name', 255);
+            $table->string('teacher_name', 255);
+            $table->date('support_date');
+            $table->integer('observe_unit')->nullable();
+            $table->integer('observe_lesson')->nullable();
+            $table->string('observe_class', 50)->nullable();
+            $table->string('observe_age', 50)->nullable();
+            $table->string('teacher_experience', 50)->nullable();
+            $table->integer('session_number')->nullable();
+            $table->string('semester_label', 100)->nullable();
+            $table->date('interview_date')->nullable();
+            $table->string('interview_time', 10)->nullable();
+            $table->string('method', 50)->nullable();
+            $table->text('other_notes')->nullable();
+            $table->integer('video_length_minutes')->nullable();
+            $table->json('procedures')->nullable();
+            $table->json('strength_areas')->nullable();
+            $table->json('growth_areas')->nullable();
+            $table->string('status', 20)->default('임시');
+            $table->unsignedBigInteger('support_record_id')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->timestamps();
         });
 
         Schema::create('S_CO_NewTarget', function (Blueprint $table): void {
@@ -281,6 +334,51 @@ class SupportCreateFormTest extends TestCase
             ->assertSet('formTarget', '김교사');
     }
 
+    public function test_coach_team_can_save_lva_fb_report_from_support_create_form(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-COACH-LVA',
+            'AccountName' => 'Coach LVA 기관',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-COACH-LVA',
+            'Account_Name' => 'Coach LVA 기관',
+            'TR' => 'Coach A',
+        ]);
+
+        $teacherId = (int) DB::table('Teachers')->insertGetId([
+            'SK_Code' => 'SK-COACH-LVA',
+            'Name' => '김교사',
+        ]);
+
+        $user = User::factory()->admin()->create(['team' => 'COACH']);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'coach'])
+            ->test(SupportCreateForm::class)
+            ->call('setReportMode', 'teacher')
+            ->call('selectInstitution', 'SK-COACH-LVA')
+            ->set('formTeacherId', $teacherId)
+            ->call('startCoachTeacherSupportCreate', 'lva_fb')
+            ->assertSet('showLvaFbModal', true)
+            ->assertSet('lvaFbTeacherId', $teacherId)
+            ->set('lvaFbMarkCompleted', true)
+            ->call('saveLvaFbReport')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('teacher_lva_fb_support_reports', [
+            'teacher_id' => $teacherId,
+            'teacher_name' => '김교사',
+            'status' => '완료',
+        ]);
+
+        $this->assertDatabaseHas('Teachers', [
+            'ID' => $teacherId,
+            '_1st_Support_Type' => 'LVA + FB',
+        ]);
+    }
+
     public function test_coach_teacher_report_mode_requires_support_type_selection_before_save(): void
     {
         Institution::query()->create([
@@ -433,6 +531,61 @@ class SupportCreateFormTest extends TestCase
             ->assertHasNoErrors();
 
         Mail::assertNothingSent();
+    }
+
+    public function test_urgent_save_creates_notifications_and_sends_urgent_mails(): void
+    {
+        Mail::fake();
+
+        config(['support_report_mail.notify_addresses' => []]);
+
+        Institution::query()->create([
+            'SKcode' => 'SK-URGENT-1',
+            'AccountName' => '긴급 알림 기관',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-URGENT-1',
+            'Account_Name' => '긴급 알림 기관',
+            'CO' => 'co-user',
+            'TR' => 'tr-user',
+            'CS' => 'cs-user',
+        ]);
+
+        $sender = User::factory()->create(['name' => 'sender-user', 'email' => 'sender@example.com']);
+        $co = User::factory()->create(['name' => 'co-user', 'email' => 'co@example.com', 'is_active' => true]);
+        $tr = User::factory()->create(['name' => 'tr-user', 'email' => 'tr@example.com', 'is_active' => true]);
+        $cs = User::factory()->create(['name' => 'cs-user', 'email' => 'cs@example.com', 'is_active' => true]);
+
+        Livewire::actingAs($sender)
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-URGENT-1')
+            ->set('isUrgent', true)
+            ->set('formToAccount', '긴급 공지 내용')
+            ->set('formToDepart', '본사 공유')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_SupportInfo_Account', [
+            'SK_Code' => 'SK-URGENT-1',
+            'is_urgent' => true,
+        ]);
+
+        $this->assertDatabaseCount('urgent_support_notifications', 3);
+        $this->assertDatabaseHas('urgent_support_notifications', [
+            'recipient_user_id' => $co->id,
+            'sender_user_id' => $sender->id,
+        ]);
+        $this->assertDatabaseHas('urgent_support_notifications', [
+            'recipient_user_id' => $tr->id,
+            'sender_user_id' => $sender->id,
+        ]);
+        $this->assertDatabaseHas('urgent_support_notifications', [
+            'recipient_user_id' => $cs->id,
+            'sender_user_id' => $sender->id,
+        ]);
+
+        Mail::assertSent(UrgentSupportNotificationMail::class, 3);
     }
 
     public function test_save_mirrors_to_potential_detail_for_uncontracted_target(): void
@@ -709,6 +862,26 @@ class SupportCreateFormTest extends TestCase
         Livewire::actingAs(User::factory()->create())
             ->withQueryParams(['sk_code' => 'SK-TERM'])
             ->test(SupportCreateForm::class)
+            ->assertSet('formSkCode', '')
+            ->assertSet('formAccountName', '');
+    }
+
+    public function test_select_institution_blocks_terminated_customer(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-TERM-SELECT',
+            'AccountName' => '선택 차단 해지 기관',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-TERM-SELECT',
+            'Account_Name' => '선택 차단 해지 기관',
+            'Customer_Type' => '해지',
+        ]);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-TERM-SELECT')
             ->assertSet('formSkCode', '')
             ->assertSet('formAccountName', '');
     }

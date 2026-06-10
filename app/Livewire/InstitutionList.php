@@ -54,6 +54,12 @@ class InstitutionList extends Component
     public string $assignmentFilter = '';
     // 담당자 배정 상태 필터: '' | assigned | unassigned | my_assigned
 
+    public string $filterCo = '';
+
+    public string $filterTr = '';
+
+    public string $filterCs = '';
+
     public string $sortField = 'FGC_CreateDate';
     // 현재 정렬 기준 컬럼 (기본: S_Account_Information.FGC_CreateDate)
 
@@ -170,6 +176,68 @@ class InstitutionList extends Component
 
     public function updatingAssignmentFilter(): void
     {
+        $this->resetPage();
+    }
+
+    public function updatingFilterCo(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterTr(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterCs(): void
+    {
+        $this->resetPage();
+    }
+
+    public function clearListFilters(): void
+    {
+        $this->search = '';
+        $this->assignmentFilter = '';
+        $this->statusFilter = 'all';
+        $this->filterCo = '';
+        $this->filterTr = '';
+        $this->filterCs = '';
+        $this->resetPage();
+    }
+
+    public function clearSearchFilter(): void
+    {
+        $this->search = '';
+        $this->resetPage();
+    }
+
+    public function clearStatusFilter(): void
+    {
+        $this->statusFilter = 'all';
+        $this->resetPage();
+    }
+
+    public function clearAssignmentFilter(): void
+    {
+        $this->assignmentFilter = '';
+        $this->resetPage();
+    }
+
+    public function clearCoFilter(): void
+    {
+        $this->filterCo = '';
+        $this->resetPage();
+    }
+
+    public function clearTrFilter(): void
+    {
+        $this->filterTr = '';
+        $this->resetPage();
+    }
+
+    public function clearCsFilter(): void
+    {
+        $this->filterCs = '';
         $this->resetPage();
     }
 
@@ -1142,6 +1210,15 @@ class InstitutionList extends Component
             })
             ->when($this->assignmentFilter === 'my_assigned', function (Builder $query): void {
                 $this->applyCurrentUserManagerScopeOnAccountInformation($query);
+            })
+            ->when(filled($this->filterCo), function (Builder $query): void {
+                $this->applyManagerColumnFilter($query, 'CO', $this->filterCo, self::DEPT_CO);
+            })
+            ->when(filled($this->filterTr), function (Builder $query): void {
+                $this->applyManagerColumnFilter($query, 'TR', $this->filterTr, self::DEPT_TR);
+            })
+            ->when(filled($this->filterCs), function (Builder $query): void {
+                $this->applyManagerColumnFilter($query, 'CS', $this->filterCs, self::DEPT_CS);
             });
     }
 
@@ -1534,6 +1611,50 @@ class InstitutionList extends Component
     {
         $query->whereNotNull($column)
             ->where($column, '!=', '');
+    }
+
+    private function applyManagerColumnFilter(Builder $query, string $column, string $managerName, string $deptNo): void
+    {
+        if (blank($managerName)) {
+            return;
+        }
+
+        $query->whereManagerMatches($column, $this->resolveSelectedManagerAliases($managerName, $deptNo));
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function resolveSelectedManagerAliases(string $managerName, string $deptNo): array
+    {
+        $aliases = collect([$managerName]);
+
+        if (Schema::hasTable('employee')) {
+            $targetKey = ManagerNameNormalizer::normalize($managerName);
+
+            $employee = Employee::query()
+                ->where('WORKDEPT', $deptNo)
+                ->where('STATUS', 1)
+                ->get(['KOREANAME', 'ENGLISHNAME'])
+                ->first(function (Employee $employee) use ($targetKey): bool {
+                    return ManagerNameNormalizer::normalize((string) ($employee->ENGLISHNAME ?? '')) === $targetKey
+                        || ManagerNameNormalizer::normalize((string) ($employee->KOREANAME ?? '')) === $targetKey;
+                });
+
+            if ($employee !== null) {
+                $aliases->push(
+                    (string) ($employee->ENGLISHNAME ?? ''),
+                    (string) ($employee->KOREANAME ?? ''),
+                );
+            }
+        }
+
+        return $aliases
+            ->map(fn (string $value): string => ManagerNameNormalizer::normalize($value))
+            ->filter(fn (string $value): bool => $value !== '')
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function applyInstitutionSort(Builder $query): void

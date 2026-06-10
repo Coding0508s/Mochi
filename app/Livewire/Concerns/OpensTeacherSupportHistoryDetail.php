@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Gate;
 
 trait OpensTeacherSupportHistoryDetail
 {
+    use ManagesSupportReportRoundSelection;
+
     public bool $showTeacherSupportHistoryDetailModal = false;
 
     public ?array $selectedTeacherSupportHistoryDetail = null;
@@ -199,6 +201,7 @@ trait OpensTeacherSupportHistoryDetail
     public function closeDemoLessonModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showDemoLessonModal = false;
         $this->demoLessonTeacherId = null;
         $this->demoLessonForm = [];
@@ -209,6 +212,7 @@ trait OpensTeacherSupportHistoryDetail
     public function closeLvaFrModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showLvaFrModal = false;
         $this->lvaFrTeacherId = null;
         $this->lvaFrForm = [];
@@ -219,6 +223,7 @@ trait OpensTeacherSupportHistoryDetail
     public function closeLvaFbModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showLvaFbModal = false;
         $this->lvaFbTeacherId = null;
         $this->lvaFbForm = [];
@@ -229,6 +234,7 @@ trait OpensTeacherSupportHistoryDetail
     public function closeLsOnsiteLvaModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showLsOnsiteLvaModal = false;
         $this->lsOnsiteLvaTeacherId = null;
         $this->lsOnsiteLvaForm = [];
@@ -239,6 +245,7 @@ trait OpensTeacherSupportHistoryDetail
     public function closeLittleseedConModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showLittleseedConModal = false;
         $this->littleseedConTeacherId = null;
         $this->littleseedConForm = [];
@@ -249,6 +256,7 @@ trait OpensTeacherSupportHistoryDetail
     public function closeOnsiteModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showOnsiteModal = false;
         $this->onsiteTeacherId = null;
         $this->onsiteForm = [];
@@ -259,6 +267,7 @@ trait OpensTeacherSupportHistoryDetail
     public function closeProConModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showProConModal = false;
         $this->proConTeacherId = null;
         $this->proConForm = [];
@@ -269,6 +278,7 @@ trait OpensTeacherSupportHistoryDetail
     public function closeOpenClassModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showOpenClassModal = false;
         $this->openClassTeacherId = null;
         $this->openClassForm = [];
@@ -279,6 +289,7 @@ trait OpensTeacherSupportHistoryDetail
     public function closeUnit21PlusModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showUnit21PlusModal = false;
         $this->unit21PlusTeacherId = null;
         $this->unit21PlusForm = [];
@@ -289,6 +300,7 @@ trait OpensTeacherSupportHistoryDetail
     public function closeUnit31PlusModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showUnit31PlusModal = false;
         $this->unit31PlusTeacherId = null;
         $this->unit31PlusForm = [];
@@ -363,6 +375,7 @@ trait OpensTeacherSupportHistoryDetail
 
     protected function closeOpenSupportReportModals(): void
     {
+        $this->resetSupportRoundSelection();
         $this->showDemoLessonModal = false;
         $this->showLvaFrModal = false;
         $this->showLvaFbModal = false;

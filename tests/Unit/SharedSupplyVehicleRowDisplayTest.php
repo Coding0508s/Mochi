@@ -112,7 +112,7 @@ class SharedSupplyVehicleRowDisplayTest extends TestCase
 
         $this->assertSame('complete', $supply->vehicleRowStatus());
         $this->assertSame(
-            '광명 올어바웃어린이집 / 일반업무 / 광명 올어바웃어린이집',
+            '광명 올어바웃어린이집',
             $supply->vehicleRowPrimaryRemark(),
         );
         $this->assertStringContainsString('125km', $supply->vehicleRowSecondaryRemark());

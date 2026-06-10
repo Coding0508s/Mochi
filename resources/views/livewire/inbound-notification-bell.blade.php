@@ -5,14 +5,15 @@
     wire:poll.30s="loadCounters"
     x-data="{ open: false }"
     @click.outside="open = false"
+    x-on:livewire:navigated.window="$wire.loadCounters()"
 >
     <button
         type="button"
         class="mochi-topbar-action mochi-topbar-bell relative inline-flex items-center justify-center"
         :aria-expanded="open ? 'true' : 'false'"
         aria-haspopup="true"
-        aria-label="외부 시스템 연동 알림 열기"
-        @click="open = !open"
+        aria-label="알림 열기"
+        @click="if (!open) { $wire.loadCounters() }; open = !open"
     >
         {{-- Lucide 스타일 벨: 종 몸통 + 하단 클래퍼 --}}
         <svg
@@ -44,9 +45,9 @@
     >
         <div class="flex items-start justify-between gap-2 border-b border-gray-100 px-3 pb-2">
             <div>
-                <div class="text-sm font-semibold text-gray-900">외부 시스템 연동</div>
+                <div class="text-sm font-semibold text-gray-900">알림 센터</div>
                 <div class="mt-0.5 text-xs leading-snug text-gray-500">
-                    E-Ordering에서 보낸 기관 정보가 등록되면 여기에 표시됩니다.
+                    기관 담당자 변경과 "긴급 알림" 확인이 필요한 기관 지원 보고서가 등록되었습니다.
                 </div>
             </div>
             <div class="flex shrink-0 items-center gap-2">
@@ -72,24 +73,19 @@
 
         <div class="max-h-80 overflow-y-auto">
             @forelse($recentRows as $row)
-                @php
-                    $href = str_starts_with($row['sk_code'], 'LEAD-')
-                        ? route('potential-institutions.view')
-                        : route('institutions.index');
-                @endphp
                 <div
-                    wire:key="inbound-row-{{ $row['id'] }}"
+                    wire:key="inbound-row-{{ $row['row_key'] ?? $row['id'] }}"
                     class="group relative border-b border-gray-50 {{ ($row['is_unread'] ?? false) ? 'bg-sky-50/80' : '' }}"
                 >
                     <a
-                        href="{{ $href }}"
+                        href="{{ $row['href'] ?? route('supports.index') }}"
                         class="block px-3 py-2.5 pr-8 text-left transition hover:bg-gray-50"
                     >
                         @include('livewire.partials.inbound-notification-row-body', ['row' => $row])
                     </a>
                     <button
                         type="button"
-                        wire:click.stop="deleteLog({{ $row['id'] }})"
+                        wire:click.stop="deleteLog('{{ $row['row_key'] ?? ('inbound:'.$row['id']) }}')"
                         title="이 알림 삭제"
                         class="absolute right-2 top-2.5 hidden rounded p-0.5 text-gray-300 hover:bg-red-50 hover:text-red-400 group-hover:flex"
                         aria-label="알림 삭제"
@@ -100,7 +96,7 @@
                     </button>
                 </div>
             @empty
-                <p class="px-3 py-6 text-center text-sm text-gray-500">E-Ordering에서 보낸 기관 정보가 없습니다.</p>
+                <p class="px-3 py-6 text-center text-sm text-gray-500">새로운 알림이 없습니다.</p>
             @endforelse
         </div>
     </div>

@@ -6,11 +6,13 @@ use App\Livewire\SharedSupplyManager;
 use App\Models\SharedSupply;
 use App\Models\SharedSupplyItem;
 use App\Models\SharedSupplyLabel;
+use App\Models\SupportRecord;
 use App\Models\User;
 use App\Models\VehicleUsageLog;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -1284,5 +1286,205 @@ class SharedSupplyManagerTest extends TestCase
             ->assertSet('vehicleArrivalLocation', '')
             ->assertSet('vehicleOdometerBefore', 56592)
             ->assertSet('vehicleLatestRemark', '첫 번째 도착지 / 첫 번째 운행 적요');
+    }
+
+    public function test_vehicle_edit_for_co_team_shows_support_prompt_with_institution_action_only(): void
+    {
+        $user = User::factory()->create([
+            'is_admin' => false,
+            'team' => 'CO',
+        ]);
+
+        $supply = $this->createPendingPostUseVehicleSupply($user);
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class)
+            ->call('openEditModal', $supply->id)
+            ->set('vehicleOdometerAfter', 100120)
+            ->set('purpose', 'CO팀 반납 저장')
+            ->call('save')
+            ->assertSet('showSupportReportPrompt', true)
+            ->assertSet('supportReportPromptTeam', 'co')
+            ->assertSee('기관 지원 보고서 작성')
+            ->assertDontSee('교사 지원 보고서 작성');
+    }
+
+    public function test_vehicle_edit_for_coach_team_shows_support_prompt_with_teacher_action(): void
+    {
+        $user = User::factory()->create([
+            'is_admin' => false,
+            'team' => 'COACH',
+        ]);
+
+        $supply = $this->createPendingPostUseVehicleSupply($user);
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class)
+            ->call('openEditModal', $supply->id)
+            ->set('vehicleOdometerAfter', 100120)
+            ->set('purpose', 'Coach 반납 저장')
+            ->call('save')
+            ->assertSet('showSupportReportPrompt', true)
+            ->assertSet('supportReportPromptTeam', 'coach')
+            ->assertSee('기관 지원 보고서 작성')
+            ->assertSee('교사 지원 보고서 작성');
+    }
+
+    public function test_vehicle_edit_does_not_show_support_prompt_when_usage_purpose_is_commute(): void
+    {
+        $user = User::factory()->create([
+            'is_admin' => false,
+            'team' => 'CO',
+        ]);
+
+        $supply = $this->createPendingPostUseVehicleSupply($user, '출퇴근');
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class)
+            ->call('openEditModal', $supply->id)
+            ->set('vehicleOdometerAfter', 100120)
+            ->call('save')
+            ->assertSet('showSupportReportPrompt', false);
+    }
+
+    public function test_vehicle_edit_does_not_show_support_prompt_when_usage_purpose_is_non_business(): void
+    {
+        $user = User::factory()->create([
+            'is_admin' => false,
+            'team' => 'CO',
+        ]);
+
+        $supply = $this->createPendingPostUseVehicleSupply($user, '업무외');
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class)
+            ->call('openEditModal', $supply->id)
+            ->set('vehicleOdometerAfter', 100120)
+            ->call('save')
+            ->assertSet('showSupportReportPrompt', false);
+    }
+
+    public function test_vehicle_create_does_not_show_support_prompt_even_with_post_use_odometer(): void
+    {
+        $user = User::factory()->create([
+            'is_admin' => false,
+            'team' => 'CO',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class)
+            ->call('openCreateModal')
+            ->set('useDate', '2026-06-20')
+            ->set('startTime', '09:00')
+            ->set('endTime', '10:00')
+            ->set('sharedSupplyItemId', $this->itemIdByCode('00003'))
+            ->set('sharedSupplyLabelId', $this->labelIdByCode('01'))
+            ->set('title', '[출장 차량배차] 신청 및 예약')
+            ->set('vehicleUsagePurpose', '일반업무')
+            ->set('vehicleOdometerBefore', 200000)
+            ->set('vehicleOdometerAfter', 200020)
+            ->set('purpose', '신규 등록 테스트')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertSet('showSupportReportPrompt', false);
+    }
+
+    public function test_vehicle_edit_does_not_show_support_prompt_for_cs_team(): void
+    {
+        $user = User::factory()->create([
+            'is_admin' => false,
+            'team' => 'CS',
+        ]);
+
+        $supply = $this->createPendingPostUseVehicleSupply($user);
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class)
+            ->call('openEditModal', $supply->id)
+            ->set('vehicleOdometerAfter', 100120)
+            ->call('save')
+            ->assertSet('showSupportReportPrompt', false);
+    }
+
+    public function test_vehicle_edit_skips_support_prompt_when_same_day_support_record_exists(): void
+    {
+        if (! Schema::hasTable('S_SupportInfo_Account')) {
+            $this->markTestSkipped('S_SupportInfo_Account 테이블이 없어 당일 보고서 중복 체크를 검증할 수 없습니다.');
+        }
+
+        $user = User::factory()->create([
+            'is_admin' => false,
+            'team' => 'CO',
+            'name' => '홍길동',
+        ]);
+
+        $supply = $this->createPendingPostUseVehicleSupply($user, '일반업무', '2026-06-18');
+
+        $payload = [
+            'Year' => 2026,
+            'SK_Code' => 'SK-EXIST-001',
+            'Account_Name' => '테스트 기관',
+            'TR_Name' => $user->nameForCoReports(),
+            'Support_Date' => '2026-06-18',
+            'Meet_Time' => '10:00',
+            'Target' => '기존 작성자',
+            'Support_Type' => '방문',
+            'Issue' => '당일 이미 작성된 보고서',
+            'TO_Account' => '테스트',
+            'Status' => '완료',
+            'dePart' => 'CO',
+            'CreatedDate' => now(),
+            'CompletedDate' => now(),
+        ];
+
+        $filteredPayload = collect($payload)
+            ->filter(fn (mixed $value, string $column): bool => SupportRecord::tableHasColumn($column))
+            ->all();
+
+        SupportRecord::query()->create($filteredPayload);
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class)
+            ->call('openEditModal', $supply->id)
+            ->set('vehicleOdometerAfter', 100120)
+            ->call('save')
+            ->assertSet('showSupportReportPrompt', false);
+    }
+
+    private function createPendingPostUseVehicleSupply(
+        User $user,
+        string $usagePurpose = '일반업무',
+        string $date = '2026-06-12'
+    ): SharedSupply {
+        $startsAt = Carbon::parse($date.' 09:00');
+        $endsAt = Carbon::parse($date.' 10:00');
+
+        $supply = SharedSupply::query()->create([
+            'user_id' => $user->id,
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+            'shared_supply_item_id' => $this->itemIdByCode('00003'),
+            'shared_supply_label_id' => $this->labelIdByCode('01'),
+            'title' => '[출장 차량배차] 신청 및 예약',
+            'purpose' => '반납 전 상태',
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
+
+        VehicleUsageLog::query()->create([
+            'shared_supply_id' => $supply->id,
+            'user_id' => $user->id,
+            'vehicle_name' => (string) SharedSupplyItem::query()->whereKey($supply->shared_supply_item_id)->value('name'),
+            'usage_purpose_name' => $usagePurpose,
+            'odometer_before' => 100000,
+            'odometer_after' => null,
+            'distance' => null,
+            'remarks' => '반납 전 기록',
+            'driven_on' => $startsAt->toDateString(),
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
+
+        return $supply;
     }
 }

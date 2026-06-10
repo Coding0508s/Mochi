@@ -17,6 +17,7 @@ use App\Actions\UpdateLegacyTeacherSupportReport;
 use App\Actions\UpdateTeacherProfile;
 use App\Actions\UpdateTeacherSupport;
 use App\Actions\UpdateTeacherSupportReport;
+use App\Livewire\Concerns\ManagesSupportReportRoundSelection;
 use App\Models\AccountInformation;
 use App\Models\Institution;
 use App\Models\SupportRecord;
@@ -47,6 +48,7 @@ use Livewire\WithPagination;
 
 class CoachTeacherSupportList extends Component
 {
+    use ManagesSupportReportRoundSelection;
     use WithPagination;
 
     public string $filterYear = '';
@@ -972,12 +974,14 @@ class CoachTeacherSupportList extends Component
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showDemoLessonModal = true;
     }
 
     public function closeDemoLessonModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showDemoLessonModal = false;
         $this->demoLessonTeacherId = null;
         $this->demoLessonForm = [];
@@ -997,7 +1001,7 @@ class CoachTeacherSupportList extends Component
 
         $payload = array_merge($this->demoLessonForm, [
             'mark_completed' => $this->demoLessonMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->demoLessonMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -1090,12 +1094,14 @@ class CoachTeacherSupportList extends Component
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showLvaFrModal = true;
     }
 
     public function closeLvaFrModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showLvaFrModal = false;
         $this->lvaFrTeacherId = null;
         $this->lvaFrForm = [];
@@ -1115,7 +1121,7 @@ class CoachTeacherSupportList extends Component
 
         $payload = array_merge($this->lvaFrForm, [
             'mark_completed' => $this->lvaFrMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->lvaFrMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -1210,12 +1216,14 @@ class CoachTeacherSupportList extends Component
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showLvaFbModal = true;
     }
 
     public function closeLvaFbModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showLvaFbModal = false;
         $this->lvaFbTeacherId = null;
         $this->lvaFbForm = [];
@@ -1235,7 +1243,7 @@ class CoachTeacherSupportList extends Component
 
         $payload = array_merge($this->lvaFbForm, [
             'mark_completed' => $this->lvaFbMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->lvaFbMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -1330,12 +1338,14 @@ class CoachTeacherSupportList extends Component
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showLsOnsiteLvaModal = true;
     }
 
     public function closeLsOnsiteLvaModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showLsOnsiteLvaModal = false;
         $this->lsOnsiteLvaTeacherId = null;
         $this->lsOnsiteLvaForm = [];
@@ -1355,7 +1365,7 @@ class CoachTeacherSupportList extends Component
 
         $payload = array_merge($this->lsOnsiteLvaForm, [
             'mark_completed' => $this->lsOnsiteLvaMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->lsOnsiteLvaMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -1452,12 +1462,14 @@ class CoachTeacherSupportList extends Component
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showLittleseedConModal = true;
     }
 
     public function closeLittleseedConModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showLittleseedConModal = false;
         $this->littleseedConTeacherId = null;
         $this->littleseedConForm = [];
@@ -1477,7 +1489,7 @@ class CoachTeacherSupportList extends Component
 
         $payload = array_merge($this->littleseedConForm, [
             'mark_completed' => $this->littleseedConMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->littleseedConMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -1567,12 +1579,14 @@ class CoachTeacherSupportList extends Component
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showOpenClassModal = true;
     }
 
     public function closeOpenClassModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showOpenClassModal = false;
         $this->openClassTeacherId = null;
         $this->openClassForm = [];
@@ -1592,7 +1606,7 @@ class CoachTeacherSupportList extends Component
 
         $payload = array_merge($this->openClassForm, [
             'mark_completed' => $this->openClassMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->openClassMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -1684,12 +1698,14 @@ class CoachTeacherSupportList extends Component
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showUnit21PlusModal = true;
     }
 
     public function closeUnit21PlusModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showUnit21PlusModal = false;
         $this->unit21PlusTeacherId = null;
         $this->unit21PlusForm = [];
@@ -1709,7 +1725,7 @@ class CoachTeacherSupportList extends Component
 
         $payload = array_merge($this->unit21PlusForm, [
             'mark_completed' => $this->unit21PlusMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->unit21PlusMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -1804,12 +1820,14 @@ class CoachTeacherSupportList extends Component
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showUnit31PlusModal = true;
     }
 
     public function closeUnit31PlusModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showUnit31PlusModal = false;
         $this->unit31PlusTeacherId = null;
         $this->unit31PlusForm = [];
@@ -1829,7 +1847,7 @@ class CoachTeacherSupportList extends Component
 
         $payload = array_merge($this->unit31PlusForm, [
             'mark_completed' => $this->unit31PlusMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->unit31PlusMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -1924,12 +1942,14 @@ class CoachTeacherSupportList extends Component
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showProConModal = true;
     }
 
     public function closeProConModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showProConModal = false;
         $this->proConTeacherId = null;
         $this->proConForm = [];
@@ -1949,7 +1969,7 @@ class CoachTeacherSupportList extends Component
 
         $payload = array_merge($this->proConForm, [
             'mark_completed' => $this->proConMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->proConMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -2039,12 +2059,14 @@ class CoachTeacherSupportList extends Component
             institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
             teacherName: (string) $teacher->Name,
         );
+        $this->seedSupportRoundSelection($teacher);
         $this->showOnsiteModal = true;
     }
 
     public function closeOnsiteModal(): void
     {
         $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
         $this->showOnsiteModal = false;
         $this->onsiteTeacherId = null;
         $this->onsiteForm = [];
@@ -2064,7 +2086,7 @@ class CoachTeacherSupportList extends Component
 
         $payload = array_merge($this->onsiteForm, [
             'mark_completed' => $this->onsiteMarkCompleted,
-        ]);
+        ], $this->supportReportRoundPayload($this->onsiteMarkCompleted));
 
         if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
             if ($this->getErrorBag()->isNotEmpty()) {
@@ -2288,28 +2310,13 @@ class CoachTeacherSupportList extends Component
 
         $kpis = TeacherSupportKpiCalculator::calculate($kpiQuery, $this->resolvedFilterYear());
 
-        $accountNameSortSubquery = DB::table('S_AccountName')
-            ->selectRaw('SKcode, MAX(AccountName) as AccountName')
-            ->groupBy('SKcode');
-
-        $accountInfoSortSubquery = DB::table('S_Account_Information')
-            ->selectRaw('SK_Code, MAX(Account_Name) as Account_Name')
-            ->groupBy('SK_Code');
-
         $teachers = (clone $baseQuery)
             ->tap(fn (Builder $q) => $this->applyKpiFilter($q))
             ->tap(fn (Builder $q) => $this->applyRoundFilter($q))
             ->tap(fn (Builder $q) => $this->applyMonthFilter($q))
             ->with(CoachTeacherScope::eagerLoads())
-            ->leftJoinSub($accountNameSortSubquery, 'sorted_account_names', function ($join): void {
-                $join->on('Teachers.SK_Code', '=', 'sorted_account_names.SKcode');
-            })
-            ->leftJoinSub($accountInfoSortSubquery, 'sorted_account_information', function ($join): void {
-                $join->on('Teachers.SK_Code', '=', 'sorted_account_information.SK_Code');
-            })
-            ->orderByRaw('COALESCE(NULLIF(sorted_account_information.Account_Name, ""), NULLIF(sorted_account_names.AccountName, ""), Teachers.School_Name) ASC')
-            ->orderBy('Teachers.SK_Code')
-            ->orderBy('Teachers.Name')
+            ->orderByDesc('Teachers.Created_Date')
+            ->orderByDesc('Teachers.ID')
             ->select('Teachers.*')
             ->paginate(50);
 

@@ -66,8 +66,8 @@
                 <tr class="bg-[#f5f0e8] text-gray-700">
                     <th class="px-3 py-2 text-left border border-gray-300">SK</th>
                     <th class="px-3 py-2 text-left border border-gray-300">기관명</th>
-                    <th class="px-3 py-2 text-left border border-gray-300">직급</th>
                     <th class="px-3 py-2 text-left border border-gray-300">교사명</th>
+                    <th class="px-3 py-2 text-left border border-gray-300">직급</th>
                     <th class="px-3 py-2 text-left border border-gray-300">퇴직일</th>
                     <th class="px-3 py-2 text-left border border-gray-300">TR</th>
                     <th class="px-3 py-2 text-center border border-gray-300">상태</th>
@@ -80,6 +80,13 @@
                         <td class="px-3 py-2 border border-gray-200">{{ $row->SK_Code }}</td>
                         <td class="px-3 py-2 border border-gray-200">{{ $row->displayAccountName() ?: '-' }}</td>
                         <td class="px-3 py-2 border border-gray-200">
+                            <button type="button"
+                                    wire:click="openDetailModal({{ $row->ID }})"
+                                    class="text-blue-700 underline text-left hover:text-blue-900 cursor-pointer">
+                                {{ $row->Name }}
+                            </button>
+                        </td>
+                        <td class="px-3 py-2 border border-gray-200">
                             @if($position = $row->displayPosition())
                                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
                                     {{ $position === '원장' ? 'bg-yellow-100 text-yellow-800' :
@@ -91,13 +98,6 @@
                             @else
                                 <span class="text-gray-400">-</span>
                             @endif
-                        </td>
-                        <td class="px-3 py-2 border border-gray-200">
-                            <button type="button"
-                                    wire:click="openDetailModal({{ $row->ID }})"
-                                    class="text-blue-700 underline text-left hover:text-blue-900 cursor-pointer">
-                                {{ $row->Name }}
-                            </button>
                         </td>
                         <td class="px-3 py-2 border border-gray-200 whitespace-nowrap">
                             {{ $row->RetirementDate?->format('Y-m-d') ?? '-' }}
@@ -148,16 +148,16 @@
                         <span class="col-span-2 text-gray-900">{{ $selectedRetirement['name'] ?? '-' }}</span>
                     </div>
                     <div class="grid grid-cols-3 gap-2">
+                        <span class="text-gray-500">직급</span>
+                        <span class="col-span-2 text-gray-900">{{ $selectedRetirement['position'] ?? '-' }}</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
                         <span class="text-gray-500">기관명</span>
                         <span class="col-span-2 text-gray-900">{{ $selectedRetirement['account_name'] ?? '-' }}</span>
                     </div>
                     <div class="grid grid-cols-3 gap-2">
                         <span class="text-gray-500">SK 코드</span>
                         <span class="col-span-2 text-gray-900">{{ $selectedRetirement['sk_code'] ?? '-' }}</span>
-                    </div>
-                    <div class="grid grid-cols-3 gap-2">
-                        <span class="text-gray-500">직급</span>
-                        <span class="col-span-2 text-gray-900">{{ $selectedRetirement['position'] ?? '-' }}</span>
                     </div>
                     <div class="grid grid-cols-3 gap-2">
                         <span class="text-gray-500">퇴직일</span>
