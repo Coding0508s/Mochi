@@ -4,8 +4,10 @@ namespace App\Livewire;
 
 use App\Models\ExternalAssignmentInboundLog;
 use App\Models\InboundNotificationDismissal;
+use App\Models\UrgentSupportNotification;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class InboundNotificationBell extends Component
@@ -14,7 +16,10 @@ class InboundNotificationBell extends Component
 
     /**
      * @var array<int, array{
+     *     type:string,
+     *     row_key:string,
      *     id:int,
+     *     href:string,
      *     sk_code:string,
      *     status:string,
      *     co:?string,
@@ -41,6 +46,12 @@ class InboundNotificationBell extends Component
         }
     }
 
+    #[On('notifications-updated')]
+    public function refreshNotifications(): void
+    {
+        $this->loadCounters();
+    }
+
     public function loadCounters(): void
     {
         if (! auth()->check()) {
@@ -63,7 +74,15 @@ class InboundNotificationBell extends Component
         if ($lastSeen !== null) {
             $unreadQuery->where('received_at', '>', $lastSeen);
         }
-        $this->unreadCount = $unreadQuery->count();
+        $inboundUnreadCount = $unreadQuery->count();
+
+        $urgentUnreadCount = UrgentSupportNotification::query()
+            ->where('recipient_user_id', $user->id)
+            ->whereNull('dismissed_at')
+            ->where('is_read', false)
+            ->count();
+
+        $this->unreadCount = $inboundUnreadCount + $urgentUnreadCount;
 
         $rows = ExternalAssignmentInboundLog::query()
             ->when($dismissedIds !== [], fn ($q) => $q->whereNotIn('id', $dismissedIds))
@@ -71,7 +90,7 @@ class InboundNotificationBell extends Component
             ->limit(10)
             ->get();
 
-        $this->recentRows = $rows->map(function (ExternalAssignmentInboundLog $row) use ($lastSeen): array {
+        $inboundRows = $rows->map(function (ExternalAssignmentInboundLog $row) use ($lastSeen): array {
             $isUnread = $lastSeen === null || ($row->received_at !== null && $row->received_at->greaterThan($lastSeen));
 
             $raw = is_array($row->raw_body) ? $row->raw_body : [];
@@ -116,7 +135,12 @@ class InboundNotificationBell extends Component
                 : null;
 
             return [
+                'type' => 'inbound',
+                'row_key' => 'inbound:'.$row->id,
                 'id' => (int) $row->id,
+                'href' => str_starts_with($skCode, 'LEAD-')
+                    ? route('potential-institutions.view')
+                    : route('institutions.index'),
                 'sk_code' => $skCode,
                 'status' => $status,
                 'co' => $row->co,
@@ -132,8 +156,57 @@ class InboundNotificationBell extends Component
                 'error_message' => $errorMessage,
                 'assignment_changes' => $assignmentChanges,
                 'portal_changes' => $portalChanges,
+                'sort_at' => $row->received_at?->timestamp ?? 0,
             ];
-        })->all();
+        });
+
+        $urgentRows = UrgentSupportNotification::query()
+            ->where('recipient_user_id', $user->id)
+            ->whereNull('dismissed_at')
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get()
+            ->map(function (UrgentSupportNotification $row): array {
+                $headlineLabel = filled($row->account_name) ? (string) $row->account_name : (string) ($row->sk_code ?: '기관');
+                $summary = trim((string) ($row->message ?? ''));
+                $summary = $summary !== '' ? Str::limit($summary, 120) : '"긴급 알림" 확인이 필요한 기관 지원 보고서가 등록되었습니다.';
+
+                return [
+                    'type' => 'urgent',
+                    'row_key' => 'urgent:'.$row->id,
+                    'id' => (int) $row->id,
+                    'href' => route('supports.index'),
+                    'sk_code' => (string) ($row->sk_code ?? '-'),
+                    'status' => 'urgent',
+                    'co' => null,
+                    'tr' => null,
+                    'cs' => null,
+                    'portal_campus_id' => null,
+                    'account_no' => null,
+                    'received_at' => $row->created_at?->format('Y-m-d H:i') ?? '—',
+                    'is_unread' => ! $row->is_read,
+                    'headline' => "[긴급] {$headlineLabel} 기관 지원 보고서",
+                    'institution_name' => $row->account_name,
+                    'replaces_sk' => null,
+                    'error_message' => null,
+                    'assignment_changes' => [],
+                    'portal_changes' => [],
+                    'message' => $summary,
+                    'sort_at' => $row->created_at?->timestamp ?? 0,
+                ];
+            });
+
+        $this->recentRows = $inboundRows
+            ->concat($urgentRows)
+            ->sortByDesc('sort_at')
+            ->take(10)
+            ->values()
+            ->map(function (array $row): array {
+                unset($row['sort_at']);
+
+                return $row;
+            })
+            ->all();
     }
 
     public function markAllAsRead(): void
@@ -146,19 +219,56 @@ class InboundNotificationBell extends Component
         $user->last_inbound_seen_at = now();
         $user->save();
 
+        UrgentSupportNotification::query()
+            ->where('recipient_user_id', $user->id)
+            ->whereNull('dismissed_at')
+            ->where('is_read', false)
+            ->update([
+                'is_read' => true,
+                'read_at' => now(),
+            ]);
+
         $this->loadCounters();
     }
 
-    public function deleteLog(int $id): void
+    public function deleteLog(int|string $id): void
     {
         $user = auth()->user();
         if (! $user) {
             return;
         }
 
+        if (is_string($id) && str_starts_with($id, 'urgent:')) {
+            $urgentId = (int) Str::after($id, 'urgent:');
+            if ($urgentId > 0) {
+                UrgentSupportNotification::query()
+                    ->where('id', $urgentId)
+                    ->where('recipient_user_id', $user->id)
+                    ->whereNull('dismissed_at')
+                    ->update([
+                        'is_read' => true,
+                        'read_at' => now(),
+                        'dismissed_at' => now(),
+                    ]);
+            }
+
+            $this->loadCounters();
+
+            return;
+        }
+
+        if (is_string($id) && str_starts_with($id, 'inbound:')) {
+            $id = (int) Str::after($id, 'inbound:');
+        }
+
+        $logId = (int) $id;
+        if ($logId <= 0) {
+            return;
+        }
+
         // 실제 로그는 보존하고, 현재 사용자에게만 안 보이도록 dismiss 흔적만 남깁니다.
         InboundNotificationDismissal::query()->updateOrCreate(
-            ['user_id' => $user->id, 'log_id' => $id],
+            ['user_id' => $user->id, 'log_id' => $logId],
             ['dismissed_at' => now()],
         );
 
@@ -195,6 +305,15 @@ class InboundNotificationBell extends Component
 
             InboundNotificationDismissal::query()->insert($rows);
         }
+
+        UrgentSupportNotification::query()
+            ->where('recipient_user_id', $user->id)
+            ->whereNull('dismissed_at')
+            ->update([
+                'is_read' => true,
+                'read_at' => now(),
+                'dismissed_at' => now(),
+            ]);
 
         $this->loadCounters();
     }

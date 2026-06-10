@@ -2,9 +2,11 @@
 
 namespace App\Livewire;
 
+use App\Actions\ResolveInstitutionRecipients;
 use App\Livewire\Concerns\ManagesCoachTeacherSupportCreateModals;
 use App\Livewire\Concerns\OpensTeacherSupportHistoryDetail;
 use App\Mail\SupportReportStoredMail;
+use App\Mail\UrgentSupportNotificationMail;
 use App\Models\CoNewTarget;
 use App\Models\CoNewTargetDetail;
 use App\Models\ContractDocument;
@@ -13,6 +15,8 @@ use App\Models\SalesforceAccount;
 use App\Models\SalesforceFile;
 use App\Models\SupportRecord;
 use App\Models\Teacher;
+use App\Models\UrgentSupportNotification;
+use App\Models\User;
 use App\Support\SkCodeNormalizer;
 use App\Support\TeamMenuContext;
 use Illuminate\Contracts\View\View;
@@ -62,6 +66,18 @@ class SupportCreateForm extends Component
     public string $formPossibility = '';
 
     public bool $formCompleted = false;
+
+    public bool $isUrgent = false;
+
+    /** @var list<int> */
+    public array $urgentRecipientIds = [];
+
+    /**
+     * @var list<array{id:int,name:string,email:?string,roles:list<string>,is_auto:bool}>
+     */
+    public array $availableRecipients = [];
+
+    public string $selectedUrgentRecipientId = '';
 
     /** @var TemporaryUploadedFile|null */
     public $sfUpload = null;
@@ -354,8 +370,7 @@ class SupportCreateForm extends Component
             return;
         }
 
-        $customerType = (string) ($institution->accountInfo?->Customer_Type ?? '');
-        if (str_contains($customerType, '해지')) {
+        if ($this->isTerminatedInstitution($institution)) {
             session()->flash('warning', '해지된 기관입니다. 신규 지원보고서 작성이 제한됩니다.');
 
             return;
@@ -407,18 +422,37 @@ class SupportCreateForm extends Component
             $this->formPotentialTargetId = null;
             $this->formIsPotential = false;
             $this->formPossibility = '';
+            if ($this->isUrgent) {
+                $this->clearUrgentRecipients();
+            }
 
             return;
         }
 
         $potential = $this->findPotentialBySkCode($value);
-        $inst = Institution::query()->where('SKcode', $value)->first();
+        $inst = Institution::query()
+            ->with('accountInfo')
+            ->where('SKcode', $value)
+            ->first();
+        if ($this->isTerminatedInstitution($inst)) {
+            session()->flash('warning', '해지된 기관입니다. 신규 지원보고서 작성이 제한됩니다.');
+            $this->formSkCode = '';
+            $this->formAccountName = '';
+            $this->formPotentialTargetId = null;
+            $this->formIsPotential = false;
+            $this->formPossibility = '';
+
+            return;
+        }
         $this->formAccountName = (string) ($inst?->AccountName ?? $potential?->AccountName ?? '');
         $this->formPotentialTargetId = $potential?->ID ? (int) $potential->ID : null;
         $this->formIsPotential = $potential !== null;
         $this->formPossibility = $potential ? (string) ($potential->Possibility ?? '') : '';
         if (filled($value)) {
             $this->applyDefaultCommunicationTemplatesIfEmpty();
+            if ($this->isUrgent) {
+                $this->refreshUrgentRecipients();
+            }
         }
     }
 
@@ -433,6 +467,9 @@ class SupportCreateForm extends Component
             $this->formIsPotential = false;
             $this->formPossibility = '';
             $this->formTeacherId = null;
+            if ($this->isUrgent) {
+                $this->clearUrgentRecipients();
+            }
 
             return;
         }
@@ -445,22 +482,41 @@ class SupportCreateForm extends Component
             $this->formIsPotential = true;
             $this->formPossibility = (string) ($potential->Possibility ?? '');
             $this->applyDefaultCommunicationTemplatesIfEmpty();
+            if ($this->isUrgent) {
+                $this->refreshUrgentRecipients();
+            }
 
             return;
         }
 
         $inst = Institution::query()
+            ->with('accountInfo')
             ->where('AccountName', $keyword)
             ->orWhere('SKcode', $keyword)
             ->first();
 
         if ($inst) {
+            if ($this->isTerminatedInstitution($inst)) {
+                session()->flash('warning', '해지된 기관입니다. 신규 지원보고서 작성이 제한됩니다.');
+                $this->formSkCode = '';
+                $this->formAccountName = '';
+                $this->formPotentialTargetId = null;
+                $this->formIsPotential = false;
+                $this->formPossibility = '';
+                $this->formTeacherId = null;
+
+                return;
+            }
+
             $this->formSkCode = (string) $inst->SKcode;
             $this->formAccountName = (string) $inst->AccountName;
             $this->formPotentialTargetId = null;
             $this->formIsPotential = false;
             $this->formPossibility = '';
             $this->applyDefaultCommunicationTemplatesIfEmpty();
+            if ($this->isUrgent) {
+                $this->refreshUrgentRecipients();
+            }
 
             return;
         }
@@ -471,13 +527,16 @@ class SupportCreateForm extends Component
         $this->formIsPotential = false;
         $this->formPossibility = '';
         $this->formTeacherId = null;
+        if ($this->isUrgent) {
+            $this->clearUrgentRecipients();
+        }
     }
 
     public function selectInstitution(string $skCode = '', bool $isPotential = false, ?int $potentialTargetId = null): void
     {
         $trimmedSkCode = trim($skCode);
         $inst = $trimmedSkCode !== ''
-            ? Institution::query()->where('SKcode', $trimmedSkCode)->first()
+            ? Institution::query()->with('accountInfo')->where('SKcode', $trimmedSkCode)->first()
             : null;
         $potential = $potentialTargetId !== null
             ? $this->findPotentialById($potentialTargetId)
@@ -499,6 +558,12 @@ class SupportCreateForm extends Component
             return;
         }
 
+        if ($this->isTerminatedInstitution($inst)) {
+            session()->flash('warning', '해지된 기관입니다. 신규 지원보고서 작성이 제한됩니다.');
+
+            return;
+        }
+
         $this->formSkCode = $inst
             ? (string) $inst->SKcode
             : trim((string) ($potential?->AccountCode ?? $trimmedSkCode));
@@ -515,6 +580,96 @@ class SupportCreateForm extends Component
         $this->formTeacherId = null;
         $this->syncFormTeacherIdFromTargetName();
         $this->applyDefaultCommunicationTemplatesIfEmpty();
+        if ($this->isUrgent) {
+            $this->refreshUrgentRecipients();
+        }
+    }
+
+    public function updatedIsUrgent(bool $value): void
+    {
+        if (! $value) {
+            $this->clearUrgentRecipients();
+
+            return;
+        }
+
+        $this->refreshUrgentRecipients();
+    }
+
+    public function addRecipient(): void
+    {
+        $recipientId = (int) $this->selectedUrgentRecipientId;
+        if ($recipientId <= 0) {
+            return;
+        }
+
+        $recipientExists = collect($this->availableRecipients)
+            ->contains(fn (array $recipient): bool => (int) ($recipient['id'] ?? 0) === $recipientId);
+
+        if (! $recipientExists) {
+            return;
+        }
+
+        if (! in_array($recipientId, $this->urgentRecipientIds, true)) {
+            $this->urgentRecipientIds[] = $recipientId;
+            $this->urgentRecipientIds = array_values(array_unique(array_map('intval', $this->urgentRecipientIds)));
+        }
+
+        $this->selectedUrgentRecipientId = '';
+    }
+
+    public function removeRecipient(int $recipientId): void
+    {
+        $this->urgentRecipientIds = array_values(array_filter(
+            $this->urgentRecipientIds,
+            fn (int $id): bool => $id !== $recipientId
+        ));
+    }
+
+    private function clearUrgentRecipients(): void
+    {
+        $this->urgentRecipientIds = [];
+        $this->availableRecipients = [];
+        $this->selectedUrgentRecipientId = '';
+    }
+
+    private function refreshUrgentRecipients(): void
+    {
+        if (! $this->hasInstitutionSelection() || blank($this->formSkCode)) {
+            $this->clearUrgentRecipients();
+
+            return;
+        }
+
+        $autoRecipients = app(ResolveInstitutionRecipients::class)
+            ->execute($this->formSkCode)
+            ->keyBy('id');
+
+        $users = User::query()
+            ->where('is_active', true)
+            ->with('employee')
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'employee_empno']);
+
+        $this->availableRecipients = $users->map(function (User $user) use ($autoRecipients): array {
+            $auto = $autoRecipients->get((int) $user->id);
+
+            return [
+                'id' => (int) $user->id,
+                'name' => $user->preferredDisplayName(),
+                'email' => filled($user->email) ? (string) $user->email : null,
+                'roles' => is_array($auto['roles'] ?? null) ? $auto['roles'] : [],
+                'is_auto' => $auto !== null,
+            ];
+        })->values()->all();
+
+        $existing = collect($this->urgentRecipientIds)
+            ->map(fn (int $id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->all();
+        $autoIds = $autoRecipients->keys()->map(fn (mixed $id): int => (int) $id)->all();
+
+        $this->urgentRecipientIds = array_values(array_unique(array_merge($existing, $autoIds)));
     }
 
     public function updatedFormTeacherId(?int $value): void
@@ -646,6 +801,7 @@ class SupportCreateForm extends Component
                         'Issue' => null,
                         'TO_Account' => $this->formToAccount,
                         'TO_Depart' => $this->formToDepart,
+                        'is_urgent' => $this->isUrgent,
                         'CreatedDate' => now(),
                         ...SupportRecord::completionAttributes($this->formCompleted),
                     ])
@@ -717,6 +873,10 @@ class SupportCreateForm extends Component
             }
         }
 
+        if ($supportRecord instanceof SupportRecord && $this->isUrgent) {
+            $this->sendUrgentNotifications($supportRecord);
+        }
+
         $this->sfUpload = null;
         session()->flash(
             'success',
@@ -728,6 +888,79 @@ class SupportCreateForm extends Component
             TeamMenuContext::route($this->afterSaveRouteName, [], null, $this->formTeamMenu),
             navigate: true,
         );
+    }
+
+    private function sendUrgentNotifications(SupportRecord $supportRecord): void
+    {
+        if (! Schema::hasTable('urgent_support_notifications')) {
+            session()->flash(
+                'warning',
+                '긴급 알림 테이블이 없어 인앱 알림을 저장하지 못했습니다. `php artisan migrate` 실행 후 다시 시도해 주세요.',
+            );
+
+            return;
+        }
+
+        $recipientIds = collect($this->urgentRecipientIds)
+            ->map(fn (int $id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($recipientIds === []) {
+            session()->flash('warning', '긴급 알림이 설정되었지만 수신자가 없어 알림을 보내지 않았습니다.');
+
+            return;
+        }
+
+        $sender = auth()->user();
+        if ($sender === null) {
+            return;
+        }
+
+        $recipients = User::query()
+            ->whereIn('id', $recipientIds)
+            ->where('is_active', true)
+            ->get();
+
+        foreach ($recipients as $recipient) {
+            UrgentSupportNotification::query()->create([
+                'support_record_id' => (int) $supportRecord->ID,
+                'recipient_user_id' => (int) $recipient->id,
+                'sender_user_id' => (int) $sender->id,
+                'sk_code' => filled($supportRecord->SK_Code) ? (string) $supportRecord->SK_Code : null,
+                'account_name' => filled($supportRecord->Account_Name) ? (string) $supportRecord->Account_Name : null,
+                'message' => filled($supportRecord->TO_Account) ? (string) $supportRecord->TO_Account : null,
+                'is_read' => false,
+                'read_at' => null,
+            ]);
+
+            if (! filled($recipient->email)) {
+                continue;
+            }
+
+            try {
+                Mail::to($recipient->email)->send(
+                    new UrgentSupportNotificationMail(
+                        supportRecord: $supportRecord,
+                        recipient: $recipient,
+                        sender: $sender,
+                        teamMenu: $this->formTeamMenu,
+                    )
+                );
+            } catch (\Throwable $mailException) {
+                report($mailException);
+                Log::warning('긴급 기관 지원 알림 메일 발송 실패', [
+                    'recipient_user_id' => $recipient->id,
+                    'recipient_email' => $recipient->email,
+                    'support_record_id' => $supportRecord->ID,
+                    'exception' => $mailException->getMessage(),
+                ]);
+            }
+        }
+
+        $this->dispatch('notifications-updated');
     }
 
     public function clearSfUpload(): void
@@ -800,6 +1033,9 @@ class SupportCreateForm extends Component
         $institutionSuggestions = collect(
             Institution::query()
                 ->with('accountInfo')
+                ->whereDoesntHave('accountInfo', function ($query): void {
+                    $query->where('Customer_Type', 'like', '%해지%');
+                })
                 ->where(function ($query) use ($normalizedKeyword): void {
                     if ($normalizedKeyword === '') {
                         $query->whereRaw('1 = 0');
@@ -967,6 +1203,15 @@ class SupportCreateForm extends Component
     private function hasInstitutionSelection(): bool
     {
         return filled($this->formSkCode) || $this->formPotentialTargetId !== null;
+    }
+
+    private function isTerminatedInstitution(?Institution $institution): bool
+    {
+        if ($institution === null) {
+            return false;
+        }
+
+        return str_contains((string) ($institution->accountInfo?->Customer_Type ?? ''), '해지');
     }
 
     private function resolveUncontractedPotentialTargetId(): ?int

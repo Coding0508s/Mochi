@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Livewire\InboundNotificationBell;
 use App\Models\ExternalAssignmentInboundLog;
+use App\Models\UrgentSupportNotification;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -106,6 +107,158 @@ class InboundNotificationBellTest extends TestCase
             ->assertSee('공동 알림 2');
 
         $this->assertDatabaseCount('external_assignment_inbound_logs', 2);
+    }
+
+    public function test_regular_user_sees_unread_urgent_notification_badge(): void
+    {
+        $user = User::factory()->create([
+            'is_admin' => false,
+        ]);
+        $sender = User::factory()->create([
+            'is_admin' => true,
+        ]);
+
+        UrgentSupportNotification::query()->create([
+            'support_record_id' => 100,
+            'recipient_user_id' => $user->id,
+            'sender_user_id' => $sender->id,
+            'sk_code' => 'SK-U-1',
+            'account_name' => '긴급 기관',
+            'message' => '긴급 안내 본문',
+            'is_read' => false,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InboundNotificationBell::class)
+            ->assertSet('unreadCount', 1)
+            ->assertSee('[긴급] 긴급 기관 기관 지원 보고서')
+            ->assertSee('긴급 안내 본문');
+    }
+
+    public function test_mark_all_as_read_marks_urgent_notifications_as_read(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+        $sender = User::factory()->create(['is_admin' => true]);
+
+        $urgent = UrgentSupportNotification::query()->create([
+            'support_record_id' => 200,
+            'recipient_user_id' => $user->id,
+            'sender_user_id' => $sender->id,
+            'sk_code' => 'SK-U-2',
+            'account_name' => '긴급 읽음 기관',
+            'message' => '읽음 처리 확인',
+            'is_read' => false,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InboundNotificationBell::class)
+            ->assertSet('unreadCount', 1)
+            ->call('markAllAsRead')
+            ->assertSet('unreadCount', 0)
+            ->assertSee('[긴급] 긴급 읽음 기관 기관 지원 보고서');
+
+        $this->assertDatabaseHas('urgent_support_notifications', [
+            'id' => $urgent->id,
+            'is_read' => true,
+        ]);
+        $this->assertNull($urgent->fresh()->dismissed_at);
+    }
+
+    public function test_regular_user_can_dismiss_urgent_notifications_individually(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+        $sender = User::factory()->create(['is_admin' => true]);
+
+        $first = UrgentSupportNotification::query()->create([
+            'support_record_id' => 201,
+            'recipient_user_id' => $user->id,
+            'sender_user_id' => $sender->id,
+            'sk_code' => 'SK-U-D1',
+            'account_name' => '긴급 삭제 기관',
+            'message' => '삭제 대상',
+            'is_read' => false,
+        ]);
+
+        UrgentSupportNotification::query()->create([
+            'support_record_id' => 202,
+            'recipient_user_id' => $user->id,
+            'sender_user_id' => $sender->id,
+            'sk_code' => 'SK-U-D2',
+            'account_name' => '남는 긴급 기관',
+            'message' => '남는 알림',
+            'is_read' => false,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InboundNotificationBell::class)
+            ->call('deleteLog', 'urgent:'.$first->id)
+            ->assertSet('unreadCount', 1)
+            ->assertDontSee('[긴급] 긴급 삭제 기관 기관 지원 보고서')
+            ->assertSee('[긴급] 남는 긴급 기관 기관 지원 보고서');
+
+        $this->assertDatabaseHas('urgent_support_notifications', [
+            'id' => $first->id,
+            'is_read' => true,
+        ]);
+        $this->assertNotNull($first->fresh()->dismissed_at);
+    }
+
+    public function test_regular_user_dismiss_all_hides_urgent_notifications(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+        $sender = User::factory()->create(['is_admin' => true]);
+
+        UrgentSupportNotification::query()->create([
+            'support_record_id' => 203,
+            'recipient_user_id' => $user->id,
+            'sender_user_id' => $sender->id,
+            'sk_code' => 'SK-U-A1',
+            'account_name' => '긴급 전체 삭제 1',
+            'message' => '전체 삭제 1',
+            'is_read' => false,
+        ]);
+
+        UrgentSupportNotification::query()->create([
+            'support_record_id' => 204,
+            'recipient_user_id' => $user->id,
+            'sender_user_id' => $sender->id,
+            'sk_code' => 'SK-U-A2',
+            'account_name' => '긴급 전체 삭제 2',
+            'message' => '전체 삭제 2',
+            'is_read' => false,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InboundNotificationBell::class)
+            ->call('deleteAllLogs')
+            ->assertSet('unreadCount', 0)
+            ->assertDontSee('[긴급] 긴급 전체 삭제 1 기관 지원 보고서')
+            ->assertDontSee('[긴급] 긴급 전체 삭제 2 기관 지원 보고서');
+    }
+
+    public function test_notifications_updated_event_refreshes_bell_counters(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+        $sender = User::factory()->create(['is_admin' => true]);
+
+        $component = Livewire::actingAs($user)
+            ->test(InboundNotificationBell::class)
+            ->assertSet('unreadCount', 0);
+
+        UrgentSupportNotification::query()->create([
+            'support_record_id' => 300,
+            'recipient_user_id' => $user->id,
+            'sender_user_id' => $sender->id,
+            'sk_code' => 'SK-U-3',
+            'account_name' => '이벤트 갱신 기관',
+            'message' => '갱신 확인',
+            'is_read' => false,
+        ]);
+
+        $component
+            ->dispatch('notifications-updated')
+            ->assertSet('unreadCount', 1)
+            ->assertSee('[긴급] 이벤트 갱신 기관 기관 지원 보고서');
     }
 
     private function createInboundLog(string $skCode, string $institutionName): ExternalAssignmentInboundLog

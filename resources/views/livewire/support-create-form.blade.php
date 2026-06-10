@@ -366,6 +366,83 @@
                         <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                     @enderror
                 </div>
+
+                @if($reportMode === 'institution')
+                    <div class="border-t border-gray-100 pt-3">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">긴급 알림</h3>
+                        <p class="mb-3 text-xs text-gray-500">
+                            긴급 알림을 켜면 선택된 수신자에게 인앱 알림과 이메일이 즉시 발송됩니다.
+                        </p>
+
+                        <div class="rounded-xl border border-orange-200 bg-orange-50/60 px-4 py-3 space-y-3">
+                            <div class="flex items-center justify-between gap-3">
+                                <div>
+                                    <p class="text-sm font-semibold text-orange-700">이슈 긴급 알림 (담당자 알림)</p>
+                                    <p class="text-xs text-orange-700/80 mt-0.5">기관 담당자(CO, TR, CS)를 자동으로 추천합니다.</p>
+                                </div>
+                                <button type="button"
+                                        wire:click="$toggle('isUrgent')"
+                                        @disabled(!$institutionSelected)
+                                        class="relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none
+                                               {{ $isUrgent ? 'bg-orange-500' : 'bg-gray-300' }}
+                                               {{ $institutionSelected ? '' : 'opacity-50 cursor-not-allowed' }}">
+                                    <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200
+                                                 {{ $isUrgent ? 'translate-x-5' : 'translate-x-0' }}"></span>
+                                </button>
+                            </div>
+
+                            @if($isUrgent)
+                                <div class="space-y-2">
+                                    <label class="block text-xs font-medium text-gray-700">알림 수신자</label>
+                                    <div class="flex flex-wrap gap-2">
+                                        @forelse($urgentRecipientIds as $recipientId)
+                                            @php
+                                                $recipient = collect($availableRecipients)->firstWhere('id', (int) $recipientId);
+                                            @endphp
+                                            @if($recipient)
+                                                <span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs
+                                                             {{ $recipient['is_auto'] ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-700' }}">
+                                                    {{ $recipient['name'] }}
+                                                    @if(!empty($recipient['roles']))
+                                                        ({{ implode('/', $recipient['roles']) }})
+                                                    @endif
+                                                    <button type="button"
+                                                            wire:click="removeRecipient({{ $recipient['id'] }})"
+                                                            class="ml-1 text-gray-400 hover:text-red-500"
+                                                            aria-label="수신자 제거">
+                                                        ×
+                                                    </button>
+                                                </span>
+                                            @endif
+                                        @empty
+                                            <span class="text-xs text-amber-700">자동 매칭된 담당자가 없습니다. 수동으로 추가해 주세요.</span>
+                                        @endforelse
+                                    </div>
+
+                                    <div class="flex items-center gap-2 max-w-md">
+                                        <select wire:model="selectedUrgentRecipientId"
+                                                class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                            <option value="">수신자 추가 선택</option>
+                                            @foreach($availableRecipients as $recipient)
+                                                <option value="{{ $recipient['id'] }}">
+                                                    {{ $recipient['name'] }}
+                                                    @if(!empty($recipient['roles']))
+                                                        ({{ implode('/', $recipient['roles']) }})
+                                                    @endif
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        <button type="button"
+                                                wire:click="addRecipient"
+                                                class="shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                            + 직원 추가
+                                        </button>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                @endif
                 @endif
 
             </div>
@@ -412,7 +489,9 @@
                             wire:loading.attr="disabled"
                             wire:loading.class="opacity-70 cursor-not-allowed"
                             wire:target="save">
-                        <span wire:loading.remove wire:target="save">저장하기</span>
+                        <span wire:loading.remove wire:target="save">
+                            {{ $isUrgent ? '저장 및 알림 발송' : '저장하기' }}
+                        </span>
                         <span wire:loading wire:target="save">저장 중...</span>
                     </button>
                 </div>

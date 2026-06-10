@@ -76,6 +76,7 @@ class SupportRecord extends Model
         'dePart',
         'CreatedDate',
         'CompletedDate',
+        'is_urgent',
     ];
 
     // ─── 날짜/타입 자동 변환 ──────────────────────────────────────────
@@ -98,6 +99,7 @@ class SupportRecord extends Model
             'TO_Account' => NormalizedMultilineText::class,
             'TO_Depart' => NormalizedMultilineText::class,
             'Others' => NormalizedMultilineText::class,
+            'is_urgent' => 'boolean',
         ];
     }
 
@@ -333,6 +335,15 @@ class SupportRecord extends Model
     public function scopeInProgress(Builder $query): Builder
     {
         return static::applyInProgressScope($query);
+    }
+
+    public function scopeUrgent(Builder $query): Builder
+    {
+        if (! static::tableHasColumn('is_urgent')) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where('is_urgent', true);
     }
 
     /**

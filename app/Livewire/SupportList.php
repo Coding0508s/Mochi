@@ -27,6 +27,8 @@ class SupportList extends Component
 
     public string $search = '';   // 키워드 검색 (기관명·SK코드·이슈·소통내용)
 
+    public bool $filterUrgentOnly = false;
+
     // ─── 보고서 작성 모달 상태 ────────────────────────────────────
     public bool $showModal = false;
 
@@ -105,6 +107,11 @@ class SupportList extends Component
     }
 
     public function updatingSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterUrgentOnly(): void
     {
         $this->resetPage();
     }
@@ -602,6 +609,10 @@ class SupportList extends Component
             ->ofYear($this->filterYear ? (int) $this->filterYear : null)
             ->ofTr($this->filterTr)
             ->keyword($this->search)
+            ->when(
+                $this->filterUrgentOnly && SupportRecord::tableHasColumn('is_urgent'),
+                fn ($query) => $query->urgent()
+            )
             ->withInstitutionWhenPossible()
             ->orderedForList()
             ->paginate(20);

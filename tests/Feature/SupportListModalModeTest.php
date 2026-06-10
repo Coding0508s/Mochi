@@ -55,6 +55,7 @@ class SupportListModalModeTest extends TestCase
             $table->string('Status', 50)->nullable();
             $table->timestamp('CompletedDate')->nullable();
             $table->timestamp('CreatedDate')->nullable();
+            $table->boolean('is_urgent')->default(false);
         });
     }
 
@@ -193,20 +194,48 @@ class SupportListModalModeTest extends TestCase
             ->assertSet('formToAccount', '원본');
     }
 
+    public function test_filter_urgent_only_shows_only_urgent_records(): void
+    {
+        $urgent = $this->createSupportRecord([
+            'SK_Code' => 'SK-URG-1',
+            'Account_Name' => '긴급 기관',
+            'is_urgent' => true,
+        ]);
+
+        $normal = $this->createSupportRecord([
+            'SK_Code' => 'SK-NOR-1',
+            'Account_Name' => '일반 기관',
+            'is_urgent' => false,
+        ]);
+
+        $user = User::factory()->create(['name' => '담당자A']);
+
+        Livewire::actingAs($user)
+            ->test(SupportList::class)
+            ->assertSee((string) $urgent->Account_Name)
+            ->assertSee((string) $normal->Account_Name)
+            ->set('filterUrgentOnly', true)
+            ->assertSee((string) $urgent->Account_Name)
+            ->assertDontSee((string) $normal->Account_Name);
+    }
+
     /**
      * @param  array<string, mixed>  $overrides
      */
     private function createSupportRecord(array $overrides = []): SupportRecord
     {
+        $skCode = (string) ($overrides['SK_Code'] ?? 'SK-MODAL-1');
+        $accountName = (string) ($overrides['Account_Name'] ?? '모달 테스트 기관');
+
         Institution::query()->create([
-            'SKcode' => 'SK-MODAL-1',
-            'AccountName' => '모달 테스트 기관',
+            'SKcode' => $skCode,
+            'AccountName' => $accountName,
         ]);
 
         return SupportRecord::query()->create(array_merge([
             'Year' => 2026,
-            'SK_Code' => 'SK-MODAL-1',
-            'Account_Name' => '모달 테스트 기관',
+            'SK_Code' => $skCode,
+            'Account_Name' => $accountName,
             'TR_Name' => 'CO',
             'Support_Date' => '2026-04-01',
             'Meet_Time' => '09:00:00',
