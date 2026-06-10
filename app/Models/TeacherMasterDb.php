@@ -42,7 +42,8 @@ class TeacherMasterDb extends Model
     {
         $retirementTeacherColumn = config('coach_retired_teachers.columns.teacher_id', 'TearcherID');
 
-        return $this->hasOne(RetirementList::class, $retirementTeacherColumn, $this->teacherIdColumn());
+        return $this->hasOne(RetirementList::class, $retirementTeacherColumn, $this->teacherIdColumn())
+            ->latestOfMany('ID');
     }
 
     public function institution(): BelongsTo

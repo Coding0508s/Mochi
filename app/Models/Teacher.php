@@ -8,6 +8,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
@@ -153,11 +154,24 @@ class Teacher extends Model
         return $this->hasOne(TeacherMasterDb::class, $foreignKey, 'ID');
     }
 
+    /**
+     * 가장 최근 퇴직 이력 1건 (재퇴직 시 이력이 여러 행 누적될 수 있음)
+     */
     public function retirementList(): HasOne
     {
         $foreignKey = config('coach_retired_teachers.columns.teacher_id', 'TearcherID');
 
-        return $this->hasOne(RetirementList::class, $foreignKey, 'ID');
+        return $this->hasOne(RetirementList::class, $foreignKey, 'ID')->latestOfMany('ID');
+    }
+
+    /**
+     * 전체 퇴직 이력 (퇴직 사이클별 행 — 복직 후 재퇴직하면 행이 추가됩니다)
+     */
+    public function retirementRecords(): HasMany
+    {
+        $foreignKey = config('coach_retired_teachers.columns.teacher_id', 'TearcherID');
+
+        return $this->hasMany(RetirementList::class, $foreignKey, 'ID');
     }
 
     public function displayAccountName(): string

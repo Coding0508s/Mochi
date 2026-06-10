@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Models\Institution;
 use App\Models\Teacher;
 use App\Models\User;
 use App\Support\CoachTeacherScope;
@@ -13,7 +14,14 @@ use InvalidArgumentException;
 
 class ReinstateTeacher
 {
-    public function execute(int $teacherId, User $user, bool $classInOut): Teacher
+    /**
+     * 퇴직 교사를 복직 처리합니다.
+     *
+     * $newSkCode가 주어지면 해당 기관으로 소속을 옮겨 복직합니다(null이면 기존 기관 유지).
+     * 퇴직 당시 기관 스냅샷(S_RetirementList의 SK_Code/Account_Name)은 변경하지 않아
+     * 전 근무 기관 기록이 보존됩니다.
+     */
+    public function execute(int $teacherId, User $user, bool $classInOut, ?string $newSkCode = null): Teacher
     {
         $teacher = Teacher::findOrFail($teacherId);
 
@@ -23,11 +31,20 @@ class ReinstateTeacher
 
         $this->authorize($teacher, $user);
 
-        return DB::transaction(function () use ($teacher, $user, $classInOut): Teacher {
-            $teacher->update([
+        $newInstitution = $this->resolveNewInstitution($teacher, $newSkCode);
+
+        return DB::transaction(function () use ($teacher, $user, $classInOut, $newInstitution): Teacher {
+            $attributes = [
                 'Status' => config('coach_retired_teachers.statuses.teacher_active', '활성화'),
                 'ClassInOut' => $classInOut,
-            ]);
+            ];
+
+            if ($newInstitution !== null) {
+                $attributes['SK_Code'] = (string) $newInstitution->SKcode;
+                $attributes['School_Name'] = $newInstitution->resolvedAccountName();
+            }
+
+            $teacher->update($attributes);
 
             $teacher->refresh();
 
@@ -36,6 +53,28 @@ class ReinstateTeacher
 
             return $teacher;
         });
+    }
+
+    /**
+     * 복직할 새 기관을 찾습니다. 기존 기관과 같거나 미지정이면 null(변경 없음)을 반환합니다.
+     */
+    private function resolveNewInstitution(Teacher $teacher, ?string $newSkCode): ?Institution
+    {
+        $skCode = trim((string) $newSkCode);
+        if ($skCode === '' || $skCode === trim((string) $teacher->SK_Code)) {
+            return null;
+        }
+
+        $institution = Institution::query()
+            ->with('accountInfo')
+            ->where('SKcode', $skCode)
+            ->first();
+
+        if (! $institution) {
+            throw new InvalidArgumentException('선택한 복직 기관을 찾을 수 없습니다. 기관을 다시 선택해 주세요.');
+        }
+
+        return $institution;
     }
 
     private function authorize(Teacher $teacher, User $user): void
