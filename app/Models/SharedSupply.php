@@ -131,7 +131,7 @@ class SharedSupply extends Model
             $reason = VehicleUsageLogRemark::forDisplay($log->remarks);
         }
 
-        return VehicleUsageLogRemark::combineArrivalAndReason($arrivalLocation, $reason);
+        return $arrivalLocation !== '' ? $arrivalLocation : $reason;
     }
 
     public function vehicleRowSecondaryRemark(): string

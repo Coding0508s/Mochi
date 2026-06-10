@@ -5,9 +5,11 @@ namespace App\Livewire;
 use App\Models\SharedSupply;
 use App\Models\SharedSupplyItem;
 use App\Models\SharedSupplyLabel;
+use App\Models\SupportRecord;
 use App\Models\TeamSchedule;
 use App\Models\VehicleUsageLog;
 use App\Support\SharedSupplyExcelImporter;
+use App\Support\TeamMenuContext;
 use App\Support\VehicleUsageLogRemark;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -40,6 +42,10 @@ class SharedSupplyManager extends Component
     public string $reservationView = 'all';
 
     public bool $showFormModal = false;
+
+    public bool $showSupportReportPrompt = false;
+
+    public string $supportReportPromptTeam = '';
 
     public bool $showResetModal = false;
 
@@ -75,13 +81,13 @@ class SharedSupplyManager extends Component
 
     public string $vehicleLatestArrivalLocation = '';
 
+    public string $vehicleUserName = '';
+
     /** @var TemporaryUploadedFile|null */
     public $importFile = null;
 
     /** @var array{inserted:int,updated:int,skipped:int}|null */
     public ?array $importSummary = null;
-
-    public string $vehicleUserName = '';
 
     /** @var array<int, string> */
     public array $importErrors = [];
@@ -275,13 +281,13 @@ class SharedSupplyManager extends Component
 
         $this->editingSupplyId = $supply->id;
         $this->viewOnly = Gate::denies('update', $supply);
+        $this->vehicleUserName = (string) ($supply->user?->name ?? '');
         $this->useDate = $supply->starts_at->format('Y-m-d');
         $this->startTime = $supply->starts_at->format('H:i');
         $this->endTime = $supply->ends_at->format('H:i');
         $this->sharedSupplyItemId = $supply->shared_supply_item_id;
         $this->sharedSupplyLabelId = $supply->shared_supply_label_id;
         $this->scheduleCategoryCode = (string) ($supply->schedule_category_code ?? '');
-        $this->vehicleUserName = (string) ($supply->user?->name ?? '');
         $this->title = (string) $supply->title;
         $this->purpose = (string) ($supply->purpose ?? '');
         $this->vehicleOdometerBefore = $vehicleLog?->odometer_before;
@@ -299,6 +305,36 @@ class SharedSupplyManager extends Component
     {
         $this->showFormModal = false;
         $this->resetForm();
+    }
+
+    public function closeSupportReportPrompt(): void
+    {
+        $this->showSupportReportPrompt = false;
+        $this->supportReportPromptTeam = '';
+    }
+
+    public function navigateToSupportCreate(string $reportMode): void
+    {
+        if (! in_array($reportMode, ['institution', 'teacher'], true)) {
+            return;
+        }
+
+        $teamMenu = $this->supportReportPromptTeam;
+        if ($teamMenu === '') {
+            return;
+        }
+
+        if ($teamMenu !== TeamMenuContext::MENU_COACH) {
+            $reportMode = 'institution';
+        }
+
+        $this->closeSupportReportPrompt();
+
+        $this->redirect(route('supports.create', [
+            'team_menu' => $teamMenu,
+            'report_mode' => $reportMode,
+            'return' => 'shared-supplies',
+        ]), navigate: true);
     }
 
     public function importFromExcel(): void
@@ -506,6 +542,16 @@ class SharedSupplyManager extends Component
             $this->syncVehicleUsageLog($supply, $user?->id);
         }
 
+        $promptTeamMenu = $this->promptSupportReportTeamMenu();
+        if ($this->shouldPromptSupportReport($promptTeamMenu)) {
+            $this->closeFormModal();
+            $this->supportReportPromptTeam = $promptTeamMenu;
+            $this->showSupportReportPrompt = true;
+            session()->flash('success', '운행 기록이 저장되었습니다.');
+
+            return;
+        }
+
         session()->flash('success', '공용품 사용 내역이 저장되었습니다.');
         $this->closeFormModal();
     }
@@ -681,6 +727,7 @@ class SharedSupplyManager extends Component
         $this->vehicleArrivalLocation = '';
         $this->vehicleLatestRemark = '';
         $this->vehicleLatestArrivalLocation = '';
+        $this->vehicleUserName = (string) (auth()->user()?->name ?? '');
     }
 
     /**
@@ -727,7 +774,6 @@ class SharedSupplyManager extends Component
             return $items->filter(fn (SharedSupplyItem $item): bool => $this->isVehicleItemName((string) $item->name))->values();
         }
 
-        $this->vehicleUserName = (string) (auth()->user()?->name ?? '');
         if ($this->shouldUseTitleAsItem()) {
             $item = $this->ensureItemByName($this->title);
 
@@ -856,6 +902,57 @@ class SharedSupplyManager extends Component
     private function requiresReservationConflictCheck(string $title): bool
     {
         return str_contains($title, '신청 및 예약');
+    }
+
+    private function shouldPromptSupportReport(string $teamMenu): bool
+    {
+        if ($this->editingSupplyId === null) {
+            return false;
+        }
+
+        if (! $this->isVehicleTitle()) {
+            return false;
+        }
+
+        if ($this->vehicleOdometerAfter === null) {
+            return false;
+        }
+
+        if (in_array($this->vehicleUsagePurpose, ['출퇴근', '업무외'], true)) {
+            return false;
+        }
+
+        if (! in_array($teamMenu, [TeamMenuContext::MENU_CO, TeamMenuContext::MENU_COACH], true)) {
+            return false;
+        }
+
+        return ! $this->hasSupportRecordForDate($this->useDate);
+    }
+
+    private function promptSupportReportTeamMenu(): string
+    {
+        $teamMenu = TeamMenuContext::activeMenu(auth()->user());
+
+        return in_array($teamMenu, [TeamMenuContext::MENU_CO, TeamMenuContext::MENU_COACH], true)
+            ? $teamMenu
+            : '';
+    }
+
+    private function hasSupportRecordForDate(string $supportDate): bool
+    {
+        $user = auth()->user();
+        if ($user === null || trim($supportDate) === '') {
+            return false;
+        }
+
+        if (! SupportRecord::tableHasColumn('Support_Date') || ! SupportRecord::tableHasColumn('TR_Name')) {
+            return false;
+        }
+
+        return SupportRecord::query()
+            ->where('TR_Name', $user->nameForCoReports())
+            ->whereDate('Support_Date', $supportDate)
+            ->exists();
     }
 
     private function syncVehicleUsageLog(SharedSupply $supply, ?int $actorId): void

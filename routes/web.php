@@ -104,6 +104,10 @@ Route::middleware(['auth'])->group(function () {
         return view('pages.shared-supplies.index');
     })->name('shared-supplies.index');
 
+    Route::get('/vehicle-usage-history', function () {
+        return view('pages.vehicle-usage-history.index');
+    })->name('vehicle-usage-history.index');
+
     Route::get('/coach/teacher-support', function () {
         return view('pages.coach.teacher-support.index');
     })->name('coach.teacher-support.index');
