@@ -70,6 +70,7 @@
                     <th class="px-3 py-2 text-left border border-gray-300">교사명</th>
                     <th class="px-3 py-2 text-left border border-gray-300">퇴직일</th>
                     <th class="px-3 py-2 text-left border border-gray-300">TR</th>
+                    <th class="px-3 py-2 text-center border border-gray-300">상태</th>
                     <th class="px-3 py-2 text-center border border-gray-300">추천</th>
                 </tr>
                 </thead>
@@ -103,6 +104,13 @@
                         </td>
                         <td class="px-3 py-2 border border-gray-200">{{ $row->TR_Name ?: '-' }}</td>
                         <td class="px-3 py-2 border border-gray-200 text-center">
+                            @php($isRetiredRow = trim((string) $row->Status) === '퇴직')
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
+                                {{ $isRetiredRow ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700' }}">
+                                {{ $isRetiredRow ? '퇴직' : '복직' }}
+                            </span>
+                        </td>
+                        <td class="px-3 py-2 border border-gray-200 text-center">
                             @if($row->displayRecommendYn())
                                 <span class="text-green-700 font-medium">Y</span>
                             @else
@@ -112,7 +120,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-4 py-10 text-center text-gray-400">
+                        <td colspan="8" class="px-4 py-10 text-center text-gray-400">
                             조건에 맞는 퇴직 교사가 없습니다.
                         </td>
                     </tr>
@@ -160,6 +168,16 @@
                         <span class="col-span-2 text-gray-900">{{ $selectedRetirement['tr_name'] ?? '-' }}</span>
                     </div>
                     <div class="grid grid-cols-3 gap-2">
+                        <span class="text-gray-500">상태</span>
+                        <span class="col-span-2">
+                            @php($isRetiredDetail = trim((string) ($selectedRetirement['status'] ?? '')) === '퇴직')
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
+                                {{ $isRetiredDetail ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700' }}">
+                                {{ $isRetiredDetail ? '퇴직' : '복직' }}
+                            </span>
+                        </span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
                         <span class="text-gray-500">추천</span>
                         <span class="col-span-2 text-gray-900">
                             {{ ($selectedRetirement['recommend_yn'] ?? false) ? '예' : '아니오' }}
@@ -203,7 +221,7 @@
                 <div class="px-5 py-4 space-y-4 text-sm text-gray-700">
                     <p>
                         <span class="font-semibold text-gray-900">{{ $reinstateTargetName }}</span> 교사를 복직 처리합니다.
-                        퇴직교사 리스트에서는 제외되며, 교사 지원·연락처 목록에 다시 표시됩니다.
+                        교사 지원·연락처 목록에 다시 표시되며, 퇴직 이력은 이 리스트에 "복직" 상태로 남습니다.
                     </p>
                     @include('partials.admin.teacher-reinstate-fields')
                 </div>

@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Actions\ReinstateTeacher;
+use App\Livewire\Concerns\ManagesReinstateInstitutionSelection;
 use App\Models\Institution;
 use App\Models\Teacher;
 use App\Models\User;
@@ -19,6 +20,7 @@ use Livewire\WithPagination;
 
 class ContactList extends Component
 {
+    use ManagesReinstateInstitutionSelection;
     use WithPagination;
 
     // ─── 검색 관련 상태 ────────────────────────────────────────────
@@ -388,6 +390,7 @@ class ContactList extends Component
 
         $this->reinstateTargetName = (string) ($teacher->Name ?? '연락처');
         $this->reinstateClassParticipation = $teacher->ClassInOut ? 'in' : 'out';
+        $this->prepareReinstateInstitutionState($teacher);
         $this->resetReinstateForm();
         $this->showReinstateModal = true;
     }
@@ -397,6 +400,7 @@ class ContactList extends Component
         $this->showReinstateModal = false;
         $this->reinstateTargetName = '';
         $this->reinstateClassParticipation = 'in';
+        $this->resetReinstateInstitutionState();
         $this->resetReinstateForm();
     }
 
@@ -416,9 +420,11 @@ class ContactList extends Component
 
         $this->validate([
             'reinstateClassParticipation' => ['required', Rule::in(['in', 'out'])],
+            'reinstateSkCode' => ['nullable', 'string', Rule::exists('S_AccountName', 'SKcode')],
         ], [
             'reinstateClassParticipation.required' => '수업 참여 여부를 선택해 주세요.',
             'reinstateClassParticipation.in' => '수업 참여 여부를 선택해 주세요.',
+            'reinstateSkCode.exists' => '선택한 복직 기관을 찾을 수 없습니다. 다시 선택해 주세요.',
         ]);
 
         $user = auth()->user();
@@ -429,8 +435,8 @@ class ContactList extends Component
         $classInOut = $this->reinstateClassParticipation === 'in';
 
         try {
-            app(ReinstateTeacher::class)->execute($this->editingId, $user, $classInOut);
-            session()->flash('success', '교사가 복직 처리되었습니다. 교사 지원·연락처 목록에 다시 표시됩니다.');
+            app(ReinstateTeacher::class)->execute($this->editingId, $user, $classInOut, $this->resolvedReinstateSkCode());
+            session()->flash('success', '교사가 복직 처리되었습니다. 퇴직 이력은 퇴직교사 리스트에 "복직" 상태로 유지됩니다.');
             $this->closeReinstateModal();
             $this->closeModal();
             $this->resetPage();
@@ -472,7 +478,7 @@ class ContactList extends Component
 
     private function resetReinstateForm(): void
     {
-        $this->resetValidation(['reinstateClassParticipation']);
+        $this->resetValidation(['reinstateClassParticipation', 'reinstateSkCode']);
     }
 
     public function confirmDelete(int $id): void
@@ -584,6 +590,7 @@ class ContactList extends Component
         return view('livewire.contact-list', [
             'teachers' => $teachers,
             'teacherInstitutionSuggestions' => $teacherInstitutionSuggestions,
+            'reinstateInstitutionSuggestions' => $this->reinstateInstitutionSuggestions(),
             'totalCount' => $totalCount,
             'activeCount' => $activeCount,
             'inactiveCount' => $inactiveCount,

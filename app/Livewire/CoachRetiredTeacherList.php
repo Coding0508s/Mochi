@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Actions\ReinstateTeacher;
+use App\Livewire\Concerns\ManagesReinstateInstitutionSelection;
 use App\Models\RetirementList;
 use App\Models\Teacher;
 use App\Models\TeacherMasterDb;
@@ -19,6 +20,7 @@ use Livewire\WithPagination;
 
 class CoachRetiredTeacherList extends Component
 {
+    use ManagesReinstateInstitutionSelection;
     use WithPagination;
 
     /** 빈 문자열이면 전체 연도 */
@@ -184,6 +186,7 @@ class CoachRetiredTeacherList extends Component
 
         $this->reinstateTargetName = (string) ($teacher->Name ?? '교사');
         $this->reinstateClassParticipation = $teacher->ClassInOut ? 'in' : 'out';
+        $this->prepareReinstateInstitutionState($teacher);
         $this->resetReinstateValidation();
         $this->showReinstateModal = true;
     }
@@ -193,6 +196,7 @@ class CoachRetiredTeacherList extends Component
         $this->showReinstateModal = false;
         $this->reinstateTargetName = '';
         $this->reinstateClassParticipation = 'in';
+        $this->resetReinstateInstitutionState();
         $this->resetReinstateValidation();
     }
 
@@ -205,9 +209,11 @@ class CoachRetiredTeacherList extends Component
 
         $this->validate([
             'reinstateClassParticipation' => ['required', Rule::in(['in', 'out'])],
+            'reinstateSkCode' => ['nullable', 'string', Rule::exists('S_AccountName', 'SKcode')],
         ], [
             'reinstateClassParticipation.required' => '수업 참여 여부를 선택해 주세요.',
             'reinstateClassParticipation.in' => '수업 참여 여부를 선택해 주세요.',
+            'reinstateSkCode.exists' => '선택한 복직 기관을 찾을 수 없습니다. 다시 선택해 주세요.',
         ]);
 
         $user = auth()->user();
@@ -218,8 +224,8 @@ class CoachRetiredTeacherList extends Component
         $classInOut = $this->reinstateClassParticipation === 'in';
 
         try {
-            app(ReinstateTeacher::class)->execute($teacherId, $user, $classInOut);
-            session()->flash('success', '교사가 복직 처리되었습니다. 교사 지원·연락처 목록에 다시 표시됩니다.');
+            app(ReinstateTeacher::class)->execute($teacherId, $user, $classInOut, $this->resolvedReinstateSkCode());
+            session()->flash('success', '교사가 복직 처리되었습니다. 퇴직 이력은 리스트에 "복직" 상태로 유지됩니다.');
             $this->closeReinstateModal();
             $this->closeDetailModal();
             $this->resetPage();
@@ -261,7 +267,7 @@ class CoachRetiredTeacherList extends Component
 
     private function resetReinstateValidation(): void
     {
-        $this->resetValidation(['reinstateClassParticipation']);
+        $this->resetValidation(['reinstateClassParticipation', 'reinstateSkCode']);
     }
 
     public function render()
@@ -270,6 +276,7 @@ class CoachRetiredTeacherList extends Component
             return view('livewire.coach-retired-teacher-list', [
                 'retirements' => collect(),
                 'tableMissing' => true,
+                'reinstateInstitutionSuggestions' => collect(),
             ]);
         }
 
@@ -305,6 +312,7 @@ class CoachRetiredTeacherList extends Component
         return view('livewire.coach-retired-teacher-list', [
             'retirements' => $retirements,
             'tableMissing' => false,
+            'reinstateInstitutionSuggestions' => $this->reinstateInstitutionSuggestions(),
         ]);
     }
 
@@ -317,7 +325,18 @@ class CoachRetiredTeacherList extends Component
             if ($this->listsFromTeachersStatus()) {
                 $query = Teacher::query();
                 CoachRetirementListScope::apply($query);
-                $query->retired();
+
+                // 퇴직 중인 교사 + 복직했지만 퇴직 이력이 있는 교사를 함께 표시합니다.
+                // (복직 처리해도 리스트에서 제거하지 않고 '복직' 배지로 구분)
+                $retiredStatus = config('coach_retired_teachers.statuses.retired', '퇴직');
+                $hasRetirementHistoryTable = Schema::hasTable('S_RetirementList');
+                $query->where(function (Builder $q) use ($retiredStatus, $hasRetirementHistoryTable): void {
+                    $q->where('Status', $retiredStatus);
+
+                    if ($hasRetirementHistoryTable) {
+                        $q->orWhereHas('retirementRecords');
+                    }
+                });
 
                 return $query;
             }
@@ -329,9 +348,9 @@ class CoachRetiredTeacherList extends Component
             return $query;
         }
 
+        // S_RetirementList 모드: 복직 행도 이력으로 함께 표시합니다.
         $query = RetirementList::query();
         CoachRetirementListScope::apply($query);
-        $query->currentlyRetired();
 
         return $query;
     }
@@ -536,7 +555,9 @@ class CoachRetiredTeacherList extends Component
             'recommend_yn' => (bool) $recommend['recommend_yn'],
             'recommend_description' => $recommend['recommend_description'],
             'description' => (string) (($master?->getAttribute($descriptionColumn) ?? '') ?: ($recommend['description'] ?? '')),
-            'status' => (string) ($teacher->Status ?? ''),
+            'status' => $teacher->isRetired()
+                ? config('coach_retired_teachers.statuses.retired', '퇴직')
+                : config('coach_retired_teachers.statuses.reinstated', '복직'),
             'can_reinstate' => $this->canReinstateTeacher($teacher->ID),
         ];
     }
@@ -556,6 +577,7 @@ class CoachRetiredTeacherList extends Component
 
         $record = RetirementList::query()
             ->where(config('coach_retired_teachers.columns.teacher_id', 'TearcherID'), $teacherId)
+            ->orderByDesc('ID')
             ->first();
 
         if (! $record) {
