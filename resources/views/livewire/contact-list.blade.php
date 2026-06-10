@@ -392,7 +392,7 @@
                 <div class="px-6 py-5 space-y-4 text-sm text-gray-700">
                     <p>
                         <span class="font-semibold text-gray-900">{{ $reinstateTargetName }}</span> 교사를 복직 처리합니다.
-                        퇴직교사 리스트에서는 제외되며, 교사 지원·연락처 목록에 다시 표시됩니다. 퇴직 이력은 유지됩니다.
+                        교사 지원·연락처 목록에 다시 표시되며, 퇴직 이력은 퇴직교사 리스트에 "복직" 상태로 남습니다.
                     </p>
                     @include('partials.admin.teacher-reinstate-fields')
                 </div>

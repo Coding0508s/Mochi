@@ -59,6 +59,9 @@ class TeacherMasterWriter
         return TeacherMasterDb::query()->create($createPayload);
     }
 
+    /**
+     * 복직 처리 시 마스터 상태를 활성화하고, 복직(현재) 기관 기준으로 소속 정보를 동기화합니다.
+     */
     public function markReinstatedFromTeacher(Teacher $teacher, User $user): ?TeacherMasterDb
     {
         if (! $this->hasTable()) {
@@ -70,9 +73,14 @@ class TeacherMasterWriter
             return null;
         }
 
+        $teacher->loadMissing(['institution.accountInfo']);
+
         $columns = $this->columns();
         $payload = $this->filterExistingColumns([
             $columns['status'] => config('coach_retired_teachers.statuses.teacher_active', '활성화'),
+            $columns['sk_code'] => $teacher->SK_Code,
+            $columns['school_name'] => $teacher->School_Name,
+            $columns['tr_name'] => (string) ($teacher->institution?->accountInfo?->TR ?? ''),
             'FGC_LastModifier' => (string) ($user->email ?? ''),
             'FGC_LastModifyDate' => now(),
         ]);
