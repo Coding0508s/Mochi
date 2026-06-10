@@ -537,27 +537,28 @@ class CoachRetiredTeacherListTest extends TestCase
             ->assertSet('selectedRetirement.name', '상세교사');
     }
 
-    public function test_reinstated_teacher_not_shown_in_current_retired_list(): void
+    public function test_reinstated_teacher_remains_in_list_with_reinstated_badge(): void
     {
         $admin = $this->createAdminUser();
         $year = now()->year;
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
-        $teacherId = $this->createTeacher('SK001', '복직후숨김', ['Status' => '활성화']);
+        $teacherId = $this->createTeacher('SK001', '복직이력유지', ['Status' => '활성화']);
 
         app(RetireTeacher::class)->execute($teacherId, $admin);
 
         Livewire::actingAs($admin)
             ->test(CoachRetiredTeacherList::class)
             ->set('filterYear', $year)
-            ->assertSee('복직후숨김');
+            ->assertSee('복직이력유지');
 
         app(ReinstateTeacher::class)->execute($teacherId, $admin, true);
 
         Livewire::actingAs($admin)
             ->test(CoachRetiredTeacherList::class)
             ->set('filterYear', $year)
-            ->assertDontSee('복직후숨김');
+            ->assertSee('복직이력유지')
+            ->assertSee('복직');
 
         $this->assertDatabaseHas('S_RetirementList', [
             'TearcherID' => $teacherId,
@@ -566,6 +567,119 @@ class CoachRetiredTeacherListTest extends TestCase
         $this->assertDatabaseHas('S_TeacherMasterDB', [
             'TearcherID' => $teacherId,
             'Status' => '활성화',
+        ]);
+    }
+
+    public function test_reinstate_with_new_institution_moves_teacher_and_keeps_snapshot(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createInstitution('SK002', '기관B', 'Coach B');
+        $teacherId = $this->createTeacher('SK001', '기관이동복직', ['School_Name' => '기관A']);
+
+        app(RetireTeacher::class)->execute($teacherId, $admin);
+        app(ReinstateTeacher::class)->execute($teacherId, $admin, true, 'SK002');
+
+        // 교사는 새 기관으로 이동
+        $this->assertDatabaseHas('Teachers', [
+            'ID' => $teacherId,
+            'Status' => '활성화',
+            'SK_Code' => 'SK002',
+            'School_Name' => '기관B',
+        ]);
+
+        // 퇴직 이력 행에는 전 근무 기관(SK001/기관A) 스냅샷 보존
+        $this->assertDatabaseHas('S_RetirementList', [
+            'TearcherID' => $teacherId,
+            'SK_Code' => 'SK001',
+            'Account_Name' => '기관A',
+            'Status' => '복직',
+        ]);
+
+        // 마스터는 현재(복직) 기관으로 동기화
+        $this->assertDatabaseHas('S_TeacherMasterDB', [
+            'TearcherID' => $teacherId,
+            'SK_Code' => 'SK002',
+            'Status' => '활성화',
+        ]);
+    }
+
+    public function test_reinstate_with_unknown_institution_is_rejected(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createTeacher('SK001', '잘못된기관복직');
+
+        app(RetireTeacher::class)->execute($teacherId, $admin);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        app(ReinstateTeacher::class)->execute($teacherId, $admin, true, 'SK-NOPE');
+    }
+
+    public function test_re_retirement_creates_new_history_row(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createInstitution('SK002', '기관B', 'Coach B');
+        $teacherId = $this->createTeacher('SK001', '재퇴직이력', ['School_Name' => '기관A']);
+
+        app(RetireTeacher::class)->execute($teacherId, $admin);
+        app(ReinstateTeacher::class)->execute($teacherId, $admin, true, 'SK002');
+        app(RetireTeacher::class)->execute($teacherId, $admin);
+
+        $this->assertSame(2, RetirementList::query()->where('TearcherID', $teacherId)->count());
+
+        // 1차 퇴직 이력: 기관A에서 퇴직 → 복직
+        $this->assertDatabaseHas('S_RetirementList', [
+            'TearcherID' => $teacherId,
+            'SK_Code' => 'SK001',
+            'Status' => '복직',
+        ]);
+
+        // 2차 퇴직 이력: 기관B에서 퇴직
+        $this->assertDatabaseHas('S_RetirementList', [
+            'TearcherID' => $teacherId,
+            'SK_Code' => 'SK002',
+            'Status' => '퇴직',
+        ]);
+    }
+
+    public function test_reinstate_with_selected_institution_from_detail_modal(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createInstitution('SK002', '기관B', 'Coach B');
+        $teacherId = $this->createTeacher('SK001', '모달기관선택복직');
+
+        app(RetireTeacher::class)->execute($teacherId, $admin);
+
+        Livewire::actingAs($admin)
+            ->test(CoachRetiredTeacherList::class)
+            ->set('filterYear', (string) $year)
+            ->call('openDetailModal', $teacherId)
+            ->call('openReinstateModal')
+            ->set('reinstateClassParticipation', 'in')
+            ->call('selectReinstateInstitution', 'SK002')
+            ->assertSet('reinstateSkCode', 'SK002')
+            ->call('reinstate')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('Teachers', [
+            'ID' => $teacherId,
+            'Status' => '활성화',
+            'SK_Code' => 'SK002',
+        ]);
+
+        $this->assertDatabaseHas('S_RetirementList', [
+            'TearcherID' => $teacherId,
+            'SK_Code' => 'SK001',
+            'Status' => '복직',
         ]);
     }
 

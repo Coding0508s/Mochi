@@ -211,6 +211,38 @@ class ContactListRetireTest extends TestCase
         ]);
     }
 
+    public function test_reinstate_from_contact_list_with_new_institution(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createInstitution('SK002', '기관B', 'Coach B');
+        $teacherId = $this->createRetiredTeacherWithRecord('SK001', '기관변경복직');
+
+        Livewire::actingAs($admin)
+            ->test(ContactList::class)
+            ->call('openEditModal', $teacherId)
+            ->call('openReinstateModal')
+            ->set('reinstateClassParticipation', 'in')
+            ->call('selectReinstateInstitution', 'SK002')
+            ->assertSet('reinstateSkCode', 'SK002')
+            ->call('reinstate')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('Teachers', [
+            'ID' => $teacherId,
+            'Status' => '활성화',
+            'SK_Code' => 'SK002',
+        ]);
+
+        // 퇴직 당시 기관(SK001) 스냅샷은 이력 행에 보존
+        $this->assertDatabaseHas('S_RetirementList', [
+            'TearcherID' => $teacherId,
+            'SK_Code' => 'SK001',
+            'Status' => '복직',
+        ]);
+    }
+
     public function test_contact_save_blocks_implicit_reinstate_for_retired_teacher(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);
