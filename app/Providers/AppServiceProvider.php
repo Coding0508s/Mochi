@@ -11,6 +11,7 @@ use App\Observers\SharedSupplyObserver;
 use App\Policies\SharedSupplyPolicy;
 use App\Policies\TeamSchedulePolicy;
 use App\Support\ManagerNameNormalizer;
+use App\Support\SetupRolePermissions;
 use App\Support\TeacherSupportReportEditAuthorization;
 use App\Support\TeamMenuContext;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -46,7 +47,9 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::define('manageEmployeeDepartment', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
 
-        Gate::define('manageTeamStructure', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
+        Gate::define('accessSetup', fn (?User $user): bool => (bool) SetupRolePermissions::allowsAbility($user, 'accessSetup'));
+
+        Gate::define('manageTeamStructure', fn (?User $user): bool => (bool) SetupRolePermissions::allowsAbility($user, 'manageTeamStructure'));
 
         Gate::define('manageStoreInventory', fn (?User $user): bool => (bool) ($user?->hasFullAccess() || $user?->can_manage_store_inventory));
 

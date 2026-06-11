@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\SharedSupplyManager;
+use App\Models\Institution;
 use App\Models\SharedSupply;
 use App\Models\SharedSupplyItem;
 use App\Models\SharedSupplyLabel;
@@ -10,6 +11,7 @@ use App\Models\SupportRecord;
 use App\Models\User;
 use App\Models\VehicleUsageLog;
 use Carbon\Carbon;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -480,6 +482,7 @@ class SharedSupplyManagerTest extends TestCase
             ->assertSee('00018 - 오전 반차')
             ->assertSee('00019 - 오후 반차')
             ->assertSee('00020 - 시차')
+            ->assertSee('00029 - 종일')
             ->assertDontSee('00003 - 04부8326 (투싼/경유)-구미김천역')
             ->assertDontSee('00013 - Grape Room')
             ->set('title', '[사내외업무] 사내외업무')
@@ -786,6 +789,8 @@ class SharedSupplyManagerTest extends TestCase
             ->assertSee('00001 - 일반업무')
             ->assertSee('00002 - 출퇴근')
             ->assertSee('00003 - 업무외')
+            ->assertSee('00004 - 신규기관 방문')
+            ->assertSee('00005 - 기존 기관 방문')
             ->set('sharedSupplyItemId', $this->itemIdByCode('00003'))
             ->set('sharedSupplyLabelId', $this->labelIdByCode('01'))
             ->set('useDate', '2026-06-12')
@@ -795,6 +800,134 @@ class SharedSupplyManagerTest extends TestCase
             ->set('vehicleOdometerBefore', 1000)
             ->call('save')
             ->assertHasErrors(['vehicleUsagePurpose']);
+    }
+
+    public function test_existing_institution_visit_requires_registered_institution_selection(): void
+    {
+        $this->createInstitutionTables();
+        $user = User::factory()->create(['is_admin' => false]);
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class)
+            ->call('openCreateModal')
+            ->set('useDate', '2026-06-12')
+            ->set('startTime', '10:00')
+            ->set('endTime', '11:00')
+            ->set('sharedSupplyItemId', $this->itemIdByCode('00003'))
+            ->set('sharedSupplyLabelId', $this->labelIdByCode('01'))
+            ->set('title', '[출장 차량배차] 신청 및 예약')
+            ->set('vehicleUsagePurpose', '기존 기관 방문')
+            ->set('vehicleOdometerBefore', 1000)
+            ->call('save')
+            ->assertHasErrors(['vehicleInstitutionSkCode']);
+    }
+
+    public function test_existing_institution_visit_saves_selected_institution(): void
+    {
+        $this->createInstitutionTables();
+
+        Institution::query()->create([
+            'SKcode' => 'SK-VEHICLE-1',
+            'AccountName' => '테스트 유치원',
+        ]);
+
+        $user = User::factory()->create(['is_admin' => false]);
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class)
+            ->call('openCreateModal')
+            ->set('useDate', '2026-06-12')
+            ->set('startTime', '10:00')
+            ->set('endTime', '11:00')
+            ->set('sharedSupplyItemId', $this->itemIdByCode('00003'))
+            ->set('sharedSupplyLabelId', $this->labelIdByCode('01'))
+            ->set('title', '[출장 차량배차] 신청 및 예약')
+            ->set('vehicleUsagePurpose', '기존 기관 방문')
+            ->call('selectVehicleInstitution', 'SK-VEHICLE-1')
+            ->set('vehicleOdometerBefore', 1000)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $supply = SharedSupply::query()->where('title', '[출장 차량배차] 신청 및 예약')->latest('id')->firstOrFail();
+
+        $this->assertDatabaseHas('vehicle_usage_logs', [
+            'shared_supply_id' => $supply->id,
+            'usage_purpose_name' => '기존 기관 방문',
+            'institution_sk_code' => 'SK-VEHICLE-1',
+            'remarks' => '테스트 유치원',
+        ]);
+
+        $this->assertSame('테스트 유치원', $supply->fresh()->purpose);
+    }
+
+    public function test_vehicle_dispatch_all_day_schedule_saves_full_day_times(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class)
+            ->call('openCreateModal')
+            ->set('useDate', '2026-06-12')
+            ->set('title', '[출장 차량배차] 신청 및 예약')
+            ->set('isAllDay', true)
+            ->set('sharedSupplyItemId', $this->itemIdByCode('00003'))
+            ->set('sharedSupplyLabelId', $this->labelIdByCode('01'))
+            ->set('vehicleUsagePurpose', '일반업무')
+            ->set('vehicleOdometerBefore', 1000)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $supply = SharedSupply::query()->latest('id')->firstOrFail();
+
+        $this->assertSame('2026-06-12 00:00:00', $supply->starts_at->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-06-12 23:59:59', $supply->ends_at->format('Y-m-d H:i:s'));
+    }
+
+    public function test_vehicle_dispatch_all_day_schedule_loads_checkbox_on_edit(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+        $day = Carbon::parse('2026-06-15');
+
+        $supply = SharedSupply::query()->create([
+            'user_id' => $user->id,
+            'starts_at' => $day->copy()->startOfDay(),
+            'ends_at' => $day->copy()->endOfDay(),
+            'shared_supply_item_id' => $this->itemIdByCode('00003'),
+            'shared_supply_label_id' => $this->labelIdByCode('01'),
+            'title' => '[출장 차량배차] 신청 및 예약',
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class)
+            ->call('openEditModal', $supply->id)
+            ->assertSet('isAllDay', true);
+    }
+
+    public function test_existing_institution_visit_shows_search_field_in_modal(): void
+    {
+        $this->createInstitutionTables();
+
+        Institution::query()->create([
+            'SKcode' => 'SK-VEHICLE-2',
+            'AccountName' => '분당 테스트 기관',
+        ]);
+
+        $user = User::factory()->create(['is_admin' => false]);
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class)
+            ->call('openCreateModal')
+            ->set('title', '[출장 차량배차] 신청 및 예약')
+            ->set('vehicleUsagePurpose', '기존 기관 방문')
+            ->assertSee('방문 기관')
+            ->set('vehicleInstitutionKeyword', '분당')
+            ->assertSee('분당 테스트 기관')
+            ->call('selectVehicleInstitution', 'SK-VEHICLE-2')
+            ->assertSet('vehicleInstitutionSkCode', 'SK-VEHICLE-2')
+            ->assertSet('vehicleInstitutionName', '분당 테스트 기관')
+            ->assertSet('purpose', '분당 테스트 기관');
     }
 
     public function test_vehicle_log_section_is_shown_in_modal_for_vehicle_booking(): void
@@ -841,7 +974,9 @@ class SharedSupplyManagerTest extends TestCase
             ->set('vehicleUsagePurpose', '일반업무')
             ->set('vehicleOdometerBefore', 123456)
             ->set('vehicleOdometerAfter', 123620)
-            ->set('vehicleArrivalLocation', '창의업유치원')
+            ->set('vehicleArrivalFloor', 'B2')
+            ->set('vehicleArrivalPillar', 'B')
+            ->set('vehicleArrivalNumber', '29')
             ->set('purpose', 'B2 B29 / 창의업유치원')
             ->call('save')
             ->assertHasNoErrors();
@@ -855,7 +990,7 @@ class SharedSupplyManagerTest extends TestCase
             'odometer_before' => 123456,
             'odometer_after' => 123620,
             'distance' => 164,
-            'arrival_location' => '창의업유치원',
+            'arrival_location' => 'B2 / B29',
             'remarks' => 'B2 B29 / 창의업유치원',
         ]);
     }
@@ -896,7 +1031,107 @@ class SharedSupplyManagerTest extends TestCase
             ->set('title', '[출장 차량배차] 신청 및 예약')
             ->set('sharedSupplyItemId', $vehicleItemId)
             ->assertSet('vehicleOdometerBefore', 210125)
-            ->assertSet('vehicleLatestRemark', '기존 도착지 / 기존 차량 적요');
+            ->assertSet('vehicleLatestArrivalLocation', '기존 도착지');
+    }
+
+    public function test_vehicle_booking_shows_location_from_remarks_when_arrival_column_is_empty(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+        $vehicleItemId = $this->itemIdByCode('00003');
+        $vehicleName = (string) SharedSupplyItem::query()->whereKey($vehicleItemId)->value('name');
+
+        VehicleUsageLog::query()->create([
+            'shared_supply_id' => SharedSupply::query()->create([
+                'user_id' => $user->id,
+                'starts_at' => Carbon::parse('2026-06-02 09:00'),
+                'ends_at' => Carbon::parse('2026-06-02 10:00'),
+                'shared_supply_item_id' => $vehicleItemId,
+                'shared_supply_label_id' => $this->labelIdByCode('01'),
+                'title' => '[출장 차량배차] 신청 및 예약',
+                'created_by' => $user->id,
+                'updated_by' => $user->id,
+            ])->id,
+            'user_id' => $user->id,
+            'vehicle_name' => $vehicleName,
+            'usage_purpose_name' => '일반업무',
+            'odometer_before' => 210000,
+            'odometer_after' => 210125,
+            'distance' => 125,
+            'remarks' => '[excel-schedule:2026/06/02 -3] B2/ B16 이천 어린왕자어린이집',
+            'arrival_location' => null,
+            'driven_on' => '2026-06-02',
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class)
+            ->call('openCreateModal')
+            ->set('title', '[출장 차량배차] 신청 및 예약')
+            ->set('sharedSupplyItemId', $vehicleItemId)
+            ->assertSet('vehicleLatestArrivalLocation', 'B2/ B16 이천 어린왕자어린이집');
+    }
+
+    public function test_vehicle_booking_skips_in_progress_trip_without_location_for_reference(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+        $vehicleItemId = $this->itemIdByCode('00008');
+        $vehicleName = (string) SharedSupplyItem::query()->whereKey($vehicleItemId)->value('name');
+
+        VehicleUsageLog::query()->create([
+            'shared_supply_id' => SharedSupply::query()->create([
+                'user_id' => $user->id,
+                'starts_at' => Carbon::parse('2026-06-04 09:00'),
+                'ends_at' => Carbon::parse('2026-06-04 13:00'),
+                'shared_supply_item_id' => $vehicleItemId,
+                'shared_supply_label_id' => $this->labelIdByCode('01'),
+                'title' => '[출장 차량배차] 신청 및 예약',
+                'created_by' => $user->id,
+                'updated_by' => $user->id,
+            ])->id,
+            'user_id' => $user->id,
+            'vehicle_name' => $vehicleName,
+            'usage_purpose_name' => '일반업무',
+            'odometer_before' => 56467,
+            'odometer_after' => 56592,
+            'distance' => 125,
+            'remarks' => '완료된 운행',
+            'arrival_location' => '광명 올어바웃어린이집',
+            'driven_on' => '2026-06-04',
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
+
+        VehicleUsageLog::query()->create([
+            'shared_supply_id' => SharedSupply::query()->create([
+                'user_id' => $user->id,
+                'starts_at' => Carbon::parse('2026-06-05 08:30'),
+                'ends_at' => Carbon::parse('2026-06-05 09:00'),
+                'shared_supply_item_id' => $vehicleItemId,
+                'shared_supply_label_id' => $this->labelIdByCode('01'),
+                'title' => '[출장 차량배차] 신청 및 예약',
+                'created_by' => $user->id,
+                'updated_by' => $user->id,
+            ])->id,
+            'user_id' => $user->id,
+            'vehicle_name' => $vehicleName,
+            'usage_purpose_name' => '일반업무',
+            'odometer_before' => 56592,
+            'odometer_after' => null,
+            'distance' => null,
+            'remarks' => '운행 중',
+            'arrival_location' => null,
+            'driven_on' => '2026-06-05',
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class)
+            ->call('openCreateModal')
+            ->set('title', '[출장 차량배차] 신청 및 예약')
+            ->set('sharedSupplyItemId', $vehicleItemId)
+            ->assertSet('vehicleLatestArrivalLocation', '광명 올어바웃어린이집');
     }
 
     public function test_new_vehicle_booking_is_blocked_when_latest_trip_has_no_odometer_after(): void
@@ -1147,7 +1382,74 @@ class SharedSupplyManagerTest extends TestCase
             ->assertSet('vehicleUsagePurpose', '일반업무')
             ->assertSet('vehicleOdometerBefore', 56467)
             ->assertSet('vehicleOdometerAfter', null)
-            ->assertSet('vehicleArrivalLocation', '');
+            ->assertSet('vehicleArrivalFloor', '')
+            ->assertSet('vehicleArrivalPillar', '')
+            ->assertSet('vehicleArrivalNumber', '');
+    }
+
+    public function test_edit_vehicle_schedule_loads_structured_arrival_location_parts(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+        $vehicleItemId = $this->itemIdByCode('00008');
+
+        $supply = SharedSupply::query()->create([
+            'user_id' => $user->id,
+            'starts_at' => Carbon::parse('2026-06-04 14:00'),
+            'ends_at' => Carbon::parse('2026-06-04 15:00'),
+            'shared_supply_item_id' => $vehicleItemId,
+            'shared_supply_label_id' => $this->labelIdByCode('01'),
+            'title' => '[출장 차량배차] 신청 및 예약',
+            'purpose' => 'B2 B16 / 이천 어린왕자어린이집',
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
+
+        VehicleUsageLog::query()->create([
+            'shared_supply_id' => $supply->id,
+            'user_id' => $user->id,
+            'vehicle_name' => (string) SharedSupplyItem::query()->whereKey($vehicleItemId)->value('name'),
+            'usage_purpose_name' => '일반업무',
+            'odometer_before' => 56467,
+            'odometer_after' => 56500,
+            'distance' => 33,
+            'arrival_location' => 'B2/ B16',
+            'remarks' => 'B2 B16 / 이천 어린왕자어린이집',
+            'driven_on' => '2026-06-04',
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class)
+            ->call('openEditModal', $supply->id)
+            ->assertSet('vehicleArrivalFloor', 'B2')
+            ->assertSet('vehicleArrivalPillar', 'B')
+            ->assertSet('vehicleArrivalNumber', '16')
+            ->assertSet('vehicleArrivalLocationLegacy', '');
+    }
+
+    public function test_partial_arrival_location_selection_is_rejected(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+
+        $supply = SharedSupply::query()->create([
+            'user_id' => $user->id,
+            'starts_at' => Carbon::parse('2026-06-04 14:00'),
+            'ends_at' => Carbon::parse('2026-06-04 15:00'),
+            'shared_supply_item_id' => $this->itemIdByCode('00008'),
+            'shared_supply_label_id' => $this->labelIdByCode('01'),
+            'title' => '[출장 차량배차] 신청 및 예약',
+            'purpose' => '방문 예정',
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class)
+            ->call('openEditModal', $supply->id)
+            ->set('vehicleArrivalFloor', 'B2')
+            ->call('save')
+            ->assertHasErrors(['vehicleArrivalFloor']);
     }
 
     public function test_update_vehicle_schedule_persists_partial_vehicle_fields_without_odometer_after(): void
@@ -1242,8 +1544,10 @@ class SharedSupplyManagerTest extends TestCase
             ->assertSet('vehicleUsagePurpose', '')
             ->assertSet('vehicleOdometerBefore', null)
             ->assertSet('vehicleOdometerAfter', null)
-            ->assertSet('vehicleArrivalLocation', '')
-            ->assertSet('vehicleLatestRemark', '이천 어린왕자어린이집 / B2/ B16 이천 어린왕자어린이집');
+            ->assertSet('vehicleArrivalFloor', '')
+            ->assertSet('vehicleArrivalPillar', '')
+            ->assertSet('vehicleArrivalNumber', '')
+            ->assertSet('vehicleLatestArrivalLocation', '이천 어린왕자어린이집');
     }
 
     public function test_create_vehicle_schedule_after_previous_trip_keeps_input_fields_empty_except_odometer_before(): void
@@ -1283,9 +1587,11 @@ class SharedSupplyManagerTest extends TestCase
             ->set('sharedSupplyItemId', $vehicleItemId)
             ->assertSet('vehicleUsagePurpose', '')
             ->assertSet('vehicleOdometerAfter', null)
-            ->assertSet('vehicleArrivalLocation', '')
+            ->assertSet('vehicleArrivalFloor', '')
+            ->assertSet('vehicleArrivalPillar', '')
+            ->assertSet('vehicleArrivalNumber', '')
             ->assertSet('vehicleOdometerBefore', 56592)
-            ->assertSet('vehicleLatestRemark', '첫 번째 도착지 / 첫 번째 운행 적요');
+            ->assertSet('vehicleLatestArrivalLocation', '첫 번째 도착지');
     }
 
     public function test_vehicle_edit_for_co_team_shows_support_prompt_with_institution_action_only(): void
@@ -1486,5 +1792,24 @@ class SharedSupplyManagerTest extends TestCase
         ]);
 
         return $supply;
+    }
+
+    private function createInstitutionTables(): void
+    {
+        Schema::dropIfExists('S_Account_Information');
+        Schema::dropIfExists('S_AccountName');
+
+        Schema::create('S_AccountName', function (Blueprint $table): void {
+            $table->increments('ID');
+            $table->string('SKcode', 100)->unique();
+            $table->string('AccountName', 255);
+        });
+
+        Schema::create('S_Account_Information', function (Blueprint $table): void {
+            $table->increments('ID');
+            $table->string('SK_Code', 100);
+            $table->string('Account_Name', 255)->nullable();
+            $table->string('Customer_Type', 255)->nullable();
+        });
     }
 }

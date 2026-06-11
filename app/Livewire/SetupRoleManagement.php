@@ -2,9 +2,16 @@
 
 namespace App\Livewire;
 
+use App\Models\AccountAuditLog;
 use App\Models\SetupRole;
+use App\Models\User;
+use App\Support\CoachTeamLeadEligibility;
+use App\Support\SetupRoleAccountFlags;
+use App\Support\SetupRolePermissions;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -19,6 +26,16 @@ class SetupRoleManagement extends Component
     public bool $showEditModal = false;
 
     public bool $showDeleteModal = false;
+
+    public bool $showAssignModal = false;
+
+    public int $assignRoleId = 0;
+
+    public string $assignRoleName = '';
+
+    public string $assignUserSearch = '';
+
+    public string $assignUserId = '';
 
     public int $editId = 0;
 
@@ -36,6 +53,9 @@ class SetupRoleManagement extends Component
 
     public array $newPermissions = [];
 
+    /** @var array<string, bool> */
+    public array $newAccountFlags = [];
+
     public string $editRoleKey = '';
 
     public string $editRoleName = '';
@@ -46,26 +66,59 @@ class SetupRoleManagement extends Component
 
     public array $editPermissions = [];
 
+    /** @var array<string, bool> */
+    public array $editAccountFlags = [];
+
     public array $permissionMenus = [
-        'people' => 'People',
-        'institutions' => '기관 리스트',
-        'contacts' => '기관 연락처',
-        'supports' => '기관 지원 내역',
-        'potential_institutions' => '잠재기관 관리',
-        'setup' => 'SetUp',
+        SetupRolePermissions::MENU_SETUP => 'SetUp',
     ];
 
-    public array $permissionActions = ['view', 'create', 'update', 'delete'];
+    public array $permissionActions = [];
 
     public function mount(): void
     {
-        $this->newPermissions = $this->defaultPermissions();
-        $this->editPermissions = $this->defaultPermissions();
+        $this->permissionActions = SetupRolePermissions::actions();
+        $this->newPermissions = SetupRolePermissions::defaultMatrix();
+        $this->editPermissions = SetupRolePermissions::defaultMatrix();
+        $this->newAccountFlags = SetupRoleAccountFlags::defaults();
+        $this->editAccountFlags = SetupRoleAccountFlags::defaults();
     }
 
     public function updatingSearch(): void
     {
         $this->resetPage();
+    }
+
+    public function updatedNewAccountFlagsIsAdmin($value): void
+    {
+        if ($value) {
+            $this->newAccountFlags[SetupRoleAccountFlags::FLAG_IS_DEPUTY_ADMIN] = false;
+            $this->newAccountFlags[SetupRoleAccountFlags::FLAG_IS_COACH_TEAM_LEAD] = false;
+        }
+    }
+
+    public function updatedEditAccountFlagsIsAdmin($value): void
+    {
+        if ($value) {
+            $this->editAccountFlags[SetupRoleAccountFlags::FLAG_IS_DEPUTY_ADMIN] = false;
+            $this->editAccountFlags[SetupRoleAccountFlags::FLAG_IS_COACH_TEAM_LEAD] = false;
+        }
+    }
+
+    public function updatedNewAccountFlagsIsDeputyAdmin($value): void
+    {
+        if ($value) {
+            $this->newAccountFlags[SetupRoleAccountFlags::FLAG_IS_ADMIN] = false;
+            $this->newAccountFlags[SetupRoleAccountFlags::FLAG_IS_COACH_TEAM_LEAD] = false;
+        }
+    }
+
+    public function updatedEditAccountFlagsIsDeputyAdmin($value): void
+    {
+        if ($value) {
+            $this->editAccountFlags[SetupRoleAccountFlags::FLAG_IS_ADMIN] = false;
+            $this->editAccountFlags[SetupRoleAccountFlags::FLAG_IS_COACH_TEAM_LEAD] = false;
+        }
     }
 
     public function openCreateModal(): void
@@ -76,7 +129,8 @@ class SetupRoleManagement extends Component
         $this->newRoleName = '';
         $this->newDescription = '';
         $this->newIsActive = '1';
-        $this->newPermissions = $this->defaultPermissions();
+        $this->newPermissions = SetupRolePermissions::defaultMatrix();
+        $this->newAccountFlags = SetupRoleAccountFlags::defaults();
         $this->resetErrorBag();
         $this->resetValidation();
         $this->showCreateModal = true;
@@ -112,7 +166,8 @@ class SetupRoleManagement extends Component
             'role_name' => trim($validated['newRoleName']),
             'description' => trim((string) ($validated['newDescription'] ?? '')),
             'is_active' => $this->newIsActive === '1',
-            'permissions' => $this->normalizePermissions($this->newPermissions),
+            'permissions' => SetupRolePermissions::normalizeMatrix($this->newPermissions),
+            'account_flags' => SetupRoleAccountFlags::normalize($this->newAccountFlags),
         ]);
 
         $this->closeCreateModal();
@@ -133,7 +188,8 @@ class SetupRoleManagement extends Component
         $this->editRoleName = (string) $role->role_name;
         $this->editDescription = (string) ($role->description ?? '');
         $this->editIsActive = $role->is_active ? '1' : '0';
-        $this->editPermissions = $this->mergePermissions($role->permissions ?? []);
+        $this->editPermissions = SetupRolePermissions::normalizeMatrix($role->permissions ?? []);
+        $this->editAccountFlags = SetupRoleAccountFlags::normalize($role->account_flags);
         $this->resetErrorBag();
         $this->resetValidation();
         $this->showEditModal = true;
@@ -177,12 +233,17 @@ class SetupRoleManagement extends Component
             return;
         }
 
+        $normalizedAccountFlags = SetupRoleAccountFlags::normalize($this->editAccountFlags);
+        $this->guardSyncWouldRemoveLastAdmin($role, $normalizedAccountFlags);
+
         $role->role_key = trim($validated['editRoleKey']);
         $role->role_name = trim($validated['editRoleName']);
         $role->description = trim((string) ($validated['editDescription'] ?? ''));
         $role->is_active = $this->editIsActive === '1';
-        $role->permissions = $this->normalizePermissions($this->editPermissions);
+        $role->permissions = SetupRolePermissions::normalizeMatrix($this->editPermissions);
+        $role->account_flags = $normalizedAccountFlags;
         $role->save();
+        $role->syncAccountFlagsToAssignedUsers();
 
         $this->closeEditModal();
         session()->flash('success', '역할이 수정되었습니다.');
@@ -229,9 +290,141 @@ class SetupRoleManagement extends Component
         session()->flash('success', '역할이 삭제되었습니다.');
     }
 
-    public function render()
+    public function openAssignModal(int $id): void
+    {
+        Gate::authorize('manageTeamStructure');
+
+        $role = SetupRole::query()->find($id);
+        if (! $role) {
+            return;
+        }
+
+        $this->assignRoleId = $role->id;
+        $this->assignRoleName = (string) $role->role_name;
+        $this->assignUserSearch = '';
+        $this->assignUserId = '';
+        $this->resetErrorBag();
+        $this->resetValidation();
+        $this->showAssignModal = true;
+    }
+
+    public function closeAssignModal(): void
+    {
+        $this->showAssignModal = false;
+        $this->assignRoleId = 0;
+        $this->assignRoleName = '';
+        $this->assignUserSearch = '';
+        $this->assignUserId = '';
+        $this->resetErrorBag();
+        $this->resetValidation();
+    }
+
+    public function assignUserToRole(): void
+    {
+        Gate::authorize('manageTeamStructure');
+
+        $validated = $this->validate([
+            'assignUserId' => ['required', 'integer', 'exists:users,id'],
+        ], [
+            'assignUserId.required' => '할당할 사용자를 선택해 주세요.',
+            'assignUserId.exists' => '선택한 사용자를 찾을 수 없습니다.',
+        ]);
+
+        $role = SetupRole::query()->find($this->assignRoleId);
+        if (! $role || ! $role->is_active) {
+            $this->addError('assignUserId', '활성 역할을 찾을 수 없습니다.');
+
+            return;
+        }
+
+        $user = User::query()->with('employee')->find((int) $validated['assignUserId']);
+        if (! $user) {
+            $this->addError('assignUserId', '선택한 사용자를 찾을 수 없습니다.');
+
+            return;
+        }
+
+        if ($user->setup_role_id === $role->id) {
+            $this->addError('assignUserId', '이미 이 역할이 할당된 사용자입니다.');
+
+            return;
+        }
+
+        $flags = $role->normalizedAccountFlags();
+
+        if ($this->wouldRemoveLastActiveAdmin($user, $flags)) {
+            throw ValidationException::withMessages([
+                'assignUserId' => ['마지막 활성 관리자 계정은 관리자 권한을 해제할 수 없습니다.'],
+            ]);
+        }
+
+        $this->guardCoachTeamLeadAssignment($user, $flags);
+
+        $beforeRoleId = $user->setup_role_id;
+        $actor = auth()->user();
+
+        $user->setup_role_id = $role->id;
+        SetupRoleAccountFlags::applyToUser($user, $flags);
+        $user->save();
+
+        AccountAuditLog::record($user, $actor, 'role_changed', [
+            'setup_role_id' => [
+                'before' => $beforeRoleId,
+                'after' => $role->id,
+            ],
+        ]);
+
+        $this->assignUserId = '';
+        session()->flash('success', '사용자에게 역할이 할당되었습니다.');
+    }
+
+    public function removeUserFromRole(int $userId): void
+    {
+        Gate::authorize('manageTeamStructure');
+
+        $role = SetupRole::query()->find($this->assignRoleId);
+        if (! $role) {
+            return;
+        }
+
+        $user = User::query()
+            ->whereKey($userId)
+            ->where('setup_role_id', $role->id)
+            ->first();
+
+        if (! $user) {
+            return;
+        }
+
+        $defaults = SetupRoleAccountFlags::defaults();
+
+        if ($this->wouldRemoveLastActiveAdmin($user, $defaults)) {
+            throw ValidationException::withMessages([
+                'assignUserId' => ['마지막 활성 관리자 계정은 관리자 권한을 해제할 수 없습니다.'],
+            ]);
+        }
+
+        $beforeRoleId = $user->setup_role_id;
+        $actor = auth()->user();
+
+        $user->setup_role_id = null;
+        SetupRoleAccountFlags::applyToUser($user, $defaults);
+        $user->save();
+
+        AccountAuditLog::record($user, $actor, 'role_changed', [
+            'setup_role_id' => [
+                'before' => $beforeRoleId,
+                'after' => null,
+            ],
+        ]);
+
+        session()->flash('success', '역할 할당이 해제되었습니다.');
+    }
+
+    public function render(): View
     {
         $roles = SetupRole::query()
+            ->withCount('users')
             ->when(trim($this->search) !== '', function ($q) {
                 $keyword = preg_replace('/\s+/u', '', trim($this->search)) ?? '';
                 if ($keyword === '') {
@@ -246,49 +439,115 @@ class SetupRoleManagement extends Component
             ->orderBy('id')
             ->paginate(15);
 
+        $assignedUsers = collect();
+        $assignableUsers = collect();
+
+        if ($this->showAssignModal && $this->assignRoleId > 0) {
+            $assignedUsers = User::query()
+                ->where('setup_role_id', $this->assignRoleId)
+                ->orderBy('name')
+                ->get(['id', 'name', 'email', 'employee_empno']);
+
+            $keyword = preg_replace('/\s+/u', '', trim($this->assignUserSearch)) ?? '';
+
+            $assignableUsers = User::query()
+                ->where('is_active', true)
+                ->when($keyword !== '', function ($query) use ($keyword): void {
+                    $query->where(function ($sub) use ($keyword): void {
+                        $sub->whereRaw("REPLACE(name, ' ', '') like ?", ["%{$keyword}%"])
+                            ->orWhereRaw("REPLACE(email, ' ', '') like ?", ["%{$keyword}%"])
+                            ->orWhereRaw("REPLACE(COALESCE(employee_empno, ''), ' ', '') like ?", ["%{$keyword}%"]);
+                    });
+                })
+                ->with('setupRole:id,role_name')
+                ->orderBy('name')
+                ->limit(50)
+                ->get(['id', 'name', 'email', 'employee_empno', 'setup_role_id']);
+        }
+
         return view('livewire.setup-role-management', [
             'roles' => $roles,
+            'assignedUsers' => $assignedUsers,
+            'assignableUsers' => $assignableUsers,
         ]);
     }
 
-    private function defaultPermissions(): array
+    /**
+     * @param  array<string, bool>  $newFlags
+     */
+    private function wouldRemoveLastActiveAdmin(User $user, array $newFlags): bool
     {
-        $permissions = [];
+        $isCurrentlyActiveAdmin = (bool) $user->is_active && (bool) $user->is_admin;
+        $willRemainActiveAdmin = (bool) $user->is_active
+            && (bool) ($newFlags[SetupRoleAccountFlags::FLAG_IS_ADMIN] ?? false);
 
-        foreach (array_keys($this->permissionMenus) as $menuKey) {
-            $permissions[$menuKey] = [];
-
-            foreach ($this->permissionActions as $action) {
-                $permissions[$menuKey][$action] = false;
-            }
+        if (! $isCurrentlyActiveAdmin || $willRemainActiveAdmin) {
+            return false;
         }
 
-        return $permissions;
+        return User::query()
+            ->where('is_active', true)
+            ->where('is_admin', true)
+            ->whereKeyNot($user->id)
+            ->count() === 0;
     }
 
-    private function mergePermissions(array $savedPermissions): array
+    /**
+     * @param  array<string, bool>  $normalizedAccountFlags
+     */
+    private function guardSyncWouldRemoveLastAdmin(SetupRole $role, array $normalizedAccountFlags): void
     {
-        $merged = $this->defaultPermissions();
-
-        foreach ($merged as $menuKey => $actions) {
-            foreach (array_keys($actions) as $action) {
-                $merged[$menuKey][$action] = (bool) ($savedPermissions[$menuKey][$action] ?? false);
-            }
+        if ($normalizedAccountFlags[SetupRoleAccountFlags::FLAG_IS_ADMIN]) {
+            return;
         }
 
-        return $merged;
+        $losingAdminUserIds = $role->users()
+            ->where('is_active', true)
+            ->where('is_admin', true)
+            ->pluck('id')
+            ->all();
+
+        if ($losingAdminUserIds === []) {
+            return;
+        }
+
+        $remainingActiveAdminCount = User::query()
+            ->where('is_active', true)
+            ->where('is_admin', true)
+            ->whereNotIn('id', $losingAdminUserIds)
+            ->count();
+
+        if ($remainingActiveAdminCount === 0) {
+            throw ValidationException::withMessages([
+                'editAccountFlags.is_admin' => ['마지막 활성 관리자 계정은 관리자 권한을 해제할 수 없습니다.'],
+            ]);
+        }
     }
 
-    private function normalizePermissions(array $permissions): array
+    /**
+     * @param  array<string, bool>  $flags
+     */
+    private function guardCoachTeamLeadAssignment(User $user, array $flags): void
     {
-        $normalized = $this->defaultPermissions();
+        $roleGrantsCoachKpi = (bool) ($flags[SetupRoleAccountFlags::FLAG_IS_COACH_TEAM_LEAD] ?? false);
+        $roleGrantsAdmin = (bool) ($flags[SetupRoleAccountFlags::FLAG_IS_ADMIN] ?? false);
+        $roleGrantsDeputy = (bool) ($flags[SetupRoleAccountFlags::FLAG_IS_DEPUTY_ADMIN] ?? false);
 
-        foreach ($normalized as $menuKey => $actions) {
-            foreach (array_keys($actions) as $action) {
-                $normalized[$menuKey][$action] = (bool) ($permissions[$menuKey][$action] ?? false);
-            }
+        if (! $roleGrantsCoachKpi || $roleGrantsAdmin || $roleGrantsDeputy) {
+            return;
         }
 
-        return $normalized;
+        $employee = $user->employee;
+
+        if (! CoachTeamLeadEligibility::allowsTeamKpiCheckbox(
+            true,
+            (string) ($employee->JOB ?? ''),
+            (string) ($employee->WORKDEPT ?? ''),
+            isset($employee->STATUS) ? (int) $employee->STATUS : null,
+        )) {
+            throw ValidationException::withMessages([
+                'assignUserId' => ['팀 지원 KPI 권한은 Coach 부서(A05)의 Department Manager(재직)에게만 부여할 수 있습니다.'],
+            ]);
+        }
     }
 }

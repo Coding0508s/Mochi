@@ -75,29 +75,8 @@
 
                 <p class="mt-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-700">
                     직원 등록 시 로그인 계정이 자동으로 생성되며, 비밀번호 재설정 링크 메일이 발송됩니다.
+                    특수 권한은 등록 후 <a href="{{ route('setup.roles') }}" class="underline font-medium">Setup &gt; 역할·권한</a>에서 역할로 할당하세요.
                 </p>
-
-                <label class="mt-3 flex items-start gap-2 cursor-pointer select-none">
-                    <input type="checkbox" wire:model.defer="isGsBrochureAdmin"
-                           class="mt-0.5 rounded border-gray-300 text-mochi-header focus:ring-mochi-header"/>
-                    <span class="text-sm text-gray-700 leading-snug">
-                        GS Brochure 관리 권한 부여
-                        <span class="block text-[11px] text-gray-500 font-normal mt-0.5">
-                            체크하면 해당 계정은 GS Brochure 관리자 화면에 접근할 수 있습니다.
-                        </span>
-                    </span>
-                </label>
-                <label class="mt-3 flex items-start gap-2 cursor-pointer select-none">
-                    <input type="checkbox" wire:model.defer="coachTeamKpi"
-                           class="mt-0.5 rounded border-gray-300 text-mochi-header focus:ring-mochi-header"/>
-                    <span class="text-sm text-gray-700 leading-snug">
-                        팀 지원 KPI 조회 (Coach 팀장)
-                        <span class="block text-[11px] text-gray-500 font-normal mt-0.5">
-                            Coach 부서({{ $coachDeptCode }})의 Department Manager(재직)일 때만 부여할 수 있습니다.
-                        </span>
-                    </span>
-                </label>
-                @error('coachTeamKpi') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
             </div>
 
             <div>

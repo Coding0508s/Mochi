@@ -4,12 +4,14 @@ namespace App\Livewire;
 
 use App\Models\TeamSchedule;
 use App\Models\User;
+use App\Support\ScheduleTimeInput;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class TeamScheduleCalendar extends Component
@@ -30,7 +32,13 @@ class TeamScheduleCalendar extends Component
 
     public bool $showDayModal = false;
 
+    public bool $showAddChoiceModal = false;
+
     public string $selectedDay = '';
+
+    public string $pendingCreateDate = '';
+
+    public ?string $calendarFlashMessage = null;
 
     public ?int $editingScheduleId = null;
 
@@ -112,14 +120,48 @@ class TeamScheduleCalendar extends Component
 
     public function openCreateModal(string $date): void
     {
+        $this->pendingCreateDate = Carbon::parse($date)->format('Y-m-d');
+        $this->showAddChoiceModal = true;
+        $this->closeDayModal();
+    }
+
+    public function closeAddChoiceModal(): void
+    {
+        $this->showAddChoiceModal = false;
+        $this->pendingCreateDate = '';
+    }
+
+    public function openPersonalScheduleCreate(): void
+    {
         Gate::authorize('create', TeamSchedule::class);
 
+        $this->showAddChoiceModal = false;
         $this->resetForm();
-        $this->closeDayModal();
-        $this->date = Carbon::parse($date)->format('Y-m-d');
+        $this->date = $this->pendingCreateDate !== ''
+            ? $this->pendingCreateDate
+            : now()->format('Y-m-d');
         $this->startTime = '09:00';
         $this->endTime = '10:00';
         $this->showFormModal = true;
+        $this->pendingCreateDate = '';
+    }
+
+    public function openSharedSupplyCreate(string $defaultTitle): void
+    {
+        if ($this->pendingCreateDate === '') {
+            $this->pendingCreateDate = now()->format('Y-m-d');
+        }
+
+        $date = $this->pendingCreateDate;
+        $this->showAddChoiceModal = false;
+        $this->pendingCreateDate = '';
+        $this->dispatch('calendar-open-shared-supply-create', date: $date, defaultTitle: $defaultTitle);
+    }
+
+    #[On('shared-supply-calendar-changed')]
+    public function handleSharedSupplyCalendarChanged(string $message): void
+    {
+        $this->calendarFlashMessage = $message;
     }
 
     public function openDayModal(string $date): void
@@ -138,6 +180,14 @@ class TeamScheduleCalendar extends Component
     {
         $schedule = TeamSchedule::query()->with('user')->findOrFail($id);
         Gate::authorize('view', $schedule);
+
+        if ($schedule->source_type === TeamSchedule::SOURCE_TYPE_SHARED_SUPPLY && $schedule->source_id !== null) {
+            $this->closeDayModal();
+            $this->closeAddChoiceModal();
+            $this->dispatch('calendar-open-shared-supply-edit', supplyId: (int) $schedule->source_id);
+
+            return;
+        }
 
         $this->closeDayModal();
         $this->editingScheduleId = $schedule->id;
@@ -168,10 +218,12 @@ class TeamScheduleCalendar extends Component
         $validated = $this->validate();
         $user = auth()->user();
 
-        $startsAt = Carbon::parse($validated['date'].' '.($validated['isAllDay'] ? '00:00' : $validated['startTime']));
+        $startsAt = $validated['isAllDay']
+            ? Carbon::parse($validated['date'])->startOfDay()
+            : ScheduleTimeInput::parseOnDate($validated['date'], $validated['startTime']);
         $endsAt = $validated['isAllDay']
             ? $startsAt->copy()->endOfDay()
-            : (filled($validated['endTime']) ? Carbon::parse($validated['date'].' '.$validated['endTime']) : null);
+            : (filled($validated['endTime']) ? ScheduleTimeInput::parseOnDate($validated['date'], $validated['endTime']) : null);
 
         if ($endsAt !== null && $endsAt->lessThanOrEqualTo($startsAt)) {
             $this->addError('endTime', '종료 시간은 시작 시간보다 늦어야 합니다.');
@@ -291,8 +343,8 @@ class TeamScheduleCalendar extends Component
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'date' => ['required', 'date'],
-            'startTime' => [Rule::requiredIf(fn (): bool => ! $this->isAllDay), 'nullable', 'date_format:H:i'],
-            'endTime' => ['nullable', 'date_format:H:i'],
+            'startTime' => [Rule::requiredIf(fn (): bool => ! $this->isAllDay), 'nullable', ScheduleTimeInput::VALIDATION_REGEX],
+            'endTime' => ['nullable', ScheduleTimeInput::VALIDATION_REGEX],
             'isAllDay' => ['boolean'],
             'type' => ['required', Rule::in(['meeting', 'task', 'personal', 'etc'])],
             'visibility' => ['required', Rule::in(['private', 'team'])],

@@ -61,15 +61,17 @@
             <div class="w-full lg:w-auto lg:ml-auto flex flex-wrap shrink-0 items-center justify-end gap-2 whitespace-nowrap">
                 <button type="button"
                         wire:click="$toggle('filterUrgentOnly')"
-                        class="flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors
-                               {{ $filterUrgentOnly ? 'bg-orange-100 text-orange-800 border border-orange-300' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50' }}">
+                        @class([
+                            'inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold shadow-sm transition',
+                            'border border-red-400 bg-red-50 text-red-800 hover:bg-red-100' => $filterUrgentOnly,
+                            'border border-red-300 bg-white text-red-700 hover:bg-red-50' => ! $filterUrgentOnly,
+                        ])>
                     긴급 이슈만 보기
                 </button>
 
                 <a href="{{ \App\Support\TeamMenuContext::route('supports.create') }}"
-                   class="flex items-center justify-center gap-2 px-4 py-2 bg-mochi-header hover:bg-mochi-header/90
-                          text-white text-sm font-medium rounded-lg transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   class="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
@@ -78,9 +80,8 @@
 
                 <button type="button"
                         wire:click="openContractUploadModal"
-                        class="flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-800
-                               text-white text-sm font-medium rounded-lg transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                     </svg>

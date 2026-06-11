@@ -148,12 +148,62 @@ class SharedSupplyVehicleRowDisplayTest extends TestCase
         $this->assertSame('회의실', $supply->reservationCategoryBadgeLabel());
     }
 
-    public function test_reservation_category_badge_label_is_null_for_non_reservation_title(): void
+    public function test_reservation_category_badge_label_for_business_trip(): void
     {
         $supply = $this->createVehicleSupply([
             'title' => '[출장] 출장',
         ]);
 
+        $this->assertSame('출장', $supply->reservationCategoryBadgeLabel());
+    }
+
+    public function test_reservation_category_badge_label_for_overseas_business_trip(): void
+    {
+        $supply = $this->createVehicleSupply([
+            'title' => '[해외출장] 해외출장',
+        ]);
+
+        $this->assertSame('출장', $supply->reservationCategoryBadgeLabel());
+    }
+
+    public function test_reservation_category_badge_label_for_annual_leave(): void
+    {
+        $supply = $this->createVehicleSupply([
+            'title' => '[휴가] 연차휴가',
+        ]);
+
+        $this->assertSame('연차', $supply->reservationCategoryBadgeLabel());
+    }
+
+    public function test_reservation_category_badge_label_is_null_for_unclassified_title(): void
+    {
+        $supply = $this->createVehicleSupply([
+            'title' => '[기타] 일반 일정',
+        ]);
+
         $this->assertNull($supply->reservationCategoryBadgeLabel());
+    }
+
+    public function test_vehicle_row_primary_remark_shows_visit_institution_from_log_when_purpose_is_empty(): void
+    {
+        $supply = $this->createVehicleSupply([
+            'purpose' => null,
+        ]);
+
+        VehicleUsageLog::query()->create([
+            'shared_supply_id' => $supply->id,
+            'user_id' => $supply->user_id,
+            'usage_purpose_name' => '기존 기관 방문',
+            'institution_sk_code' => 'SK-VISIT-1',
+            'odometer_before' => 1000,
+            'odometer_after' => null,
+            'distance' => null,
+            'remarks' => null,
+            'driven_on' => '2026-06-04',
+        ]);
+
+        $supply->load('vehicleUsageLog');
+
+        $this->assertSame('SK-VISIT-1', $supply->vehicleRowPrimaryRemark());
     }
 }

@@ -138,7 +138,7 @@
                                 @endif
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                                @php($arrivalDisplay = trim((string) ($log->arrival_location ?? '')))
+                                @php($arrivalDisplay = \App\Support\VehicleArrivalLocation::forDisplay($log->arrival_location))
                                 @if($arrivalDisplay === '')
                                     @php($arrivalDisplay = \App\Support\VehicleUsageLogRemark::forDisplay((string) $log->remarks))
                                 @endif
@@ -198,7 +198,7 @@
                     </div>
                     <div class="text-sm text-gray-700">
                         <span class="font-medium">{{ $log->usage_purpose_name ?? '목적 미상' }}</span>
-                        @php($mobileArrivalDisplay = trim((string) ($log->arrival_location ?? '')))
+                        @php($mobileArrivalDisplay = \App\Support\VehicleArrivalLocation::forDisplay($log->arrival_location))
                         @if($mobileArrivalDisplay === '')
                             @php($mobileArrivalDisplay = \App\Support\VehicleUsageLogRemark::forDisplay((string) $log->remarks))
                         @endif

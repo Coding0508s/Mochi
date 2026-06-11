@@ -12,11 +12,16 @@ use App\Support\RetirementListWriter;
 use App\Support\SkCodeNormalizer;
 use App\Support\TeacherMasterWriter;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ContactList extends Component
 {
@@ -517,55 +522,100 @@ class ContactList extends Component
         $this->resetPage();
     }
 
+    public function exportContactsExcel(): ?StreamedResponse
+    {
+        try {
+            $teachers = $this->filteredTeachersQuery()
+                ->with('institution.accountInfo')
+                ->orderBy('ID', 'desc')
+                ->get();
+
+            $this->hydrateTeacherInstitutions($teachers);
+
+            if ($teachers->isEmpty()) {
+                session()->flash('error', '다운로드할 데이터가 없습니다.');
+
+                return null;
+            }
+
+            $spreadsheet = new Spreadsheet;
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('교직원 연락처');
+
+            $headers = [
+                '기관코드',
+                '기관명',
+                '이름',
+                '직급',
+                '이메일',
+                '전화번호',
+                '상태',
+                'GrapeSEED Essentials',
+                'LittleSEED Essentials',
+                '담당 Coach',
+                'CS',
+                'CO',
+                '주소',
+                '비고',
+            ];
+
+            foreach ($headers as $index => $header) {
+                $column = chr(65 + $index);
+                $sheet->setCellValue($column.'1', $header);
+                $sheet->getStyle($column.'1')->getFont()->setBold(true);
+            }
+
+            $row = 2;
+            foreach ($teachers as $teacher) {
+                $sheet->fromArray([
+                    (string) ($teacher->SK_Code ?? ''),
+                    (string) ($teacher->School_Name ?? ''),
+                    (string) ($teacher->Name ?? ''),
+                    (string) ($teacher->Position ?? ''),
+                    (string) ($teacher->Email ?? ''),
+                    (string) ($teacher->Phone ?? ''),
+                    $this->contactStatusLabel($teacher),
+                    optional($teacher->GrapeSEEDEssentials)->format('Y-m-d') ?? '',
+                    optional($teacher->LittleSEEDEssentials)->format('Y-m-d') ?? '',
+                    (string) ($teacher->institution?->accountInfo?->TR ?? ''),
+                    (string) ($teacher->CS ?: $teacher->institution?->accountInfo?->CS ?: ''),
+                    (string) ($teacher->CO ?: $teacher->institution?->accountInfo?->CO ?: ''),
+                    (string) ($teacher->institution?->Address ?? ''),
+                    (string) ($teacher->Description ?? ''),
+                ], null, 'A'.$row);
+                $row++;
+            }
+
+            foreach (range('A', 'N') as $column) {
+                $sheet->getColumnDimension($column)->setAutoSize(true);
+            }
+
+            $fileName = '교직원_연락처_'.now()->format('Ymd_His').'.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet): void {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ]);
+        } catch (\Exception) {
+            session()->flash('error', '엑셀 다운로드 중 오류가 발생했습니다.');
+
+            return null;
+        }
+    }
+
     // ─── 화면 렌더링 ──────────────────────────────────────────────
     public function render()
     {
-        $teachersQuery = Teacher::query()
-            ->searchBy($this->searchType, $this->search)
-            ->when($this->employmentFilter === 'active', function ($query) {
-                $query->where('ClassInOut', true);
-            })
-            ->when($this->employmentFilter === 'inactive', function ($query) {
-                $query->where('ClassInOut', false);
-            });
-        CoachTeacherScope::apply($teachersQuery);
+        $teachersQuery = $this->filteredTeachersQuery();
 
-        $teachers = $teachersQuery
+        $teachers = (clone $teachersQuery)
             ->with('institution.accountInfo')
             ->orderBy('ID', 'desc')
             ->paginate(20);
 
-        $teacherRows = $teachers->getCollection();
-        $normalizedSkCodes = $teacherRows
-            ->filter(fn (Teacher $teacher) => ! $teacher->institution)
-            ->map(fn (Teacher $teacher) => SkCodeNormalizer::normalize($teacher->SK_Code))
-            ->filter()
-            ->unique()
-            ->values();
-
-        if ($normalizedSkCodes->isNotEmpty()) {
-            $fallbackInstitutions = Institution::query()
-                ->with('accountInfo')
-                ->whereIn('SKcode', $normalizedSkCodes)
-                ->get()
-                ->keyBy('SKcode');
-
-            $teacherRows->each(function (Teacher $teacher) use ($fallbackInstitutions): void {
-                if ($teacher->institution) {
-                    return;
-                }
-
-                $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
-                if (! $normalizedSkCode) {
-                    return;
-                }
-
-                $fallbackInstitution = $fallbackInstitutions->get($normalizedSkCode);
-                if ($fallbackInstitution) {
-                    $teacher->setRelation('institution', $fallbackInstitution);
-                }
-            });
-        }
+        $this->hydrateTeacherInstitutions($teachers->getCollection());
 
         $statsQuery = Teacher::query();
         CoachTeacherScope::apply($statsQuery);
@@ -605,6 +655,73 @@ class ContactList extends Component
         }
 
         return $value->format('Y-m-d');
+    }
+
+    private function filteredTeachersQuery(): Builder
+    {
+        $teachersQuery = Teacher::query()
+            ->searchBy($this->searchType, $this->search)
+            ->when($this->employmentFilter === 'active', function ($query) {
+                $query->where('ClassInOut', true);
+            })
+            ->when($this->employmentFilter === 'inactive', function ($query) {
+                $query->where('ClassInOut', false);
+            });
+        CoachTeacherScope::apply($teachersQuery);
+
+        return $teachersQuery;
+    }
+
+    /**
+     * @param  Collection<int, Teacher>  $teacherRows
+     */
+    private function hydrateTeacherInstitutions(Collection $teacherRows): void
+    {
+        $normalizedSkCodes = $teacherRows
+            ->filter(fn (Teacher $teacher) => ! $teacher->institution)
+            ->map(fn (Teacher $teacher) => SkCodeNormalizer::normalize($teacher->SK_Code))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($normalizedSkCodes->isEmpty()) {
+            return;
+        }
+
+        $fallbackInstitutions = Institution::query()
+            ->with('accountInfo')
+            ->whereIn('SKcode', $normalizedSkCodes)
+            ->get()
+            ->keyBy('SKcode');
+
+        $teacherRows->each(function (Teacher $teacher) use ($fallbackInstitutions): void {
+            if ($teacher->institution) {
+                return;
+            }
+
+            $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
+            if (! $normalizedSkCode) {
+                return;
+            }
+
+            $fallbackInstitution = $fallbackInstitutions->get($normalizedSkCode);
+            if ($fallbackInstitution) {
+                $teacher->setRelation('institution', $fallbackInstitution);
+            }
+        });
+    }
+
+    private function contactStatusLabel(Teacher $teacher): string
+    {
+        if (trim((string) $teacher->Status) === '퇴직') {
+            return '퇴직';
+        }
+
+        if (in_array(trim((string) $teacher->Status), ['inactive', '비활성', '비활성화'], true)) {
+            return '비활성화';
+        }
+
+        return '활성화';
     }
 
     private function normalizeStatusForForm(?string $status): string

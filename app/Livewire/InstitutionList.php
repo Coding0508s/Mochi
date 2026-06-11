@@ -28,6 +28,9 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InstitutionList extends Component
 {
@@ -944,6 +947,87 @@ class InstitutionList extends Component
 
         session()->flash('success', '담당자 정보가 저장되었습니다.');
         $this->closeManagerModal();
+    }
+
+    public function exportInstitutionsExcel(): ?StreamedResponse
+    {
+        try {
+            $hiddenInstitutionSkCodes = $this->hiddenInstitutionSkCodes();
+            $managerColumn = $this->currentUserManagerColumn();
+            $assignmentColumn = $managerColumn ?? 'CO';
+
+            $accounts = $this->accountInformationListQuery($hiddenInstitutionSkCodes, $assignmentColumn)
+                ->with($this->accountInformationEagerLoads())
+                ->tap(fn (Builder $query) => $this->applyAccountInformationListSort($query))
+                ->get();
+
+            if ($accounts->isEmpty()) {
+                session()->flash('error', '다운로드할 데이터가 없습니다.');
+
+                return null;
+            }
+
+            $spreadsheet = new Spreadsheet;
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('기관리스트');
+
+            $headers = [
+                'SK코드',
+                '기관명',
+                'CO',
+                'Coach',
+                'CS',
+                'Type',
+                '구분',
+                '기관장',
+                '연락처',
+                '기관연락처',
+                '주소',
+            ];
+
+            foreach ($headers as $index => $header) {
+                $column = chr(65 + $index);
+                $sheet->setCellValue($column.'1', $header);
+                $sheet->getStyle($column.'1')->getFont()->setBold(true);
+            }
+
+            $row = 2;
+            foreach ($accounts as $account) {
+                $master = $account->institution;
+
+                $sheet->fromArray([
+                    (string) ($account->SK_Code ?? ''),
+                    (string) ($account->Account_Name ?: ($master?->AccountName ?? '')),
+                    (string) ($account->CO ?? ''),
+                    (string) ($account->TR ?? ''),
+                    (string) ($account->CS ?? ''),
+                    (string) ($account->Customer_Type ?? ''),
+                    (string) ($master?->Gubun ?? ''),
+                    (string) ($master?->Director ?? ''),
+                    (string) ($master?->Phone ?? ''),
+                    (string) ($master?->AccountTel ?? ''),
+                    (string) ($account->Address ?: ($master?->Address ?? '')),
+                ], null, 'A'.$row);
+                $row++;
+            }
+
+            foreach (range('A', 'K') as $column) {
+                $sheet->getColumnDimension($column)->setAutoSize(true);
+            }
+
+            $fileName = '기관리스트_'.now()->format('Ymd_His').'.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet): void {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ]);
+        } catch (\Exception) {
+            session()->flash('error', '엑셀 다운로드 중 오류가 발생했습니다.');
+
+            return null;
+        }
     }
 
     // ─── 화면에 표시할 데이터 가져오기 ───────────────────────────────

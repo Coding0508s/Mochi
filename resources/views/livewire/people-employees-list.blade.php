@@ -377,26 +377,8 @@
 
                             <p class="mt-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-700">
                                 직원 등록 시 로그인 계정이 자동으로 생성되며, 비밀번호 재설정 링크 메일이 발송됩니다.
+                                특수 권한은 등록 후 <a href="{{ route('setup.roles') }}" class="underline font-medium">Setup &gt; 역할·권한</a>에서 역할로 할당하세요.
                             </p>
-
-                            <label class="mt-3 flex items-start gap-2 cursor-pointer select-none">
-                                <input type="checkbox" wire:model.defer="createIsGsBrochureAdmin"
-                                       class="mt-0.5 rounded border-gray-300 text-mochi-header focus:ring-mochi-header"/>
-                                <span class="text-sm text-gray-700 leading-snug">
-                                    GS Brochure 관리 권한 부여
-                                </span>
-                            </label>
-                            <label class="mt-3 flex items-start gap-2 cursor-pointer select-none">
-                                <input type="checkbox" wire:model.defer="createCoachTeamKpi"
-                                       class="mt-0.5 rounded border-gray-300 text-mochi-header focus:ring-mochi-header"/>
-                                <span class="text-sm text-gray-700 leading-snug">
-                                    팀 지원 KPI 조회 (Coach 팀장)
-                                    <span class="mt-0.5 block text-[11px] font-normal text-gray-500">
-                                        Coach 부서({{ $coachDeptCode }})의 Department Manager(재직)일 때만 부여할 수 있습니다.
-                                    </span>
-                                </span>
-                            </label>
-                            @error('createCoachTeamKpi') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
@@ -516,7 +498,7 @@
 
                         @if($canManageUserAccounts && $isPeopleModalAccountEditEnabled)
                             <div class="md:col-span-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 space-y-3">
-                                <div class="text-xs font-semibold text-gray-500">계정 권한</div>
+                                <div class="text-xs font-semibold text-gray-500">로그인 계정</div>
 
                                 <div class="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
                                     계정 활성은 직원 상태와 자동 동기화됩니다.
@@ -525,76 +507,15 @@
                                     </span>
                                 </div>
 
-                                <label class="flex items-start gap-2 cursor-pointer select-none">
-                                    <input type="checkbox"
-                                           wire:model.defer="editUserIsAdmin"
-                                           class="mt-0.5 rounded border-gray-300 text-mochi-header focus:ring-mochi-header"/>
-                                    <span class="text-sm text-gray-700 leading-snug">
-                                        관리자 권한
-                                        <span class="mt-0.5 block text-[11px] font-normal text-gray-500">
-                                            Setup, 팀 관리 등 관리자 기능 접근 권한입니다.
-                                        </span>
-                                    </span>
-                                </label>
-                                @error('editUserIsAdmin') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                <p class="text-[11px] text-gray-600 leading-snug">
+                                    관리자·GS Brochure·스토어 재고 등 특수 권한은
+                                    <a href="{{ route('setup.roles') }}" class="text-mochi-header underline font-medium">Setup &gt; 역할·권한</a>에서
+                                    역할로 정의하고 사용자에게 할당하세요.
+                                </p>
 
-                                <label class="flex items-start gap-2 cursor-pointer select-none">
-                                    <input type="checkbox"
-                                           wire:model.defer="editUserIsDeputyAdmin"
-                                           @disabled($editUserIsAdmin)
-                                           class="mt-0.5 rounded border-gray-300 text-mochi-header focus:ring-mochi-header disabled:bg-gray-100 disabled:cursor-not-allowed"/>
-                                    <span class="text-sm text-gray-700 leading-snug">
-                                        준관리자 (전역 조회)
-                                        <span class="mt-0.5 block text-[11px] font-normal text-gray-500">
-                                            소속 팀과 무관하게 플랫폼 데이터를 조회할 수 있습니다. 삭제·Setup·People 수정 권한은 없습니다.
-                                        </span>
-                                    </span>
-                                </label>
-                                @error('editUserIsDeputyAdmin') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-
-                                <label class="flex items-start gap-2 cursor-pointer select-none">
-                                    <input type="checkbox"
-                                           wire:model.defer="editGsBrochureAdmin"
-                                           class="mt-0.5 rounded border-gray-300 text-mochi-header focus:ring-mochi-header"/>
-                                    <span class="text-sm text-gray-700 leading-snug">
-                                        GS Brochure 권한
-                                        <span class="mt-0.5 block text-[11px] font-normal text-gray-500">
-                                            GS Brochure 관리자 화면 접근 권한입니다.
-                                        </span>
-                                    </span>
-                                </label>
-
-                                <label class="flex items-start gap-2 cursor-pointer select-none">
-                                    <input type="checkbox"
-                                           wire:model.defer="editCanManageStoreInventory"
-                                           class="mt-0.5 rounded border-gray-300 text-mochi-header focus:ring-mochi-header"/>
-                                    <span class="text-sm text-gray-700 leading-snug">
-                                        스토어 재고 수량 수정
-                                        <span class="mt-0.5 block text-[11px] font-normal text-gray-500">
-                                            Store 재고 화면에서 품목 추가·스토어사이트 재고 수정 등을 할 수 있습니다.
-                                        </span>
-                                    </span>
-                                </label>
-                                @error('editCanManageStoreInventory') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-
-                                <label class="flex items-start gap-2 cursor-pointer select-none">
-                                    <input type="checkbox"
-                                           wire:model.defer="editCoachTeamKpi"
-                                           @disabled($editUserIsAdmin || $editUserIsDeputyAdmin)
-                                           class="mt-0.5 rounded border-gray-300 text-mochi-header focus:ring-mochi-header disabled:bg-gray-100 disabled:cursor-not-allowed"/>
-                                    <span class="text-sm text-gray-700 leading-snug">
-                                        팀 지원 KPI 조회 (Coach 팀장)
-                                        <span class="mt-0.5 block text-[11px] font-normal text-gray-500">
-                                            Coach 부서({{ $coachDeptCode }})의 Department Manager(재직)일 때만 부여할 수 있습니다.
-                                        </span>
-                                        @if($editUserIsAdmin || $editUserIsDeputyAdmin)
-                                            <span class="mt-0.5 block text-[11px] font-normal text-amber-700">
-                                                관리자·준관리자 권한이 있으면 별도 체크 없이 팀 지원 KPI에 접근할 수 있습니다.
-                                            </span>
-                                        @endif
-                                    </span>
-                                </label>
-                                @error('editCoachTeamKpi') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                                <p class="text-sm text-gray-700">
+                                    현재 역할: <span class="font-medium">{{ $editAssignedRoleLabel }}</span>
+                                </p>
 
                                 @if(! $hasLinkedLoginAccount)
                                     <p class="text-[11px] text-amber-700">
@@ -646,7 +567,8 @@
                                             계정 발급 + 비밀번호 설정 메일 보내기
                                         </button>
                                         <p class="mt-1.5 text-[11px] text-amber-700">
-                                            새 계정은 일반 권한으로 생성됩니다. 관리자/GS/재고 권한이 필요하면 발급 후 위 체크박스로 설정해 주세요.
+                                            새 계정은 일반 권한으로 생성됩니다. 추가 권한이 필요하면 발급 후
+                                            <a href="{{ route('setup.roles') }}" class="underline font-medium">Setup &gt; 역할·권한</a>에서 역할을 할당하세요.
                                         </p>
                                     @elseif(! $hasLinkedLoginAccount)
                                         <p class="text-[11px] text-amber-700">
@@ -834,7 +756,7 @@
                     @if($resetTargetMode === 'create_and_send')
                         <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800 leading-snug">
                             <strong>새 계정은 일반 권한(관리자·GS·재고 권한 모두 없음)으로 생성됩니다.</strong><br/>
-                            추가 권한이 필요하면 발급 후 직원 정보 수정 창에서 별도로 설정해 주세요.
+                            추가 권한이 필요하면 발급 후 Setup &gt; 역할·권한에서 역할을 할당해 주세요.
                         </div>
                     @endif
                 </div>

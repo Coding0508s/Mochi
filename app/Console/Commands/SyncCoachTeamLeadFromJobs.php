@@ -11,11 +11,12 @@ class SyncCoachTeamLeadFromJobs extends Command
 {
     protected $signature = 'users:sync-coach-team-lead-from-jobs {--revoke-ineligible : 조건 미충족 사용자의 is_coach_team_lead 를 false 로 내립니다}';
 
-    protected $description = 'employee JOB/WORKDEPT/STATUS 기준으로 users.is_coach_team_lead 를 동기화합니다.';
+    protected $description = 'employee JOB/WORKDEPT/STATUS 기준으로 users.is_coach_team_lead 를 동기화합니다. Setup 역할이 할당된 계정은 제외합니다.';
 
     public function handle(): int
     {
         $users = User::query()
+            ->whereNull('setup_role_id')
             ->whereNotNull('employee_empno')
             ->where('employee_empno', '!=', '')
             ->get(['id', 'employee_empno', 'is_coach_team_lead']);

@@ -1,13 +1,14 @@
-<div class="mochi-page" x-data @shared-supply-show-alert.window="alert($event.detail.message)">
-    @if(session('success'))
+<div class="{{ $embeddedInCalendar ? '' : 'mochi-page' }}" x-data @shared-supply-show-alert.window="alert($event.detail.message)">
+    @if(! $embeddedInCalendar && session('success'))
         <div class="px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm" data-mochi-flash-dismiss="3000" role="status">
             {{ session('success') }}
         </div>
     @endif
 
+    @unless($embeddedInCalendar)
     <div class="mochi-summary-card">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <h2 class="text-base font-semibold text-[#2b78c5]">공용품관리</h2>
+            <h2 class="text-base font-semibold text-[#2b78c5]">공용품 및 일정 관리</h2>
             <span class="hidden sm:inline text-gray-300" aria-hidden="true">|</span>
             <div class="mochi-toggle-group flex-wrap">
                 <button type="button"
@@ -219,7 +220,7 @@
                                     @foreach($groupedSupplies as $supply)
                                         <tr wire:key="item-supply-row-{{ $supply->id }}">
                                             <td class="px-3 py-2">{{ $supply->starts_at->format('Y/m/d (D)') }}</td>
-                                            <td class="px-3 py-2">{{ $supply->starts_at->format('H:i') }} ~ {{ $supply->ends_at->format('H:i') }}</td>
+                                            <td class="px-3 py-2 whitespace-nowrap">{{ $supply->starts_at->format('H:i') }} ~ {{ $supply->ends_at->format('H:i') }}</td>
                                             <td class="px-3 py-2">{{ $supply->title }}</td>
                                             <td class="px-3 py-2">{{ $supply->user?->name ?? 'User' }}</td>
                                         </tr>
@@ -250,12 +251,10 @@
                             <p class="shrink-0 text-xs text-gray-500">{{ $supply->starts_at->format('H:i') }} ~ {{ $supply->ends_at->format('H:i') }}</p>
                         </div>
                         <div class="mt-2 flex flex-wrap items-center gap-1.5">
-                            <span class="font-medium text-sm text-gray-900">{{ $supply->title }}</span>
-                            @if($reservationCategoryBadge === '차량 배차')
-                                <span class="rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">차량 배차</span>
-                            @elseif($reservationCategoryBadge === '회의실')
-                                <span class="rounded-md bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">회의실</span>
+                            @if($reservationCategoryBadge)
+                                @include('partials.shared-supply.category-badge', ['label' => $reservationCategoryBadge])
                             @endif
+                            <span class="font-medium text-sm text-gray-900">{{ $supply->title }}</span>
                             @if($vehicleRowStatus === 'pending_post_use')
                                 <span class="rounded-md bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700">예약 및 사용중</span>
                             @elseif($vehicleRowStatus === 'complete')
@@ -336,15 +335,13 @@
                                 @else
                                     <td class="px-3 py-2 whitespace-nowrap {{ $dateSeparatorClass }}">{{ $supply->starts_at->format('Y/m/d (D)') }}</td>
                                 @endif
-                                <td class="px-3 py-2 text-gray-700 {{ $dateSeparatorClass }}">{{ $supply->starts_at->format('H:i') }} ~ {{ $supply->ends_at->format('H:i') }}</td>
+                                <td class="px-3 py-2 whitespace-nowrap text-gray-700 {{ $dateSeparatorClass }}">{{ $supply->starts_at->format('H:i') }} ~ {{ $supply->ends_at->format('H:i') }}</td>
                                 <td class="px-3 py-2 {{ $dateSeparatorClass }}">
                                     <div class="flex flex-wrap items-center gap-1.5">
-                                        <span class="font-medium text-gray-900">{{ $supply->title }}</span>
-                                        @if($reservationCategoryBadge === '차량 배차')
-                                            <span class="shrink-0 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">차량 배차</span>
-                                        @elseif($reservationCategoryBadge === '회의실')
-                                            <span class="shrink-0 rounded-md bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">회의실</span>
+                                        @if($reservationCategoryBadge)
+                                            @include('partials.shared-supply.category-badge', ['label' => $reservationCategoryBadge])
                                         @endif
+                                        <span class="font-medium text-gray-900">{{ $supply->title }}</span>
                                         @if($vehicleRowStatus === 'pending_post_use')
                                             <span class="shrink-0 rounded-md bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700">예약 및 사용중</span>
                                         @elseif($vehicleRowStatus === 'complete')
@@ -373,10 +370,32 @@
                         @endforelse
                     </tbody>
                 </table>
+
+                @if($hasMoreSupplies)
+                    <div class="border-t border-gray-100 px-4 py-2">
+                        <div wire:intersect.margin.200px="loadMoreSupplies"
+                             class="flex h-8 items-center justify-center text-xs text-gray-500">
+                            <span wire:loading.remove wire:target="loadMoreSupplies">아래로 스크롤하면 계속 불러옵니다</span>
+                            <span wire:loading.inline-flex wire:target="loadMoreSupplies" class="items-center gap-2 text-blue-600">
+                                <svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"></path>
+                                </svg>
+                                더 불러오는 중...
+                            </span>
+                        </div>
+                    </div>
+                @elseif($supplies->isNotEmpty())
+                    <div class="border-t border-gray-100 px-4 py-2">
+                        <div class="flex h-8 items-center justify-center text-xs text-gray-500">
+                            모든 내역을 불러왔습니다
+                        </div>
+                    </div>
+                @endif
             </div>
 
             @if($hasMoreSupplies)
-                <div class="border-t border-gray-100 px-4 py-2">
+                <div class="md:hidden border-t border-gray-100 px-4 py-2">
                     <div wire:intersect.margin.200px="loadMoreSupplies"
                          class="flex h-8 items-center justify-center text-xs text-gray-500">
                         <span wire:loading.remove wire:target="loadMoreSupplies">아래로 스크롤하면 계속 불러옵니다</span>
@@ -390,7 +409,7 @@
                     </div>
                 </div>
             @elseif($supplies->isNotEmpty())
-                <div class="border-t border-gray-100 px-4 py-2">
+                <div class="md:hidden border-t border-gray-100 px-4 py-2">
                     <div class="flex h-8 items-center justify-center text-xs text-gray-500">
                         모든 내역을 불러왔습니다
                     </div>
@@ -398,9 +417,10 @@
             @endif
         @endif
     </div>
+    @endunless
 
     @if($showFormModal)
-        <div class="mochi-modal-overlay" wire:click.self="closeFormModal">
+        <div class="mochi-modal-overlay {{ $embeddedInCalendar ? 'z-[70]' : '' }}" wire:click.self="closeFormModal">
             <div class="mochi-modal-shell mx-3 flex w-full max-w-2xl max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex-col sm:mx-0" wire:click.stop>
                 <div class="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
                     <h3 class="text-lg font-semibold text-gray-900">{{ $viewOnly ? '공용품 사용 상세' : ($editingSupplyId ? '공용품 사용 수정' : '공용품 사용 등록') }}</h3>
@@ -417,15 +437,25 @@
                         </div>
                         <div>
                             <label class="mb-1 block text-sm font-medium text-gray-700">시작시간</label>
-                            <input type="time" wire:model.defer="startTime" @disabled($viewOnly) class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100">
+                            <x-ui.time-select wire:model.defer="startTime" :disabled="$viewOnly || (str_contains($title, '차량배차') && $isAllDay)" />
                             @error('startTime') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="mb-1 block text-sm font-medium text-gray-700">종료시간</label>
-                            <input type="time" wire:model.defer="endTime" @disabled($viewOnly) class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100">
+                            <x-ui.time-select wire:model.defer="endTime" :disabled="$viewOnly || (str_contains($title, '차량배차') && $isAllDay)" />
                             @error('endTime') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
+
+                    @if(str_contains($title, '차량배차'))
+                        <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox"
+                                   wire:model.live="isAllDay"
+                                   @disabled($viewOnly)
+                                   class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:bg-gray-100">
+                            종일 일정
+                        </label>
+                    @endif
 
                     <div class="grid gap-3 md:grid-cols-3">
                         <div>
@@ -475,7 +505,7 @@
                             <div class="mt-3 grid gap-3 md:grid-cols-2">
                                 <div>
                                     <label class="mb-1 block text-sm font-medium text-gray-700">사용목적명</label>
-                                    <select wire:model.defer="vehicleUsagePurpose"
+                                    <select wire:model.live="vehicleUsagePurpose"
                                             @disabled($viewOnly)
                                             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100">
                                         <option value="">선택하세요</option>
@@ -493,6 +523,54 @@
                                            class="w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700">
                                 </div>
                             </div>
+
+                            @if($vehicleUsagePurpose === '기존 기관 방문')
+                                <div class="mt-3">
+                                    <label class="mb-1 block text-sm font-medium text-gray-700">
+                                        방문 기관 <span class="text-red-500">*</span>
+                                    </label>
+                                    @if($viewOnly)
+                                        <input type="text"
+                                               value="{{ filled($vehicleInstitutionName) ? $vehicleInstitutionName.' ('.$vehicleInstitutionSkCode.')' : '-' }}"
+                                               readonly
+                                               class="w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700">
+                                    @else
+                                        <input type="text"
+                                               wire:model.live.debounce.200ms="vehicleInstitutionKeyword"
+                                               placeholder="기관명 또는 SK 코드로 검색"
+                                               @disabled(filled($vehicleInstitutionSkCode))
+                                               class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100">
+
+                                        @if(filled($vehicleInstitutionKeyword) && blank($vehicleInstitutionSkCode) && $vehicleInstitutionSuggestions->isNotEmpty())
+                                            <div class="mt-2 max-h-44 overflow-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+                                                @foreach($vehicleInstitutionSuggestions as $institution)
+                                                    <button type="button"
+                                                            wire:click="selectVehicleInstitution('{{ $institution->SKcode }}')"
+                                                            class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-blue-50">
+                                                        <span class="font-medium text-gray-900">{{ $institution->resolvedAccountName() }}</span>
+                                                        <span class="ml-2 text-xs text-gray-500">({{ $institution->SKcode }})</span>
+                                                    </button>
+                                                @endforeach
+                                            </div>
+                                        @endif
+
+                                        @if(filled($vehicleInstitutionSkCode))
+                                            <div class="mt-2 flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm">
+                                                <p class="text-blue-800">
+                                                    선택된 기관: <span class="font-medium">{{ $vehicleInstitutionName }}</span>
+                                                    <span class="text-blue-600">({{ $vehicleInstitutionSkCode }})</span>
+                                                </p>
+                                                <button type="button"
+                                                        wire:click="clearVehicleInstitutionSelection"
+                                                        class="text-xs font-medium text-blue-700 hover:text-blue-900">
+                                                    변경
+                                                </button>
+                                            </div>
+                                        @endif
+                                    @endif
+                                    @error('vehicleInstitutionSkCode') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                                </div>
+                            @endif
 
                             <div class="mt-3 grid gap-3 md:grid-cols-2">
                                 <div>
@@ -520,11 +598,11 @@
                             </div>
 
                             <div class="mt-3">
-                                <label class="mb-1 block text-sm font-medium text-gray-700">해당 차량 최근 적요 (참고)</label>
-                                <p class="mb-1 text-xs text-gray-500">도착 위치 / 사유 형식으로 표시됩니다.</p>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">해당 차량 위치 (참고)</label>
+                                <p class="mb-1 text-xs text-gray-500">최근 운행 후 입력된 도착 위치가 표시됩니다.</p>
                                 <textarea rows="1"
                                           readonly
-                                          class="w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700">{{ $vehicleLatestRemark }}</textarea>
+                                          class="w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700">{{ $vehicleLatestArrivalLocation }}</textarea>
                             </div>
 
                             <div class="mt-3">
@@ -532,12 +610,59 @@
                                     <span>도착 위치</span>
                                     <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">사용 후 입력</span>
                                 </label>
-                                <input type="text"
-                                       wire:model.defer="vehicleArrivalLocation"
-                                       @disabled($viewOnly || $editingSupplyId === null)
-                                       placeholder="방문 후 입력"
-                                       class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100">
-                                @error('vehicleArrivalLocation') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+
+                                @if($viewOnly)
+                                    <input type="text"
+                                           value="{{ $vehicleArrivalFloor !== '' ? \App\Support\VehicleArrivalLocation::compose($vehicleArrivalFloor, $vehicleArrivalPillar, $vehicleArrivalNumber) : (\App\Support\VehicleArrivalLocation::forDisplay($vehicleArrivalLocationLegacy) !== '' ? \App\Support\VehicleArrivalLocation::forDisplay($vehicleArrivalLocationLegacy) : '-') }}"
+                                           readonly
+                                           class="w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700">
+                                @else
+                                    <div class="grid grid-cols-3 gap-2">
+                                        <div>
+                                            <label class="mb-1 block text-xs font-medium text-gray-600">층</label>
+                                            <select wire:model.defer="vehicleArrivalFloor"
+                                                    @disabled($editingSupplyId === null)
+                                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100">
+                                                <option value="">선택</option>
+                                                @foreach($vehicleArrivalFloorOptions as $floorOption)
+                                                    <option value="{{ $floorOption }}">{{ $floorOption }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="mb-1 block text-xs font-medium text-gray-600">기둥</label>
+                                            <select wire:model.defer="vehicleArrivalPillar"
+                                                    @disabled($editingSupplyId === null)
+                                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100">
+                                                <option value="">선택</option>
+                                                @foreach($vehicleArrivalPillarOptions as $pillarOption)
+                                                    <option value="{{ $pillarOption }}">{{ $pillarOption }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="mb-1 block text-xs font-medium text-gray-600">번호</label>
+                                            <input type="number"
+                                                   min="1"
+                                                   max="100"
+                                                   wire:model.defer="vehicleArrivalNumber"
+                                                   @disabled($editingSupplyId === null)
+                                                   placeholder="1~100"
+                                                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100">
+                                        </div>
+                                    </div>
+
+                                    @if($vehicleArrivalLocationLegacy !== '')
+                                        <p class="mt-2 text-xs text-gray-500">
+                                            기존 도착 위치: {{ $vehicleArrivalLocationLegacy }}
+                                            (층·기둥·번호를 선택하면 새 형식으로 저장됩니다)
+                                        </p>
+                                    @endif
+                                @endif
+
+                                @error('vehicleArrivalFloor') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                                @error('vehicleArrivalPillar') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                                @error('vehicleArrivalNumber') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                             </div>
 
                             @if($editingSupplyId === null)
@@ -575,7 +700,7 @@
     @endif
 
     @if($showSupportReportPrompt)
-        <div class="mochi-modal-overlay" wire:click.self="closeSupportReportPrompt">
+        <div class="mochi-modal-overlay {{ $embeddedInCalendar ? 'z-[70]' : '' }}" wire:click.self="closeSupportReportPrompt">
             <div class="mochi-modal-shell mx-3 flex w-full max-w-md min-h-0 flex-col sm:mx-0" wire:click.stop>
                 <div class="flex shrink-0 items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
                     <h3 class="text-lg font-semibold text-gray-900">차량 반납 처리 완료</h3>

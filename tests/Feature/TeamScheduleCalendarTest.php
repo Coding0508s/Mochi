@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Livewire\SharedSupplyManager;
 use App\Livewire\TeamScheduleCalendar;
+use App\Models\SharedSupply;
 use App\Models\SharedSupplyItem;
 use App\Models\TeamSchedule;
 use App\Models\User;
@@ -373,6 +374,7 @@ class TeamScheduleCalendarTest extends TestCase
         Livewire::actingAs($user)
             ->test(TeamScheduleCalendar::class)
             ->call('openCreateModal', now()->startOfMonth()->format('Y-m-d'))
+            ->call('openPersonalScheduleCreate')
             ->set('title', '주간 반복 회의')
             ->set('startTime', '09:00')
             ->set('endTime', '10:00')
@@ -742,5 +744,119 @@ class TeamScheduleCalendarTest extends TestCase
         ]);
 
         return [$parent, $child];
+    }
+
+    public function test_schedules_page_includes_calendar_and_embedded_shared_supply_manager(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+
+        $this->actingAs($user)
+            ->get(route('schedules.index'))
+            ->assertOk()
+            ->assertSeeLivewire(TeamScheduleCalendar::class)
+            ->assertSeeLivewire(SharedSupplyManager::class);
+    }
+
+    public function test_open_create_modal_shows_add_choice_modal(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $date = now()->startOfMonth()->addDays(3)->format('Y-m-d');
+
+        Livewire::actingAs($user)
+            ->test(TeamScheduleCalendar::class)
+            ->call('openCreateModal', $date)
+            ->assertSet('showAddChoiceModal', true)
+            ->assertSet('pendingCreateDate', $date)
+            ->assertSet('showFormModal', false);
+    }
+
+    public function test_open_shared_supply_create_dispatches_calendar_event(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $date = now()->startOfMonth()->addDays(4)->format('Y-m-d');
+
+        Livewire::actingAs($user)
+            ->test(TeamScheduleCalendar::class)
+            ->call('openCreateModal', $date)
+            ->call('openSharedSupplyCreate', '[출장] 출장')
+            ->assertDispatched('calendar-open-shared-supply-create', date: $date, defaultTitle: '[출장] 출장')
+            ->assertSet('showAddChoiceModal', false);
+    }
+
+    public function test_open_edit_modal_for_shared_supply_dispatches_edit_event(): void
+    {
+        if (! Schema::hasColumn('team_schedules', 'source_type')) {
+            $this->markTestSkipped('team_schedules.source_type column is required.');
+        }
+
+        $user = User::factory()->create(['is_active' => true]);
+
+        $schedule = TeamSchedule::query()->create([
+            'user_id' => $user->id,
+            'created_by' => $user->id,
+            'title' => '[회의실] 캘린더 연동',
+            'starts_at' => now()->startOfMonth()->addDays(5)->setTime(10, 0),
+            'ends_at' => now()->startOfMonth()->addDays(5)->setTime(11, 0),
+            'visibility' => 'team',
+            'status' => 'planned',
+            'type' => 'etc',
+            'source_type' => TeamSchedule::SOURCE_TYPE_SHARED_SUPPLY,
+            'source_id' => 42,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(TeamScheduleCalendar::class)
+            ->call('openEditModal', $schedule->id)
+            ->assertDispatched('calendar-open-shared-supply-edit', supplyId: 42)
+            ->assertSet('showFormModal', false);
+    }
+
+    public function test_embedded_shared_supply_manager_opens_create_modal_from_calendar_event(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $date = now()->startOfMonth()->addDays(6)->format('Y-m-d');
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class, ['embeddedInCalendar' => true])
+            ->call('handleCalendarOpenCreate', $date, '[휴가] 연차휴가')
+            ->assertSet('showFormModal', true)
+            ->assertSet('useDate', $date)
+            ->assertSet('title', '[휴가] 연차휴가');
+    }
+
+    public function test_calendar_shared_supply_save_creates_supply_and_team_schedule(): void
+    {
+        if (! Schema::hasColumn('team_schedules', 'source_type')) {
+            $this->markTestSkipped('team_schedules.source_type column is required.');
+        }
+
+        $user = User::factory()->create(['is_active' => true]);
+        $itemId = (int) SharedSupplyItem::query()->where('code', '00013')->value('id');
+        $date = now()->startOfMonth()->addDays(9)->format('Y-m-d');
+
+        Livewire::actingAs($user)
+            ->test(SharedSupplyManager::class, ['embeddedInCalendar' => true])
+            ->call('handleCalendarOpenCreate', $date, '[회의실] 신청 및 예약 (팀 회의)')
+            ->set('startTime', '10:00')
+            ->set('endTime', '11:00')
+            ->set('sharedSupplyItemId', $itemId)
+            ->set('purpose', '캘린더 연동 테스트')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertDispatched('shared-supply-calendar-changed');
+
+        $this->assertDatabaseHas('shared_supplies', [
+            'user_id' => $user->id,
+            'title' => '[회의실] 신청 및 예약 (팀 회의)',
+            'purpose' => '캘린더 연동 테스트',
+        ]);
+
+        $supplyId = (int) SharedSupply::query()->where('title', '[회의실] 신청 및 예약 (팀 회의)')->value('id');
+
+        $this->assertDatabaseHas('team_schedules', [
+            'source_type' => TeamSchedule::SOURCE_TYPE_SHARED_SUPPLY,
+            'source_id' => $supplyId,
+            'title' => '[회의실] 신청 및 예약 (팀 회의)',
+        ]);
     }
 }

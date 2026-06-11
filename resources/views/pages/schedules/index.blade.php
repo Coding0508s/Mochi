@@ -2,4 +2,6 @@
 
     <livewire:team-schedule-calendar />
 
+    <livewire:shared-supply-manager :embedded-in-calendar="true" />
+
 </x-layouts.app>

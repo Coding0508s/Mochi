@@ -14,13 +14,18 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Schema;
 
-#[Fillable(['name', 'email', 'employee_empno', 'password', 'must_change_password', 'is_admin', 'team', 'is_gs_brochure_admin', 'can_manage_store_inventory', 'is_coach_team_lead', 'is_deputy_admin', 'is_active'])]
+#[Fillable(['name', 'email', 'employee_empno', 'password', 'must_change_password', 'is_admin', 'team', 'is_gs_brochure_admin', 'can_manage_store_inventory', 'is_coach_team_lead', 'is_deputy_admin', 'setup_role_id', 'is_active'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'employee_empno', 'EMPNO');
+    }
+
+    public function setupRole(): BelongsTo
+    {
+        return $this->belongsTo(SetupRole::class, 'setup_role_id');
     }
 
     /** @use HasFactory<UserFactory> */
@@ -76,6 +81,25 @@ class User extends Authenticatable
     public function canViewCoachTeamKpi(): bool
     {
         return $this->hasPlatformWideViewAccess() || (bool) $this->is_coach_team_lead;
+    }
+
+    public function rolePermission(string $menu, string $action): bool
+    {
+        if ($this->hasFullAccess()) {
+            return true;
+        }
+
+        $role = $this->setupRole;
+        if ($role === null || ! $role->is_active) {
+            return false;
+        }
+
+        $permissions = $role->permissions;
+        if (! is_array($permissions)) {
+            return false;
+        }
+
+        return (bool) ($permissions[$menu][$action] ?? false);
     }
 
     /**

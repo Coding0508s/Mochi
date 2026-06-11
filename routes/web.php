@@ -190,25 +190,27 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/contract-documents/{contractDocument}/preview', [ContractDocumentFileController::class, 'preview'])
         ->name('contract-documents.preview');
 
-    Route::get('/setup', function () {
-        return view('pages.setup.index');
-    })->name('setup.index');
+    Route::middleware('can:accessSetup')->group(function (): void {
+        Route::get('/setup', function () {
+            return view('pages.setup.index');
+        })->name('setup.index');
 
-    Route::get('/setup/team', function () {
-        return view('pages.setup.team');
-    })->name('setup.team');
+        Route::get('/setup/team', function () {
+            return view('pages.setup.team');
+        })->name('setup.team');
 
-    Route::get('/setup/common-codes', function () {
-        return view('pages.setup.common-codes');
-    })->name('setup.common-codes');
+        Route::get('/setup/common-codes', function () {
+            return view('pages.setup.common-codes');
+        })->name('setup.common-codes');
 
-    Route::get('/setup/roles', function () {
-        return view('pages.setup.roles');
-    })->name('setup.roles');
+        Route::get('/setup/roles', function () {
+            return view('pages.setup.roles');
+        })->name('setup.roles');
 
-    Route::get('/setup/employees/create', function () {
-        return view('pages.setup.employee-create');
-    })->name('setup.employees.create');
+        Route::get('/setup/employees/create', function () {
+            return view('pages.setup.employee-create');
+        })->name('setup.employees.create');
+    });
 });
 
 require __DIR__.'/auth.php';

@@ -6,7 +6,6 @@ use App\Actions\SetTemporaryUserPassword;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\User;
-use App\Support\CoachTeamLeadEligibility;
 use App\Support\DepartmentCodeGenerator;
 use App\Support\DepartmentDisplay;
 use App\Support\EmployeeExcelImporter;
@@ -135,25 +134,13 @@ class PeopleEmployeesList extends Component
 
     public string $importResetConfirmationText = '';
 
-    public bool $createIsGsBrochureAdmin = false;
-
-    public bool $createCoachTeamKpi = false;
-
     public bool $hasLinkedLoginAccount = false;
 
     public ?int $linkedUserId = null;
 
     public bool $editUserIsActive = true;
 
-    public bool $editUserIsAdmin = false;
-
-    public bool $editGsBrochureAdmin = false;
-
-    public bool $editCanManageStoreInventory = false;
-
-    public bool $editCoachTeamKpi = false;
-
-    public bool $editUserIsDeputyAdmin = false;
+    public string $editAssignedRoleLabel = '';
 
     protected array $queryString = [
         'filterDept' => ['as' => 'team', 'except' => ''],
@@ -181,82 +168,11 @@ class PeopleEmployeesList extends Component
         $this->resetPage();
     }
 
-    public function updatedEditUserIsAdmin($value): void
-    {
-        if ($value) {
-            $this->editUserIsDeputyAdmin = false;
-            $this->editCoachTeamKpi = false;
-
-            return;
-        }
-
-        $this->syncEditCoachTeamKpiRecommendation();
-    }
-
-    public function updatedEditUserIsDeputyAdmin($value): void
-    {
-        if ($value) {
-            $this->editUserIsAdmin = false;
-            $this->editCoachTeamKpi = false;
-
-            return;
-        }
-
-        if (! $this->editUserIsAdmin) {
-            $this->syncEditCoachTeamKpiRecommendation();
-        }
-    }
-
     public function updatedEditStatus($value): void
     {
         $this->editUserIsActive = $this->shouldActivateUserFromEmployeeStatus(
             $value === null ? null : (string) $value
         );
-
-        if ($this->editUserIsAdmin || $this->editUserIsDeputyAdmin) {
-            $this->editCoachTeamKpi = false;
-
-            return;
-        }
-
-        $this->syncEditCoachTeamKpiRecommendation();
-    }
-
-    public function updatedEditJob(): void
-    {
-        if ($this->editUserIsAdmin || $this->editUserIsDeputyAdmin) {
-            $this->editCoachTeamKpi = false;
-
-            return;
-        }
-
-        $this->syncEditCoachTeamKpiRecommendation();
-    }
-
-    public function updatedEditWorkDept(): void
-    {
-        if ($this->editUserIsAdmin || $this->editUserIsDeputyAdmin) {
-            $this->editCoachTeamKpi = false;
-
-            return;
-        }
-
-        $this->syncEditCoachTeamKpiRecommendation();
-    }
-
-    public function updatedCreateJob(): void
-    {
-        $this->syncCreateCoachTeamKpiRecommendation();
-    }
-
-    public function updatedCreateWorkDept(): void
-    {
-        $this->syncCreateCoachTeamKpiRecommendation();
-    }
-
-    public function updatedCreateStatus(): void
-    {
-        $this->syncCreateCoachTeamKpiRecommendation();
     }
 
     public function sort(string $field): void
@@ -294,11 +210,7 @@ class PeopleEmployeesList extends Component
         $this->hasLinkedLoginAccount = $linkedUser !== null;
         $this->linkedUserId = $linkedUser?->id;
         $this->editUserIsActive = $this->shouldActivateUserFromEmployeeStatus($this->editStatus);
-        $this->editUserIsAdmin = (bool) ($linkedUser?->is_admin ?? false);
-        $this->editGsBrochureAdmin = (bool) ($linkedUser?->is_gs_brochure_admin ?? false);
-        $this->editCanManageStoreInventory = (bool) ($linkedUser?->can_manage_store_inventory ?? false);
-        $this->editCoachTeamKpi = (bool) ($linkedUser?->is_coach_team_lead ?? false);
-        $this->editUserIsDeputyAdmin = (bool) ($linkedUser?->is_deputy_admin ?? false);
+        $this->editAssignedRoleLabel = $linkedUser?->setupRole?->role_name ?? '역할 미지정';
 
         $this->resetErrorBag();
         $this->resetValidation();
@@ -320,11 +232,7 @@ class PeopleEmployeesList extends Component
         $this->hasLinkedLoginAccount = false;
         $this->linkedUserId = null;
         $this->editUserIsActive = true;
-        $this->editUserIsAdmin = false;
-        $this->editGsBrochureAdmin = false;
-        $this->editCanManageStoreInventory = false;
-        $this->editCoachTeamKpi = false;
-        $this->editUserIsDeputyAdmin = false;
+        $this->editAssignedRoleLabel = '';
 
         $this->resetErrorBag();
         $this->resetValidation();
@@ -355,11 +263,6 @@ class PeopleEmployeesList extends Component
             'editPhone' => ['required', 'string', 'max:20'],
             'editStatus' => ['nullable', 'in:0,1'],
             'editWorkDept' => ['required', 'string', Rule::in($deptCodes)],
-            'editUserIsAdmin' => ['boolean'],
-            'editUserIsDeputyAdmin' => ['boolean'],
-            'editGsBrochureAdmin' => ['boolean'],
-            'editCanManageStoreInventory' => ['boolean'],
-            'editCoachTeamKpi' => ['boolean'],
         ], [
             'editKoreanName.required' => '이름(한글)은 필수입니다.',
             'editEnglishName.required' => '영어 이름은 필수입니다.',
@@ -374,18 +277,6 @@ class PeopleEmployeesList extends Component
         ]);
 
         $this->editUserIsActive = $this->shouldActivateUserFromEmployeeStatus($validated['editStatus'] ?? null);
-        if ($this->editUserIsAdmin) {
-            $validated['editCoachTeamKpi'] = false;
-            $validated['editUserIsDeputyAdmin'] = false;
-            $this->editCoachTeamKpi = false;
-            $this->editUserIsDeputyAdmin = false;
-        }
-        if ($this->editUserIsDeputyAdmin) {
-            $validated['editUserIsAdmin'] = false;
-            $validated['editCoachTeamKpi'] = false;
-            $this->editUserIsAdmin = false;
-            $this->editCoachTeamKpi = false;
-        }
 
         $canManageUserAccounts = Gate::allows('manageUserAccounts')
             && (bool) config('features.people_modal_account_edit_enabled', true);
@@ -421,21 +312,6 @@ class PeopleEmployeesList extends Component
 
                 if (! $canManageUserAccounts) {
                     return;
-                }
-
-                $eligibleForCoachKpi = CoachTeamLeadEligibility::allowsTeamKpiCheckbox(
-                    (bool) ($validated['editCoachTeamKpi'] ?? false),
-                    trim((string) $validated['editJob']),
-                    (string) $validated['editWorkDept'],
-                    $validated['editStatus'] === '' || $validated['editStatus'] === null
-                        ? null
-                        : (int) $validated['editStatus'],
-                );
-
-                if (! $eligibleForCoachKpi) {
-                    throw ValidationException::withMessages([
-                        'editCoachTeamKpi' => ['팀 지원 KPI 권한은 Coach 부서(A05)의 Department Manager(재직)에게만 부여할 수 있습니다.'],
-                    ]);
                 }
 
                 $currentEmployeeEmpNo = trim((string) ($employee->EMPNO ?? ''));
@@ -475,11 +351,11 @@ class PeopleEmployeesList extends Component
                             'email' => $normalizedEmail,
                             'employee_empno' => $currentEmployeeEmpNo,
                             'password' => Str::random(48),
-                            'is_admin' => (bool) $this->editUserIsAdmin,
-                            'is_gs_brochure_admin' => (bool) $this->editGsBrochureAdmin,
-                            'can_manage_store_inventory' => (bool) $this->editCanManageStoreInventory,
-                            'is_coach_team_lead' => (bool) ($validated['editCoachTeamKpi'] ?? false),
-                            'is_deputy_admin' => (bool) ($validated['editUserIsDeputyAdmin'] ?? false),
+                            'is_admin' => false,
+                            'is_gs_brochure_admin' => false,
+                            'can_manage_store_inventory' => false,
+                            'is_coach_team_lead' => false,
+                            'is_deputy_admin' => false,
                             'is_active' => (bool) $this->editUserIsActive,
                             'email_verified_at' => null,
                         ];
@@ -487,7 +363,7 @@ class PeopleEmployeesList extends Component
                             $validated['editWorkDept'],
                             trim($validated['editJob'])
                         );
-                        if ($syncedTeam !== null && ! $this->editUserIsAdmin && ! $this->editUserIsDeputyAdmin) {
+                        if ($syncedTeam !== null) {
                             $newUserPayload['team'] = $syncedTeam;
                         }
                         $linkedUser = User::query()->create($newUserPayload);
@@ -515,9 +391,9 @@ class PeopleEmployeesList extends Component
                     ]);
                 }
 
-                $isCurrentlyActiveAdmin = (bool) $linkedUser->is_active && (bool) $linkedUser->is_admin;
-                $willRemainActiveAdmin = $this->editUserIsActive && $this->editUserIsAdmin;
-                if ($isCurrentlyActiveAdmin && ! $willRemainActiveAdmin) {
+                $isCurrentlyAdmin = (bool) $linkedUser->is_admin;
+                $isDeactivating = ! $this->editUserIsActive && (bool) $linkedUser->is_active;
+                if ($isCurrentlyAdmin && $isDeactivating) {
                     $otherActiveAdminCount = User::query()
                         ->where('is_active', true)
                         ->where('is_admin', true)
@@ -526,7 +402,7 @@ class PeopleEmployeesList extends Component
 
                     if ($otherActiveAdminCount === 0) {
                         throw ValidationException::withMessages([
-                            'editUserIsAdmin' => ['마지막 활성 관리자 계정은 관리자 권한을 해제하거나 비활성화할 수 없습니다.'],
+                            'editStatus' => ['마지막 활성 관리자 계정은 비활성화할 수 없습니다.'],
                         ]);
                     }
                 }
@@ -536,17 +412,12 @@ class PeopleEmployeesList extends Component
                     'email' => $normalizedEmail,
                     'employee_empno' => $currentEmployeeEmpNo,
                     'is_active' => $this->editUserIsActive,
-                    'is_admin' => $this->editUserIsAdmin,
-                    'is_gs_brochure_admin' => $this->editGsBrochureAdmin,
-                    'can_manage_store_inventory' => $this->editCanManageStoreInventory,
-                    'is_coach_team_lead' => (bool) ($validated['editCoachTeamKpi'] ?? false),
-                    'is_deputy_admin' => (bool) ($validated['editUserIsDeputyAdmin'] ?? false),
                 ];
                 $syncedTeam = TeamMenuContext::inferUserTeamForRegistration(
                     $validated['editWorkDept'],
                     trim($validated['editJob'])
                 );
-                if ($syncedTeam !== null && ! $this->editUserIsAdmin && ! $this->editUserIsDeputyAdmin) {
+                if ($syncedTeam !== null && ! $linkedUser->is_admin && ! $linkedUser->is_deputy_admin) {
                     $linkedUserPayload['team'] = $syncedTeam;
                 }
                 $linkedUser->forceFill($linkedUserPayload)->save();
@@ -593,8 +464,6 @@ class PeopleEmployeesList extends Component
         $this->createWorkDept = '';
         $this->createHireDate = null;
         $this->createSex = '';
-        $this->createIsGsBrochureAdmin = false;
-        $this->createCoachTeamKpi = false;
         $this->resetErrorBag();
         $this->resetValidation();
         $this->showCreateEmployeeModal = true;
@@ -638,8 +507,6 @@ class PeopleEmployeesList extends Component
             'createWorkDept' => ['required', 'string', Rule::in($deptCodes)],
             'createHireDate' => ['nullable', 'date'],
             'createSex' => ['nullable', 'string', Rule::in(EmployeeSex::allowedValues())],
-            'createIsGsBrochureAdmin' => ['boolean'],
-            'createCoachTeamKpi' => ['boolean'],
         ], [
             'createEmpNo.required' => '사번은 필수입니다.',
             'createEmpNo.unique' => '이미 등록된 사번입니다.',
@@ -656,19 +523,6 @@ class PeopleEmployeesList extends Component
             'createJob.in' => '직책은 목록에서 선택해 주세요.',
             'createSex.in' => '성별 값이 올바르지 않습니다.',
         ]);
-
-        if (! CoachTeamLeadEligibility::allowsTeamKpiCheckbox(
-            (bool) ($validated['createCoachTeamKpi'] ?? false),
-            trim((string) $validated['createJob']),
-            (string) $validated['createWorkDept'],
-            $validated['createStatus'] === '' || $validated['createStatus'] === null
-                ? null
-                : (int) $validated['createStatus'],
-        )) {
-            throw ValidationException::withMessages([
-                'createCoachTeamKpi' => ['팀 지원 KPI 권한은 Coach 부서(A05)의 Department Manager(재직)에게만 부여할 수 있습니다.'],
-            ]);
-        }
 
         $email = strtolower(trim($validated['createEmail']));
 
@@ -692,8 +546,10 @@ class PeopleEmployeesList extends Component
                 'employee_empno' => trim($validated['createEmpNo']),
                 'password' => Str::random(48),
                 'is_admin' => false,
-                'is_gs_brochure_admin' => (bool) ($validated['createIsGsBrochureAdmin'] ?? false),
-                'is_coach_team_lead' => (bool) ($validated['createCoachTeamKpi'] ?? false),
+                'is_gs_brochure_admin' => false,
+                'can_manage_store_inventory' => false,
+                'is_coach_team_lead' => false,
+                'is_deputy_admin' => false,
                 'is_active' => true,
                 'email_verified_at' => null,
             ];
@@ -1082,11 +938,7 @@ class PeopleEmployeesList extends Component
                 $relinkPayload = [
                     'employee_empno' => $empNo,
                     'is_active' => true,
-                    'is_coach_team_lead' => CoachTeamLeadEligibility::recommendsTeamKpi(
-                        (string) ($employee->JOB ?? ''),
-                        (string) ($employee->WORKDEPT ?? ''),
-                        isset($employee->STATUS) ? (int) $employee->STATUS : null,
-                    ),
+                    'is_coach_team_lead' => false,
                 ];
                 $syncedTeam = TeamMenuContext::inferUserTeamForRegistration(
                     (string) ($employee->WORKDEPT ?? ''),
@@ -1108,11 +960,7 @@ class PeopleEmployeesList extends Component
                 'is_admin' => false,
                 'is_gs_brochure_admin' => false,
                 'can_manage_store_inventory' => false,
-                'is_coach_team_lead' => CoachTeamLeadEligibility::recommendsTeamKpi(
-                    (string) ($employee->JOB ?? ''),
-                    (string) ($employee->WORKDEPT ?? ''),
-                    isset($employee->STATUS) ? (int) $employee->STATUS : null,
-                ),
+                'is_coach_team_lead' => false,
                 'is_active' => true,
                 'email_verified_at' => null,
             ];
@@ -1234,36 +1082,7 @@ class PeopleEmployeesList extends Component
                 ? EmployeeImportRollback::summaryLabel($snapshot)
                 : null,
             'isPeopleModalAccountEditEnabled' => (bool) config('features.people_modal_account_edit_enabled', true),
-            'coachDeptCode' => TeamMenuContext::DEPT_COACH,
         ]);
-    }
-
-    private function syncEditCoachTeamKpiRecommendation(): void
-    {
-        $this->editCoachTeamKpi = CoachTeamLeadEligibility::recommendsTeamKpi(
-            $this->editJob,
-            $this->editWorkDept,
-            $this->normalizeStatusValue($this->editStatus),
-        );
-    }
-
-    private function syncCreateCoachTeamKpiRecommendation(): void
-    {
-        $this->createCoachTeamKpi = CoachTeamLeadEligibility::recommendsTeamKpi(
-            $this->createJob,
-            $this->createWorkDept,
-            $this->normalizeStatusValue($this->createStatus),
-        );
-    }
-
-    private function normalizeStatusValue(?string $status): ?int
-    {
-        $statusValue = trim((string) $status);
-        if ($statusValue === '') {
-            return null;
-        }
-
-        return (int) $statusValue;
     }
 
     private function resolveCurrentTeamLabel($deptOptions): string
@@ -1347,8 +1166,9 @@ class PeopleEmployeesList extends Component
 
         if ($useAccountLink && $employeeEmpNo !== '') {
             $linkedByEmpNo = User::query()
+                ->with('setupRole:id,role_name')
                 ->where('employee_empno', $employeeEmpNo)
-                ->first(['id', 'email', 'is_active', 'is_admin', 'is_gs_brochure_admin', 'can_manage_store_inventory']);
+                ->first(['id', 'email', 'is_active', 'is_admin', 'is_deputy_admin', 'setup_role_id']);
 
             if ($linkedByEmpNo) {
                 return $linkedByEmpNo;
@@ -1366,8 +1186,9 @@ class PeopleEmployeesList extends Component
         }
 
         return User::query()
+            ->with('setupRole:id,role_name')
             ->whereRaw('LOWER(TRIM(COALESCE(email, \'\'))) = ?', [$normalizedEmail])
-            ->first(['id', 'email', 'is_active', 'is_admin', 'is_gs_brochure_admin', 'can_manage_store_inventory']);
+            ->first(['id', 'email', 'is_active', 'is_admin', 'is_deputy_admin', 'setup_role_id']);
     }
 
     private function shouldActivateUserFromEmployeeStatus(?string $employeeStatus): bool
