@@ -41,7 +41,7 @@ class SharedSupplyManagerTest extends TestCase
         $this->actingAs($user)
             ->get(route('shared-supplies.index'))
             ->assertOk()
-            ->assertSee('공용품관리')
+            ->assertSee('공용품 및 일정 관리')
             ->assertSee('검색')
             ->assertSee('일정 등록')
             ->assertDontSee('엑셀 업로드');
