@@ -237,8 +237,7 @@
                 </div>
             </div>
 
-            {{-- ── 일정 관리 (메뉴 숨김 처리, 다시 노출하려면 @if(false)를 제거) ── --}}
-            @if(false)
+            {{-- ── 일정 관리 ── --}}
             <div class="sidebar-group">
                 <button type="button"
                         @click="openScheduleManagement = !openScheduleManagement"
@@ -276,7 +275,6 @@
                     </a>
                 </div>
             </div>
-            @endif
 
             {{-- ── Teams (열고 닫기 가능) ── --}}
             <div class="sidebar-group">
