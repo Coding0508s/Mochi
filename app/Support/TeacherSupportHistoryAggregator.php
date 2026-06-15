@@ -14,8 +14,8 @@ class TeacherSupportHistoryAggregator
     /** @var array<string, bool> 요청 단위 테이블 존재 여부 캐시 */
     private array $schemaTableCache = [];
 
-    /** @var array<string, bool> 요청 단위 컬럼 존재 여부 캐시 */
-    private array $schemaColumnCache = [];
+    /** @var array<string, list<string>> 요청 단위 테이블 컬럼 목록 캐시 (소문자) */
+    private array $schemaColumnsCache = [];
 
     /**
      * @return list<array{id: int|string, coach: string, teacher: string, date: string, status: string, type: string, sort_at: int}>
@@ -355,10 +355,27 @@ class TeacherSupportHistoryAggregator
     }
 
     /**
-     * 요청 단위로 컬럼 존재 여부를 메모이즈한다 (루프 내 Schema::hasColumn 반복 방지).
+     * 컬럼 존재 여부를 테이블당 컬럼 목록 1회 조회로 판정한다.
+     *
+     * 컬럼마다 Schema::hasColumn 을 호출하면 information_schema 왕복이 컬럼 수만큼 발생한다.
+     * 원격 DB에서는 이 왕복 비용이 커서, 테이블당 getColumnListing 한 번으로 모은 뒤
+     * 메모리에서 대조한다. 대소문자 무시는 Schema::hasColumn 동작과 동일하게 맞춘다.
      */
     private function hasColumn(string $table, string $column): bool
     {
-        return $this->schemaColumnCache[$table.'.'.$column] ??= Schema::hasColumn($table, $column);
+        return in_array(strtolower($column), $this->tableColumns($table), true);
+    }
+
+    /**
+     * 요청 단위로 테이블 컬럼 목록(소문자)을 메모이즈한다.
+     *
+     * @return list<string>
+     */
+    private function tableColumns(string $table): array
+    {
+        return $this->schemaColumnsCache[$table] ??= array_map(
+            'strtolower',
+            Schema::getColumnListing($table),
+        );
     }
 }
