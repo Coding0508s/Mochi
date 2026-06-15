@@ -11,6 +11,12 @@ use Illuminate\Support\Facades\Schema;
 
 class TeacherSupportHistoryAggregator
 {
+    /** @var array<string, bool> 요청 단위 테이블 존재 여부 캐시 */
+    private array $schemaTableCache = [];
+
+    /** @var array<string, bool> 요청 단위 컬럼 존재 여부 캐시 */
+    private array $schemaColumnCache = [];
+
     /**
      * @return list<array{id: int|string, coach: string, teacher: string, date: string, status: string, type: string, sort_at: int}>
      */
@@ -19,13 +25,13 @@ class TeacherSupportHistoryAggregator
         $linkedAccountIds = $this->linkedSupportRecordIdsForTeacher($teacher->ID);
 
         $records = collect();
-        $records = $records->merge($this->fromLegacyTables(teacherId: $teacher->ID));
+        $records = $records->merge($this->fromLegacyTables(teacherId: (int) $teacher->ID));
         $records = $records->merge($this->fromSupportInfoAccount(
             teacherName: (string) $teacher->Name,
             skCode: SkCodeNormalizer::normalize($teacher->SK_Code),
             excludeAccountIds: $linkedAccountIds,
         ));
-        $records = $records->merge($this->fromMochiReportTables(teacherId: $teacher->ID));
+        $records = $records->merge($this->fromMochiReportTables([(int) $teacher->ID]));
 
         return $this->finalize($records);
     }
@@ -46,10 +52,7 @@ class TeacherSupportHistoryAggregator
         }
 
         $records = collect();
-
-        foreach ($candidateSkCodes as $skCode) {
-            $records = $records->merge($this->fromLegacyTables(skCode: $skCode));
-        }
+        $records = $records->merge($this->fromLegacyTables(skCodes: $candidateSkCodes));
 
         $teacherIds = Teacher::query()
             ->whereIn('SK_Code', $candidateSkCodes)
@@ -57,25 +60,26 @@ class TeacherSupportHistoryAggregator
                 ! $includeRetiredTeachers,
                 fn ($query) => $query->excludeRetired(),
             )
-            ->pluck('ID');
+            ->pluck('ID')
+            ->map(fn ($id) => (int) $id)
+            ->all();
 
-        foreach ($teacherIds as $teacherId) {
-            $records = $records->merge($this->fromMochiReportTables(teacherId: (int) $teacherId));
-        }
+        $records = $records->merge($this->fromMochiReportTables($teacherIds));
 
         return $this->finalize($records, $limit);
     }
 
     /**
+     * @param  list<string>  $skCodes
      * @return Collection<int, array<string, mixed>>
      */
-    private function fromLegacyTables(?int $teacherId = null, ?string $skCode = null): Collection
+    private function fromLegacyTables(?int $teacherId = null, array $skCodes = []): Collection
     {
         $records = collect();
 
         foreach (config('coach_teacher_legacy_support.legacy_sources', []) as $source) {
             $table = $source['table'] ?? null;
-            if (! is_string($table) || ! Schema::hasTable($table)) {
+            if (! is_string($table) || ! $this->hasTable($table)) {
                 continue;
             }
 
@@ -90,8 +94,8 @@ class TeacherSupportHistoryAggregator
                 $query->where($teacherIdColumn, $teacherId);
             }
 
-            if ($skCode !== null && Schema::hasColumn($table, 'SK_Code')) {
-                $query->where('SK_Code', $skCode);
+            if ($skCodes !== [] && $this->hasColumn($table, 'SK_Code')) {
+                $query->whereIn('SK_Code', $skCodes);
             }
 
             $rows = $query->get($this->legacySelectColumns($table));
@@ -113,7 +117,7 @@ class TeacherSupportHistoryAggregator
         ?string $skCode = null,
         array $excludeAccountIds = [],
     ): Collection {
-        if (! Schema::hasTable('S_SupportInfo_Account')) {
+        if (! $this->hasTable('S_SupportInfo_Account')) {
             return collect();
         }
 
@@ -155,21 +159,26 @@ class TeacherSupportHistoryAggregator
     }
 
     /**
+     * @param  list<int>  $teacherIds
      * @return Collection<int, array<string, mixed>>
      */
-    private function fromMochiReportTables(int $teacherId): Collection
+    private function fromMochiReportTables(array $teacherIds): Collection
     {
         $records = collect();
 
+        if ($teacherIds === []) {
+            return $records;
+        }
+
         foreach (config('coach_teacher_legacy_support.mochi_report_tables', []) as $table => $typeLabel) {
-            if (! Schema::hasTable($table)) {
+            if (! $this->hasTable($table)) {
                 continue;
             }
 
             $rows = DB::table($table)
-                ->where('teacher_id', $teacherId)
+                ->whereIn('teacher_id', $teacherIds)
                 ->orderByDesc('support_date')
-                ->get(['id', 'coach_name', 'teacher_name', 'support_date', 'status', 'support_record_id']);
+                ->get(['id', 'coach_name', 'teacher_name', 'support_date', 'status', 'support_record_id', 'teacher_id']);
 
             foreach ($rows as $row) {
                 $records->push([
@@ -182,7 +191,7 @@ class TeacherSupportHistoryAggregator
                     'sort_at' => $this->parseSortTimestamp($row->support_date),
                     'dedupe_key' => $table.':'.$row->id,
                     'detail_key' => 'mochi:'.$table.':'.$row->id,
-                    'teacher_id' => (int) $teacherId,
+                    'teacher_id' => (int) $row->teacher_id,
                 ]);
             }
         }
@@ -198,7 +207,7 @@ class TeacherSupportHistoryAggregator
         $ids = [];
 
         foreach (array_keys(config('coach_teacher_legacy_support.mochi_report_tables', [])) as $table) {
-            if (! Schema::hasTable($table)) {
+            if (! $this->hasTable($table)) {
                 continue;
             }
 
@@ -316,7 +325,7 @@ class TeacherSupportHistoryAggregator
     private function legacyTeacherIdColumn(string $table): ?string
     {
         foreach (['TeacherId', 'TeacherID'] as $column) {
-            if (Schema::hasColumn($table, $column)) {
+            if ($this->hasColumn($table, $column)) {
                 return $column;
             }
         }
@@ -333,7 +342,23 @@ class TeacherSupportHistoryAggregator
 
         return array_values(array_filter(
             $candidates,
-            fn (string $column) => Schema::hasColumn($table, $column),
+            fn (string $column) => $this->hasColumn($table, $column),
         ));
+    }
+
+    /**
+     * 요청 단위로 테이블 존재 여부를 메모이즈한다 (루프 내 Schema::hasTable 반복 방지).
+     */
+    private function hasTable(string $table): bool
+    {
+        return $this->schemaTableCache[$table] ??= Schema::hasTable($table);
+    }
+
+    /**
+     * 요청 단위로 컬럼 존재 여부를 메모이즈한다 (루프 내 Schema::hasColumn 반복 방지).
+     */
+    private function hasColumn(string $table, string $column): bool
+    {
+        return $this->schemaColumnCache[$table.'.'.$column] ??= Schema::hasColumn($table, $column);
     }
 }
