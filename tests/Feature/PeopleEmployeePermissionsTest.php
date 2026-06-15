@@ -6,6 +6,7 @@ use App\Livewire\PeopleEmployeesList;
 use App\Livewire\SetupEmployeeCreate;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\SetupRole;
 use App\Models\User;
 use App\Notifications\CustomResetPassword;
 use Illuminate\Database\Schema\Blueprint;
@@ -233,9 +234,6 @@ class PeopleEmployeePermissionsTest extends TestCase
         $this->actingAs($admin)
             ->get(route('people.index'))
             ->assertOk()
-            ->assertSee('Review')
-            ->assertSee('Goal')
-            ->assertSee('Feedback')
             ->assertSee('Configuration')
             ->assertSee('Setup');
     }
@@ -457,46 +455,7 @@ class PeopleEmployeePermissionsTest extends TestCase
         ]);
     }
 
-    public function test_people_modal_auto_recommends_team_kpi_for_department_manager_in_coach_dept(): void
-    {
-        $admin = User::factory()->admin()->create();
-
-        Livewire::actingAs($admin)
-            ->test(PeopleEmployeesList::class)
-            ->call('openCreateEmployeeModal')
-            ->set('createJob', 'Department Manager')
-            ->set('createWorkDept', 'A05')
-            ->set('createStatus', '1')
-            ->assertSet('createCoachTeamKpi', true);
-    }
-
-    public function test_people_modal_rejects_team_kpi_when_ineligible(): void
-    {
-        Notification::fake();
-
-        $admin = User::factory()->admin()->create();
-
-        Livewire::actingAs($admin)
-            ->test(PeopleEmployeesList::class)
-            ->call('openCreateEmployeeModal')
-            ->set('createEmpNo', 'E992')
-            ->set('createKoreanName', '권한불가')
-            ->set('createEnglishName', 'Not Eligible')
-            ->set('createJob', 'Department Manager')
-            ->set('createEmail', 'not-eligible@example.com')
-            ->set('createPhone', '010-4444-1111')
-            ->set('createWorkDept', 'A01')
-            ->set('createStatus', '1')
-            ->set('createCoachTeamKpi', true)
-            ->call('createEmployee')
-            ->assertHasErrors(['createCoachTeamKpi']);
-
-        $this->assertDatabaseMissing('users', [
-            'email' => 'not-eligible@example.com',
-        ]);
-    }
-
-    public function test_people_modal_can_assign_team_kpi_when_eligible(): void
+    public function test_people_modal_create_user_has_no_elevated_permissions(): void
     {
         Notification::fake();
 
@@ -506,20 +465,23 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->test(PeopleEmployeesList::class)
             ->call('openCreateEmployeeModal')
             ->set('createEmpNo', 'E991')
-            ->set('createKoreanName', '권한가능')
-            ->set('createEnglishName', 'Eligible')
+            ->set('createKoreanName', '권한없음')
+            ->set('createEnglishName', 'No Flags')
             ->set('createJob', 'Department Manager')
-            ->set('createEmail', 'eligible@example.com')
+            ->set('createEmail', 'no-flags@example.com')
             ->set('createPhone', '010-4444-2222')
             ->set('createWorkDept', 'A05')
             ->set('createStatus', '1')
-            ->set('createCoachTeamKpi', true)
             ->call('createEmployee')
             ->assertHasNoErrors();
 
         $this->assertDatabaseHas('users', [
-            'email' => 'eligible@example.com',
-            'is_coach_team_lead' => true,
+            'email' => 'no-flags@example.com',
+            'is_admin' => false,
+            'is_gs_brochure_admin' => false,
+            'can_manage_store_inventory' => false,
+            'is_coach_team_lead' => false,
+            'is_deputy_admin' => false,
         ]);
     }
 
@@ -587,7 +549,7 @@ class PeopleEmployeePermissionsTest extends TestCase
         Notification::assertSentTo($newUser, CustomResetPassword::class);
     }
 
-    public function test_register_employee_via_setup_can_assign_gs_brochure_admin_permission(): void
+    public function test_register_employee_via_setup_creates_user_without_elevated_permissions(): void
     {
         Notification::fake();
 
@@ -596,71 +558,20 @@ class PeopleEmployeePermissionsTest extends TestCase
         Livewire::actingAs($admin)
             ->test(SetupEmployeeCreate::class)
             ->set('empNo', 'E889')
-            ->set('koreanName', '브로셔권한')
-            ->set('englishName', 'Brochure Admin')
+            ->set('koreanName', '기본계정')
+            ->set('englishName', 'Basic Account')
             ->set('job', '매니저')
-            ->set('email', 'brochure.admin@example.com')
+            ->set('email', 'basic.account@example.com')
             ->set('phone', '010-7777-9999')
             ->set('workDept', 'A01')
             ->set('status', '1')
-            ->set('isGsBrochureAdmin', true)
             ->call('save')
             ->assertHasNoErrors();
 
-        $newUser = User::query()->where('email', 'brochure.admin@example.com')->first();
+        $newUser = User::query()->where('email', 'basic.account@example.com')->first();
         $this->assertNotNull($newUser);
-        $this->assertTrue((bool) $newUser->is_gs_brochure_admin);
-    }
-
-    public function test_register_employee_via_setup_can_assign_coach_team_kpi_when_eligible(): void
-    {
-        Notification::fake();
-
-        $admin = User::factory()->admin()->create();
-
-        Livewire::actingAs($admin)
-            ->test(SetupEmployeeCreate::class)
-            ->set('empNo', 'E887')
-            ->set('koreanName', '팀장권한')
-            ->set('englishName', 'Team Lead')
-            ->set('job', 'Department Manager')
-            ->set('email', 'team.lead@example.com')
-            ->set('phone', '010-1212-3434')
-            ->set('workDept', 'A05')
-            ->set('status', '1')
-            ->set('coachTeamKpi', true)
-            ->call('save')
-            ->assertHasNoErrors();
-
-        $this->assertDatabaseHas('users', [
-            'email' => 'team.lead@example.com',
-            'is_coach_team_lead' => true,
-        ]);
-    }
-
-    public function test_register_employee_via_setup_rejects_coach_team_kpi_when_ineligible(): void
-    {
-        Notification::fake();
-
-        $admin = User::factory()->admin()->create();
-
-        Livewire::actingAs($admin)
-            ->test(SetupEmployeeCreate::class)
-            ->set('empNo', 'E886')
-            ->set('koreanName', '권한거부')
-            ->set('englishName', 'Rejected Lead')
-            ->set('job', 'Department Manager')
-            ->set('email', 'rejected.lead@example.com')
-            ->set('phone', '010-5656-7878')
-            ->set('workDept', 'A01')
-            ->set('status', '1')
-            ->set('coachTeamKpi', true)
-            ->call('save')
-            ->assertHasErrors(['coachTeamKpi']);
-
-        $this->assertDatabaseMissing('users', [
-            'email' => 'rejected.lead@example.com',
-        ]);
+        $this->assertFalse((bool) $newUser->is_gs_brochure_admin);
+        $this->assertFalse((bool) $newUser->is_coach_team_lead);
     }
 
     public function test_admin_can_open_edit_modal_for_linked_employee_without_changing_gs_brochure_when_gate_disabled(): void
@@ -679,9 +590,7 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->test(PeopleEmployeesList::class)
             ->call('openEditModal', 'E001')
             ->assertSet('showEditModal', true)
-            ->assertDontSee('계정 권한')
-            ->set('editUserIsAdmin', true)
-            ->set('editGsBrochureAdmin', true)
+            ->assertDontSee('로그인 계정')
             ->call('saveEmployee')
             ->assertHasNoErrors();
 
@@ -734,7 +643,7 @@ class PeopleEmployeePermissionsTest extends TestCase
         $this->assertDatabaseMissing('employee', ['EMPNO' => 'E777']);
     }
 
-    public function test_user_without_manage_user_accounts_gate_cannot_see_or_save_account_checkboxes_from_employee_modal(): void
+    public function test_user_without_manage_user_accounts_gate_cannot_see_account_section_from_employee_modal(): void
     {
         $linkedUser = User::factory()->create([
             'employee_empno' => 'E001',
@@ -751,9 +660,8 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->test(PeopleEmployeesList::class)
             ->call('openEditModal', 'E001')
             ->assertSet('hasLinkedLoginAccount', true)
-            ->assertDontSee('계정 권한')
-            ->set('editUserIsAdmin', true)
-            ->set('editGsBrochureAdmin', true)
+            ->assertDontSee('로그인 계정')
+            ->set('editStatus', '0')
             ->call('saveEmployee')
             ->assertHasNoErrors();
 
@@ -765,13 +673,13 @@ class PeopleEmployeePermissionsTest extends TestCase
         ]);
     }
 
-    public function test_user_with_manage_user_accounts_gate_can_save_account_checkboxes_from_employee_modal(): void
+    public function test_user_with_manage_user_accounts_gate_syncs_is_active_without_changing_permission_flags(): void
     {
         $linkedUser = User::factory()->create([
             'employee_empno' => 'E001',
             'is_active' => true,
             'is_admin' => false,
-            'is_gs_brochure_admin' => false,
+            'is_gs_brochure_admin' => true,
         ]);
 
         $admin = User::factory()->admin()->create();
@@ -780,29 +688,35 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->test(PeopleEmployeesList::class)
             ->call('openEditModal', 'E001')
             ->assertSet('hasLinkedLoginAccount', true)
-            ->assertSee('계정 권한')
+            ->assertSee('로그인 계정')
+            ->assertSee('현재 역할:')
             ->set('editStatus', '0')
-            ->set('editUserIsAdmin', true)
-            ->set('editGsBrochureAdmin', true)
             ->call('saveEmployee')
             ->assertHasNoErrors();
 
         $this->assertDatabaseHas('users', [
             'id' => $linkedUser->id,
             'is_active' => false,
-            'is_admin' => true,
+            'is_admin' => false,
             'is_gs_brochure_admin' => true,
         ]);
     }
 
-    public function test_people_edit_modal_rejects_team_kpi_checkbox_when_employee_is_ineligible(): void
+    public function test_people_edit_modal_shows_assigned_role_label(): void
     {
-        $linkedUser = User::factory()->create([
+        $role = SetupRole::query()->create([
+            'role_key' => 'sales_lead',
+            'role_name' => '영업 리드',
+            'description' => '',
+            'is_active' => true,
+            'permissions' => [],
+            'account_flags' => [],
+        ]);
+
+        User::factory()->create([
             'employee_empno' => 'E001',
             'email' => 'e001@example.com',
-            'is_active' => true,
-            'is_admin' => false,
-            'is_coach_team_lead' => false,
+            'setup_role_id' => $role->id,
         ]);
 
         $admin = User::factory()->admin()->create();
@@ -810,14 +724,7 @@ class PeopleEmployeePermissionsTest extends TestCase
         Livewire::actingAs($admin)
             ->test(PeopleEmployeesList::class)
             ->call('openEditModal', 'E001')
-            ->set('editCoachTeamKpi', true)
-            ->call('saveEmployee')
-            ->assertHasErrors(['editCoachTeamKpi']);
-
-        $this->assertDatabaseHas('users', [
-            'id' => $linkedUser->id,
-            'is_coach_team_lead' => false,
-        ]);
+            ->assertSet('editAssignedRoleLabel', '영업 리드');
     }
 
     public function test_user_cannot_deactivate_own_account_from_employee_modal(): void
@@ -853,7 +760,7 @@ class PeopleEmployeePermissionsTest extends TestCase
         ]);
     }
 
-    public function test_last_active_admin_cannot_remove_own_admin_flag_from_employee_modal(): void
+    public function test_last_active_admin_cannot_deactivate_from_employee_modal(): void
     {
         Employee::query()->create([
             'EMPNO' => 'E002',
@@ -879,9 +786,9 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->test(PeopleEmployeesList::class)
             ->call('openEditModal', 'E002')
             ->assertSet('hasLinkedLoginAccount', true)
-            ->set('editUserIsAdmin', false)
+            ->set('editStatus', '0')
             ->call('saveEmployee')
-            ->assertHasErrors(['editUserIsAdmin']);
+            ->assertHasErrors(['editStatus']);
 
         $this->assertDatabaseHas('users', [
             'id' => $onlyAdmin->id,
@@ -922,15 +829,14 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->test(PeopleEmployeesList::class)
             ->call('openEditModal', 'E001')
             ->assertSet('hasLinkedLoginAccount', false)
-            ->set('editUserIsAdmin', false)
-            ->set('editGsBrochureAdmin', true)
             ->call('saveEmployee')
             ->assertHasNoErrors();
 
         $createdUser = User::query()->where('employee_empno', 'E001')->first();
         $this->assertNotNull($createdUser);
         $this->assertSame('e001@example.com', $createdUser->email);
-        $this->assertTrue((bool) $createdUser->is_gs_brochure_admin);
+        $this->assertFalse((bool) $createdUser->is_gs_brochure_admin);
+        $this->assertFalse((bool) $createdUser->is_admin);
 
         Notification::assertSentTo($createdUser, CustomResetPassword::class);
     }

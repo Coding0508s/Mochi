@@ -158,6 +158,19 @@
 
             <div class="ml-auto flex flex-wrap items-center gap-3">
                 <div class="flex items-center gap-2 text-sm">
+                    <span class="text-gray-500">기관</span>
+                    <div class="mochi-toggle-group">
+                        <button type="button" wire:click="$set('showAllInstitutionsView', false)"
+                                class="mochi-toggle-btn {{ ! $showAllInstitutionsView ? 'mochi-toggle-btn--active' : '' }}">
+                            최신 지원 보기
+                        </button>
+                        <button type="button" wire:click="$set('showAllInstitutionsView', true)"
+                                class="mochi-toggle-btn {{ $showAllInstitutionsView ? 'mochi-toggle-btn--active' : '' }}">
+                            전체 지원 보기
+                        </button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 text-sm">
                     <span class="text-gray-500">퇴직</span>
                     <div class="mochi-toggle-group">
                         <button type="button" wire:click="$set('showAllTeachers', false)"
@@ -217,7 +230,7 @@
         }
     @endphp
     <div class="mochi-table-card relative">
-        <div wire:loading.flex wire:target="search,filterYear,filterRound,filterMonth,kpiFilter,showAllTeachers,showExtendedColumns,setKpiFilter,resetFilters,clearSearch,clearRoundFilter,clearMonthFilter,clearKpiFilter,openEditModal,saveEditForm"
+        <div wire:loading.flex wire:target="search,filterYear,filterRound,filterMonth,filterCoach,kpiFilter,showAllTeachers,showAllInstitutionsView,showExtendedColumns,setKpiFilter,resetFilters,clearSearch,clearRoundFilter,clearMonthFilter,clearKpiFilter,openEditModal,saveEditForm"
              class="absolute inset-0 z-20 hidden items-center justify-center bg-white/70 backdrop-blur-[1px]">
             <div class="flex items-center gap-2 rounded-full border border-mochi-header/20 bg-white px-3 py-2 text-sm font-medium text-mochi-header shadow-sm">
                 <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">

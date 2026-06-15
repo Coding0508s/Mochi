@@ -1,5 +1,9 @@
 <div class="mochi-page">
-    @if(session('success'))
+    @if($calendarFlashMessage)
+        <div class="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm" data-mochi-flash-dismiss="3000" role="status">
+            {{ $calendarFlashMessage }}
+        </div>
+    @elseif(session('success'))
         <div class="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm" data-mochi-flash-dismiss="3000" role="status">
             {{ session('success') }}
         </div>
@@ -236,6 +240,63 @@
                         <p class="py-8 text-center text-sm text-gray-400">일정이 없습니다.</p>
                     @endforelse
                 </div>
+                <div class="flex flex-wrap justify-end gap-2 border-t border-gray-200 px-6 py-4">
+                    <button type="button"
+                            wire:click="openCreateModal('{{ $selectedDay }}')"
+                            class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                        일정 추가
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if($showAddChoiceModal)
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4" wire:click.self="closeAddChoiceModal">
+            <div class="w-full max-w-md rounded-2xl bg-white shadow-xl" wire:click.stop>
+                <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">일정 추가</h3>
+                        <p class="text-sm text-gray-500">{{ $pendingCreateDate }} · 추가 유형을 선택하세요.</p>
+                    </div>
+                    <button type="button" wire:click="closeAddChoiceModal"
+                            class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                        ✕
+                    </button>
+                </div>
+                <div class="space-y-2 px-6 py-5">
+                    <button type="button"
+                            wire:click="openPersonalScheduleCreate"
+                            class="w-full rounded-xl border border-gray-200 px-4 py-3 text-left hover:border-blue-200 hover:bg-blue-50/40">
+                        <p class="text-sm font-semibold text-gray-900">개인·팀 일정</p>
+                        <p class="mt-1 text-xs text-gray-500">미팅, 업무, 개인 일정 등 일반 캘린더 일정</p>
+                    </button>
+                    <p class="pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">공용품 예약</p>
+                    <button type="button"
+                            wire:click="openSharedSupplyCreate('[출장 차량배차] 신청 및 예약')"
+                            class="w-full rounded-xl border border-gray-200 px-4 py-3 text-left hover:border-indigo-200 hover:bg-indigo-50/40">
+                        <p class="text-sm font-semibold text-gray-900">차량 배차</p>
+                        <p class="mt-1 text-xs text-gray-500">출장 차량 예약 및 운행 기록</p>
+                    </button>
+                    <button type="button"
+                            wire:click="openSharedSupplyCreate('[회의실] 신청 및 예약 (팀 회의)')"
+                            class="w-full rounded-xl border border-gray-200 px-4 py-3 text-left hover:border-indigo-200 hover:bg-indigo-50/40">
+                        <p class="text-sm font-semibold text-gray-900">회의실</p>
+                        <p class="mt-1 text-xs text-gray-500">회의실 예약 (팀 회의·기타)</p>
+                    </button>
+                    <button type="button"
+                            wire:click="openSharedSupplyCreate('[출장] 출장')"
+                            class="w-full rounded-xl border border-gray-200 px-4 py-3 text-left hover:border-indigo-200 hover:bg-indigo-50/40">
+                        <p class="text-sm font-semibold text-gray-900">출장</p>
+                        <p class="mt-1 text-xs text-gray-500">출장·해외출장 등 업무 일정</p>
+                    </button>
+                    <button type="button"
+                            wire:click="openSharedSupplyCreate('[휴가] 연차휴가')"
+                            class="w-full rounded-xl border border-gray-200 px-4 py-3 text-left hover:border-indigo-200 hover:bg-indigo-50/40">
+                        <p class="text-sm font-semibold text-gray-900">연차</p>
+                        <p class="mt-1 text-xs text-gray-500">연차휴가 등 휴가 일정</p>
+                    </button>
+                </div>
             </div>
         </div>
     @endif
@@ -273,12 +334,12 @@
                         </div>
                         <div>
                             <label class="mb-1 block text-sm font-medium text-gray-700">시작 시간</label>
-                            <input type="time" wire:model.defer="startTime" @disabled($isAllDay || $viewOnly) class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
+                            <x-ui.time-select wire:model.defer="startTime" :disabled="$isAllDay || $viewOnly" />
                             @error('startTime') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="mb-1 block text-sm font-medium text-gray-700">종료 시간</label>
-                            <input type="time" wire:model.defer="endTime" @disabled($isAllDay || $viewOnly) class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
+                            <x-ui.time-select wire:model.defer="endTime" :disabled="$isAllDay || $viewOnly" />
                             @error('endTime') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                         </div>
                     </div>

@@ -17,6 +17,7 @@ class VehicleUsageLog extends Model
         'user_id',
         'vehicle_name',
         'usage_purpose_name',
+        'institution_sk_code',
         'odometer_before',
         'odometer_after',
         'distance',

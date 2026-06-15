@@ -183,6 +183,36 @@ class InstitutionListTest extends TestCase
             ->assertSee('마스터만 있는 기관');
     }
 
+    public function test_exports_institution_list_to_excel_with_current_filters(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-EXPORT-1',
+            'AccountName' => '엑셀 테스트 기관',
+            'Director' => '홍길동',
+            'Phone' => '010-1234-5678',
+            'Gubun' => '유치원',
+        ]);
+
+        AccountInformation::query()->create([
+            'SK_Code' => 'SK-EXPORT-1',
+            'Account_Name' => '엑셀 테스트 기관',
+            'TR' => 'Coach A',
+            'CS' => 'CS A',
+            'CO' => 'CO A',
+            'Customer_Type' => 'GTS 13 기존',
+            'Address' => '경기도 수원시',
+        ]);
+
+        $now = now();
+        Carbon::setTestNow($now);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(InstitutionList::class)
+            ->set('search', '엑셀 테스트')
+            ->call('exportInstitutionsExcel')
+            ->assertFileDownloaded('기관리스트_'.$now->format('Ymd_His').'.xlsx');
+    }
+
     public function test_timeline_tab_loads_merged_events_with_default_six_month_range(): void
     {
         $institution = Institution::query()->create([

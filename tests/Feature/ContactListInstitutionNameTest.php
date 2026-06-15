@@ -6,6 +6,7 @@ use App\Livewire\ContactList;
 use App\Models\Institution;
 use App\Models\Teacher;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -86,5 +87,27 @@ class ContactListInstitutionNameTest extends TestCase
             ->call('selectTeacherInstitution', 'SK-SSOT-CONTACT-1')
             ->assertSet('newSkCode', 'SK-SSOT-CONTACT-1')
             ->assertSet('newSchoolName', '마스터 연락처 기관명');
+    }
+
+    public function test_exports_contacts_to_excel_with_current_filters(): void
+    {
+        Teacher::query()->create([
+            'SK_Code' => 'SK-EXPORT-CONTACT',
+            'Name' => '엑셀 테스트 교사',
+            'Email' => 'export-contact@example.com',
+            'Phone' => '010-9999-8888',
+            'School_Name' => '엑셀 테스트 기관',
+            'ClassInOut' => true,
+        ]);
+
+        $now = now();
+        Carbon::setTestNow($now);
+
+        Livewire::actingAs(User::factory()->create(['is_admin' => true]))
+            ->test(ContactList::class)
+            ->set('searchType', 'name')
+            ->set('search', '엑셀 테스트')
+            ->call('exportContactsExcel')
+            ->assertFileDownloaded('교직원_연락처_'.$now->format('Ymd_His').'.xlsx');
     }
 }

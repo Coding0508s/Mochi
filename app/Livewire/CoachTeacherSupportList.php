@@ -59,6 +59,8 @@ class CoachTeacherSupportList extends Component
 
     public string $filterCoach = '';
 
+    public bool $showAllInstitutionsView = false;
+
     public string $search = '';
 
     public string $kpiFilter = '';
@@ -206,6 +208,8 @@ class CoachTeacherSupportList extends Component
         }
 
         $this->maybeOpenCreateSupportFromQuery();
+
+        $this->filterCoach = $this->resolveAllowedFilterCoach();
     }
 
     private function maybeOpenCreateSupportFromQuery(): void
@@ -762,7 +766,7 @@ class CoachTeacherSupportList extends Component
             return $scopedQuery->exists();
         }
 
-        CoachTeacherScope::apply($scopedQuery, $user);
+        $this->applyTeacherListScope($scopedQuery, $user);
 
         return $scopedQuery->exists();
     }
@@ -780,7 +784,7 @@ class CoachTeacherSupportList extends Component
 
         $scopedQuery = Teacher::query()->whereIn('SK_Code', SkCodeNormalizer::candidates($skCode));
         $this->applyTeacherListVisibilityFilter($scopedQuery);
-        CoachTeacherScope::apply($scopedQuery, $user);
+        $this->applyTeacherListScope($scopedQuery, $user);
 
         return $scopedQuery->exists();
     }
@@ -2185,6 +2189,11 @@ class CoachTeacherSupportList extends Component
         $this->resetPage();
     }
 
+    public function updatedShowAllInstitutionsView(): void
+    {
+        $this->resetPage();
+    }
+
     public function updatedShowAllTeachers(): void
     {
         $this->resetPage();
@@ -2315,8 +2324,7 @@ class CoachTeacherSupportList extends Component
             ->tap(fn (Builder $q) => $this->applyRoundFilter($q))
             ->tap(fn (Builder $q) => $this->applyMonthFilter($q))
             ->with(CoachTeacherScope::eagerLoads())
-            ->orderByDesc('Teachers.Created_Date')
-            ->orderByDesc('Teachers.ID')
+            ->tap(fn (Builder $q) => $this->applyTeacherListOrdering($q))
             ->select('Teachers.*')
             ->paginate(50);
 
@@ -2425,15 +2433,7 @@ class CoachTeacherSupportList extends Component
     {
         $query = Teacher::query();
         $this->applyTeacherListVisibilityFilter($query);
-
-        $user = auth()->user();
-        $allowedCoachFilter = $this->resolveAllowedFilterCoach();
-
-        if ($user?->canViewCoachTeamKpi() && filled($allowedCoachFilter)) {
-            CoachTeacherScope::excludeHiddenInstitutions($query);
-        } else {
-            CoachTeacherScope::apply($query);
-        }
+        $this->applyTeacherListScope($query);
 
         if (filled($this->search)) {
             $term = '%'.preg_replace('/\s+/u', '', $this->search).'%';
@@ -2447,6 +2447,42 @@ class CoachTeacherSupportList extends Component
         $this->applyCoachFilter($query);
 
         return $query;
+    }
+
+    /**
+     * 목록·KPI·필터 옵션에 공통 적용하는 교사 스코프.
+     * 기본: TR 담당 기관. 전체 기관 보기 또는 KPI 담당 코치 필터 시 숨김 기관만 제외.
+     *
+     * @param  Builder<Teacher>  $query
+     */
+    private function applyTeacherListScope(Builder $query, ?User $user = null): void
+    {
+        $user ??= auth()->user();
+
+        if (! $user) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        if ($this->usesWideInstitutionListScope($user)) {
+            CoachTeacherScope::excludeHiddenInstitutions($query);
+
+            return;
+        }
+
+        CoachTeacherScope::apply($query, $user);
+    }
+
+    private function usesWideInstitutionListScope(?User $user = null): bool
+    {
+        $user ??= auth()->user();
+
+        if ($this->showAllInstitutionsView) {
+            return true;
+        }
+
+        return $user?->canViewCoachTeamKpi() && filled($this->resolveAllowedFilterCoach());
     }
 
     /**
@@ -2510,12 +2546,7 @@ class CoachTeacherSupportList extends Component
 
         $scopedTeacherQuery = Teacher::query();
         $this->applyTeacherListVisibilityFilter($scopedTeacherQuery);
-
-        if ($user->canViewCoachTeamKpi()) {
-            CoachTeacherScope::excludeHiddenInstitutions($scopedTeacherQuery);
-        } else {
-            CoachTeacherScope::apply($scopedTeacherQuery, $user);
-        }
+        $this->applyTeacherListScope($scopedTeacherQuery, $user);
 
         $query = AccountInformation::query()
             ->whereIn('SK_Code', $scopedTeacherQuery->select('SK_Code'))
@@ -2536,6 +2567,38 @@ class CoachTeacherSupportList extends Component
         }
 
         return $query->orderBy('TR')->pluck('TR');
+    }
+
+    /**
+     * @param  Builder<Teacher>  $query
+     */
+    private function applyTeacherListOrdering(Builder $query): void
+    {
+        if (! $this->showAllInstitutionsView) {
+            $query->orderByDesc('Teachers.Created_Date')
+                ->orderByDesc('Teachers.ID');
+
+            return;
+        }
+
+        // S_AccountName에 같은 SKcode가 중복 존재할 수 있어 join 대신
+        // 스칼라 서브쿼리로 정렬한다(행 복제 방지).
+        $normalizedSkCode = $this->sqlNormalizedTeacherSkCodeExpression();
+
+        $query->orderByRaw(
+            'COALESCE((SELECT MIN(san.AccountName) FROM S_AccountName AS san'
+            ." WHERE san.SKcode = {$normalizedSkCode}), Teachers.School_Name) ASC"
+        )
+            ->orderBy('Teachers.SK_Code')
+            ->orderBy('Teachers.Name');
+    }
+
+    private function sqlNormalizedTeacherSkCodeExpression(): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'sqlite' => "ltrim(Teachers.SK_Code, '*')",
+            default => "TRIM(LEADING '*' FROM Teachers.SK_Code)",
+        };
     }
 
     /**
@@ -2709,7 +2772,7 @@ class CoachTeacherSupportList extends Component
         $viewableQuery = Teacher::query()->whereIn('ID', $ids);
         $this->applyTeacherListVisibilityFilter($viewableQuery);
         if (! $user->hasPlatformWideViewAccess()) {
-            CoachTeacherScope::apply($viewableQuery, $user);
+            $this->applyTeacherListScope($viewableQuery, $user);
         }
         $viewableIds = array_fill_keys($viewableQuery->pluck('ID')->all(), true);
 

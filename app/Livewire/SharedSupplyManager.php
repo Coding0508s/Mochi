@@ -2,14 +2,17 @@
 
 namespace App\Livewire;
 
+use App\Models\Institution;
 use App\Models\SharedSupply;
 use App\Models\SharedSupplyItem;
 use App\Models\SharedSupplyLabel;
 use App\Models\SupportRecord;
 use App\Models\TeamSchedule;
 use App\Models\VehicleUsageLog;
+use App\Support\ScheduleTimeInput;
 use App\Support\SharedSupplyExcelImporter;
 use App\Support\TeamMenuContext;
+use App\Support\VehicleArrivalLocation;
 use App\Support\VehicleUsageLogRemark;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -19,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
@@ -28,6 +32,8 @@ class SharedSupplyManager extends Component
     use WithFileUploads;
 
     private const RESET_CONFIRMATION_PHRASE = '초기화 실행';
+
+    public bool $embeddedInCalendar = false;
 
     public string $month = '';
 
@@ -59,6 +65,8 @@ class SharedSupplyManager extends Component
 
     public string $endTime = '';
 
+    public bool $isAllDay = false;
+
     public ?int $sharedSupplyItemId = null;
 
     public ?int $sharedSupplyLabelId = null;
@@ -75,9 +83,19 @@ class SharedSupplyManager extends Component
 
     public string $vehicleUsagePurpose = '';
 
-    public string $vehicleArrivalLocation = '';
+    public string $vehicleInstitutionKeyword = '';
 
-    public string $vehicleLatestRemark = '';
+    public string $vehicleInstitutionSkCode = '';
+
+    public string $vehicleInstitutionName = '';
+
+    public string $vehicleArrivalFloor = '';
+
+    public string $vehicleArrivalPillar = '';
+
+    public string $vehicleArrivalNumber = '';
+
+    public string $vehicleArrivalLocationLegacy = '';
 
     public string $vehicleLatestArrivalLocation = '';
 
@@ -100,12 +118,34 @@ class SharedSupplyManager extends Component
 
     public string $resetConfirmationText = '';
 
-    public function mount(): void
+    public function mount(bool $embeddedInCalendar = false): void
     {
+        $this->embeddedInCalendar = $embeddedInCalendar;
+
         $today = now();
         $this->month = $today->format('Y-m');
         $this->dateFrom = $today->format('Y-m-d');
         $this->dateTo = $today->copy()->endOfMonth()->format('Y-m-d');
+    }
+
+    #[On('calendar-open-shared-supply-create')]
+    public function handleCalendarOpenCreate(string $date, ?string $defaultTitle = null): void
+    {
+        if (! $this->embeddedInCalendar) {
+            return;
+        }
+
+        $this->openCreateModalForDate($date, $defaultTitle);
+    }
+
+    #[On('calendar-open-shared-supply-edit')]
+    public function handleCalendarOpenEdit(int $supplyId): void
+    {
+        if (! $this->embeddedInCalendar) {
+            return;
+        }
+
+        $this->openEditModal($supplyId);
     }
 
     public function previousMonth(): void
@@ -199,15 +239,22 @@ class SharedSupplyManager extends Component
 
     public function openCreateModal(): void
     {
+        $this->openCreateModalForDate(now()->format('Y-m-d'));
+    }
+
+    public function openCreateModalForDate(string $date, ?string $defaultTitle = null): void
+    {
         Gate::authorize('create', SharedSupply::class);
 
         $this->resetForm();
-        $this->useDate = now()->format('Y-m-d');
+        $this->useDate = Carbon::parse($date)->format('Y-m-d');
         $this->startTime = '09:00';
         $this->endTime = '10:00';
-        $this->title = '[회의실] 신청 및 예약 (팀 회의)';
+        $this->title = $defaultTitle ?? '[회의실] 신청 및 예약 (팀 회의)';
         $this->syncScheduleCategoryByTitle();
         $this->syncLabelByTitle();
+        $this->syncSharedSupplyItemByTitle();
+        $this->syncVehicleOdometerBeforeByLatestLog();
         $this->showFormModal = true;
     }
 
@@ -215,12 +262,18 @@ class SharedSupplyManager extends Component
     {
         if ($value === '') {
             $this->sharedSupplyItemId = null;
+            $this->isAllDay = false;
 
             return;
         }
 
         $this->syncScheduleCategoryByTitle();
         $this->syncLabelByTitle();
+
+        if (! $this->isVehicleTitle()) {
+            $this->isAllDay = false;
+        }
+
         $this->syncSharedSupplyItemByTitle();
 
         if ($this->sharedSupplyItemId === null) {
@@ -257,6 +310,71 @@ class SharedSupplyManager extends Component
         $this->syncVehicleOdometerBeforeByLatestLog();
     }
 
+    public function updatedVehicleUsagePurpose(string $value): void
+    {
+        if ($value !== '기존 기관 방문') {
+            $this->resetVehicleInstitutionFields();
+        }
+    }
+
+    public function updatedVehicleInstitutionKeyword(string $value): void
+    {
+        if (filled($this->vehicleInstitutionSkCode)) {
+            return;
+        }
+
+        $keyword = trim($value);
+        if ($keyword === '') {
+            return;
+        }
+
+        $institution = Institution::query()
+            ->with('accountInfo')
+            ->whereNotNull('SKcode')
+            ->where(function (Builder $query) use ($keyword): void {
+                $query->where('AccountName', $keyword)
+                    ->orWhere('SKcode', $keyword)
+                    ->orWhereHas('accountInfo', function (Builder $info) use ($keyword): void {
+                        $info->where('Account_Name', $keyword);
+                    });
+            })
+            ->whereDoesntHave('accountInfo', function (Builder $query): void {
+                $query->where('Customer_Type', 'like', '%해지%');
+            })
+            ->first();
+
+        if ($institution !== null) {
+            $this->applyVehicleInstitution($institution);
+        }
+    }
+
+    public function selectVehicleInstitution(string $skCode): void
+    {
+        $trimmed = trim($skCode);
+        if ($trimmed === '') {
+            return;
+        }
+
+        $institution = Institution::query()
+            ->with('accountInfo')
+            ->where('SKcode', $trimmed)
+            ->whereDoesntHave('accountInfo', function (Builder $query): void {
+                $query->where('Customer_Type', 'like', '%해지%');
+            })
+            ->first();
+
+        if ($institution === null) {
+            return;
+        }
+
+        $this->applyVehicleInstitution($institution);
+    }
+
+    public function clearVehicleInstitutionSelection(): void
+    {
+        $this->resetVehicleInstitutionFields();
+    }
+
     public function updatedSharedSupplyItemId($value): void
     {
         if ($value === null || $value === '') {
@@ -283,6 +401,8 @@ class SharedSupplyManager extends Component
         $this->viewOnly = Gate::denies('update', $supply);
         $this->vehicleUserName = (string) ($supply->user?->name ?? '');
         $this->useDate = $supply->starts_at->format('Y-m-d');
+        $this->isAllDay = $this->isVehicleTitleFor((string) $supply->title)
+            && $this->scheduleTimesRepresentAllDay($supply->starts_at, $supply->ends_at);
         $this->startTime = $supply->starts_at->format('H:i');
         $this->endTime = $supply->ends_at->format('H:i');
         $this->sharedSupplyItemId = $supply->shared_supply_item_id;
@@ -293,7 +413,8 @@ class SharedSupplyManager extends Component
         $this->vehicleOdometerBefore = $vehicleLog?->odometer_before;
         $this->vehicleOdometerAfter = $vehicleLog?->odometer_after;
         $this->vehicleUsagePurpose = (string) ($vehicleLog?->usage_purpose_name ?? '');
-        $this->vehicleArrivalLocation = (string) ($vehicleLog?->arrival_location ?? '');
+        $this->loadVehicleInstitutionFromLog($vehicleLog);
+        $this->loadVehicleArrivalLocationFromLog($vehicleLog);
         $this->syncVehicleReferenceFieldsForItem(
             (int) $supply->shared_supply_item_id,
             $supply->id,
@@ -458,13 +579,23 @@ class SharedSupplyManager extends Component
     public function save(): void
     {
         $this->syncSharedSupplyItemByTitle();
+
+        if ($this->vehicleArrivalPartsArePartial()) {
+            $this->addError('vehicleArrivalFloor', '층, 기둥, 번호를 모두 선택해 주세요.');
+
+            return;
+        }
+
         $validated = $this->validate();
         $selectedItem = SharedSupplyItem::query()->find($validated['sharedSupplyItemId']);
         $selectedLabel = SharedSupplyLabel::query()->find($validated['sharedSupplyLabelId']);
-        $startsAt = Carbon::parse($validated['useDate'].' '.$validated['startTime']);
-        $endsAt = Carbon::parse($validated['useDate'].' '.$validated['endTime']);
+        [$startsAt, $endsAt] = $this->resolveScheduleDateTimes(
+            $validated['useDate'],
+            $validated['startTime'] ?? '',
+            $validated['endTime'] ?? '',
+        );
 
-        if ($endsAt->lessThanOrEqualTo($startsAt)) {
+        if (! $this->isVehicleAllDaySchedule() && $endsAt->lessThanOrEqualTo($startsAt)) {
             $this->addError('endTime', '종료 시간은 시작 시간보다 늦어야 합니다.');
 
             return;
@@ -502,6 +633,10 @@ class SharedSupplyManager extends Component
         }
 
         $user = auth()->user();
+
+        if ($this->isVehicleTitle() && $this->vehicleUsagePurpose === '기존 기관 방문') {
+            $validated['purpose'] = $this->mergeVehiclePurposeWithInstitution((string) ($validated['purpose'] ?? ''));
+        }
 
         if ($this->editingSupplyId !== null) {
             $supply = SharedSupply::query()->findOrFail($this->editingSupplyId);
@@ -547,12 +682,12 @@ class SharedSupplyManager extends Component
             $this->closeFormModal();
             $this->supportReportPromptTeam = $promptTeamMenu;
             $this->showSupportReportPrompt = true;
-            session()->flash('success', '운행 기록이 저장되었습니다.');
+            $this->notifyCalendarChanged('운행 기록이 저장되었습니다.');
 
             return;
         }
 
-        session()->flash('success', '공용품 사용 내역이 저장되었습니다.');
+        $this->notifyCalendarChanged('공용품 사용 내역이 저장되었습니다.');
         $this->closeFormModal();
     }
 
@@ -566,16 +701,28 @@ class SharedSupplyManager extends Component
         Gate::authorize('delete', $supply);
         $supply->delete();
 
-        session()->flash('success', '공용품 사용 내역이 삭제되었습니다.');
+        $this->notifyCalendarChanged('공용품 사용 내역이 삭제되었습니다.');
         $this->closeFormModal();
+    }
+
+    private function notifyCalendarChanged(string $message): void
+    {
+        if ($this->embeddedInCalendar) {
+            $this->dispatch('shared-supply-calendar-changed', message: $message);
+
+            return;
+        }
+
+        session()->flash('success', $message);
     }
 
     protected function rules(): array
     {
         return [
             'useDate' => ['required', 'date'],
-            'startTime' => ['required', 'date_format:H:i'],
-            'endTime' => ['required', 'date_format:H:i'],
+            'startTime' => [Rule::requiredIf(fn (): bool => ! $this->isVehicleAllDaySchedule()), 'nullable', ScheduleTimeInput::VALIDATION_REGEX],
+            'endTime' => [Rule::requiredIf(fn (): bool => ! $this->isVehicleAllDaySchedule()), 'nullable', ScheduleTimeInput::VALIDATION_REGEX],
+            'isAllDay' => ['boolean'],
             'sharedSupplyItemId' => ['required', 'integer', Rule::exists('shared_supply_items', 'id')],
             'sharedSupplyLabelId' => ['required', 'integer', Rule::exists('shared_supply_labels', 'id')],
             'scheduleCategoryCode' => ['nullable', Rule::in(array_keys($this->scheduleCategoryOptions()))],
@@ -587,9 +734,17 @@ class SharedSupplyManager extends Component
                 'string',
                 Rule::in($this->allowedVehicleUsagePurposeNamesForValidation()),
             ],
+            'vehicleInstitutionSkCode' => [
+                Rule::requiredIf(fn (): bool => $this->isVehicleTitle() && $this->vehicleUsagePurpose === '기존 기관 방문'),
+                'nullable',
+                'string',
+                Rule::exists('S_AccountName', 'SKcode'),
+            ],
             'vehicleOdometerBefore' => [Rule::requiredIf(fn (): bool => $this->isVehicleTitle() && $this->editingSupplyId === null), 'nullable', 'integer', 'min:0'],
             'vehicleOdometerAfter' => ['nullable', 'integer', 'min:0'],
-            'vehicleArrivalLocation' => ['nullable', 'string', 'max:255'],
+            'vehicleArrivalFloor' => ['nullable', 'string', Rule::in(VehicleArrivalLocation::floorOptions())],
+            'vehicleArrivalPillar' => ['nullable', 'string', Rule::in(VehicleArrivalLocation::pillarOptions())],
+            'vehicleArrivalNumber' => ['nullable', 'integer', 'min:1', 'max:100'],
         ];
     }
 
@@ -638,6 +793,9 @@ class SharedSupplyManager extends Component
                             function (Builder $searchQuery): void {
                                 $searchQuery->orWhereHas('vehicleUsageLog', function (Builder $vehicleLogQuery): void {
                                     $vehicleLogQuery->where('usage_purpose_name', 'like', '%'.$this->search.'%');
+                                    if (Schema::hasColumn('vehicle_usage_logs', 'institution_sk_code')) {
+                                        $vehicleLogQuery->orWhere('institution_sk_code', 'like', '%'.$this->search.'%');
+                                    }
                                     if (Schema::hasColumn('vehicle_usage_logs', 'arrival_location')) {
                                         $vehicleLogQuery->orWhere('arrival_location', 'like', '%'.$this->search.'%');
                                     }
@@ -704,6 +862,9 @@ class SharedSupplyManager extends Component
             'scheduleCategoryOptions' => $this->scheduleCategoryOptions(),
             'titleOptions' => $this->titleOptions(),
             'vehicleUsagePurposeSelectOptions' => $this->vehicleUsagePurposeSelectOptions(),
+            'vehicleInstitutionSuggestions' => $this->vehicleInstitutionSuggestions(),
+            'vehicleArrivalFloorOptions' => VehicleArrivalLocation::floorOptions(),
+            'vehicleArrivalPillarOptions' => VehicleArrivalLocation::pillarOptions(),
             'monthLabel' => Carbon::parse($this->month.'-01')->format('Y년 n월'),
         ]);
     }
@@ -716,6 +877,7 @@ class SharedSupplyManager extends Component
         $this->useDate = '';
         $this->startTime = '';
         $this->endTime = '';
+        $this->isAllDay = false;
         $this->sharedSupplyItemId = null;
         $this->sharedSupplyLabelId = null;
         $this->scheduleCategoryCode = '';
@@ -724,8 +886,8 @@ class SharedSupplyManager extends Component
         $this->vehicleOdometerBefore = null;
         $this->vehicleOdometerAfter = null;
         $this->vehicleUsagePurpose = '';
-        $this->vehicleArrivalLocation = '';
-        $this->vehicleLatestRemark = '';
+        $this->resetVehicleInstitutionFields();
+        $this->resetVehicleArrivalLocationFields();
         $this->vehicleLatestArrivalLocation = '';
         $this->vehicleUserName = (string) (auth()->user()?->name ?? '');
     }
@@ -821,7 +983,7 @@ class SharedSupplyManager extends Component
 
     private function ensureLeaveItemsExist(): void
     {
-        foreach (['오전 반차', '오후 반차', '시차'] as $leaveItemName) {
+        foreach (['오전 반차', '오후 반차', '시차', '종일'] as $leaveItemName) {
             $this->ensureItemByName($leaveItemName);
         }
     }
@@ -844,6 +1006,38 @@ class SharedSupplyManager extends Component
     private function isVehicleTitle(): bool
     {
         return str_contains($this->title, '차량배차');
+    }
+
+    private function isVehicleAllDaySchedule(): bool
+    {
+        return $this->isVehicleTitle() && $this->isAllDay;
+    }
+
+    /**
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    private function resolveScheduleDateTimes(string $useDate, string $startTime, string $endTime): array
+    {
+        if ($this->isVehicleAllDaySchedule()) {
+            $day = Carbon::parse($useDate);
+
+            return [$day->copy()->startOfDay(), $day->copy()->endOfDay()];
+        }
+
+        return [
+            ScheduleTimeInput::parseOnDate($useDate, $startTime),
+            ScheduleTimeInput::parseOnDate($useDate, $endTime),
+        ];
+    }
+
+    private function scheduleTimesRepresentAllDay(Carbon $startsAt, Carbon $endsAt): bool
+    {
+        if (! $startsAt->isSameDay($endsAt)) {
+            return false;
+        }
+
+        return $startsAt->format('H:i') === '00:00'
+            && $endsAt->format('H:i:s') === '23:59:59';
     }
 
     private function isVehicleTitleFor(string $title): bool
@@ -871,7 +1065,7 @@ class SharedSupplyManager extends Component
     private function isLeaveItemName(string $itemName): bool
     {
         $normalized = preg_replace('/[\s\p{P}\p{S}]+/u', '', mb_strtolower(trim($itemName))) ?? '';
-        $leaveItemNames = ['오전반차', '오후반차', '시차'];
+        $leaveItemNames = ['오전반차', '오후반차', '시차', '종일'];
 
         return in_array($normalized, $leaveItemNames, true);
     }
@@ -964,9 +1158,10 @@ class SharedSupplyManager extends Component
         }
 
         $hasVehicleInput = $this->vehicleUsagePurpose !== ''
+            || $this->vehicleInstitutionSkCode !== ''
             || $this->vehicleOdometerBefore !== null
             || $this->vehicleOdometerAfter !== null
-            || $this->vehicleArrivalLocation !== '';
+            || $this->resolvedVehicleArrivalLocation() !== '';
 
         if (! $hasVehicleInput) {
             return;
@@ -1017,7 +1212,14 @@ class SharedSupplyManager extends Component
         }
 
         if (Schema::hasColumn('vehicle_usage_logs', 'arrival_location')) {
-            $logPayload['arrival_location'] = $this->vehicleArrivalLocation !== '' ? $this->vehicleArrivalLocation : null;
+            $resolvedArrivalLocation = $this->resolvedVehicleArrivalLocation();
+            $logPayload['arrival_location'] = $resolvedArrivalLocation !== '' ? $resolvedArrivalLocation : null;
+        }
+
+        if (Schema::hasColumn('vehicle_usage_logs', 'institution_sk_code')) {
+            $logPayload['institution_sk_code'] = $this->vehicleUsagePurpose === '기존 기관 방문' && $this->vehicleInstitutionSkCode !== ''
+                ? $this->vehicleInstitutionSkCode
+                : null;
         }
 
         return $logPayload;
@@ -1028,47 +1230,199 @@ class SharedSupplyManager extends Component
         $this->vehicleOdometerBefore = null;
         $this->vehicleOdometerAfter = null;
         $this->vehicleUsagePurpose = '';
-        $this->vehicleArrivalLocation = '';
-        $this->vehicleLatestRemark = '';
+        $this->resetVehicleInstitutionFields();
+        $this->resetVehicleArrivalLocationFields();
         $this->vehicleLatestArrivalLocation = '';
+    }
+
+    private function resetVehicleArrivalLocationFields(): void
+    {
+        $this->vehicleArrivalFloor = '';
+        $this->vehicleArrivalPillar = '';
+        $this->vehicleArrivalNumber = '';
+        $this->vehicleArrivalLocationLegacy = '';
+        $this->resetErrorBag(['vehicleArrivalFloor', 'vehicleArrivalPillar', 'vehicleArrivalNumber']);
+    }
+
+    private function loadVehicleArrivalLocationFromLog(?VehicleUsageLog $vehicleLog): void
+    {
+        $this->resetVehicleArrivalLocationFields();
+
+        $rawLocation = trim((string) ($vehicleLog?->arrival_location ?? ''));
+        if ($rawLocation === '') {
+            return;
+        }
+
+        $parts = VehicleArrivalLocation::parse($rawLocation);
+        if ($parts['floor'] !== '') {
+            $this->vehicleArrivalFloor = $parts['floor'];
+            $this->vehicleArrivalPillar = $parts['pillar'];
+            $this->vehicleArrivalNumber = $parts['number'];
+
+            return;
+        }
+
+        $this->vehicleArrivalLocationLegacy = $rawLocation;
+    }
+
+    private function resolvedVehicleArrivalLocation(): string
+    {
+        $composed = VehicleArrivalLocation::compose(
+            $this->vehicleArrivalFloor,
+            $this->vehicleArrivalPillar,
+            $this->vehicleArrivalNumber,
+        );
+
+        if ($composed !== '') {
+            return $composed;
+        }
+
+        return trim($this->vehicleArrivalLocationLegacy);
+    }
+
+    private function vehicleArrivalPartsArePartial(): bool
+    {
+        $parts = [
+            trim($this->vehicleArrivalFloor),
+            trim($this->vehicleArrivalPillar),
+            trim($this->vehicleArrivalNumber),
+        ];
+
+        $filledCount = count(array_filter($parts, static fn (string $part): bool => $part !== ''));
+
+        return $filledCount > 0 && $filledCount < 3;
+    }
+
+    private function resetVehicleInstitutionFields(): void
+    {
+        $this->vehicleInstitutionKeyword = '';
+        $this->vehicleInstitutionSkCode = '';
+        $this->vehicleInstitutionName = '';
+        $this->resetErrorBag('vehicleInstitutionSkCode');
+    }
+
+    private function applyVehicleInstitution(Institution $institution): void
+    {
+        $this->vehicleInstitutionSkCode = (string) $institution->SKcode;
+        $this->vehicleInstitutionName = $institution->resolvedAccountName();
+        $this->vehicleInstitutionKeyword = '';
+        $this->purpose = $this->mergeVehiclePurposeWithInstitution($this->purpose);
+        $this->resetErrorBag('vehicleInstitutionSkCode');
+    }
+
+    private function mergeVehiclePurposeWithInstitution(string $currentPurpose): string
+    {
+        $institutionName = trim($this->vehicleInstitutionName);
+        if ($institutionName === '') {
+            return trim($currentPurpose);
+        }
+
+        $current = trim($currentPurpose);
+        if ($current === '') {
+            return $institutionName;
+        }
+
+        if (str_contains($current, $institutionName)) {
+            return $current;
+        }
+
+        return $institutionName.' / '.$current;
+    }
+
+    private function loadVehicleInstitutionFromLog(?VehicleUsageLog $vehicleLog): void
+    {
+        $this->resetVehicleInstitutionFields();
+
+        if ($vehicleLog === null || ! Schema::hasColumn('vehicle_usage_logs', 'institution_sk_code')) {
+            return;
+        }
+
+        $skCode = trim((string) ($vehicleLog->institution_sk_code ?? ''));
+        if ($skCode === '') {
+            return;
+        }
+
+        $institution = Institution::query()
+            ->with('accountInfo')
+            ->where('SKcode', $skCode)
+            ->first();
+
+        if ($institution === null) {
+            $this->vehicleInstitutionSkCode = $skCode;
+            $this->vehicleInstitutionName = $skCode;
+
+            return;
+        }
+
+        $this->applyVehicleInstitution($institution);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, Institution>
+     */
+    private function vehicleInstitutionSuggestions(): \Illuminate\Support\Collection
+    {
+        if ($this->vehicleUsagePurpose !== '기존 기관 방문' || filled($this->vehicleInstitutionSkCode)) {
+            return collect();
+        }
+
+        $keyword = trim($this->vehicleInstitutionKeyword);
+        if ($keyword === '' || ! Schema::hasTable('S_AccountName')) {
+            return collect();
+        }
+
+        $normalizedKeyword = preg_replace('/\s+/u', '', $keyword) ?? '';
+        if ($normalizedKeyword === '') {
+            return collect();
+        }
+
+        return Institution::query()
+            ->with('accountInfo')
+            ->whereNotNull('SKcode')
+            ->whereDoesntHave('accountInfo', function (Builder $query): void {
+                $query->where('Customer_Type', 'like', '%해지%');
+            })
+            ->where(function (Builder $query) use ($normalizedKeyword): void {
+                $query->whereRaw("REPLACE(AccountName, ' ', '') like ?", ["%{$normalizedKeyword}%"])
+                    ->orWhereRaw("REPLACE(SKcode, ' ', '') like ?", ["%{$normalizedKeyword}%"]);
+            })
+            ->orderBy('AccountName')
+            ->limit(8)
+            ->get();
     }
 
     private function syncVehicleReferenceFieldsForItem(int $itemId, ?int $excludeSharedSupplyId = null): void
     {
-        $latestVehicleLog = $this->latestVehicleUsageLogForItemId($itemId, $excludeSharedSupplyId);
+        $latestVehicleLog = $this->latestVehicleUsageLogWithReferenceLocationForItemId($itemId, $excludeSharedSupplyId);
         if ($latestVehicleLog === null) {
-            $this->vehicleLatestRemark = '';
             $this->vehicleLatestArrivalLocation = '';
 
             return;
         }
 
-        $this->vehicleLatestArrivalLocation = (string) ($latestVehicleLog->arrival_location ?? '');
-        $this->vehicleLatestRemark = VehicleUsageLogRemark::combineArrivalAndReason(
-            $this->vehicleLatestArrivalLocation,
-            VehicleUsageLogRemark::forDisplay($latestVehicleLog->remarks),
-        );
+        $this->vehicleLatestArrivalLocation = $this->resolveVehicleLogReferenceLocationForDisplay($latestVehicleLog);
     }
 
     private function syncVehicleOdometerBeforeByLatestLog(): void
     {
-        if (! $this->isVehicleTitle() || $this->editingSupplyId !== null) {
-            if (! $this->isVehicleTitle()) {
-                $this->vehicleLatestRemark = '';
-                $this->vehicleLatestArrivalLocation = '';
-            }
+        if (! $this->isVehicleTitle()) {
+            $this->vehicleLatestArrivalLocation = '';
 
             return;
         }
 
         if ($this->sharedSupplyItemId === null) {
-            $this->vehicleLatestRemark = '';
             $this->vehicleLatestArrivalLocation = '';
 
             return;
         }
 
-        $this->syncVehicleReferenceFieldsForItem((int) $this->sharedSupplyItemId);
+        $excludeSharedSupplyId = $this->editingSupplyId;
+        $this->syncVehicleReferenceFieldsForItem((int) $this->sharedSupplyItemId, $excludeSharedSupplyId);
+
+        if ($this->editingSupplyId !== null) {
+            return;
+        }
 
         $latestVehicleLog = $this->latestVehicleUsageLogForCurrentItem();
         if ($latestVehicleLog === null) {
@@ -1160,6 +1514,66 @@ class SharedSupplyManager extends Component
         }
 
         return null;
+    }
+
+    private function latestVehicleUsageLogWithReferenceLocationForItemId(int $itemId, ?int $excludeSharedSupplyId = null): ?VehicleUsageLog
+    {
+        foreach ($this->vehicleUsageLogsForItemId($itemId, $excludeSharedSupplyId) as $vehicleLog) {
+            if ($this->resolveVehicleLogReferenceLocationForDisplay($vehicleLog) !== '') {
+                return $vehicleLog;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return Collection<int, VehicleUsageLog>
+     */
+    private function vehicleUsageLogsForItemId(int $itemId, ?int $excludeSharedSupplyId = null, int $limit = 20): Collection
+    {
+        $itemName = (string) (SharedSupplyItem::query()->whereKey($itemId)->value('name') ?? '');
+        if ($itemName === '') {
+            return new Collection;
+        }
+
+        $baseQuery = $this->latestVehicleUsageLogBaseQuery($excludeSharedSupplyId);
+
+        $exactMatched = (clone $baseQuery)
+            ->where('vehicle_name', $itemName)
+            ->limit($limit)
+            ->get();
+        if ($exactMatched->isNotEmpty()) {
+            return $exactMatched;
+        }
+
+        $plateNumber = $this->extractVehiclePlateNumber($itemName);
+        if ($plateNumber === null) {
+            return new Collection;
+        }
+
+        return (clone $baseQuery)
+            ->where('vehicle_name', 'like', '%'.$plateNumber.'%')
+            ->limit($limit)
+            ->get();
+    }
+
+    private function resolveVehicleLogReferenceLocationForDisplay(?VehicleUsageLog $vehicleLog): string
+    {
+        if ($vehicleLog === null) {
+            return '';
+        }
+
+        $fromArrivalColumn = VehicleArrivalLocation::forDisplay($vehicleLog->arrival_location);
+        if ($fromArrivalColumn !== '') {
+            return $fromArrivalColumn;
+        }
+
+        if ($vehicleLog->odometer_after === null) {
+            return '';
+        }
+
+        return VehicleUsageLogRemark::forDisplay($vehicleLog->remarks);
     }
 
     private function extractVehiclePlateNumber(string $text): ?string
@@ -1273,6 +1687,8 @@ class SharedSupplyManager extends Component
             '일반업무',
             '출퇴근',
             '업무외',
+            '신규기관 방문',
+            '기존 기관 방문',
         ];
     }
 
@@ -1300,6 +1716,8 @@ class SharedSupplyManager extends Component
             '일반업무' => '00001 - 일반업무',
             '출퇴근' => '00002 - 출퇴근',
             '업무외' => '00003 - 업무외',
+            '신규기관 방문' => '00004 - 신규기관 방문',
+            '기존 기관 방문' => '00005 - 기존 기관 방문',
         ];
 
         $current = trim($this->vehicleUsagePurpose);
@@ -1367,6 +1785,7 @@ class SharedSupplyManager extends Component
             ['code' => '00026', 'name' => '[사내외행사] 사내외행사', 'is_active' => true, 'sort_order' => 20, 'created_at' => now(), 'updated_at' => now()],
             ['code' => '00027', 'name' => '[경조사] 경조사', 'is_active' => true, 'sort_order' => 21, 'created_at' => now(), 'updated_at' => now()],
             ['code' => '00028', 'name' => '[건강검진] 건강검진', 'is_active' => true, 'sort_order' => 22, 'created_at' => now(), 'updated_at' => now()],
+            ['code' => '00029', 'name' => '종일', 'is_active' => true, 'sort_order' => 23, 'created_at' => now(), 'updated_at' => now()],
         ];
     }
 

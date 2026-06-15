@@ -7,6 +7,7 @@ use App\Livewire\CoachTeacherSupportList;
 use App\Models\Teacher;
 use App\Models\User;
 use App\Support\ExcelSerialDate;
+use App\Support\SkCodeNormalizer;
 use App\Support\TeacherSupportKpiCalculator;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -668,6 +669,100 @@ class CoachTeacherSupportListTest extends TestCase
             ->viewData('coachFilterOptions');
 
         $this->assertEqualsCanonicalizing(['Coach A', 'Coach B'], $options->all());
+    }
+
+    public function test_show_all_institutions_view_expands_coach_scope(): void
+    {
+        $coach = $this->createCoachUser('Coach A', 'coacha@example.com');
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createInstitution('SK002', '기관B', 'Coach B');
+        $this->createTeacher('SK001', '김교사', ['Plan_1st_Support_Date' => "{$year}-03-01"]);
+        $this->createTeacher('SK002', '이교사', ['Plan_1st_Support_Date' => "{$year}-04-01"]);
+
+        Livewire::actingAs($coach)
+            ->test(CoachTeacherSupportList::class)
+            ->assertSee('김교사')
+            ->assertDontSee('이교사')
+            ->set('showAllInstitutionsView', true)
+            ->assertSee('김교사')
+            ->assertSee('이교사');
+    }
+
+    public function test_teachers_ordered_by_institution_name_in_all_institutions_view(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '한국기관', 'Coach A');
+        $this->createInstitution('SK002', '가나기관', 'Coach A');
+        $this->createTeacher('SK001', '김교사', ['Plan_1st_Support_Date' => "{$year}-03-01"]);
+        $this->createTeacher('SK002', '이교사', ['Plan_1st_Support_Date' => "{$year}-04-01"]);
+
+        $skCodes = collect(
+            Livewire::actingAs($admin)
+                ->test(CoachTeacherSupportList::class)
+                ->set('showAllInstitutionsView', true)
+                ->set('filterYear', $year)
+                ->viewData('teachers')
+                ->items()
+        )->pluck('SK_Code')
+            ->map(fn (mixed $skCode): ?string => SkCodeNormalizer::normalize((string) $skCode))
+            ->all();
+
+        $this->assertSame(['SK002', 'SK001'], $skCodes);
+    }
+
+    public function test_all_institutions_view_does_not_duplicate_teachers_when_account_name_rows_duplicated(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        // 운영 DB의 S_AccountName에는 같은 SKcode가 대소문자 변형으로 중복 존재한다(예: Sk2844/SK2844).
+        // join 방식이면 MySQL(대소문자 무시 collation)에서 교사 행이 복제된다.
+        \DB::table('S_AccountName')->insert([
+            'SKcode' => 'Sk001',
+            'AccountName' => '기관A',
+        ]);
+        $this->createTeacher('SK001', '김교사', ['Plan_1st_Support_Date' => "{$year}-03-01"]);
+
+        $component = Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->set('showAllInstitutionsView', true)
+            ->set('filterYear', $year);
+
+        $names = collect($component->viewData('teachers')->items())->pluck('Name')->all();
+
+        $this->assertSame(['김교사'], $names);
+        $this->assertSame(1, $component->viewData('teachers')->total());
+    }
+
+    public function test_default_view_keeps_created_date_order(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '오래된교사', [
+            'Plan_1st_Support_Date' => "{$year}-03-01",
+            'Created_Date' => '2025-01-01 10:00:00',
+        ]);
+        $this->createTeacher('SK001', '최근교사', [
+            'Plan_1st_Support_Date' => "{$year}-04-01",
+            'Created_Date' => '2026-01-01 10:00:00',
+        ]);
+
+        $names = collect(
+            Livewire::actingAs($admin)
+                ->test(CoachTeacherSupportList::class)
+                ->set('filterYear', $year)
+                ->viewData('teachers')
+                ->items()
+        )->pluck('Name')->all();
+
+        $this->assertSame(['최근교사', '오래된교사'], $names);
     }
 
     public function test_coach_with_no_alias_sees_nothing(): void

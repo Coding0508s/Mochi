@@ -45,6 +45,7 @@
     @php
         $topbarDisplayName = auth()->user()?->preferredDisplayName() ?? 'User';
         $canSeeManagementMenus = (bool) auth()->user()?->hasFullAccess();
+        $canSeeSetupMenus = $canSeeManagementMenus || (bool) auth()->user()?->can('accessSetup');
     @endphp
 
     {{-- 상단 헤더 (전체 너비) --}}
@@ -399,8 +400,9 @@
 
             {{-- <div class="sidebar-divider"></div> --}}
 
-            @if($canSeeManagementMenus)
-                {{-- ── Review ── --}}
+            @if($canSeeSetupMenus)
+                {{-- ── Review · Goal · Feedback (메뉴 숨김 처리, 다시 노출하려면 @if(false)를 제거) ── --}}
+                @if(false)
                 <div class="sidebar-group">
                     <button type="button"
                             @click="openReview = !openReview"
@@ -444,6 +446,7 @@
                         </svg>
                     </button>
                 </div>
+                @endif
 
                 {{-- ── Configuration ── --}}
                 <div class="sidebar-group">

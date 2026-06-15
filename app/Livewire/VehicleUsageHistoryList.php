@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\SharedSupplyItem;
 use App\Models\VehicleUsageLog;
+use App\Support\VehicleArrivalLocation;
 use App\Support\VehicleUsageLogRemark;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -75,7 +76,7 @@ class VehicleUsageHistoryList extends Component
                     $purpose .= $purpose ? ' - '.$displayRemark : $displayRemark;
                 }
 
-                $arrivalDisplay = trim((string) ($log->arrival_location ?? ''));
+                $arrivalDisplay = VehicleArrivalLocation::forDisplay($log->arrival_location);
                 if ($arrivalDisplay === '') {
                     $arrivalDisplay = $displayRemark;
                 }

@@ -47,22 +47,35 @@ class SetupPagesTest extends TestCase
 
     public function test_setup_hub_returns_ok(): void
     {
-        $this->actingAs($this->user)->get('/setup')->assertOk();
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)->get('/setup')->assertOk();
     }
 
     public function test_setup_team_returns_ok(): void
     {
-        $this->actingAs($this->user)->get('/setup/team')->assertOk();
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)->get('/setup/team')->assertOk();
     }
 
     public function test_setup_common_codes_returns_ok(): void
     {
-        $this->actingAs($this->user)->get('/setup/common-codes')->assertOk();
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)->get('/setup/common-codes')->assertOk();
     }
 
     public function test_setup_roles_returns_ok(): void
     {
-        $this->actingAs($this->user)->get('/setup/roles')->assertOk();
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)->get('/setup/roles')->assertOk();
+    }
+
+    public function test_setup_hub_forbidden_for_user_without_setup_access(): void
+    {
+        $this->actingAs($this->user)->get('/setup')->assertForbidden();
     }
 
     public function test_setup_employee_create_allows_admin(): void

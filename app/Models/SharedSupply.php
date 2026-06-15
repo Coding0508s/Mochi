@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\VehicleArrivalLocation;
 use App\Support\VehicleUsageLogRemark;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -82,6 +83,22 @@ class SharedSupply extends Model
         return str_contains((string) $this->title, '회의실') || str_contains((string) $this->title, '[팀회의]');
     }
 
+    public function isLeaveTitle(): bool
+    {
+        return str_starts_with((string) $this->title, '[휴가]');
+    }
+
+    public function isBusinessTripTitle(): bool
+    {
+        if ($this->isVehicleDispatchTitle()) {
+            return false;
+        }
+
+        $title = (string) $this->title;
+
+        return str_starts_with($title, '[출장]') || str_starts_with($title, '[해외출장]');
+    }
+
     public function isReservationTitle(): bool
     {
         return str_contains((string) $this->title, '신청 및 예약');
@@ -89,16 +106,20 @@ class SharedSupply extends Model
 
     public function reservationCategoryBadgeLabel(): ?string
     {
-        if (! $this->isReservationTitle()) {
-            return null;
-        }
-
         if ($this->isVehicleDispatchTitle()) {
             return '차량 배차';
         }
 
         if ($this->isMeetingRoomTitle()) {
             return '회의실';
+        }
+
+        if ($this->isLeaveTitle()) {
+            return '연차';
+        }
+
+        if ($this->isBusinessTripTitle()) {
+            return '출장';
         }
 
         return null;
@@ -124,11 +145,15 @@ class SharedSupply extends Model
     public function vehicleRowPrimaryRemark(): string
     {
         $log = $this->vehicleUsageLog;
-        $arrivalLocation = trim((string) ($log?->arrival_location ?? ''));
+        $arrivalLocation = VehicleArrivalLocation::forDisplay($log?->arrival_location);
         $reason = trim((string) ($this->purpose ?? ''));
 
         if ($reason === '' && $log !== null) {
             $reason = VehicleUsageLogRemark::forDisplay($log->remarks);
+        }
+
+        if ($reason === '' && $log !== null) {
+            $reason = $this->vehicleInstitutionDisplayName($log);
         }
 
         return $arrivalLocation !== '' ? $arrivalLocation : $reason;
@@ -252,5 +277,32 @@ class SharedSupply extends Model
         $firstSegment = trim((string) ($segments[0] ?? ''));
 
         return $firstSegment;
+    }
+
+    private function vehicleInstitutionDisplayName(?VehicleUsageLog $log): string
+    {
+        if ($log === null || ! Schema::hasColumn('vehicle_usage_logs', 'institution_sk_code')) {
+            return '';
+        }
+
+        $skCode = trim((string) ($log->institution_sk_code ?? ''));
+        if ($skCode === '') {
+            return '';
+        }
+
+        if (! Schema::hasTable('S_AccountName')) {
+            return $skCode;
+        }
+
+        $institution = Institution::query()
+            ->with('accountInfo')
+            ->where('SKcode', $skCode)
+            ->first();
+
+        if ($institution !== null) {
+            return $institution->resolvedAccountName();
+        }
+
+        return $skCode;
     }
 }

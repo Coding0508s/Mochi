@@ -17,6 +17,15 @@
         </div>
     @endif
 
+    @if(session('error'))
+        <div class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center gap-2" data-mochi-flash-dismiss="3000" role="alert">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            {{ session('error') }}
+        </div>
+    @endif
+
     {{-- 요약 영역 --}}
     <div class="mochi-summary-card">
         <div class="flex flex-wrap items-center gap-4 text-sm">
@@ -68,6 +77,26 @@
                        class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
             </div>
 
+            <button type="button"
+                    wire:click="exportContactsExcel"
+                    wire:loading.attr="disabled"
+                    wire:target="exportContactsExcel"
+                    class="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60">
+                <span wire:loading.remove wire:target="exportContactsExcel" class="inline-flex items-center gap-2">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    엑셀 다운로드
+                </span>
+                <span wire:loading.inline-flex wire:target="exportContactsExcel" class="hidden items-center gap-2">
+                    <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                    </svg>
+                    생성 중…
+                </span>
+            </button>
+
             @if($search)
                 <button wire:click="$set('search', '')"
                         class="py-2 px-3 text-sm text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
@@ -75,9 +104,10 @@
                 </button>
             @endif
 
-            <button wire:click="openCreateModal"
-                    class="ml-auto flex items-center gap-2 px-4 py-2 bg-mochi-header hover:bg-mochi-header/90 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer max-md:w-full max-md:justify-center max-md:ml-0">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button type="button"
+                    wire:click="openCreateModal"
+                    class="ml-auto inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 cursor-pointer max-md:w-full max-md:ml-0">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
                 신규 생성
@@ -256,6 +286,8 @@
                                     <option value="부원장">부원장</option>
                                     <option value="교사">교사</option>
                                     <option value="행정">행정</option>
+                                    <option value="교수 부장">교수 부장</option>
+                                    <option value="교감">교감</option>
                                     <option value="기타">기타</option>
                                 </select>
                             </div>

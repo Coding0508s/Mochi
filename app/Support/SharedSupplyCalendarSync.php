@@ -22,7 +22,7 @@ class SharedSupplyCalendarSync
             'description' => (string) ($sharedSupply->purpose ?? ''),
             'starts_at' => $sharedSupply->starts_at,
             'ends_at' => $sharedSupply->ends_at,
-            'is_all_day' => false,
+            'is_all_day' => $this->sharedSupplyRepresentsAllDay($sharedSupply),
             'type' => 'etc',
             'visibility' => 'team',
             'status' => 'planned',
@@ -63,5 +63,23 @@ class SharedSupplyCalendarSync
             && Schema::hasColumn('team_schedules', 'source_id');
 
         return $this->isSourceColumnsReady;
+    }
+
+    private function sharedSupplyRepresentsAllDay(SharedSupply $sharedSupply): bool
+    {
+        if (! str_contains((string) $sharedSupply->title, '차량배차')) {
+            return false;
+        }
+
+        $startsAt = $sharedSupply->starts_at;
+        $endsAt = $sharedSupply->ends_at;
+
+        if ($startsAt === null || $endsAt === null) {
+            return false;
+        }
+
+        return $startsAt->isSameDay($endsAt)
+            && $startsAt->format('H:i') === '00:00'
+            && $endsAt->format('H:i:s') === '23:59:59';
     }
 }
