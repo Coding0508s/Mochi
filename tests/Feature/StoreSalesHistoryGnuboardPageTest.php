@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Livewire\StoreSalesHistoryList;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
@@ -42,6 +43,10 @@ class StoreSalesHistoryGnuboardPageTest extends TestCase
         Config::set('store.gnuboard.sales.cart_status_column', 'ct_status');
         Config::set('store.gnuboard.sales.order_settle_case_column', 'od_settle_case');
         Config::set('store.gnuboard.sales.order_customer_name_column', 'od_name');
+        Config::set('store.gnuboard.sales.order_member_id_column', 'mb_id');
+        Config::set('store.gnuboard.sales.member_table', 'g5_member');
+        Config::set('store.gnuboard.sales.member_id_column', 'mb_id');
+        Config::set('store.gnuboard.sales.member_nickname_column', 'mb_nick');
         Config::set('store.gnuboard.sales.excluded_order_statuses', ['취소']);
         Config::set('store.gnuboard.sales.excluded_cart_statuses', ['취소']);
         Config::set('store.gnuboard.sales.lookback_days', 30);
@@ -80,9 +85,14 @@ class StoreSalesHistoryGnuboardPageTest extends TestCase
             'it_name' => '그누보드 판매 상품',
         ]);
 
+        DB::connection('mysql_grapeseed_goods')->table('g5_member')->insert([
+            'mb_id' => 'institution01',
+            'mb_nick' => '행복학원',
+        ]);
+
         DB::connection('mysql_grapeseed_goods')->table('g5_shop_order')->insert([
-            ['od_id' => 'OD-OK', 'od_time' => now()->subHour()->format('Y-m-d H:i:s'), 'od_status' => '결제완료', 'od_settle_case' => '신용카드', 'od_name' => '홍길동'],
-            ['od_id' => 'OD-CANCEL', 'od_time' => now()->subMinutes(30)->format('Y-m-d H:i:s'), 'od_status' => '취소', 'od_settle_case' => '신용카드', 'od_name' => '김취소'],
+            ['od_id' => 'OD-OK', 'od_time' => now()->subHour()->format('Y-m-d H:i:s'), 'od_status' => '결제완료', 'od_settle_case' => '신용카드', 'od_name' => '홍길동', 'mb_id' => 'institution01'],
+            ['od_id' => 'OD-CANCEL', 'od_time' => now()->subMinutes(30)->format('Y-m-d H:i:s'), 'od_status' => '취소', 'od_settle_case' => '신용카드', 'od_name' => '김취소', 'mb_id' => 'institution01'],
         ]);
 
         DB::connection('mysql_grapeseed_goods')->table('g5_shop_cart')->insert([
@@ -109,9 +119,85 @@ class StoreSalesHistoryGnuboardPageTest extends TestCase
             ->assertSee('OD-OK')
             ->assertSee('3')
             ->assertSee('홍길동')
+            ->assertSee('행복학원')
             ->assertSee('결제완료')
             ->assertSee('신용카드')
             ->assertDontSee('OD-CANCEL');
+    }
+
+    public function test_sales_history_search_matches_institution_nickname(): void
+    {
+        DB::connection('mysql_grapeseed_goods')->table('g5_shop_item')->insert([
+            'it_id' => 'ITEM-2',
+            'it_model' => 'P-SEARCH',
+            'it_name' => '검색용 상품',
+        ]);
+
+        DB::connection('mysql_grapeseed_goods')->table('g5_member')->insert([
+            'mb_id' => 'institution02',
+            'mb_nick' => '별빛어린이집',
+        ]);
+
+        DB::connection('mysql_grapeseed_goods')->table('g5_shop_order')->insert([
+            'od_id' => 'OD-SEARCH',
+            'od_time' => now()->subHour()->format('Y-m-d H:i:s'),
+            'od_status' => '결제완료',
+            'od_settle_case' => '무통장',
+            'od_name' => '이주문',
+            'mb_id' => 'institution02',
+        ]);
+
+        DB::connection('mysql_grapeseed_goods')->table('g5_shop_cart')->insert([
+            'od_id' => 'OD-SEARCH',
+            'it_id' => 'ITEM-2',
+            'ct_qty' => 1,
+            'it_name' => '검색용 상품',
+            'ct_status' => '완료',
+        ]);
+
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(StoreSalesHistoryList::class)
+            ->set('search', '별빛어린이집')
+            ->assertSee('OD-SEARCH')
+            ->assertSee('별빛어린이집')
+            ->assertDontSee('OD-OK');
+    }
+
+    public function test_exports_filtered_sales_history_to_excel(): void
+    {
+        DB::connection('mysql_grapeseed_goods')->table('g5_shop_item')->insert([
+            'it_id' => 'ITEM-EXPORT',
+            'it_model' => 'P-EXPORT',
+            'it_name' => '엑셀보내기 상품',
+        ]);
+
+        DB::connection('mysql_grapeseed_goods')->table('g5_member')->insert([
+            'mb_id' => 'institution03',
+            'mb_nick' => '엑셀학원',
+        ]);
+
+        DB::connection('mysql_grapeseed_goods')->table('g5_shop_order')->insert([
+            ['od_id' => 'OD-EXPORT', 'od_time' => now()->subHour()->format('Y-m-d H:i:s'), 'od_status' => '결제완료', 'od_settle_case' => '신용카드', 'od_name' => '엑셀주문', 'mb_id' => 'institution03'],
+            ['od_id' => 'OD-SKIP', 'od_time' => now()->subHour()->format('Y-m-d H:i:s'), 'od_status' => '취소', 'od_settle_case' => '신용카드', 'od_name' => '제외', 'mb_id' => 'institution03'],
+        ]);
+
+        DB::connection('mysql_grapeseed_goods')->table('g5_shop_cart')->insert([
+            ['od_id' => 'OD-EXPORT', 'it_id' => 'ITEM-EXPORT', 'ct_qty' => 5, 'it_name' => '엑셀보내기 상품', 'ct_status' => '완료'],
+            ['od_id' => 'OD-SKIP', 'it_id' => 'ITEM-EXPORT', 'ct_qty' => 1, 'it_name' => '엑셀보내기 상품', 'ct_status' => '완료'],
+        ]);
+
+        $user = User::factory()->create();
+        $now = now();
+        Carbon::setTestNow($now);
+
+        Livewire::actingAs($user)
+            ->test(StoreSalesHistoryList::class)
+            ->set('dateStart', $now->copy()->subDays(7)->format('Y-m-d'))
+            ->set('dateEnd', $now->format('Y-m-d'))
+            ->call('exportToExcel')
+            ->assertFileDownloaded('Store_판매내역_'.$now->format('Ymd_His').'.xlsx');
     }
 
     private function useSqliteGnuboardConnection(): void
@@ -135,12 +221,18 @@ class StoreSalesHistoryGnuboardPageTest extends TestCase
             $table->string('it_name')->nullable();
         });
 
+        Schema::connection('mysql_grapeseed_goods')->create('g5_member', function (Blueprint $table) {
+            $table->string('mb_id')->primary();
+            $table->string('mb_nick')->nullable();
+        });
+
         Schema::connection('mysql_grapeseed_goods')->create('g5_shop_order', function (Blueprint $table) {
             $table->string('od_id')->primary();
             $table->dateTime('od_time')->nullable();
             $table->string('od_status')->nullable();
             $table->string('od_settle_case')->nullable();
             $table->string('od_name')->nullable();
+            $table->string('mb_id')->nullable();
         });
 
         Schema::connection('mysql_grapeseed_goods')->create('g5_shop_cart', function (Blueprint $table) {

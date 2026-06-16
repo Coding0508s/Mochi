@@ -4,8 +4,10 @@ namespace App\Repositories\GrapeSeed;
 
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 use Throwable;
 
 class GnuboardSalesHistoryRepository
@@ -134,6 +136,78 @@ class GnuboardSalesHistoryRepository
             return $this->emptyPaginator($safePerPage);
         }
 
+        $built = $this->buildAllSaleHistoriesQuery($search, $startDate, $endDate);
+        if ($built === null) {
+            return $this->emptyPaginator($safePerPage);
+        }
+
+        try {
+            return $built['query']
+                ->orderByDesc("o.{$built['order_datetime_column']}")
+                ->paginate($safePerPage);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return $this->emptyPaginator($safePerPage);
+        }
+    }
+
+    /**
+     * 엑셀 다운로드용: 현재 필터와 동일한 전체 주문 라인을 조회합니다.
+     *
+     * @return array<int, object>
+     */
+    public function getAllSaleHistoriesForExport(
+        ?string $search,
+        ?CarbonInterface $startDate,
+        ?CarbonInterface $endDate,
+    ): array {
+        if (! (bool) config('store.gnuboard.enabled', true)) {
+            return [];
+        }
+
+        $built = $this->buildAllSaleHistoriesQuery($search, $startDate, $endDate);
+        if ($built === null) {
+            return [];
+        }
+
+        $maxRows = max(1, (int) config('store.gnuboard.sales.max_rows_per_query', 5000));
+        $orderDatetimeColumn = $built['order_datetime_column'];
+
+        try {
+            $totalCount = (clone $built['query'])->count();
+            if ($totalCount > $maxRows) {
+                throw new RuntimeException(
+                    "다운로드 가능한 최대 건수({$maxRows}건)를 초과했습니다. 조회 기간을 줄이거나 검색어로 범위를 좁혀 주세요."
+                );
+            }
+
+            if ($totalCount === 0) {
+                return [];
+            }
+
+            return $built['query']
+                ->orderByDesc("o.{$orderDatetimeColumn}")
+                ->limit($maxRows)
+                ->get()
+                ->all();
+        } catch (RuntimeException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return [];
+        }
+    }
+
+    /**
+     * @return array{query: Builder, order_datetime_column: string}|null
+     */
+    private function buildAllSaleHistoriesQuery(
+        ?string $search,
+        ?CarbonInterface $startDate,
+        ?CarbonInterface $endDate,
+    ): ?array {
         $orderTable = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.order_table', 'g5_shop_order'));
         $cartTable = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.cart_table', 'g5_shop_cart'));
         $itemTable = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.item_table', 'g5_shop_item'));
@@ -155,7 +229,7 @@ class GnuboardSalesHistoryRepository
             || $orderDatetimeColumn === '' || $cartProductIdColumn === '' || $cartQuantityColumn === ''
             || $itemProductCodeColumn === '' || $itemFallbackCodeColumn === '' || $itemNameColumn === ''
         ) {
-            return $this->emptyPaginator($safePerPage);
+            return null;
         }
 
         $codeExpression = "COALESCE(i.`{$itemProductCodeColumn}`, c.`{$cartProductIdColumn}`)";
@@ -168,7 +242,9 @@ class GnuboardSalesHistoryRepository
             $query = DB::connection($this->connectionName())
                 ->table("{$cartTable} as c")
                 ->join("{$orderTable} as o", "o.{$orderIdColumn}", '=', "c.{$orderIdColumn}")
-                ->leftJoin("{$itemTable} as i", "i.{$itemFallbackCodeColumn}", '=', "c.{$cartProductIdColumn}")
+                ->leftJoin("{$itemTable} as i", "i.{$itemFallbackCodeColumn}", '=', "c.{$cartProductIdColumn}");
+            $this->applyMemberJoin($query);
+            $query
                 ->selectRaw("{$normalizedCodeSql['sql']} as product_code", $normalizedCodeSql['bindings'])
                 ->selectRaw("{$productNameSql} as product_name")
                 ->selectRaw("c.`{$cartQuantityColumn}` as qty")
@@ -177,6 +253,7 @@ class GnuboardSalesHistoryRepository
                 ->selectRaw("o.`{$orderIdColumn}` as order_ref")
                 ->selectRaw(($orderSettleCaseColumn !== '' ? "o.`{$orderSettleCaseColumn}`" : "''").' as order_reason')
                 ->selectRaw(($orderCustomerNameColumn !== '' ? "o.`{$orderCustomerNameColumn}`" : "''").' as order_customer_name')
+                ->selectRaw($this->institutionNicknameSelectSql())
                 ->where("c.{$cartQuantityColumn}", '>', 0);
 
             $excludedOrderStatuses = $this->normalizeStatusFilters((array) config('store.gnuboard.sales.excluded_order_statuses', []));
@@ -206,8 +283,9 @@ class GnuboardSalesHistoryRepository
             }
 
             $searchKeyword = trim((string) $search);
+            $memberJoinConfig = $this->memberJoinConfig();
             if ($searchKeyword !== '') {
-                $query->where(function ($builder) use ($searchKeyword, $productNameSql, $orderCustomerNameColumn, $orderIdColumn): void {
+                $query->where(function ($builder) use ($searchKeyword, $productNameSql, $orderCustomerNameColumn, $orderIdColumn, $memberJoinConfig): void {
                     $builder
                         ->whereRaw("{$productNameSql} LIKE ?", ["%{$searchKeyword}%"])
                         ->orWhere("o.{$orderIdColumn}", 'LIKE', "%{$searchKeyword}%");
@@ -215,16 +293,21 @@ class GnuboardSalesHistoryRepository
                     if ($orderCustomerNameColumn !== '') {
                         $builder->orWhere("o.{$orderCustomerNameColumn}", 'LIKE', "%{$searchKeyword}%");
                     }
+
+                    if ($memberJoinConfig !== null) {
+                        $builder->orWhere("m.{$memberJoinConfig['memberNicknameColumn']}", 'LIKE', "%{$searchKeyword}%");
+                    }
                 });
             }
 
-            return $query
-                ->orderByDesc("o.{$orderDatetimeColumn}")
-                ->paginate($safePerPage);
+            return [
+                'query' => $query,
+                'order_datetime_column' => $orderDatetimeColumn,
+            ];
         } catch (Throwable $exception) {
             report($exception);
 
-            return $this->emptyPaginator($safePerPage);
+            return null;
         }
     }
 
@@ -445,6 +528,56 @@ class GnuboardSalesHistoryRepository
     private function connectionName(): string
     {
         return (string) config('store.gnuboard.connection', 'mysql_grapeseed_goods');
+    }
+
+    /**
+     * @return array{memberTable:string, orderMemberIdColumn:string, memberIdColumn:string, memberNicknameColumn:string}|null
+     */
+    private function memberJoinConfig(): ?array
+    {
+        $memberTable = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.member_table', 'g5_member'));
+        $orderMemberIdColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.order_member_id_column', 'mb_id'));
+        $memberIdColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.member_id_column', 'mb_id'));
+        $memberNicknameColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.member_nickname_column', 'mb_nick'));
+
+        if ($memberTable === '' || $orderMemberIdColumn === '' || $memberIdColumn === '' || $memberNicknameColumn === '') {
+            return null;
+        }
+
+        return [
+            'memberTable' => $memberTable,
+            'orderMemberIdColumn' => $orderMemberIdColumn,
+            'memberIdColumn' => $memberIdColumn,
+            'memberNicknameColumn' => $memberNicknameColumn,
+        ];
+    }
+
+    /**
+     * @param  Builder  $query
+     */
+    private function applyMemberJoin($query, string $orderAlias = 'o'): void
+    {
+        $config = $this->memberJoinConfig();
+        if ($config === null) {
+            return;
+        }
+
+        $query->leftJoin(
+            "{$config['memberTable']} as m",
+            "m.{$config['memberIdColumn']}",
+            '=',
+            "{$orderAlias}.{$config['orderMemberIdColumn']}",
+        );
+    }
+
+    private function institutionNicknameSelectSql(): string
+    {
+        $config = $this->memberJoinConfig();
+        if ($config === null) {
+            return "'' as institution_nickname";
+        }
+
+        return "COALESCE(m.`{$config['memberNicknameColumn']}`, '') as institution_nickname";
     }
 
     private function emptyPaginator(int $perPage): LengthAwarePaginator

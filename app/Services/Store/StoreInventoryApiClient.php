@@ -96,6 +96,23 @@ final class StoreInventoryApiClient
     }
 
     /**
+     * @return array<int, object>
+     */
+    public function fetchAllSaleHistoriesForExport(
+        ?string $search,
+        ?CarbonInterface $startDate,
+        ?CarbonInterface $endDate,
+    ): array {
+        $dataSource = strtolower((string) config('store.sales_history_source', config('store.data_source', 'ecount')));
+
+        return match ($dataSource) {
+            'gnuboard' => app(GnuboardSalesHistoryRepository::class)
+                ->getAllSaleHistoriesForExport($search, $startDate, $endDate),
+            default => throw new RuntimeException('전체 내역 조회는 gnuboard 소스만 지원합니다.'),
+        };
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
