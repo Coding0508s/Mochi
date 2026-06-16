@@ -3,10 +3,15 @@
 namespace App\Livewire;
 
 use App\Services\Store\StoreInventoryApiClient;
+use App\Support\UnicodeTextNormalizer;
 use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Component;
 use Livewire\WithPagination;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class StoreSalesHistoryList extends Component
@@ -42,6 +47,97 @@ class StoreSalesHistoryList extends Component
     public function applyDateFilter(): void
     {
         $this->resetPage();
+    }
+
+    public function exportToExcel(): ?StreamedResponse
+    {
+        $range = $this->resolveDateRange();
+        if ($range === null) {
+            session()->flash('error', $this->loadError ?? '조회 기간을 확인해 주세요.');
+
+            return null;
+        }
+
+        [$start, $end] = $range;
+        $keyword = trim($this->search);
+
+        try {
+            $rows = app(StoreInventoryApiClient::class)->fetchAllSaleHistoriesForExport(
+                $keyword !== '' ? $keyword : null,
+                $start,
+                $end,
+            );
+        } catch (RuntimeException $exception) {
+            session()->flash('error', $exception->getMessage());
+
+            return null;
+        } catch (Throwable $exception) {
+            report($exception);
+            session()->flash('error', '엑셀 다운로드 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+
+            return null;
+        }
+
+        if ($rows === []) {
+            session()->flash('error', '다운로드할 데이터가 없습니다.');
+
+            return null;
+        }
+
+        try {
+            $spreadsheet = new Spreadsheet;
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Store 판매내역');
+
+            $headers = [
+                '주문 일시',
+                '주문번호',
+                '기관명',
+                '주문자',
+                '상품코드',
+                '상품명',
+                '수량',
+                '상태',
+                '결제수단',
+            ];
+
+            foreach ($headers as $index => $header) {
+                $column = chr(65 + $index);
+                $sheet->setCellValue($column.'1', $header);
+                $sheet->getStyle($column.'1')->getFont()->setBold(true);
+            }
+
+            $row = 2;
+            foreach ($rows as $item) {
+                $sheet->setCellValue('A'.$row, UnicodeTextNormalizer::toNfc((string) ($item->sold_at ?? '')));
+                $sheet->setCellValue('B'.$row, UnicodeTextNormalizer::toNfc((string) ($item->order_ref ?? '')));
+                $sheet->setCellValue('C'.$row, UnicodeTextNormalizer::toNfc((string) ($item->institution_nickname ?? '')));
+                $sheet->setCellValue('D'.$row, UnicodeTextNormalizer::toNfc((string) ($item->order_customer_name ?? '')));
+                $sheet->setCellValue('E'.$row, UnicodeTextNormalizer::toNfc((string) ($item->product_code ?? '')));
+                $sheet->setCellValue('F'.$row, UnicodeTextNormalizer::toNfc((string) ($item->product_name ?? '')));
+                $sheet->setCellValue('G'.$row, (int) ($item->qty ?? 0));
+                $sheet->setCellValue('H'.$row, UnicodeTextNormalizer::toNfc((string) ($item->order_status ?? '')));
+                $sheet->setCellValue('I'.$row, UnicodeTextNormalizer::toNfc((string) ($item->order_reason ?? '')));
+
+                $row++;
+            }
+
+            foreach (range('A', 'I') as $column) {
+                $sheet->getColumnDimension($column)->setAutoSize(true);
+            }
+
+            $writer = new Xlsx($spreadsheet);
+            $filename = 'Store_판매내역_'.now()->format('Ymd_His').'.xlsx';
+
+            return response()->streamDownload(function () use ($writer) {
+                $writer->save('php://output');
+            }, $filename);
+        } catch (Throwable $exception) {
+            report($exception);
+            session()->flash('error', '엑셀 다운로드 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+
+            return null;
+        }
     }
 
     private function resolveDateRange(): ?array

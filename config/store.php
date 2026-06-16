@@ -31,6 +31,10 @@ return [
             'cart_status_column' => env('STORE_GNUBOARD_CART_STATUS_COLUMN', 'ct_status'),
             'order_settle_case_column' => env('STORE_GNUBOARD_ORDER_SETTLE_CASE_COLUMN', 'od_settle_case'),
             'order_customer_name_column' => env('STORE_GNUBOARD_ORDER_CUSTOMER_NAME_COLUMN', 'od_name'),
+            'order_member_id_column' => env('STORE_GNUBOARD_ORDER_MEMBER_ID_COLUMN', 'mb_id'),
+            'member_table' => env('STORE_GNUBOARD_MEMBER_TABLE', 'g5_member'),
+            'member_id_column' => env('STORE_GNUBOARD_MEMBER_ID_COLUMN', 'mb_id'),
+            'member_nickname_column' => env('STORE_GNUBOARD_MEMBER_NICKNAME_COLUMN', 'mb_nick'),
             'excluded_order_statuses' => array_values(array_filter(array_map(
                 static fn (string $status): string => trim($status),
                 explode(',', (string) env('STORE_GNUBOARD_EXCLUDED_ORDER_STATUSES', '취소,주문취소'))
