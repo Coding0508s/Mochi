@@ -489,11 +489,6 @@
                                   {{ request()->routeIs('setup.team') ? 'sidebar-subitem-active' : '' }}">
                             <span class="sidebar-subitem-label">팀 관리</span>
                         </a>
-                        <a href="{{ route('setup.roles') }}"
-                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                                  {{ request()->routeIs('setup.roles') ? 'sidebar-subitem-active' : '' }}">
-                            <span class="sidebar-subitem-label">역할·권한</span>
-                        </a>
                     </div>
                 </div>
             @endif

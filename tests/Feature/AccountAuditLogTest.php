@@ -16,19 +16,19 @@ class AccountAuditLogTest extends TestCase
         $target = User::factory()->create();
         $actor = User::factory()->admin()->create();
 
-        AccountAuditLog::record($target, $actor, 'role_changed', [
-            'setup_role_id' => ['before' => null, 'after' => 1],
+        AccountAuditLog::record($target, $actor, 'permission_changed', [
+            'setup_manage' => ['before' => false, 'after' => true],
         ]);
 
         $this->assertDatabaseHas('account_audit_logs', [
             'user_id' => $target->id,
             'actor_id' => $actor->id,
-            'action' => 'role_changed',
+            'action' => 'permission_changed',
         ]);
 
         $log = AccountAuditLog::query()->first();
         $this->assertNotNull($log);
         $this->assertNotNull($log->created_at);
-        $this->assertSame(1, $log->changes['setup_role_id']['after']);
+        $this->assertTrue($log->changes['setup_manage']['after']);
     }
 }

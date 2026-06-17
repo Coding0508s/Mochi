@@ -6,7 +6,6 @@ use App\Livewire\PeopleEmployeesList;
 use App\Livewire\SetupEmployeeCreate;
 use App\Models\Department;
 use App\Models\Employee;
-use App\Models\SetupRole;
 use App\Models\User;
 use App\Notifications\CustomResetPassword;
 use Illuminate\Database\Schema\Blueprint;
@@ -689,7 +688,7 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->call('openEditModal', 'E001')
             ->assertSet('hasLinkedLoginAccount', true)
             ->assertSee('로그인 계정')
-            ->assertSee('현재 역할:')
+            ->assertDontSee('현재 역할:')
             ->set('editStatus', '0')
             ->call('saveEmployee')
             ->assertHasNoErrors();
@@ -702,21 +701,11 @@ class PeopleEmployeePermissionsTest extends TestCase
         ]);
     }
 
-    public function test_people_edit_modal_shows_assigned_role_label(): void
+    public function test_people_edit_modal_shows_account_section_without_role_label(): void
     {
-        $role = SetupRole::query()->create([
-            'role_key' => 'sales_lead',
-            'role_name' => '영업 리드',
-            'description' => '',
-            'is_active' => true,
-            'permissions' => [],
-            'account_flags' => [],
-        ]);
-
         User::factory()->create([
             'employee_empno' => 'E001',
             'email' => 'e001@example.com',
-            'setup_role_id' => $role->id,
         ]);
 
         $admin = User::factory()->admin()->create();
@@ -724,7 +713,43 @@ class PeopleEmployeePermissionsTest extends TestCase
         Livewire::actingAs($admin)
             ->test(PeopleEmployeesList::class)
             ->call('openEditModal', 'E001')
-            ->assertSet('editAssignedRoleLabel', '영업 리드');
+            ->assertSee('로그인 계정')
+            ->assertDontSee('현재 역할:');
+    }
+
+    public function test_admin_can_update_user_permissions_from_employee_modal(): void
+    {
+        $linkedUser = User::factory()->create([
+            'employee_empno' => 'E001',
+            'is_admin' => false,
+            'is_deputy_admin' => false,
+            'setup_view' => false,
+            'setup_manage' => false,
+            'is_gs_brochure_admin' => false,
+            'can_manage_store_inventory' => false,
+        ]);
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openEditModal', 'E001')
+            ->set('editIsDeputyAdmin', true)
+            ->set('editSetupManage', true)
+            ->set('editIsGsBrochureAdmin', true)
+            ->set('editCanManageStoreInventory', true)
+            ->call('saveEmployee')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $linkedUser->id,
+            'is_admin' => false,
+            'is_deputy_admin' => true,
+            'setup_view' => true,
+            'setup_manage' => true,
+            'is_gs_brochure_admin' => true,
+            'can_manage_store_inventory' => true,
+        ]);
     }
 
     public function test_user_cannot_deactivate_own_account_from_employee_modal(): void

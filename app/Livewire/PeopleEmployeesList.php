@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -140,7 +141,19 @@ class PeopleEmployeesList extends Component
 
     public bool $editUserIsActive = true;
 
-    public string $editAssignedRoleLabel = '';
+    public bool $editIsAdmin = false;
+
+    public bool $editIsDeputyAdmin = false;
+
+    public bool $editSetupView = false;
+
+    public bool $editSetupManage = false;
+
+    public bool $editIsGsBrochureAdmin = false;
+
+    public bool $editCanManageStoreInventory = false;
+
+    private ?bool $supportsSetupPermissionColumns = null;
 
     protected array $queryString = [
         'filterDept' => ['as' => 'team', 'except' => ''],
@@ -173,6 +186,30 @@ class PeopleEmployeesList extends Component
         $this->editUserIsActive = $this->shouldActivateUserFromEmployeeStatus(
             $value === null ? null : (string) $value
         );
+    }
+
+    public function updatedEditIsAdmin(bool $value): void
+    {
+        if ($value) {
+            $this->editIsDeputyAdmin = false;
+            $this->editSetupView = true;
+            $this->editSetupManage = true;
+        }
+    }
+
+    public function updatedEditIsDeputyAdmin(bool $value): void
+    {
+        if ($value) {
+            $this->editIsAdmin = false;
+            $this->editSetupView = true;
+        }
+    }
+
+    public function updatedEditSetupManage(bool $value): void
+    {
+        if ($value) {
+            $this->editSetupView = true;
+        }
     }
 
     public function sort(string $field): void
@@ -210,7 +247,12 @@ class PeopleEmployeesList extends Component
         $this->hasLinkedLoginAccount = $linkedUser !== null;
         $this->linkedUserId = $linkedUser?->id;
         $this->editUserIsActive = $this->shouldActivateUserFromEmployeeStatus($this->editStatus);
-        $this->editAssignedRoleLabel = $linkedUser?->setupRole?->role_name ?? '역할 미지정';
+        $this->editIsAdmin = (bool) ($linkedUser?->is_admin);
+        $this->editIsDeputyAdmin = (bool) ($linkedUser?->is_deputy_admin);
+        $this->editSetupView = (bool) ($linkedUser?->setup_view);
+        $this->editSetupManage = (bool) ($linkedUser?->setup_manage);
+        $this->editIsGsBrochureAdmin = (bool) ($linkedUser?->is_gs_brochure_admin);
+        $this->editCanManageStoreInventory = (bool) ($linkedUser?->can_manage_store_inventory);
 
         $this->resetErrorBag();
         $this->resetValidation();
@@ -232,7 +274,12 @@ class PeopleEmployeesList extends Component
         $this->hasLinkedLoginAccount = false;
         $this->linkedUserId = null;
         $this->editUserIsActive = true;
-        $this->editAssignedRoleLabel = '';
+        $this->editIsAdmin = false;
+        $this->editIsDeputyAdmin = false;
+        $this->editSetupView = false;
+        $this->editSetupManage = false;
+        $this->editIsGsBrochureAdmin = false;
+        $this->editCanManageStoreInventory = false;
 
         $this->resetErrorBag();
         $this->resetValidation();
@@ -359,6 +406,10 @@ class PeopleEmployeesList extends Component
                             'is_active' => (bool) $this->editUserIsActive,
                             'email_verified_at' => null,
                         ];
+                        if ($this->supportsSetupPermissionColumns()) {
+                            $newUserPayload['setup_view'] = false;
+                            $newUserPayload['setup_manage'] = false;
+                        }
                         $syncedTeam = TeamMenuContext::inferUserTeamForRegistration(
                             $validated['editWorkDept'],
                             trim($validated['editJob'])
@@ -413,11 +464,26 @@ class PeopleEmployeesList extends Component
                     'employee_empno' => $currentEmployeeEmpNo,
                     'is_active' => $this->editUserIsActive,
                 ];
+
+                $nextIsAdmin = (bool) $this->editIsAdmin;
+                $nextIsDeputyAdmin = $nextIsAdmin ? false : (bool) $this->editIsDeputyAdmin;
+                $nextSetupManage = $nextIsAdmin ? true : (bool) $this->editSetupManage;
+                $nextSetupView = $nextIsAdmin ? true : ((bool) $this->editSetupView || $nextSetupManage || $nextIsDeputyAdmin);
+
+                $linkedUserPayload['is_admin'] = $nextIsAdmin;
+                $linkedUserPayload['is_deputy_admin'] = $nextIsDeputyAdmin;
+                $linkedUserPayload['is_gs_brochure_admin'] = (bool) $this->editIsGsBrochureAdmin;
+                $linkedUserPayload['can_manage_store_inventory'] = (bool) $this->editCanManageStoreInventory;
+                if ($this->supportsSetupPermissionColumns()) {
+                    $linkedUserPayload['setup_view'] = $nextSetupView;
+                    $linkedUserPayload['setup_manage'] = $nextSetupManage;
+                }
+
                 $syncedTeam = TeamMenuContext::inferUserTeamForRegistration(
                     $validated['editWorkDept'],
                     trim($validated['editJob'])
                 );
-                if ($syncedTeam !== null && ! $linkedUser->is_admin && ! $linkedUser->is_deputy_admin) {
+                if ($syncedTeam !== null && ! $nextIsAdmin && ! $nextIsDeputyAdmin) {
                     $linkedUserPayload['team'] = $syncedTeam;
                 }
                 $linkedUser->forceFill($linkedUserPayload)->save();
@@ -1166,9 +1232,8 @@ class PeopleEmployeesList extends Component
 
         if ($useAccountLink && $employeeEmpNo !== '') {
             $linkedByEmpNo = User::query()
-                ->with('setupRole:id,role_name')
                 ->where('employee_empno', $employeeEmpNo)
-                ->first(['id', 'email', 'is_active', 'is_admin', 'is_deputy_admin', 'setup_role_id']);
+                ->first($this->linkedUserSelectColumns());
 
             if ($linkedByEmpNo) {
                 return $linkedByEmpNo;
@@ -1186,9 +1251,42 @@ class PeopleEmployeesList extends Component
         }
 
         return User::query()
-            ->with('setupRole:id,role_name')
             ->whereRaw('LOWER(TRIM(COALESCE(email, \'\'))) = ?', [$normalizedEmail])
-            ->first(['id', 'email', 'is_active', 'is_admin', 'is_deputy_admin', 'setup_role_id']);
+            ->first($this->linkedUserSelectColumns());
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function linkedUserSelectColumns(): array
+    {
+        $columns = [
+            'id',
+            'email',
+            'is_active',
+            'is_admin',
+            'is_deputy_admin',
+            'is_gs_brochure_admin',
+            'can_manage_store_inventory',
+        ];
+
+        if ($this->supportsSetupPermissionColumns()) {
+            $columns[] = 'setup_view';
+            $columns[] = 'setup_manage';
+        }
+
+        return $columns;
+    }
+
+    private function supportsSetupPermissionColumns(): bool
+    {
+        if ($this->supportsSetupPermissionColumns !== null) {
+            return $this->supportsSetupPermissionColumns;
+        }
+
+        $this->supportsSetupPermissionColumns = Schema::hasColumns('users', ['setup_view', 'setup_manage']);
+
+        return $this->supportsSetupPermissionColumns;
     }
 
     private function shouldActivateUserFromEmployeeStatus(?string $employeeStatus): bool

@@ -377,7 +377,7 @@
 
                             <p class="mt-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-700">
                                 직원 등록 시 로그인 계정이 자동으로 생성되며, 비밀번호 재설정 링크 메일이 발송됩니다.
-                                특수 권한은 등록 후 <a href="{{ route('setup.roles') }}" class="underline font-medium">Setup &gt; 역할·권한</a>에서 역할로 할당하세요.
+                                특수 권한은 등록 후 관리자 화면에서 직접 설정하세요.
                             </p>
                         </div>
 
@@ -508,13 +508,37 @@
                                 </div>
 
                                 <p class="text-[11px] text-gray-600 leading-snug">
-                                    관리자·GS Brochure·스토어 재고 등 특수 권한은
-                                    <a href="{{ route('setup.roles') }}" class="text-mochi-header underline font-medium">Setup &gt; 역할·권한</a>에서
-                                    역할로 정의하고 사용자에게 할당하세요.
+                                    관리자·GS Brochure·스토어 재고 등 특수 권한은 사용자 계정에서 직접 관리됩니다.
                                 </p>
 
-                                <p class="text-sm text-gray-700">
-                                    현재 역할: <span class="font-medium">{{ $editAssignedRoleLabel }}</span>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 rounded-md border border-gray-200 bg-white px-3 py-3">
+                                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                                        <input type="checkbox" wire:model.defer="editIsAdmin" class="rounded border-gray-300 text-mochi-header focus:ring-mochi-header">
+                                        <span>관리자</span>
+                                    </label>
+                                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                                        <input type="checkbox" wire:model.defer="editIsDeputyAdmin" class="rounded border-gray-300 text-mochi-header focus:ring-mochi-header">
+                                        <span>준관리자</span>
+                                    </label>
+                                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                                        <input type="checkbox" wire:model.defer="editSetupView" class="rounded border-gray-300 text-mochi-header focus:ring-mochi-header">
+                                        <span>Setup 조회</span>
+                                    </label>
+                                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                                        <input type="checkbox" wire:model.defer="editSetupManage" class="rounded border-gray-300 text-mochi-header focus:ring-mochi-header">
+                                        <span>Setup 관리</span>
+                                    </label>
+                                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                                        <input type="checkbox" wire:model.defer="editIsGsBrochureAdmin" class="rounded border-gray-300 text-mochi-header focus:ring-mochi-header">
+                                        <span>GS Brochure 관리자</span>
+                                    </label>
+                                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                                        <input type="checkbox" wire:model.defer="editCanManageStoreInventory" class="rounded border-gray-300 text-mochi-header focus:ring-mochi-header">
+                                        <span>Store 재고관리</span>
+                                    </label>
+                                </div>
+                                <p class="text-[11px] text-gray-500">
+                                    관리자 선택 시 Setup 조회/관리는 자동 활성화되며, 준관리자와 중복 지정되지 않습니다.
                                 </p>
 
                                 @if(! $hasLinkedLoginAccount)
@@ -567,8 +591,7 @@
                                             계정 발급 + 비밀번호 설정 메일 보내기
                                         </button>
                                         <p class="mt-1.5 text-[11px] text-amber-700">
-                                            새 계정은 일반 권한으로 생성됩니다. 추가 권한이 필요하면 발급 후
-                                            <a href="{{ route('setup.roles') }}" class="underline font-medium">Setup &gt; 역할·권한</a>에서 역할을 할당하세요.
+                                            새 계정은 일반 권한으로 생성됩니다. 추가 권한이 필요하면 생성 후 계정 권한을 직접 조정하세요.
                                         </p>
                                     @elseif(! $hasLinkedLoginAccount)
                                         <p class="text-[11px] text-amber-700">
