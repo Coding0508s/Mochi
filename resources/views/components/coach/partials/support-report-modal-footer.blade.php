@@ -14,6 +14,8 @@
         default => '취소하기',
     };
     $markCompleted = (bool) ($this->{$markCompletedModel} ?? false);
+    $roundOptions = method_exists($this, 'supportRoundOptions') ? $this->supportRoundOptions() : [];
+    $referenceYear = method_exists($this, 'supportRoundReferenceYear') ? $this->supportRoundReferenceYear() : null;
 @endphp
 
 <div class="shrink-0 px-6 py-4 border-t bg-gray-50 flex flex-wrap items-center justify-between gap-3">
@@ -42,12 +44,17 @@
             @if($markCompleted)
                 <label class="flex items-center gap-2 text-sm text-gray-700">
                     <span class="whitespace-nowrap">현황 차수</span>
+                    @if($referenceYear !== null)
+                        <span class="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                            기준 연도 {{ $referenceYear }}
+                        </span>
+                    @endif
                     <select wire:model="supportRound"
                             class="min-w-[7rem] rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
                         <option value="">기록 안 함</option>
-                        @foreach([1, 2, 3, 4] as $round)
-                            <option value="{{ $round }}" @disabled(in_array($round, $supportRoundRecorded ?? [], true))>
-                                {{ $round }}차@if(in_array($round, $supportRoundRecorded ?? [], true)) (기록됨)@endif
+                        @foreach($roundOptions as $option)
+                            <option value="{{ $option['value'] }}" @disabled((bool) ($option['disabled'] ?? false))>
+                                {{ $option['label'] }}
                             </option>
                         @endforeach
                     </select>

@@ -1,6 +1,9 @@
-<div class="mochi-page">
+<div class="mochi-page" x-data @visit-support-show-alert.window="alert($event.detail.message)">
+    @php
+        $listRouteName = 'supports.index';
+    @endphp
     <div class="mb-4">
-        <a href="{{ \App\Support\TeamMenuContext::route('supports.index', [], null, $formTeamMenu) }}"
+        <a href="{{ \App\Support\TeamMenuContext::route($listRouteName, [], null, $formTeamMenu) }}"
            class="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
@@ -13,17 +16,20 @@
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
             <div class="w-full flex items-center justify-between gap-3">
                 <div>
-                    <h2 class="text-base font-semibold text-gray-900">{{ \App\Support\TeamMenuContext::supportReportFormHeading(null, $formTeamMenu, $reportMode) }}</h2>
-                    <p class="text-xs text-gray-400 mt-0.5">
-                        {{ \App\Support\TeamMenuContext::supportReportFormSubtitle(null, $formTeamMenu, $reportMode) }}
-                    </p>
+                    @if($reportMode === 'issue')
+                        <h2 class="text-base font-semibold text-gray-900">CS Team 기관 이슈 작성</h2>
+                        <p class="text-xs text-gray-400 mt-0.5">기관에서 발생한 이슈를 짧게 기록합니다.</p>
+                    @elseif($reportMode === 'teacher' && $formTeamMenu === 'coach')
+                        <h2 class="text-base font-semibold text-gray-900">Coach Team 교사 지원 및 참관 보고서 작성</h2>
+                        <p class="text-xs text-gray-400 mt-0.5">아래 입력 항목을 작성한 뒤 저장해 주세요.</p>
+                    @else
+                        <h2 class="text-base font-semibold text-gray-900">{{ \App\Support\TeamMenuContext::supportReportFormHeading(null, $formTeamMenu, $reportMode) }}</h2>
+                        <p class="text-xs text-gray-400 mt-0.5">
+                            {{ \App\Support\TeamMenuContext::supportReportFormSubtitle(null, $formTeamMenu, $reportMode) }}
+                        </p>
+                    @endif
                 </div>
                 <div class="inline-flex rounded-xl border border-gray-200 p-1 bg-gray-50">
-                    <button type="button"
-                            wire:click="setReportMode('institution')"
-                            class="px-3 py-1.5 text-sm rounded-lg transition-colors {{ $reportMode === 'institution' ? 'bg-white text-gray-900 shadow-sm border border-gray-200 font-medium' : 'text-gray-500 hover:text-gray-700' }}">
-                        기관 지원 보고서
-                    </button>
                     @if($this->canUseTeacherReportMode())
                         <button type="button"
                                 wire:click="setReportMode('teacher')"
@@ -31,6 +37,18 @@
                             교사 지원 보고서
                         </button>
                     @endif
+                    @if($this->canUseIssueReportMode())
+                        <button type="button"
+                                wire:click="setReportMode('issue')"
+                                class="px-3 py-1.5 text-sm rounded-lg transition-colors {{ $reportMode === 'issue' ? 'bg-white text-gray-900 shadow-sm border border-gray-200 font-medium' : 'text-gray-500 hover:text-gray-700' }}">
+                            기관 이슈
+                        </button>
+                    @endif
+                    <button type="button"
+                            wire:click="setReportMode('institution')"
+                            class="px-3 py-1.5 text-sm rounded-lg transition-colors {{ $reportMode === 'institution' ? 'bg-white text-gray-900 shadow-sm border border-gray-200 font-medium' : 'text-gray-500 hover:text-gray-700' }}">
+                        기관 지원 보고서
+                    </button>
                 </div>
             </div>
         </div>
@@ -172,62 +190,215 @@
                     </div>
 
                     <div class="border-t border-gray-100 pt-4">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-2">교사 지원 유형 선택</h3>
-                        <p class="text-xs text-gray-500 mb-3">기관과 교사를 선택한 뒤, 작성할 보고서 유형을 선택하면 해당 입력 화면이 열립니다.</p>
-                        <div class="space-y-2">
-                            <select
-                                wire:change="startCoachTeacherSupportCreate($event.target.value)"
-                                wire:loading.attr="disabled"
-                                wire:target="startCoachTeacherSupportCreate"
-                                @disabled(!$canPickSupportType)
-                                class="w-full py-2.5 px-3 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500
-                                       {{ $canPickSupportType
-                                           ? 'border-blue-300 text-slate-600 bg-blue-50/40'
-                                           : 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed' }}"
-                            >
-                                <option value="">지원 유형을 선택하세요</option>
-                                @foreach($coachTeacherSupportCreateTypes as $pill)
-                                    @php
-                                        $pillLabel = is_array($pill) ? ($pill['label'] ?? '') : (string) $pill;
-                                        $pillAction = is_array($pill) ? ($pill['action'] ?? '') : '';
-                                    @endphp
-                                    @if($pillLabel === '' || $pillAction === '')
-                                        @continue
-                                    @endif
-                                    <option value="{{ $pillAction }}">{{ $pillLabel }}</option>
-                                @endforeach
-                            </select>
-                            <p class="text-[11px] text-gray-400">유형을 선택하면 Coach Team 교사지원 전용 입력 화면이 열립니다.</p>
-                        </div>
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">교사 지원 및 참관 보고서</h3>
+                        <p class="text-xs text-gray-500">기관과 교사를 선택하면 11번째 교사 지원 및 참관 보고서 입력 영역이 이 페이지에 바로 표시됩니다.</p>
                     </div>
                 @elseif($coachTypedTeacherSupportForm)
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">담당 Coach</label>
-                            <input type="text" wire:model="formCoName" readonly
-                                   class="w-full py-2.5 px-3 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-700">
+                            <input type="text"
+                                   wire:model="formCoName"
+                                   @if($teacherSelected) readonly @else @disabled(!$institutionSelected) @endif
+                                   class="w-full py-2.5 px-3 text-sm border rounded-xl
+                                          {{ $teacherSelected || ! $institutionSelected ? 'border-gray-200 bg-gray-50 text-gray-700' : 'border-gray-300 bg-white text-gray-700' }}
+                                          {{ $teacherSelected ? 'cursor-default' : '' }}">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">교사명</label>
-                            <input type="text" wire:model="formTarget" readonly
-                                   class="w-full py-2.5 px-3 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-700">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                교사명 <span class="text-red-500">*</span>
+                            </label>
+                            <select wire:model.live="formTeacherId"
+                                    @disabled(!$institutionSelected || $institutionTeachers->isEmpty())
+                                    class="w-full py-2.5 px-3 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500
+                                           {{ $errors->has('formTeacherId') ? 'border-red-400' : '' }}
+                                           {{ $institutionSelected && $institutionTeachers->isNotEmpty() ? 'border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}">
+                                <option value="">교사를 선택하세요</option>
+                                @foreach($institutionTeachers as $teacher)
+                                    <option value="{{ $teacher->ID }}">{{ $teacher->Name }}</option>
+                                @endforeach
+                            </select>
+                            @if($institutionSelected && $institutionTeachers->isEmpty())
+                                <p class="mt-1 text-xs text-amber-600">선택한 기관에 등록된 교사가 없습니다. Coach Team 교사지원 화면에서 교사를 먼저 등록해 주세요.</p>
+                            @endif
+                            @error('formTeacherId')
+                                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                            @enderror
                         </div>
                     </div>
 
-                    <div class="rounded-xl border border-blue-100 bg-blue-50/40 px-4 py-4">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                                <p class="text-sm font-semibold text-gray-900">{{ $this->coachTypedTeacherSupportCreateLabel() }} 작성</p>
-                                <p class="mt-1 text-xs text-gray-600">{{ $formAccountName }} · {{ $formTarget }}</p>
-                                <p class="mt-2 text-xs text-gray-500">열린 입력 창에서 보고서를 작성한 뒤 저장해 주세요.</p>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 border-t border-gray-100 pt-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">지원 날짜 <span class="text-red-500">*</span></label>
+                            <input type="date" wire:model="visitForm.support_date"
+                                   class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                            @error('visitForm.support_date')
+                                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">장소</label>
+                            <input type="text" wire:model="visitForm.support_location"
+                                   placeholder="예: 분당 ○○어학원"
+                                   class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">지원 목적 <span class="text-red-500">*</span></label>
+                            <input type="text" wire:model="visitForm.support_purpose"
+                                   placeholder="예: 신임 교사 온보딩, 정기 수업 참관"
+                                   class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                            @error('visitForm.support_purpose')
+                                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">지원 방법</label>
+                            <select wire:model="visitForm.meeting_type"
+                                    class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                @foreach(($visitConfig['method_options'] ?? []) as $method)
+                                    <option value="{{ $method }}">{{ $method }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Session/Semester</label>
+                            <div class="flex gap-2">
+                                <select wire:model="visitForm.session_number"
+                                        class="w-1/2 py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">차수 선택</option>
+                                    @foreach(($visitConfig['session_options'] ?? []) as $session)
+                                        <option value="{{ $session }}">{{ $session }}차</option>
+                                    @endforeach
+                                </select>
+                                <select wire:model="visitForm.semester_label"
+                                        class="w-1/2 py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    @foreach(($visitConfig['semester_options'] ?? []) as $semester)
+                                        <option value="{{ $semester }}">{{ $semester }}</option>
+                                    @endforeach
+                                </select>
                             </div>
-                            <button type="button"
-                                    wire:click="resetCoachTeacherSupportCreate"
-                                    class="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
-                                유형 다시 선택
-                            </button>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">면담 시간</label>
+                            <input type="time" wire:model="visitForm.interview_time"
+                                   class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                         </div>
                     </div>
+
+                    <div class="border-t border-gray-100 pt-3">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">참관 수업 정보</h3>
+                        <div class="grid grid-cols-4 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                                <input type="number" min="0" max="99" wire:model="visitForm.observe_unit"
+                                       class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Lesson</label>
+                                <input type="number" min="0" max="99" wire:model="visitForm.observe_lesson"
+                                       class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">반</label>
+                                <input type="text" wire:model="visitForm.observe_class"
+                                       class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">세</label>
+                                <input type="text" wire:model="visitForm.observe_age"
+                                       class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-gray-100 pt-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">사전 요청 및 주요 이슈</label>
+                        <textarea wire:model="visitForm.pre_request_notes"
+                                  rows="4"
+                                  placeholder="교사 사전 요청 사항과 지원 배경을 작성해 주세요."
+                                  class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+                    </div>
+
+                    <div class="border-t border-gray-100 pt-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">세부 지원 내용 <span class="text-red-500">*</span></label>
+                        <textarea wire:model="visitForm.monitoring_feedback"
+                                  rows="5"
+                                  placeholder="수업 모니터링 결과와 Strengths/개선점을 작성해 주세요."
+                                  class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+                        @error('visitForm.monitoring_feedback')
+                            <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="border-t border-gray-100 pt-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">면담 내용 및 Action Plan <span class="text-red-500">*</span></label>
+                        <textarea wire:model="visitForm.interview_and_action_plan"
+                                  rows="5"
+                                  placeholder="면담 내용, 현장 건의사항, 후속 조치 계획을 작성해 주세요."
+                                  class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+                        @error('visitForm.interview_and_action_plan')
+                            <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="border-t border-gray-100 pt-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">특이사항</label>
+                        <textarea wire:model="visitForm.special_notes"
+                                  rows="4"
+                                  placeholder="추가 공유가 필요한 특이사항을 작성해 주세요."
+                                  class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+                    </div>
+                @elseif($reportMode === 'issue')
+                {{-- ── 기관 이슈(경량) 입력 ── --}}
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            발생일 <span class="text-red-500">*</span>
+                        </label>
+                        <input type="date"
+                               wire:model="formSupportDate"
+                               @disabled(!$institutionSelected)
+                               class="w-full py-1.5 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
+                                      {{ $errors->has('formSupportDate') ? 'border-red-400' : '' }}
+                                      {{ $institutionSelected ? 'border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}"/>
+                        @error('formSupportDate')
+                            <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            시간 <span class="text-red-500">*</span>
+                        </label>
+                        <input type="time"
+                               wire:model="formSupportTime"
+                               @disabled(!$institutionSelected)
+                               class="w-full py-1.5 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
+                                      {{ $errors->has('formSupportTime') ? 'border-red-400' : '' }}
+                                      {{ $institutionSelected ? 'border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}"/>
+                        @error('formSupportTime')
+                            <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-100 pt-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            이슈 내용 <span class="text-red-500">*</span>
+                        </label>
+                        <textarea wire:model="formIssue"
+                                  @disabled(!$institutionSelected)
+                                  rows="10"
+                                  placeholder="발생한 이슈와 처리 내역을 기록해 주세요."
+                                  class="w-full min-h-[260px] py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y
+                                         {{ $errors->has('formIssue') ? 'border-red-400' : '' }}
+                                         {{ $institutionSelected ? 'border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}"></textarea>
+                        @error('formIssue')
+                            <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
                 @else
                 {{-- ── 2행~: 나머지 필드 2열 그리드 (기관/CS 교사 지원) ── --}}
                 <div class="grid grid-cols-2 gap-3">
@@ -366,8 +537,9 @@
                         <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                     @enderror
                 </div>
+                @endif
 
-                @if($reportMode === 'institution')
+                @if($reportMode === 'issue')
                     <div class="border-t border-gray-100 pt-3">
                         <h3 class="text-sm font-semibold text-gray-700 mb-2">긴급 알림</h3>
                         <p class="mb-3 text-xs text-gray-500">
@@ -443,43 +615,67 @@
                         </div>
                     </div>
                 @endif
-                @endif
 
             </div>
 
             <div class="px-8 py-5 bg-gray-50 border-t border-gray-200 flex items-center justify-between rounded-b-2xl">
                 @if($coachTypedTeacherCreate)
-                    <p class="text-xs text-gray-500">유형을 선택하면 Coach Team 교사지원 전용 입력 화면이 열립니다.</p>
+                    <p class="text-xs text-gray-500">교사를 선택하면 지원 및 참관 보고서 입력 화면이 바로 열립니다.</p>
                     <a href="{{ \App\Support\TeamMenuContext::route('supports.index', [], null, $formTeamMenu) }}"
                        class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-xl hover:bg-gray-100 transition-colors">
                         취소하기
                     </a>
-                @elseif($coachTypedTeacherSupportForm)
-                    <p class="text-xs text-gray-500">입력 창을 닫거나 저장하면 이 화면으로 돌아옵니다.</p>
-                    <a href="{{ \App\Support\TeamMenuContext::route('supports.index', [], null, $formTeamMenu) }}"
-                       class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-xl hover:bg-gray-100 transition-colors">
-                        목록으로
-                    </a>
                 @else
-                <label class="flex items-center gap-3 cursor-pointer">
-                    <span class="text-sm font-medium text-gray-700">완료처리</span>
-                    <button type="button"
-                            wire:click="$toggle('formCompleted')"
-                            @disabled(!$institutionSelected)
-                            class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent
-                                   transition-colors duration-200 focus:outline-none
-                                   {{ $formCompleted ? 'bg-green-500' : 'bg-gray-300' }}
-                                   {{ $institutionSelected ? '' : 'opacity-50 cursor-not-allowed' }}">
-                        <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200
-                                     {{ $formCompleted ? 'translate-x-5' : 'translate-x-0' }}"></span>
-                    </button>
-                    <span class="text-xs {{ $formCompleted ? 'text-green-600 font-medium' : 'text-gray-400' }}">
-                        {{ $formCompleted ? '완료됨' : '진행중' }}
-                    </span>
-                </label>
+                <div class="flex flex-col gap-2">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <span class="text-sm font-medium text-gray-700">완료처리</span>
+                        <button type="button"
+                                wire:click="$toggle('formCompleted')"
+                                @disabled(!$institutionSelected)
+                                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent
+                                       transition-colors duration-200 focus:outline-none
+                                       {{ $formCompleted ? 'bg-green-500' : 'bg-gray-300' }}
+                                       {{ $institutionSelected ? '' : 'opacity-50 cursor-not-allowed' }}">
+                            <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200
+                                         {{ $formCompleted ? 'translate-x-5' : 'translate-x-0' }}"></span>
+                        </button>
+                        <span class="text-xs {{ $formCompleted ? 'text-green-600 font-medium' : 'text-gray-400' }}">
+                            {{ $formCompleted ? '완료됨' : '진행중' }}
+                        </span>
+                    </label>
+
+                    @if($coachTypedTeacherSupportForm && $formCompleted)
+                        @php
+                            $roundOptions = method_exists($this, 'supportRoundOptions') ? $this->supportRoundOptions() : [];
+                            $referenceYear = method_exists($this, 'supportRoundReferenceYear') ? $this->supportRoundReferenceYear() : null;
+                        @endphp
+                        <div class="flex flex-col gap-1.5">
+                            <label class="flex items-center gap-2 text-xs text-gray-600">
+                                <span>현황 차수</span>
+                                @if($referenceYear !== null)
+                                    <span class="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                                        기준 연도 {{ $referenceYear }}
+                                    </span>
+                                @endif
+                            </label>
+                            <select wire:model="supportRound"
+                                    class="min-w-[13rem] rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                                <option value="">기록 안 함</option>
+                                @foreach($roundOptions as $option)
+                                    <option value="{{ $option['value'] }}" @disabled((bool) ($option['disabled'] ?? false))>
+                                        {{ $option['label'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('support_round')
+                                <p class="text-xs text-red-500">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    @endif
+                </div>
 
                 <div class="flex items-center gap-3">
-                    <a href="{{ \App\Support\TeamMenuContext::route('supports.index', [], null, $formTeamMenu) }}"
+                    <a href="{{ \App\Support\TeamMenuContext::route($listRouteName, [], null, $formTeamMenu) }}"
                        class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
                         취소하기
                     </a>
@@ -500,7 +696,4 @@
         </form>
     </div>
 
-    @if($formTeamMenu === 'coach' && $reportMode === 'teacher')
-        @include('partials.coach.support-create-typed-modals')
-    @endif
 </div>

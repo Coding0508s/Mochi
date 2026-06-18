@@ -96,8 +96,18 @@ class SupportCreateFormTest extends TestCase
             $table->string('School_Name', 255)->nullable();
             $table->string('Name', 255)->nullable();
             $table->string('Status', 50)->nullable();
+            $table->string('Plan_1st_Support_Date')->nullable();
+            $table->string('Plan_2nd_Support_Date')->nullable();
+            $table->string('Plan_3rd_Support_Date')->nullable();
+            $table->string('Plan_4th_Support_Date')->nullable();
             $table->string('_1st_Support_Date')->nullable();
+            $table->string('_2nd_Support_Date')->nullable();
+            $table->string('_3rd_Support_Date')->nullable();
+            $table->string('_4th_Support_Date')->nullable();
             $table->string('_1st_Support_Type')->nullable();
+            $table->string('_2nd_Support_Type')->nullable();
+            $table->string('_3rd_Support_Type')->nullable();
+            $table->string('_4th_Support_Type')->nullable();
         });
 
         Schema::dropIfExists('teacher_lva_fb_support_reports');
@@ -448,6 +458,62 @@ class SupportCreateFormTest extends TestCase
             ->assertSee('세부 지원 내용')
             ->assertDontSee('기관 이슈 및 논의 사항')
             ->assertSet('formTarget', '김교사');
+    }
+
+    public function test_coach_team_support_round_defaults_to_year_matched_plan_round(): void
+    {
+        $year = now()->year;
+
+        Institution::query()->create([
+            'SKcode' => 'SK-COACH-ROUND',
+            'AccountName' => 'Coach 차시 추천 기관',
+        ]);
+
+        $teacherId = (int) DB::table('Teachers')->insertGetId([
+            'SK_Code' => 'SK-COACH-ROUND',
+            'Name' => '추천교사',
+            'Plan_1st_Support_Date' => ($year - 1).'-03-01',
+            'Plan_2nd_Support_Date' => $year.'-05-01',
+        ]);
+
+        $user = User::factory()->create(['team' => 'COACH']);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'coach'])
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-COACH-ROUND')
+            ->set('formTeacherId', $teacherId)
+            ->assertSet('supportRound', '2');
+    }
+
+    public function test_coach_team_support_round_select_shows_all_rounds_with_year_recommendation_label(): void
+    {
+        $year = now()->year;
+
+        Institution::query()->create([
+            'SKcode' => 'SK-COACH-ROUND-LABEL',
+            'AccountName' => 'Coach 차시 라벨 기관',
+        ]);
+
+        $teacherId = (int) DB::table('Teachers')->insertGetId([
+            'SK_Code' => 'SK-COACH-ROUND-LABEL',
+            'Name' => '라벨교사',
+            'Plan_3rd_Support_Date' => $year.'-08-10',
+        ]);
+
+        $user = User::factory()->create(['team' => 'COACH']);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'coach'])
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-COACH-ROUND-LABEL')
+            ->set('formTeacherId', $teacherId)
+            ->set('formCompleted', true)
+            ->assertSee('1차')
+            ->assertSee('2차')
+            ->assertSee('3차 (해당 연도 계획)')
+            ->assertSee('4차')
+            ->assertSee('기준 연도 '.$year);
     }
 
     public function test_coach_teacher_selector_excludes_retired_teacher(): void
