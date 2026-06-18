@@ -60,6 +60,9 @@ class SupportCreateForm extends Component
     /** 본사/타 부서 공유 (TO_Depart) */
     public string $formToDepart = '';
 
+    /** CS 기관 이슈 모드의 이슈 내용 (Issue 컬럼) */
+    public string $formIssue = '';
+
     public bool $formIsPotential = false;
 
     /** 잠재기관일 때만 사용하는 가능성 (A/B/C/D) */
@@ -129,11 +132,7 @@ class SupportCreateForm extends Component
         $this->formTeamMenu = in_array($requestedTeamMenu, ['co', 'coach', 'cs'], true)
             ? (string) $requestedTeamMenu
             : (TeamMenuContext::activeMenu($user) ?? 'co');
-        if (! $this->canUseTeacherReportMode()) {
-            $this->reportMode = 'institution';
-        } elseif (request()->query('report_mode') === 'teacher') {
-            $this->reportMode = 'teacher';
-        }
+        $this->applyInitialReportMode();
 
         $prefillId = $potentialTargetId ?? request()->integer('potential_target_id');
         if ($prefillId > 0) {
@@ -146,6 +145,7 @@ class SupportCreateForm extends Component
             }
 
             $this->applyPotentialTargetPrefill($prefillId);
+            $this->syncInlineVisitFormState();
 
             return;
         }
@@ -171,11 +171,20 @@ class SupportCreateForm extends Component
         if ($prefillSupportType !== '') {
             $this->formSupportType = $prefillSupportType;
         }
+
+        $this->syncInlineVisitFormState();
     }
 
     public function canUseTeacherReportMode(): bool
     {
-        return $this->formTeamMenu !== 'co';
+        // 교사 지원 보고서는 Coach 팀 전용 (CO·CS 팀은 사용하지 않음)
+        return ! in_array($this->formTeamMenu, ['co', 'cs'], true);
+    }
+
+    /** CS 팀만 "기관 이슈" 경량 보고서 토글을 사용한다. */
+    public function canUseIssueReportMode(): bool
+    {
+        return $this->formTeamMenu === 'cs';
     }
 
     public function usesCoachTypedTeacherSupportCreate(): bool
@@ -185,14 +194,59 @@ class SupportCreateForm extends Component
             && blank($this->formCoachTeacherCreateAction);
     }
 
+    /** CS 팀은 기관 이슈, Coach 팀은 교사 지원, 그 외는 기관 지원 보고서가 기본 모드다. */
+    private function defaultReportMode(): string
+    {
+        if ($this->canUseIssueReportMode()) {
+            return 'issue';
+        }
+
+        if ($this->formTeamMenu === 'coach') {
+            return 'teacher';
+        }
+
+        return 'institution';
+    }
+
+    private function applyInitialReportMode(): void
+    {
+        $requestedReportMode = request()->query('report_mode');
+
+        if ($requestedReportMode === 'teacher' && $this->canUseTeacherReportMode()) {
+            $this->reportMode = 'teacher';
+
+            return;
+        }
+
+        if ($requestedReportMode === 'issue' && $this->canUseIssueReportMode()) {
+            $this->reportMode = 'issue';
+
+            return;
+        }
+
+        if ($requestedReportMode === 'institution') {
+            $this->reportMode = 'institution';
+
+            return;
+        }
+
+        $this->reportMode = $this->defaultReportMode();
+    }
+
     public function setReportMode(string $mode): void
     {
-        if (! in_array($mode, ['institution', 'teacher'], true)) {
+        if (! in_array($mode, ['institution', 'teacher', 'issue'], true)) {
             return;
         }
 
         if ($mode === 'teacher' && ! $this->canUseTeacherReportMode()) {
-            $this->reportMode = 'institution';
+            $this->reportMode = $this->defaultReportMode();
+
+            return;
+        }
+
+        if ($mode === 'issue' && ! $this->canUseIssueReportMode()) {
+            $this->reportMode = $this->defaultReportMode();
 
             return;
         }
@@ -203,13 +257,21 @@ class SupportCreateForm extends Component
         if ($previousMode !== $this->reportMode) {
             $this->syncCommunicationTemplatesOnModeChange($previousMode);
             $this->formTeacherId = null;
-            $this->formCoachTeacherCreateAction = null;
+
+            if ($this->formTeamMenu === 'coach' && $this->reportMode === 'teacher') {
+                $this->syncInlineVisitFormState();
+            } else {
+                $this->formCoachTeacherCreateAction = null;
+                $this->visitTeacherId = null;
+                $this->visitForm = [];
+                $this->resetSupportRoundSelection();
+            }
         }
     }
 
     public function startCoachTeacherSupportCreate(string $action): void
     {
-        if (! $this->usesCoachTypedTeacherSupportCreate()) {
+        if (! ($this->usesCoachTypedTeacherSupportCreate() || $this->usesCoachTypedTeacherSupportForm())) {
             return;
         }
 
@@ -256,8 +318,60 @@ class SupportCreateForm extends Component
 
         $this->formCoachTeacherCreateAction = $action;
         $this->formSupportType = (string) $selectedType['label'];
+
+        if ($action === 'visit') {
+            $teacher = $this->findVisibleTeacherForSupportModal((int) $this->formTeacherId);
+            if (! $teacher) {
+                $this->addError('formTeacherId', '교사를 선택해 주세요.');
+                $this->formCoachTeacherCreateAction = null;
+
+                return;
+            }
+
+            $institution = $teacher->institution;
+            if (! $institution) {
+                $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
+                if ($normalizedSkCode) {
+                    $institution = Institution::query()
+                        ->with('accountInfo')
+                        ->where('SKcode', $normalizedSkCode)
+                        ->first();
+                }
+            }
+
+            $accountInfo = $institution?->accountInfo;
+            $user = auth()->user();
+            $coachName = $accountInfo?->TR ?? ($user?->nameForCoReports() ?? '');
+
+            $this->visitTeacherId = (int) $this->formTeacherId;
+            $this->visitMarkCompleted = $this->formCompleted;
+            $this->visitForm = $this->defaultVisitForm(
+                skCode: SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
+                coachName: $coachName,
+                institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
+                teacherName: (string) $teacher->Name,
+            );
+            $this->seedSupportRoundSelection($teacher);
+
+            return;
+        }
+
         $this->closeOpenSupportReportModals();
         $this->openCoachTeacherSupportCreateModal($action, (int) $this->formTeacherId);
+    }
+
+    private function defaultCoachTeacherSupportCreateAction(): string
+    {
+        return 'visit';
+    }
+
+    private function openDefaultCoachTeacherSupportCreateIfReady(): void
+    {
+        if ($this->formTeamMenu !== 'coach' || $this->reportMode !== 'teacher') {
+            return;
+        }
+
+        $this->syncInlineVisitFormState();
     }
 
     public function usesCoachTypedTeacherSupportForm(): bool
@@ -269,8 +383,7 @@ class SupportCreateForm extends Component
 
     public function resetCoachTeacherSupportCreate(): void
     {
-        $this->closeAllTeacherSupportReportModals();
-        $this->formCoachTeacherCreateAction = null;
+        $this->syncInlineVisitFormState();
     }
 
     public function coachTypedTeacherSupportCreateLabel(): ?string
@@ -318,7 +431,7 @@ class SupportCreateForm extends Component
             ->with(['institution.accountInfo'])
             ->find($teacherId);
 
-        if ($teacher === null) {
+        if ($teacher === null || $teacher->isRetired()) {
             return null;
         }
 
@@ -336,13 +449,13 @@ class SupportCreateForm extends Component
     protected function finalizeCoachTeacherSupportReportSave(int $teacherId, callable $closeModal): void
     {
         $closeModal();
-        $this->formCoachTeacherCreateAction = null;
+        $this->syncInlineVisitFormState();
     }
 
     protected function afterCoachTeacherSupportModalClosed(): void
     {
         if ($this->formTeamMenu === 'coach' && $this->reportMode === 'teacher') {
-            $this->formCoachTeacherCreateAction = null;
+            $this->syncInlineVisitFormState();
         }
     }
 
@@ -576,8 +689,8 @@ class SupportCreateForm extends Component
             : null;
         $this->formIsPotential = $this->formPotentialTargetId !== null;
         $this->formPossibility = $this->formIsPotential ? (string) ($potential?->Possibility ?? '') : '';
-        $this->formCoachTeacherCreateAction = null;
         $this->formTeacherId = null;
+        $this->syncInlineVisitFormState();
         $this->syncFormTeacherIdFromTargetName();
         $this->applyDefaultCommunicationTemplatesIfEmpty();
         if ($this->isUrgent) {
@@ -676,13 +789,25 @@ class SupportCreateForm extends Component
     {
         if ($value === null || $value <= 0) {
             $this->formTarget = '';
-            $this->formCoachTeacherCreateAction = null;
+            $this->syncInlineVisitFormState();
 
             return;
         }
 
         $teacher = Teacher::query()->find($value);
+        if ($teacher?->isRetired()) {
+            $this->addError('formTeacherId', '퇴직 교사는 선택할 수 없습니다.');
+            $this->formTeacherId = null;
+            $this->formTarget = '';
+            $this->visitTeacherId = null;
+            $this->syncInlineVisitFormState();
+
+            return;
+        }
+
         $this->formTarget = $teacher !== null ? (string) $teacher->Name : '';
+        $this->resetValidation('formTeacherId');
+        $this->openDefaultCoachTeacherSupportCreateIfReady();
     }
 
     private function syncFormTeacherIdFromTargetName(): void
@@ -693,10 +818,12 @@ class SupportCreateForm extends Component
 
         $teacher = Teacher::query()
             ->whereIn('SK_Code', SkCodeNormalizer::candidates($this->formSkCode))
+            ->excludeRetired()
             ->where('Name', $this->formTarget)
             ->first();
 
         $this->formTeacherId = $teacher !== null ? (int) $teacher->ID : null;
+        $this->openDefaultCoachTeacherSupportCreateIfReady();
     }
 
     /**
@@ -710,6 +837,7 @@ class SupportCreateForm extends Component
 
         return Teacher::query()
             ->whereIn('SK_Code', SkCodeNormalizer::candidates($this->formSkCode))
+            ->excludeRetired()
             ->orderBy('Name')
             ->get(['ID', 'Name']);
     }
@@ -720,6 +848,11 @@ class SupportCreateForm extends Component
     private function applyDefaultCommunicationTemplatesIfEmpty(): void
     {
         if (! $this->hasInstitutionSelection()) {
+            return;
+        }
+
+        // 기관 이슈 모드의 "처리 내역"에는 소통 템플릿을 채우지 않는다.
+        if ($this->reportMode === 'issue') {
             return;
         }
 
@@ -734,8 +867,44 @@ class SupportCreateForm extends Component
 
     public function save(): void
     {
-        if ($this->usesCoachTypedTeacherSupportCreate() || $this->usesCoachTypedTeacherSupportForm()) {
-            $this->addError('formTeacherId', '아래에서 교사 지원 유형을 선택해 주세요.');
+        if ($this->reportMode === 'issue') {
+            $this->saveInstitutionIssue();
+
+            return;
+        }
+
+        if ($this->usesCoachTypedTeacherSupportForm()
+            && $this->visitTeacherId !== null
+            && $this->visitTeacherId > 0
+            && Teacher::query()->whereKey($this->visitTeacherId)->retired()->exists()) {
+            $this->addError('formTeacherId', '퇴직 교사는 선택할 수 없습니다.');
+
+            return;
+        }
+
+        if ($this->usesCoachTypedTeacherSupportForm()) {
+            if ($this->formCoachTeacherCreateAction === 'visit') {
+                if ($this->visitTeacherId === null || $this->visitTeacherId <= 0) {
+                    $this->addError('formTeacherId', '교사를 선택해 주세요.');
+
+                    return;
+                }
+
+                $this->visitMarkCompleted = $this->formCompleted;
+                $this->saveVisitReport();
+                if ($this->getErrorBag()->isEmpty()) {
+                    $this->redirect(
+                        TeamMenuContext::route($this->afterSaveRouteName, [], null, $this->formTeamMenu),
+                        navigate: true,
+                    );
+                }
+
+                return;
+            }
+        }
+
+        if ($this->usesCoachTypedTeacherSupportCreate()) {
+            $this->addError('formTeacherId', '교사를 선택하면 지원 및 참관 보고서 입력 화면이 열립니다.');
 
             return;
         }
@@ -886,6 +1055,66 @@ class SupportCreateForm extends Component
         );
         $this->redirect(
             TeamMenuContext::route($this->afterSaveRouteName, [], null, $this->formTeamMenu),
+            navigate: true,
+        );
+    }
+
+    /**
+     * CS 기관 이슈(경량) 저장 — record_kind='issue'.
+     * 처리 내역은 formToAccount(TO_Account)에 저장한다.
+     */
+    private function saveInstitutionIssue(): void
+    {
+        if (! $this->canUseIssueReportMode()) {
+            $this->reportMode = 'institution';
+
+            return;
+        }
+
+        $this->validate([
+            'formSkCode' => ['required'],
+            'formSupportDate' => ['required', 'date'],
+            'formSupportTime' => ['required', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
+            'formIssue' => ['required', 'string', 'max:5000'],
+        ], [
+            'formSkCode.required' => '기관을 선택해 주세요.',
+            'formSupportDate.required' => '발생일을 입력해 주세요.',
+            'formSupportDate.date' => '올바른 날짜 형식이 아닙니다.',
+            'formSupportTime.required' => '시간을 입력해 주세요.',
+            'formSupportTime.regex' => '시간은 HH:MM 형식으로 입력해 주세요.',
+            'formIssue.required' => '이슈 내용을 입력해 주세요.',
+        ]);
+
+        $issueRecord = null;
+
+        DB::transaction(function () use (&$issueRecord): void {
+            $issueRecord = SupportRecord::query()->create(
+                SupportRecord::filterAttributesForTable([
+                    'Year' => (int) date('Y', strtotime($this->formSupportDate)),
+                    'SK_Code' => $this->formSkCode,
+                    'Account_Name' => $this->formAccountName,
+                    'TR_Name' => $this->formCoName,
+                    'Support_Date' => $this->formSupportDate,
+                    'Meet_Time' => $this->formSupportTime.':00',
+                    'Support_Type' => '기관이슈',
+                    'Issue' => $this->formIssue,
+                    'TO_Account' => null,
+                    'is_urgent' => $this->isUrgent,
+                    'record_kind' => SupportRecord::KIND_ISSUE,
+                    'CreatedDate' => now(),
+                    ...SupportRecord::completionAttributes($this->formCompleted),
+                ])
+            );
+        });
+
+        if ($issueRecord instanceof SupportRecord && $this->isUrgent) {
+            $this->sendUrgentNotifications($issueRecord);
+        }
+
+        session()->flash('success', '기관 이슈가 저장되었습니다.');
+
+        $this->redirect(
+            TeamMenuContext::route('institutions.index', [], null, $this->formTeamMenu),
             navigate: true,
         );
     }
@@ -1101,6 +1330,58 @@ class SupportCreateForm extends Component
         return is_array($options) ? array_values($options) : [];
     }
 
+    private function syncInlineVisitFormState(): void
+    {
+        if ($this->formTeamMenu !== 'coach' || $this->reportMode !== 'teacher') {
+            return;
+        }
+
+        $this->formCoachTeacherCreateAction = $this->defaultCoachTeacherSupportCreateAction();
+        $this->formSupportType = '교사 지원 및 참관';
+        $this->visitMarkCompleted = $this->formCompleted;
+
+        $teacher = $this->formTeacherId !== null && $this->formTeacherId > 0
+            ? $this->findVisibleTeacherForSupportModal((int) $this->formTeacherId)
+            : null;
+
+        if (! $teacher) {
+            $this->visitTeacherId = null;
+            $this->visitForm = $this->defaultVisitForm(
+                skCode: SkCodeNormalizer::normalize($this->formSkCode) ?? (string) $this->formSkCode,
+                coachName: (string) $this->formCoName,
+                institutionName: (string) $this->formAccountName,
+                teacherName: (string) $this->formTarget,
+            );
+            $this->resetSupportRoundSelection();
+
+            return;
+        }
+
+        $institution = $teacher->institution;
+        if (! $institution) {
+            $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
+            if ($normalizedSkCode) {
+                $institution = Institution::query()
+                    ->with('accountInfo')
+                    ->where('SKcode', $normalizedSkCode)
+                    ->first();
+            }
+        }
+
+        $accountInfo = $institution?->accountInfo;
+        $user = auth()->user();
+        $coachName = $accountInfo?->TR ?? ($user?->nameForCoReports() ?? '');
+
+        $this->visitTeacherId = (int) $teacher->ID;
+        $this->visitForm = $this->defaultVisitForm(
+            skCode: SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
+            coachName: $coachName,
+            institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
+            teacherName: (string) $teacher->Name,
+        );
+        $this->seedSupportRoundSelection($teacher);
+    }
+
     private function communicationTemplate(string $field, string $mode): string
     {
         $configKey = $mode === 'teacher'
@@ -1112,6 +1393,11 @@ class SupportCreateForm extends Component
 
     private function syncCommunicationTemplatesOnModeChange(string $previousMode): void
     {
+        // 기관 이슈 모드로 전환하면 처리 내역은 사용자가 직접 입력한다.
+        if ($this->reportMode === 'issue') {
+            return;
+        }
+
         foreach (['to_account' => 'formToAccount', 'to_depart' => 'formToDepart'] as $field => $property) {
             $current = $this->{$property};
             $previousTemplate = $this->communicationTemplate($field, $previousMode);
