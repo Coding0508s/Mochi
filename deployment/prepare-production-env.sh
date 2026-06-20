@@ -29,8 +29,8 @@ fi
 "${SED[@]}" 's/^APP_DEBUG=.*/APP_DEBUG=false/' "$OUT"
 "${SED[@]}" 's|^APP_URL=.*|APP_URL=https://crm.grapeseed.co.kr|' "$OUT"
 "${SED[@]}" 's/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=database/' "$OUT"
-"${SED[@]}" 's/^SESSION_DRIVER=.*/SESSION_DRIVER=database/' "$OUT"
-"${SED[@]}" 's/^CACHE_STORE=.*/CACHE_STORE=database/' "$OUT"
+"${SED[@]}" 's/^SESSION_DRIVER=.*/SESSION_DRIVER=file/' "$OUT"
+"${SED[@]}" 's/^CACHE_STORE=.*/CACHE_STORE=file/' "$OUT"
 "${SED[@]}" 's/^LOG_LEVEL=.*/LOG_LEVEL=warning/' "$OUT"
 
 echo "Wrote $OUT"

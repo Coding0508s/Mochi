@@ -37,7 +37,13 @@
     $canSeeSetupMenus = $canSeeManagementMenus || (bool) ($sidebarUser?->can('accessSetup'));
 
     $peopleTeams = collect();
-    if (\Illuminate\Support\Facades\Schema::hasTable('department')) {
+    $hasDepartmentTable = \Illuminate\Support\Facades\Cache::remember(
+        'layout:has-department-table:v1',
+        now()->addMinutes(30),
+        fn (): bool => \Illuminate\Support\Facades\Schema::hasTable('department')
+    );
+
+    if ($hasDepartmentTable) {
         $cachedTeams = \Illuminate\Support\Facades\Cache::remember(
             'layout:people-teams:v1',
             now()->addMinutes(10),
@@ -139,7 +145,9 @@
             </nav>
 
             <div class="mochi-topbar-user">
-                <livewire:inbound-notification-bell />
+                @auth
+                    <livewire:inbound-notification-bell />
+                @endauth
                 {{-- 프로필 (편집 페이지로 이동) --}}
                 <a href="{{ route('profile.edit') }}" class="mochi-topbar-profile">
                     <span class="mochi-topbar-profile__depth" aria-hidden="true"></span>

@@ -7,6 +7,7 @@ use App\Models\InboundNotificationDismissal;
 use App\Models\UrgentSupportNotification;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -56,25 +57,26 @@ class InboundNotificationBell extends Component
     public function refreshUnreadCount(): void
     {
         if (! auth()->check()) {
+            $this->unreadCount = 0;
+
             return;
         }
 
         $user = auth()->user();
         $lastSeen = $user->last_inbound_seen_at;
+        $userId = (int) $user->id;
 
-        $unreadQuery = $this->visibleInboundLogsQuery((int) $user->id);
-        if ($lastSeen !== null) {
-            $unreadQuery->where('received_at', '>', $lastSeen);
+        if (app()->runningUnitTests()) {
+            $this->unreadCount = $this->computeUnreadCount($userId, $lastSeen);
+
+            return;
         }
-        $inboundUnreadCount = $unreadQuery->count();
 
-        $urgentUnreadCount = UrgentSupportNotification::query()
-            ->where('recipient_user_id', $user->id)
-            ->whereNull('dismissed_at')
-            ->where('is_read', false)
-            ->count();
-
-        $this->unreadCount = $inboundUnreadCount + $urgentUnreadCount;
+        $this->unreadCount = (int) Cache::remember(
+            $this->unreadCountCacheKey($userId),
+            now()->addSeconds(20),
+            fn (): int => $this->computeUnreadCount($userId, $lastSeen)
+        );
     }
 
     public function loadPanelData(): void
@@ -231,6 +233,7 @@ class InboundNotificationBell extends Component
                 'read_at' => now(),
             ]);
 
+        $this->forgetUnreadCountCache((int) $user->id);
         $this->loadPanelData();
     }
 
@@ -255,6 +258,7 @@ class InboundNotificationBell extends Component
                     ]);
             }
 
+            $this->forgetUnreadCountCache((int) $user->id);
             $this->loadPanelData();
 
             return;
@@ -275,6 +279,7 @@ class InboundNotificationBell extends Component
             ['dismissed_at' => now()],
         );
 
+        $this->forgetUnreadCountCache((int) $user->id);
         $this->loadPanelData();
     }
 
@@ -318,6 +323,7 @@ class InboundNotificationBell extends Component
                 'dismissed_at' => now(),
             ]);
 
+        $this->forgetUnreadCountCache((int) $user->id);
         $this->loadPanelData();
     }
 
@@ -458,5 +464,36 @@ class InboundNotificationBell extends Component
             ->whereNotIn('id', InboundNotificationDismissal::query()
                 ->select('log_id')
                 ->where('user_id', $userId));
+    }
+
+    private function computeUnreadCount(int $userId, mixed $lastSeen): int
+    {
+        $unreadQuery = $this->visibleInboundLogsQuery($userId);
+        if ($lastSeen !== null) {
+            $unreadQuery->where('received_at', '>', $lastSeen);
+        }
+        $inboundUnreadCount = $unreadQuery->count();
+
+        $urgentUnreadCount = UrgentSupportNotification::query()
+            ->where('recipient_user_id', $userId)
+            ->whereNull('dismissed_at')
+            ->where('is_read', false)
+            ->count();
+
+        return $inboundUnreadCount + $urgentUnreadCount;
+    }
+
+    private function unreadCountCacheKey(int $userId): string
+    {
+        return 'inbound-bell:unread-count:user:'.$userId;
+    }
+
+    private function forgetUnreadCountCache(int $userId): void
+    {
+        if (app()->runningUnitTests()) {
+            return;
+        }
+
+        Cache::forget($this->unreadCountCacheKey($userId));
     }
 }

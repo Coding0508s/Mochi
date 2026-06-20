@@ -55,10 +55,9 @@ fi
 echo "Ensuring storage link..."
 php artisan storage:link 2>/dev/null || true
 
-echo "Caching config, routes, views..."
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
+echo "Rebuilding Laravel optimize cache..."
+php artisan optimize:clear
+php artisan optimize
 
 if [[ "${RESTART_WORKER:-0}" == "1" ]]; then
     if command -v supervisorctl >/dev/null 2>&1; then
