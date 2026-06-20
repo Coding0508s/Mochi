@@ -10,7 +10,7 @@ class SidebarScheduleMenuTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_schedule_menu_is_exposed_as_main_sidebar_accordion_with_submenus(): void
+    public function test_schedule_menu_is_disabled_in_sidebar(): void
     {
         $user = User::factory()->create([
             'team' => 'COACH',
@@ -22,12 +22,12 @@ class SidebarScheduleMenuTest extends TestCase
 
         $content = $response->getContent();
         $this->assertIsString($content);
-        $this->assertStringContainsString('href="'.route('schedules.index').'"', $content);
-        $this->assertStringContainsString('href="'.route('shared-supplies.index').'"', $content);
-        $this->assertStringContainsString('<span class="sidebar-subitem-label">일정 캘린더</span>', $content);
-        $this->assertStringContainsString('<span class="sidebar-subitem-label">공용품 관리</span>', $content);
-        $this->assertSame(1, substr_count($content, '<span class="font-medium">일정 관리</span>'));
-        $this->assertStringNotContainsString('/schedules?team_menu=', $content);
+        $this->assertStringContainsString('<span class="font-medium">일정 관리</span>', $content);
+        $this->assertStringContainsString('aria-disabled="true"', $content);
+        $this->assertStringContainsString('cursor-not-allowed opacity-50', $content);
+        $this->assertStringNotContainsString('href="'.route('schedules.index').'"', $content);
+        $this->assertStringNotContainsString('href="'.route('shared-supplies.index').'"', $content);
+        $this->assertStringNotContainsString('href="'.route('vehicle-usage-history.index').'"', $content);
     }
 
     public function test_shared_supplies_page_is_accessible(): void
