@@ -108,6 +108,6 @@ class CrossTeamReadOnlyTest extends TestCase
         $this->actingAs($coach)
             ->get(route('profile.edit', ['team_menu' => TeamMenuContext::MENU_CS]))
             ->assertOk()
-            ->assertSee('다른 팀 메뉴에서는 조회만 가능합니다', false);
+            ->assertSee('타 팀 메뉴에서는 조회만 가능합니다', false);
     }
 }
