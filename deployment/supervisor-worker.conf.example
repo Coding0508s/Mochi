@@ -1,0 +1,21 @@
+; Supervisor queue worker for MOCHI platform
+;
+; 1. Copy: sudo cp deployment/supervisor-worker.conf.example /etc/supervisor/conf.d/mocchi-worker.conf
+; 2. Edit APP_DIR if the install path differs from /var/www/mocchi-platform
+; 3. Apply: sudo supervisorctl reread && sudo supervisorctl update
+; 4. Start: sudo supervisorctl start mocchi-worker:*
+;
+; Requires QUEUE_CONNECTION=database (or redis) in .env
+
+[program:mocchi-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=php /var/www/mocchi-platform/artisan queue:work database --sleep=3 --tries=3 --max-time=3600
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=www-data
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/var/www/mocchi-platform/storage/logs/worker.log
+stopwaitsecs=3600

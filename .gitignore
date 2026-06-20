@@ -3,6 +3,7 @@
 .env
 .env.backup
 .env.production
+database/scripts/restore_users_from_backup.sql
 .phpactor.json
 .phpunit.result.cache
 /.fleet

@@ -1,0 +1,7 @@
+# Laravel scheduler — install for www-data (or the PHP-FPM user)
+#
+#   sudo crontab -u www-data -e
+#
+# Add this single line (adjust path if APP_DIR differs):
+
+* * * * * cd /var/www/mocchi-platform && php artisan schedule:run >> /dev/null 2>&1
