@@ -346,7 +346,7 @@ final class InstitutionAccountListQuery
     public function shouldScopeToAssignedInstitutions(): bool
     {
         $user = auth()->user();
-        if (! $user || $user->hasPlatformWideViewAccess()) {
+        if (! $user || TeamMenuContext::hasExpandedReadScope($user)) {
             return false;
         }
 

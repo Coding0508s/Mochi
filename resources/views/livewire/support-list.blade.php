@@ -69,6 +69,7 @@
                     긴급 이슈만 보기
                 </button>
 
+                @unless($crossTeamReadOnly ?? false)
                 <a href="{{ \App\Support\TeamMenuContext::route('supports.create') }}"
                    class="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -87,6 +88,7 @@
                     </svg>
                     CO 파일업로드
                 </button>
+                @endunless
             </div>
 
         </div>
@@ -207,6 +209,7 @@
 
                         {{-- 완료처리 토글: wire:click.stop으로 행 클릭 이벤트 차단 --}}
                         <td class="px-3 py-2.5 text-center">
+                            @if(! ($crossTeamReadOnly ?? false))
                             @can('updateSupportRecord', $record)
                                 <button wire:click.stop="toggleComplete({{ $record->ID }})"
                                         class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent
@@ -219,6 +222,9 @@
                             @else
                                 <span class="text-xs text-gray-400">-</span>
                             @endcan
+                            @else
+                                <span class="text-xs text-gray-400">-</span>
+                            @endif
                         </td>
 
                         {{-- 상세 보기 --}}

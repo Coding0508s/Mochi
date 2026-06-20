@@ -115,7 +115,7 @@ class InstitutionIssueTest extends TestCase
             ->assertDontSee('분리 확인용 이슈');
     }
 
-    public function test_route_access_is_cs_only(): void
+    public function test_route_is_readable_for_all_authenticated_teams(): void
     {
         $cs = User::factory()->create(['team' => 'CS']);
         $co = User::factory()->create(['team' => 'CO']);
@@ -123,7 +123,7 @@ class InstitutionIssueTest extends TestCase
 
         $this->actingAs($cs)->get('/institution-issues')->assertOk();
         $this->actingAs($admin)->get('/institution-issues')->assertOk();
-        $this->actingAs($co)->get('/institution-issues')->assertForbidden();
+        $this->actingAs($co)->get('/institution-issues?team_menu=cs')->assertOk();
     }
 
     public function test_cs_sidebar_does_not_show_issue_menu(): void

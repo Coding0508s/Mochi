@@ -52,6 +52,25 @@ class TeamMenuContextTest extends TestCase
         $this->assertTrue(TeamMenuContext::showCoTeamSidebar($admin));
     }
 
+    public function test_show_all_team_sidebars_for_authenticated_user(): void
+    {
+        $coach = new User(['team' => 'COACH', 'is_admin' => false]);
+
+        $this->assertTrue(TeamMenuContext::showAllTeamSidebars($coach));
+    }
+
+    public function test_cross_team_read_only_when_menu_differs_from_home_team(): void
+    {
+        $coach = new User(['team' => 'COACH', 'is_admin' => false]);
+
+        $this->assertTrue(
+            TeamMenuContext::isCrossTeamReadOnlyContext($coach, TeamMenuContext::MENU_CO)
+        );
+        $this->assertFalse(
+            TeamMenuContext::isCrossTeamReadOnlyContext($coach, TeamMenuContext::MENU_COACH)
+        );
+    }
+
     public function test_coach_user_sees_exclusive_coach_sidebar_only(): void
     {
         $coach = new User(['team' => 'COACH', 'is_admin' => false]);

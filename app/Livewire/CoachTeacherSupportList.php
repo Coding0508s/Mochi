@@ -18,6 +18,7 @@ use App\Actions\UpdateLegacyTeacherSupportReport;
 use App\Actions\UpdateTeacherProfile;
 use App\Actions\UpdateTeacherSupport;
 use App\Actions\UpdateTeacherSupportReport;
+use App\Livewire\Concerns\GuardsCrossTeamReadOnlyContext;
 use App\Livewire\Concerns\HandlesVisitSupportReportValidationFailures;
 use App\Livewire\Concerns\ManagesSupportReportRoundSelection;
 use App\Models\AccountInformation;
@@ -39,6 +40,7 @@ use App\Support\TeacherSupportHistoryFormLoader;
 use App\Support\TeacherSupportKpiCalculator;
 use App\Support\TeacherSupportListActivity;
 use App\Support\TeacherSupportReportEditAuthorization;
+use App\Support\TeamMenuContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -53,6 +55,7 @@ use Livewire\WithPagination;
 
 class CoachTeacherSupportList extends Component
 {
+    use GuardsCrossTeamReadOnlyContext;
     use HandlesVisitSupportReportValidationFailures;
     use ManagesSupportReportRoundSelection;
     use WithPagination;
@@ -206,8 +209,12 @@ class CoachTeacherSupportList extends Component
 
     public bool $visitMarkCompleted = true;
 
+    public bool $crossTeamReadOnly = false;
+
     public function mount(): void
     {
+        $this->crossTeamReadOnly = $this->isCrossTeamReadOnlyContext(TeamMenuContext::MENU_COACH);
+
         $year = request()->query('filterYear');
         $this->filterYear = is_numeric($year) ? (string) (int) $year : '';
 
@@ -232,6 +239,10 @@ class CoachTeacherSupportList extends Component
         $action = request()->query('create_action');
 
         if ($teacherId <= 0 || ! is_string($action) || $action === '') {
+            return;
+        }
+
+        if ($this->crossTeamReadOnly) {
             return;
         }
 
@@ -538,6 +549,10 @@ class CoachTeacherSupportList extends Component
 
     public function canEditViewingSupportReport(): bool
     {
+        if ($this->crossTeamReadOnly) {
+            return false;
+        }
+
         if ($this->viewingSupportReportDetailKey === null) {
             return false;
         }
@@ -557,6 +572,8 @@ class CoachTeacherSupportList extends Component
 
     public function startSupportReportEdit(): void
     {
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         if (! $this->canEditViewingSupportReport()) {
             return;
         }
@@ -793,7 +810,7 @@ class CoachTeacherSupportList extends Component
             ->where('ID', $teacherId);
         $this->applyTeacherListVisibilityFilter($scopedQuery);
 
-        if ($user->hasPlatformWideViewAccess()) {
+        if (TeamMenuContext::hasExpandedReadScope($user)) {
             return $scopedQuery->exists();
         }
 
@@ -809,7 +826,7 @@ class CoachTeacherSupportList extends Component
             return false;
         }
 
-        if ($user->hasPlatformWideViewAccess()) {
+        if (TeamMenuContext::hasExpandedReadScope($user)) {
             return InstitutionResolver::resolve(SkCodeNormalizer::candidates($skCode)) !== null;
         }
 
@@ -892,6 +909,9 @@ class CoachTeacherSupportList extends Component
 
     public function startTeacherEdit(): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         if (! $this->teacherDetailInfo) {
             return;
         }
@@ -909,6 +929,9 @@ class CoachTeacherSupportList extends Component
 
     public function saveTeacherProfile(): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         if (! $this->teacherDetailInfo) {
             return;
         }
@@ -929,6 +952,9 @@ class CoachTeacherSupportList extends Component
 
     public function confirmRetireTeacher(): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         $this->resetRetireRecommendationForm();
         $this->confirmingRetire = true;
     }
@@ -941,6 +967,9 @@ class CoachTeacherSupportList extends Component
 
     public function retireTeacher(): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         if (! $this->teacherDetailInfo) {
             return;
         }
@@ -979,6 +1008,9 @@ class CoachTeacherSupportList extends Component
 
     public function openDemoLessonModal(int $teacherId): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
@@ -1025,6 +1057,9 @@ class CoachTeacherSupportList extends Component
 
     public function saveDemoLessonReport(): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         if (! $this->demoLessonTeacherId) {
             return;
         }
@@ -1099,6 +1134,9 @@ class CoachTeacherSupportList extends Component
 
     public function openLvaFrModal(int $teacherId): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
@@ -1145,6 +1183,9 @@ class CoachTeacherSupportList extends Component
 
     public function saveLvaFrReport(): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         if (! $this->lvaFrTeacherId) {
             return;
         }
@@ -1221,6 +1262,9 @@ class CoachTeacherSupportList extends Component
 
     public function openLvaFbModal(int $teacherId): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
@@ -1267,6 +1311,9 @@ class CoachTeacherSupportList extends Component
 
     public function saveLvaFbReport(): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         if (! $this->lvaFbTeacherId) {
             return;
         }
@@ -1343,6 +1390,9 @@ class CoachTeacherSupportList extends Component
 
     public function openLsOnsiteLvaModal(int $teacherId): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
@@ -1389,6 +1439,9 @@ class CoachTeacherSupportList extends Component
 
     public function saveLsOnsiteLvaReport(): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         if (! $this->lsOnsiteLvaTeacherId) {
             return;
         }
@@ -1467,6 +1520,9 @@ class CoachTeacherSupportList extends Component
 
     public function openLittleseedConModal(int $teacherId): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
@@ -1513,6 +1569,9 @@ class CoachTeacherSupportList extends Component
 
     public function saveLittleseedConReport(): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         if (! $this->littleseedConTeacherId) {
             return;
         }
@@ -1584,6 +1643,9 @@ class CoachTeacherSupportList extends Component
 
     public function openOpenClassModal(int $teacherId): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
@@ -1630,6 +1692,9 @@ class CoachTeacherSupportList extends Component
 
     public function saveOpenClassReport(): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         if (! $this->openClassTeacherId) {
             return;
         }
@@ -1703,6 +1768,9 @@ class CoachTeacherSupportList extends Component
 
     public function openUnit21PlusModal(int $teacherId): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
@@ -1749,6 +1817,9 @@ class CoachTeacherSupportList extends Component
 
     public function saveUnit21PlusReport(): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         if (! $this->unit21PlusTeacherId) {
             return;
         }
@@ -1825,6 +1896,9 @@ class CoachTeacherSupportList extends Component
 
     public function openUnit31PlusModal(int $teacherId): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
@@ -1871,6 +1945,9 @@ class CoachTeacherSupportList extends Component
 
     public function saveUnit31PlusReport(): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         if (! $this->unit31PlusTeacherId) {
             return;
         }
@@ -1947,6 +2024,9 @@ class CoachTeacherSupportList extends Component
 
     public function openProConModal(int $teacherId): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
@@ -1993,6 +2073,9 @@ class CoachTeacherSupportList extends Component
 
     public function saveProConReport(): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         if (! $this->proConTeacherId) {
             return;
         }
@@ -2064,6 +2147,9 @@ class CoachTeacherSupportList extends Component
 
     public function openOnsiteModal(int $teacherId): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
@@ -2110,6 +2196,9 @@ class CoachTeacherSupportList extends Component
 
     public function saveOnsiteReport(): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         if (! $this->onsiteTeacherId) {
             return;
         }
@@ -2186,6 +2275,9 @@ class CoachTeacherSupportList extends Component
 
     public function openVisitModal(int $teacherId): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
         if (! $teacher) {
             return;
@@ -2232,6 +2324,9 @@ class CoachTeacherSupportList extends Component
 
     public function saveVisitReport(): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         if (! $this->visitTeacherId) {
             return;
         }
@@ -2406,6 +2501,9 @@ class CoachTeacherSupportList extends Component
 
     public function openEditModal(int $id): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         $teacher = Teacher::find($id);
         if (! $teacher || ! $this->canOpenEditModalForTeacher($teacher)) {
             return;
@@ -2428,6 +2526,9 @@ class CoachTeacherSupportList extends Component
 
     public function saveEditForm(): void
     {
+
+        $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
         if (! $this->editingTeacherId) {
             return;
         }
@@ -2514,6 +2615,7 @@ class CoachTeacherSupportList extends Component
             'unit31PlusConfig' => config('coach_teacher_unit31_plus'),
             'visitConfig' => config('coach_teacher_visit'),
             'displayYear' => $this->resolvedFilterYear(),
+            'crossTeamReadOnly' => $this->crossTeamReadOnly,
         ]);
     }
 
@@ -2634,7 +2736,7 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
-        if ($this->usesWideInstitutionListScope($user)) {
+        if ($this->usesWideInstitutionListScope($user) || TeamMenuContext::hasExpandedReadScope($user)) {
             CoachTeacherScope::excludeHiddenInstitutions($query);
 
             return;
@@ -2911,6 +3013,10 @@ class CoachTeacherSupportList extends Component
             return false;
         }
 
+        if ($this->crossTeamReadOnly) {
+            return false;
+        }
+
         if ($user->hasFullAccess()) {
             return true;
         }
@@ -2939,7 +3045,7 @@ class CoachTeacherSupportList extends Component
 
         $viewableQuery = Teacher::query()->whereIn('ID', $ids);
         $this->applyTeacherListVisibilityFilter($viewableQuery);
-        if (! $user->hasPlatformWideViewAccess()) {
+        if (! TeamMenuContext::hasExpandedReadScope($user)) {
             $this->applyTeacherListScope($viewableQuery, $user);
         }
         $viewableIds = array_fill_keys($viewableQuery->pluck('ID')->all(), true);

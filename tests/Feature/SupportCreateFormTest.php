@@ -812,7 +812,7 @@ class SupportCreateFormTest extends TestCase
             'AccountName' => 'Coach 메일 기관',
         ]);
 
-        $user = User::factory()->create(['name' => 'TEST', 'email' => 'coach@example.com', 'team' => 'CO']);
+        $user = User::factory()->create(['name' => 'TEST', 'email' => 'coach@example.com', 'team' => 'COACH']);
 
         Livewire::actingAs($user)
             ->withQueryParams(['team_menu' => 'coach'])
