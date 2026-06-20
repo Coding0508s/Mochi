@@ -239,7 +239,7 @@
 
             {{-- ── 일정 관리 ── --}}
             @php
-                $scheduleMenuEnabled = true;
+                $scheduleMenuEnabled = false;
             @endphp
             <div class="sidebar-group">
                 <button type="button"
