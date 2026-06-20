@@ -8,6 +8,7 @@ use App\Models\SupportRecord;
 use App\Support\SupportRecordCascadeDeleter;
 use App\Support\SupportReportStoredMailNotifier;
 use App\Support\TeamMenuContext;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
@@ -647,22 +648,29 @@ class SupportList extends Component
             ->paginate(20);
 
         // 필터 드롭다운용 데이터 (Year 컬럼 없으면 Support_Date 연도 사용)
-        $years = SupportRecord::distinctFilterYears();
+        $years = Cache::remember('support-list:distinct-years', now()->addMinutes(10), fn () => SupportRecord::distinctFilterYears());
 
-        $trList = SupportRecord::tableHasColumn('TR_Name')
-            ? SupportRecord::query()
-                ->whereNotNull('TR_Name')
-                ->where('TR_Name', '!=', '')
-                ->distinct()
-                ->orderBy('TR_Name')
-                ->pluck('TR_Name')
+        $trList = Cache::remember('support-list:tr-list', now()->addMinutes(10), function () {
+            return SupportRecord::tableHasColumn('TR_Name')
+                ? SupportRecord::query()
+                    ->whereNotNull('TR_Name')
+                    ->where('TR_Name', '!=', '')
+                    ->distinct()
+                    ->orderBy('TR_Name')
+                    ->pluck('TR_Name')
+                : collect();
+        });
+
+        $shouldLoadInstitutions = $this->showContractModal || $this->showModal;
+        $institutions = $shouldLoadInstitutions
+            ? Cache::remember('support-list:institutions-for-modal', now()->addMinutes(10), function () {
+                return Institution::query()
+                    ->with('accountInfo')
+                    ->whereNotNull('SKcode')
+                    ->orderBy('AccountName')
+                    ->get(['SKcode', 'AccountName']);
+            })
             : collect();
-
-        $institutions = Institution::query()
-            ->with('accountInfo')
-            ->whereNotNull('SKcode')
-            ->orderBy('AccountName')
-            ->get(['SKcode', 'AccountName']);
 
         $keyword = trim($this->formInstitutionKeyword);
         $institutionSuggestions = collect();

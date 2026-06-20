@@ -23,6 +23,43 @@
     $activeTeamMenu = \App\Support\TeamMenuContext::activeMenu($sidebarUser);
     $showAllTeamSidebars = \App\Support\TeamMenuContext::showAllTeamSidebars($sidebarUser);
     $crossTeamReadOnly = \App\Support\TeamMenuContext::isCrossTeamReadOnlyContext($sidebarUser);
+
+    $topbarDisplayName = 'User';
+    if ($sidebarUser !== null) {
+        $topbarDisplayName = \Illuminate\Support\Facades\Cache::remember(
+            'layout:topbar-display-name:'.$sidebarUser->id,
+            now()->addMinutes(10),
+            fn (): string => $sidebarUser->preferredDisplayName()
+        );
+    }
+
+    $canSeeManagementMenus = (bool) ($sidebarUser?->hasFullAccess());
+    $canSeeSetupMenus = $canSeeManagementMenus || (bool) ($sidebarUser?->can('accessSetup'));
+
+    $peopleTeams = collect();
+    if (\Illuminate\Support\Facades\Schema::hasTable('department')) {
+        $cachedTeams = \Illuminate\Support\Facades\Cache::remember(
+            'layout:people-teams:v1',
+            now()->addMinutes(10),
+            fn (): array => \App\Models\Department::query()
+                ->select('DEPTNO', 'DEPTNAME')
+                ->get()
+                ->map(fn (\App\Models\Department $department): array => [
+                    'DEPTNO' => (string) $department->DEPTNO,
+                    'DEPTNAME' => (string) $department->DEPTNAME,
+                ])
+                ->all()
+        );
+
+        $peopleTeams = \App\Models\Department::sortForPeopleSidebar(
+            collect($cachedTeams)->map(function (array $row): \App\Models\Department {
+                $department = new \App\Models\Department;
+                $department->forceFill($row);
+
+                return $department;
+            })
+        );
+    }
 @endphp
 
 {{-- Alpine.js: 사이드바 아코디언(열고 닫기) 에 사용 --}}
@@ -32,19 +69,14 @@
          openPeople: {{ request()->routeIs('people.*') ? 'true' : 'false' }},
          openScheduleManagement: {{ request()->routeIs('schedules.*', 'shared-supplies.*', 'vehicle-usage-history.*') ? 'true' : 'false' }},
          openTeams: true,
-        openCS: {{ $isCoTeamRoute && ($activeTeamMenu === 'cs' || ($activeTeamMenu === null && auth()->user()?->isCsTeam())) ? 'true' : 'false' }},
-        openCoach: {{ $isCoTeamRoute && ($activeTeamMenu === 'coach' || ($activeTeamMenu === null && auth()->user()?->isCoachTeam())) ? 'true' : 'false' }},
-        openCO: {{ $isCoTeamRoute && ($activeTeamMenu === 'co' || ($activeTeamMenu === null && ! auth()->user()?->isCsTeam() && ! auth()->user()?->isCoachTeam())) ? 'true' : 'false' }},
+        openCS: {{ $isCoTeamRoute && ($activeTeamMenu === 'cs' || ($activeTeamMenu === null && $sidebarUser?->isCsTeam())) ? 'true' : 'false' }},
+        openCoach: {{ $isCoTeamRoute && ($activeTeamMenu === 'coach' || ($activeTeamMenu === null && $sidebarUser?->isCoachTeam())) ? 'true' : 'false' }},
+        openCO: {{ $isCoTeamRoute && ($activeTeamMenu === 'co' || ($activeTeamMenu === null && ! $sidebarUser?->isCsTeam() && ! $sidebarUser?->isCoachTeam())) ? 'true' : 'false' }},
          openReview: false,
          openGoal: false,
          openSetup: {{ request()->routeIs('setup.*') ? 'true' : 'false' }},
     }"
     @keydown.escape.window="sidebarOpen = false">
-    @php
-        $topbarDisplayName = auth()->user()?->preferredDisplayName() ?? 'User';
-        $canSeeManagementMenus = (bool) auth()->user()?->hasFullAccess();
-        $canSeeSetupMenus = $canSeeManagementMenus || (bool) auth()->user()?->can('accessSetup');
-    @endphp
 
     {{-- 상단 헤더 (전체 너비) --}}
     <header class="mochi-topbar flex-shrink-0">
@@ -169,13 +201,6 @@
             {{-- ── People ── --}}
             <div class="sidebar-group">
                 @php
-                    $peopleTeams = \Illuminate\Support\Facades\Schema::hasTable('department')
-                        ? \App\Models\Department::sortForPeopleSidebar(
-                            \App\Models\Department::query()
-                                ->select('DEPTNO', 'DEPTNAME')
-                                ->get()
-                        )
-                        : collect();
                     $activePeopleTeam = (string) request()->query('team', '');
                     $activePeopleStatus = (string) request()->query('status', '');
                 @endphp
@@ -313,7 +338,7 @@
                 <div x-show="openTeams" class="sidebar-sublist">
 
                     @php
-                        $isSidebarMenuActive = static function (array $menu, ?string $expectedTeamMenu = null): bool {
+                        $isSidebarMenuActive = function (array $menu, ?string $expectedTeamMenu = null) use ($sidebarUser): bool {
                             if (! empty($menu['routeIs'] ?? null)) {
                                 $active = request()->routeIs($menu['routeIs']);
                             } elseif (! empty($menu['route'] ?? null)) {
@@ -328,7 +353,7 @@
 
                             $activeTeamMenu = request()->query('team_menu');
                             if (! is_string($activeTeamMenu) || $activeTeamMenu === '') {
-                                $activeTeamMenu = \App\Support\TeamMenuContext::activeMenu(auth()->user());
+                                $activeTeamMenu = \App\Support\TeamMenuContext::activeMenu($sidebarUser);
                             }
 
                             return $activeTeamMenu === $expectedTeamMenu;

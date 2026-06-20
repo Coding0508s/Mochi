@@ -2,10 +2,9 @@
 @auth
 <div
     class="relative flex shrink-0 items-center"
-    wire:poll.30s="loadCounters"
+    wire:poll.visible.120s="loadCounters"
     x-data="{ open: false }"
     @click.outside="open = false"
-    x-on:livewire:navigated.window="$wire.loadCounters()"
 >
     <button
         type="button"

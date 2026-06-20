@@ -4,8 +4,10 @@ namespace App\Support;
 
 use App\DataTransferObjects\InstitutionListFilters;
 use App\Models\Employee;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -18,22 +20,38 @@ final class InstitutionAccountListQuery
     private const DEPT_CS = 'A03';
 
     /**
+     * @var array<int, string>|null
+     */
+    private ?array $hiddenInstitutionSkCodesCache = null;
+
+    /**
      * @return array<int, string>
      */
     public function hiddenInstitutionSkCodes(): array
     {
+        if ($this->hiddenInstitutionSkCodesCache !== null) {
+            return $this->hiddenInstitutionSkCodesCache;
+        }
+
         if (! Schema::hasTable('institution_visibility_overrides')) {
             return [];
         }
 
-        return DB::table('institution_visibility_overrides')
-            ->whereNotNull('hidden_at')
-            ->pluck('sk_code')
-            ->filter(fn ($value): bool => filled($value))
-            ->map(fn ($value): string => (string) $value)
-            ->unique()
-            ->values()
-            ->all();
+        /** @var array<int, string> $hiddenSkCodes */
+        $hiddenSkCodes = Cache::remember('institution-list:hidden-sk-codes:v1', now()->addSeconds(30), function (): array {
+            return DB::table('institution_visibility_overrides')
+                ->whereNotNull('hidden_at')
+                ->pluck('sk_code')
+                ->filter(fn ($value): bool => filled($value))
+                ->map(fn ($value): string => (string) $value)
+                ->unique()
+                ->values()
+                ->all();
+        });
+
+        $this->hiddenInstitutionSkCodesCache = $hiddenSkCodes;
+
+        return $hiddenSkCodes;
     }
 
     /**
@@ -92,10 +110,28 @@ final class InstitutionAccountListQuery
 
     public function paginate(InstitutionListFilters $filters, int $perPage = 20): LengthAwarePaginator
     {
-        return $this->accountInformationListQuery($filters)
+        $page = Paginator::resolveCurrentPage(default: 1);
+        $baseQuery = $this->accountInformationListQuery($filters);
+
+        $countCacheKey = $this->paginationCountCacheKey($filters, $perPage);
+        $total = Cache::remember($countCacheKey, now()->addSeconds(30), fn (): int => (clone $baseQuery)->count());
+
+        $items = (clone $baseQuery)
             ->with($this->accountInformationEagerLoads())
             ->tap(fn (Builder $query) => $this->applyAccountInformationListSort($query, $filters))
-            ->paginate($perPage);
+            ->forPage($page, $perPage)
+            ->get();
+
+        return new LengthAwarePaginator(
+            items: $items,
+            total: $total,
+            perPage: $perPage,
+            currentPage: $page,
+            options: [
+                'path' => Paginator::resolveCurrentPath(),
+                'pageName' => 'page',
+            ],
+        );
     }
 
     public function listQueryForExport(InstitutionListFilters $filters): Builder
@@ -415,5 +451,27 @@ final class InstitutionAccountListQuery
     public function normalizeManagerAlias(string $value): string
     {
         return ManagerNameNormalizer::normalize($value);
+    }
+
+    private function paginationCountCacheKey(InstitutionListFilters $filters, int $perPage): string
+    {
+        $user = auth()->user();
+
+        return 'institution-list:paginate-total:'.sha1((string) json_encode([
+            'user_id' => $user?->id,
+            'team_menu' => request()->query('team_menu'),
+            'search' => $filters->search,
+            'status_filter' => $filters->statusFilter,
+            'assignment_filter' => $filters->assignmentFilter,
+            'filter_co' => $filters->filterCo,
+            'filter_tr' => $filters->filterTr,
+            'filter_cs' => $filters->filterCs,
+            'sort_field' => $filters->sortField,
+            'sort_direction' => $filters->sortDirection,
+            'per_page' => $perPage,
+            'manager_column' => $this->currentUserManagerColumn(),
+            'aliases' => $this->resolveCurrentUserManagerAliases(),
+            'hidden_sk_hash' => sha1(implode('|', $this->hiddenInstitutionSkCodes())),
+        ], JSON_UNESCAPED_UNICODE));
     }
 }

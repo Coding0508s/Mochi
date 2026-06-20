@@ -24,6 +24,7 @@ use App\Support\TeamMenuContext;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Attributes\On;
@@ -865,17 +866,18 @@ class InstitutionList extends Component
         $hiddenInstitutionSkCodes = $accountListQuery->hiddenInstitutionSkCodes();
 
         // 상단 요약 카드용 집계 (S_Account_Information 기준)
-        $managerColumn = $accountListQuery->currentUserManagerColumn();
-
+        $managerColumn = $accountListQuery->currentUserManagerColumn() ?? 'CO';
+        $assignmentColumn = in_array($managerColumn, ['CO', 'TR', 'CS'], true) ? $managerColumn : 'CO';
         $summaryQuery = fn (): Builder => $accountListQuery->accountInformationSummaryQuery($filters);
 
-        $allInstitutionCount = $summaryQuery()->count();
+        /** @var object{total_count:int|string|null,assigned_count:int|string|null}|null $summaryCounts */
+        $summaryCounts = $summaryQuery()
+            ->selectRaw('COUNT(*) as total_count')
+            ->selectRaw("SUM(CASE WHEN `{$assignmentColumn}` IS NULL OR `{$assignmentColumn}` = '' THEN 0 ELSE 1 END) as assigned_count")
+            ->first();
 
-        $assignmentColumn = $managerColumn ?? 'CO';
-
-        $assignedCoCount = $summaryQuery()
-            ->tap(fn (Builder $query) => $accountListQuery->applyManagerAssignedConstraint($query, $assignmentColumn))
-            ->count();
+        $allInstitutionCount = (int) ($summaryCounts?->total_count ?? 0);
+        $assignedCoCount = (int) ($summaryCounts?->assigned_count ?? 0);
 
         $myAssignedCoCount = $summaryQuery()
             ->tap(fn (Builder $query) => $accountListQuery->applyCurrentUserManagerScopeOnAccountInformation($query))
@@ -883,7 +885,21 @@ class InstitutionList extends Component
 
         $unassignedCoCount = max(0, $allInstitutionCount - $assignedCoCount);
 
-        $this->institutionTableTotal = $accountListQuery->accountInformationListQuery($filters)->count();
+        $hasExtraListFilters = filled($filters->search)
+            || filled($filters->filterCo)
+            || filled($filters->filterTr)
+            || filled($filters->filterCs);
+
+        if (! $hasExtraListFilters) {
+            $this->institutionTableTotal = match ($filters->assignmentFilter) {
+                'assigned' => $assignedCoCount,
+                'my_assigned' => $myAssignedCoCount,
+                'unassigned' => $unassignedCoCount,
+                default => $allInstitutionCount,
+            };
+        } else {
+            $this->institutionTableTotal = $accountListQuery->accountInformationListQuery($filters)->count();
+        }
 
         // 기관 구분 목록 (필터 드롭다운용)
         $gubunList = Institution::query()
@@ -1077,22 +1093,28 @@ class InstitutionList extends Component
             return collect();
         }
 
-        return Employee::query()
-            ->where('WORKDEPT', $deptNo)
-            ->where('STATUS', 1)
-            ->get(['ENGLISHNAME', 'KOREANAME'])
-            ->map(function (Employee $employee): string {
-                $english = trim((string) ($employee->ENGLISHNAME ?? ''));
-                if ($english !== '') {
-                    return $english;
-                }
+        $cacheKey = 'institution-list:manager-options:'.$deptNo;
+        $names = Cache::remember($cacheKey, now()->addMinutes(10), function () use ($deptNo): array {
+            return Employee::query()
+                ->where('WORKDEPT', $deptNo)
+                ->where('STATUS', 1)
+                ->get(['ENGLISHNAME', 'KOREANAME'])
+                ->map(function (Employee $employee): string {
+                    $english = trim((string) ($employee->ENGLISHNAME ?? ''));
+                    if ($english !== '') {
+                        return $english;
+                    }
 
-                return trim((string) ($employee->KOREANAME ?? ''));
-            })
-            ->filter(fn (string $name): bool => $name !== '')
-            ->unique()
-            ->sort()
-            ->values();
+                    return trim((string) ($employee->KOREANAME ?? ''));
+                })
+                ->filter(fn (string $name): bool => $name !== '')
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+        });
+
+        return collect($names)->map(fn (mixed $name): string => (string) $name)->values();
     }
 
     /**
