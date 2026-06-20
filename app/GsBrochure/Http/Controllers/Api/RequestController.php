@@ -9,6 +9,7 @@ use App\GsBrochure\Models\Invoice;
 use App\GsBrochure\Models\RequestItem;
 use App\GsBrochure\Models\StockHistory;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -95,12 +96,7 @@ class RequestController extends Controller
         }
 
         $requestDate = trim((string) $data['date']) !== '' ? trim((string) $data['date']) : now()->format('Y-m-d');
-        $inputContactName = trim((string) ($data['contact_name'] ?? ''));
-        $requesterName = trim((string) ($request->user()?->name ?? ''));
-        if ($requesterName === '') {
-            $requesterName = trim((string) ($request->user()?->email ?? ''));
-        }
-        $contactName = $requesterName !== '' ? $requesterName : $inputContactName;
+        $contactName = $this->resolveRequesterName($request, trim((string) ($data['contact_name'] ?? '')));
         $requestedBrochures = collect($data['brochures'])
             ->map(function (array $item): array {
                 return [
@@ -347,6 +343,26 @@ class RequestController extends Controller
         ];
     }
 
+    private function resolveRequesterName(Request $request, string $inputContactName = ''): string
+    {
+        $user = $request->user();
+        if ($user instanceof User) {
+            $fromUser = trim($user->preferredDisplayName());
+            if ($fromUser !== '') {
+                return $fromUser;
+            }
+        }
+
+        return $inputContactName;
+    }
+
+    private function formatTeamsRequesterName(?string $contactName): string
+    {
+        $name = trim((string) ($contactName ?? ''));
+
+        return $name !== '' ? $name : '외부 신청자';
+    }
+
     private function notifyTeams(BrochureRequest $req, array $addedInvoiceNumbers): void
     {
         $webhookUrl = config('services.gs_brochure_teams.webhook_url');
@@ -356,7 +372,7 @@ class RequestController extends Controller
 
         try {
             $items = $req->requestItems()->get();
-            $requesterName = trim((string) ($req->contact_name ?? '')) ?: '외부 신청자';
+            $requesterName = $this->formatTeamsRequesterName($req->contact_name);
             $brochureFacts = $items->map(fn ($item) => [
                 'name' => $item->brochure_name ?? '-',
                 'value' => ($item->quantity ?? 0).'권',
@@ -411,7 +427,7 @@ class RequestController extends Controller
         }
 
         try {
-            $requesterName = trim((string) ($req->contact_name ?? '')) ?: '외부 신청자';
+            $requesterName = $this->formatTeamsRequesterName($req->contact_name);
             $invoiceFacts = array_map(fn ($num) => ['name' => '운송장 번호', 'value' => $num], $addedNumbers);
             $payload = [
                 '@type' => 'MessageCard',

@@ -82,18 +82,24 @@
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300" for="phone">전화번호</label>
                         <input class="block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm focus:border-primary focus:ring-primary dark:text-white sm:text-sm py-2.5" id="phone" name="phone" placeholder="010-0000-0000" type="tel" maxlength="13" required/>
                     </div>
-                    <div class="space-y-2">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300" for="verify-code">인증번호</label>
-                        <div class="flex flex-wrap items-center gap-3">
-                            <span id="verify-code-wrap" class="hidden">
-                                <input class="block w-24 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm focus:border-primary focus:ring-primary dark:text-white sm:text-sm py-2.5" id="verify-code" placeholder="6자리" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code"/>
-                            </span>
-                            <button type="button" id="verify-btn" class="px-4 py-2.5 rounded-lg bg-primary hover:bg-purple-800 text-white text-sm font-medium transition-colors whitespace-nowrap shadow-sm disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-primary">
-                                인증번호 발송
-                            </button>
-                            <span id="verify-status" class="text-sm text-gray-500 dark:text-gray-400"></span>
+                    @guest
+                        <div class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300" for="verify-code">인증번호</label>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <span id="verify-code-wrap" class="hidden">
+                                    <input class="block w-24 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm focus:border-primary focus:ring-primary dark:text-white sm:text-sm py-2.5" id="verify-code" placeholder="6자리" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code"/>
+                                </span>
+                                <button type="button" id="verify-btn" class="px-4 py-2.5 rounded-lg bg-primary hover:bg-purple-800 text-white text-sm font-medium transition-colors whitespace-nowrap shadow-sm disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-primary">
+                                    인증번호 발송
+                                </button>
+                                <span id="verify-status" class="text-sm text-gray-500 dark:text-gray-400"></span>
+                            </div>
                         </div>
-                    </div>
+                    @else
+                        <div class="space-y-2 flex items-end">
+                            <p class="text-sm text-emerald-600 dark:text-emerald-400 pb-2.5">MOCHI 로그인 사용자는 인증번호 없이 신청할 수 있습니다.</p>
+                        </div>
+                    @endguest
                 </div>
                 <div class="mt-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-700">
                     <div class="flex items-start gap-3">
@@ -166,7 +172,7 @@
         </section>
 
         <div class="flex justify-end pt-4 pb-12">
-            <button type="submit" id="brochureSubmitBtn" disabled class="px-10 py-3 bg-primary hover:bg-purple-800 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary disabled:active:scale-100">
+            <button type="submit" id="brochureSubmitBtn" @guest disabled @endguest class="px-10 py-3 bg-primary hover:bg-purple-800 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary disabled:active:scale-100">
                 신청하기
             </button>
         </div>
@@ -177,6 +183,8 @@
 <script src="{{ asset('js/gs-brochure-api.js') }}"></script>
 <script>
 (function() {
+    window.skipPhoneVerification = @json(auth()->check());
+    window.phoneVerified = window.skipPhoneVerification;
     window.BROCHURE_PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='267' viewBox='0 0 200 267'%3E%3Crect fill='%23e5e7eb' width='200' height='267'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%239ca3af' font-size='14' font-family='sans-serif'%3E%EC%9D%B4%EB%AF%B8%EC%A7%80%20%EC%97%86%EC%9D%8C%3C/text%3E%3C/svg%3E";
 
     /** img src에 절대 undefined가 들어가지 않도록 보장 (GET /undefined 404 방지) */
@@ -506,6 +514,11 @@
         loadBrochureDropdown();
         initOrgNameAutocomplete();
 
+        if (window.skipPhoneVerification) {
+            var submitBtn = document.getElementById('brochureSubmitBtn');
+            if (submitBtn) submitBtn.disabled = false;
+        }
+
         var trigger = document.getElementById('brochureDropdownTrigger');
         var panel = document.getElementById('brochureDropdownPanel');
         var wrap = document.getElementById('brochureDropdownWrap');
@@ -633,6 +646,9 @@
         });
         phoneEl.addEventListener('input', function() { formatPhoneNumberV2(this); });
         phoneEl.addEventListener('input', function() {
+            if (window.skipPhoneVerification) {
+                return;
+            }
             if (window.phoneVerified) {
                 window.phoneVerified = false;
                 var submitBtn = document.getElementById('brochureSubmitBtn');

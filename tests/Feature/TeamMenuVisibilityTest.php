@@ -57,4 +57,50 @@ class TeamMenuVisibilityTest extends TestCase
             ->get('/store/sales')
             ->assertOk();
     }
+
+    public function test_cs_team_sidebar_shows_brochure_request_menu_only(): void
+    {
+        $cs = User::factory()->create([
+            'team' => 'CS',
+            'is_admin' => false,
+        ]);
+
+        $response = $this->actingAs($cs)->get(route('profile.edit'));
+
+        $response->assertOk();
+        $response->assertSee('co/gs-brochure/request?team_menu=cs', false);
+        $response->assertSee('sidebar-subitem-label">브로셔 신청<', false);
+        $response->assertDontSee('sidebar-subitem-label">신청 내역<', false);
+    }
+
+    public function test_coach_team_sidebar_shows_brochure_request_menu_only(): void
+    {
+        $coach = User::factory()->create([
+            'team' => 'COACH',
+            'is_admin' => false,
+        ]);
+
+        $response = $this->actingAs($coach)->get(route('profile.edit'));
+
+        $response->assertOk();
+        $response->assertSee('co/gs-brochure/request?team_menu=coach', false);
+        $response->assertSee('sidebar-subitem-label">브로셔 신청<', false);
+        $response->assertDontSee('sidebar-subitem-label">신청 내역<', false);
+    }
+
+    public function test_cs_user_can_access_brochure_request_and_list_pages(): void
+    {
+        $cs = User::factory()->create([
+            'team' => 'CS',
+            'is_admin' => false,
+        ]);
+
+        $this->actingAs($cs)
+            ->get(route('co.gs-brochure.request', ['team_menu' => 'cs']))
+            ->assertOk();
+
+        $this->actingAs($cs)
+            ->get(route('co.gs-brochure.request', ['view' => 'list', 'team_menu' => 'cs']))
+            ->assertOk();
+    }
 }

@@ -9,6 +9,7 @@ use App\GsBrochure\Models\StockHistory;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class GsBrochureApiBoundaryAndTransactionTest extends TestCase
@@ -277,5 +278,94 @@ class GsBrochureApiBoundaryAndTransactionTest extends TestCase
             'after_stock' => 170,
             'schoolname' => '성공 기관',
         ]);
+    }
+
+    public function test_teams_notification_uses_applicant_label_and_logged_in_requester_name(): void
+    {
+        Http::fake();
+        config(['services.gs_brochure_teams.webhook_url' => 'https://example.test/teams-webhook']);
+
+        $staffUser = User::factory()->create([
+            'name' => '홍길동',
+        ]);
+        $brochure = Brochure::create([
+            'name' => '알림 테스트 브로셔',
+            'image_url' => null,
+            'stock' => 0,
+            'stock_warehouse' => 200,
+        ]);
+
+        $response = $this->actingAs($staffUser)->postJson('/api/gs-brochure/requests', [
+            'date' => '2026-06-20',
+            'schoolname' => '알림 테스트 기관',
+            'address' => '서울시 중구',
+            'phone' => '010-2222-3333',
+            'contact_id' => null,
+            'contact_name' => null,
+            'brochures' => [[
+                'brochure' => $brochure->id,
+                'brochureName' => $brochure->name,
+                'quantity' => 20,
+            ]],
+            'invoices' => [],
+        ]);
+
+        $response->assertOk();
+
+        Http::assertSent(function ($request) {
+            if ($request->url() !== 'https://example.test/teams-webhook') {
+                return false;
+            }
+
+            $payload = $request->data();
+            $facts = $payload['sections'][0]['facts'] ?? [];
+            $applicantFact = collect($facts)->firstWhere('name', '신청자');
+
+            return is_array($applicantFact)
+                && ($applicantFact['value'] ?? null) === '홍길동';
+        });
+    }
+
+    public function test_teams_notification_uses_external_applicant_label_for_guest(): void
+    {
+        Http::fake();
+        config(['services.gs_brochure_teams.webhook_url' => 'https://example.test/teams-webhook']);
+
+        $brochure = Brochure::create([
+            'name' => '게스트 알림 브로셔',
+            'image_url' => null,
+            'stock' => 0,
+            'stock_warehouse' => 200,
+        ]);
+
+        $response = $this->postJson('/api/gs-brochure/requests', [
+            'date' => '2026-06-20',
+            'schoolname' => '게스트 알림 기관',
+            'address' => '서울시 용산구',
+            'phone' => '010-4444-5555',
+            'contact_id' => null,
+            'contact_name' => null,
+            'brochures' => [[
+                'brochure' => $brochure->id,
+                'brochureName' => $brochure->name,
+                'quantity' => 20,
+            ]],
+            'invoices' => [],
+        ]);
+
+        $response->assertOk();
+
+        Http::assertSent(function ($request) {
+            if ($request->url() !== 'https://example.test/teams-webhook') {
+                return false;
+            }
+
+            $payload = $request->data();
+            $facts = $payload['sections'][0]['facts'] ?? [];
+            $applicantFact = collect($facts)->firstWhere('name', '신청자');
+
+            return is_array($applicantFact)
+                && ($applicantFact['value'] ?? null) === '외부 신청자';
+        });
     }
 }

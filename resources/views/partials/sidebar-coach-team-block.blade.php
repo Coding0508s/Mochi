@@ -30,6 +30,7 @@
                 ['label' => '교직원 연락처보기', 'path' => '/contacts', 'route' => 'contacts', 'icon' => 'phone'],
             ],
         ])
+        @include('partials.sidebar-brochure-team-menus', ['teamMenuQuery' => 'coach'])
         <a href="/coach/retired-teachers?team_menu=coach"
            class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ request()->routeIs('coach.retired-teachers.*') ? 'sidebar-subitem-active' : '' }}"
            @if(request()->routeIs('coach.retired-teachers.*')) aria-current="page" @endif>

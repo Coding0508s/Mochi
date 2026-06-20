@@ -24,5 +24,6 @@
                 ['label' => '기관지원보고서', 'path' => '/supports', 'route' => 'supports', 'icon' => 'document'],
             ],
         ])
+        @include('partials.sidebar-brochure-team-menus', ['teamMenuQuery' => 'cs'])
     </div>
 </div>

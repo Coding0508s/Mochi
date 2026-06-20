@@ -27,7 +27,10 @@ Route::prefix('gs-brochure')->group(function () {
     Route::get('brochures', [BrochureController::class, 'index']);
 
     Route::get('requests/search', [RequestController::class, 'search']);
-    Route::post('requests', [RequestController::class, 'store']);
+
+    Route::middleware(['web'])->group(function () {
+        Route::post('requests', [RequestController::class, 'store']);
+    });
 
     Route::get('institutions', [InstitutionController::class, 'listPublic']);
     Route::post('admin/login', [AdminController::class, 'login']);

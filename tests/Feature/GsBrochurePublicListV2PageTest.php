@@ -60,4 +60,28 @@ class GsBrochurePublicListV2PageTest extends TestCase
         $adminResponse = $this->actingAs($adminUser)->get('/co/gs-brochure/requests');
         $adminResponse->assertRedirect('/co/gs-brochure/request?view=list');
     }
+
+    public function test_guest_sees_phone_verification_ui_on_request_form(): void
+    {
+        $response = $this->get('/co/gs-brochure/request');
+
+        $response->assertOk();
+        $response->assertSee('id="verify-btn"', false);
+        $response->assertSee('인증번호 발송', false);
+        $response->assertSee('skipPhoneVerification = false', false);
+        $response->assertDontSee('MOCHI 로그인 사용자는 인증번호 없이 신청할 수 있습니다.', false);
+    }
+
+    public function test_authenticated_user_skips_phone_verification_on_request_form(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/co/gs-brochure/request');
+
+        $response->assertOk();
+        $response->assertSee('MOCHI 로그인 사용자는 인증번호 없이 신청할 수 있습니다.', false);
+        $response->assertDontSee('id="verify-btn"', false);
+        $response->assertSee('skipPhoneVerification = true', false);
+        $response->assertDontSee('skipPhoneVerification = false', false);
+    }
 }
