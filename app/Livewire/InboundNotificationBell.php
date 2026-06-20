@@ -6,6 +6,7 @@ use App\Models\ExternalAssignmentInboundLog;
 use App\Models\InboundNotificationDismissal;
 use App\Models\UrgentSupportNotification;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -42,35 +43,26 @@ class InboundNotificationBell extends Component
     public function mount(): void
     {
         if (auth()->check()) {
-            $this->loadCounters();
+            $this->refreshUnreadCount();
         }
     }
 
     #[On('notifications-updated')]
     public function refreshNotifications(): void
     {
-        $this->loadCounters();
+        $this->refreshUnreadCount();
     }
 
-    public function loadCounters(): void
+    public function refreshUnreadCount(): void
     {
         if (! auth()->check()) {
             return;
         }
 
         $user = auth()->user();
-
         $lastSeen = $user->last_inbound_seen_at;
 
-        // 사용자별 "내 화면에서 숨김"한 로그 id 목록. 카운트와 목록 양쪽에 같은 필터를 적용해
-        // 다른 사용자에는 영향을 주지 않으면서 본인 알림만 비웁니다.
-        $dismissedIds = InboundNotificationDismissal::query()
-            ->where('user_id', $user->id)
-            ->pluck('log_id')
-            ->all();
-
-        $unreadQuery = ExternalAssignmentInboundLog::query()
-            ->when($dismissedIds !== [], fn ($q) => $q->whereNotIn('id', $dismissedIds));
+        $unreadQuery = $this->visibleInboundLogsQuery((int) $user->id);
         if ($lastSeen !== null) {
             $unreadQuery->where('received_at', '>', $lastSeen);
         }
@@ -83,9 +75,20 @@ class InboundNotificationBell extends Component
             ->count();
 
         $this->unreadCount = $inboundUnreadCount + $urgentUnreadCount;
+    }
 
-        $rows = ExternalAssignmentInboundLog::query()
-            ->when($dismissedIds !== [], fn ($q) => $q->whereNotIn('id', $dismissedIds))
+    public function loadPanelData(): void
+    {
+        if (! auth()->check()) {
+            return;
+        }
+
+        $this->refreshUnreadCount();
+
+        $user = auth()->user();
+        $lastSeen = $user->last_inbound_seen_at;
+
+        $rows = $this->visibleInboundLogsQuery((int) $user->id)
             ->orderByDesc('received_at')
             ->limit(10)
             ->get();
@@ -228,7 +231,7 @@ class InboundNotificationBell extends Component
                 'read_at' => now(),
             ]);
 
-        $this->loadCounters();
+        $this->loadPanelData();
     }
 
     public function deleteLog(int|string $id): void
@@ -252,7 +255,7 @@ class InboundNotificationBell extends Component
                     ]);
             }
 
-            $this->loadCounters();
+            $this->loadPanelData();
 
             return;
         }
@@ -272,7 +275,7 @@ class InboundNotificationBell extends Component
             ['dismissed_at' => now()],
         );
 
-        $this->loadCounters();
+        $this->loadPanelData();
     }
 
     public function deleteAllLogs(): void
@@ -315,7 +318,7 @@ class InboundNotificationBell extends Component
                 'dismissed_at' => now(),
             ]);
 
-        $this->loadCounters();
+        $this->loadPanelData();
     }
 
     public function render(): View
@@ -447,5 +450,13 @@ class InboundNotificationBell extends Component
         $s = trim((string) $value);
 
         return $s === '' ? null : $s;
+    }
+
+    private function visibleInboundLogsQuery(int $userId): Builder
+    {
+        return ExternalAssignmentInboundLog::query()
+            ->whereNotIn('id', InboundNotificationDismissal::query()
+                ->select('log_id')
+                ->where('user_id', $userId));
     }
 }

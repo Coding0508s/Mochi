@@ -1259,34 +1259,31 @@ class SupportCreateForm extends Component
         $keyword = trim($this->formInstitutionKeyword);
         $normalizedKeyword = preg_replace('/\s+/u', '', $keyword) ?? '';
 
-        // Eloquent\Collection::merge()는 항목을 모델로 간주해 getKey()를 호출한다.
-        // 배열로 합치려면 일반 Support\Collection으로 바꾼 뒤 merge 한다.
-        $institutionSuggestions = collect(
-            Institution::query()
-                ->with('accountInfo')
-                ->whereDoesntHave('accountInfo', function ($query): void {
-                    $query->where('Customer_Type', 'like', '%해지%');
-                })
-                ->where(function ($query) use ($normalizedKeyword): void {
-                    if ($normalizedKeyword === '') {
-                        $query->whereRaw('1 = 0');
-
-                        return;
-                    }
-
-                    $query->whereRaw("REPLACE(AccountName, ' ', '') like ?", ["%{$normalizedKeyword}%"])
-                        ->orWhereRaw("REPLACE(SKcode, ' ', '') like ?", ["%{$normalizedKeyword}%"]);
-                })
-                ->orderBy('AccountName')
-                ->limit(8)
-                ->get()
-        )->map(fn (Institution $inst): array => [
-            'SKcode' => (string) $inst->SKcode,
-            'AccountName' => $inst->resolvedAccountName(),
-            'is_potential' => false,
-            'potential_target_id' => null,
-            'dedupe_key' => 'sk:'.(string) $inst->SKcode,
-        ]);
+        $institutionSuggestions = collect();
+        if ($normalizedKeyword !== '') {
+            // Eloquent\Collection::merge()는 항목을 모델로 간주해 getKey()를 호출한다.
+            // 배열로 합치려면 일반 Support\Collection으로 바꾼 뒤 merge 한다.
+            $institutionSuggestions = collect(
+                Institution::query()
+                    ->with('accountInfo')
+                    ->whereDoesntHave('accountInfo', function ($query): void {
+                        $query->where('Customer_Type', 'like', '%해지%');
+                    })
+                    ->where(function ($query) use ($normalizedKeyword): void {
+                        $query->whereRaw("REPLACE(AccountName, ' ', '') like ?", ["%{$normalizedKeyword}%"])
+                            ->orWhereRaw("REPLACE(SKcode, ' ', '') like ?", ["%{$normalizedKeyword}%"]);
+                    })
+                    ->orderBy('AccountName')
+                    ->limit(8)
+                    ->get()
+            )->map(fn (Institution $inst): array => [
+                'SKcode' => (string) $inst->SKcode,
+                'AccountName' => $inst->resolvedAccountName(),
+                'is_potential' => false,
+                'potential_target_id' => null,
+                'dedupe_key' => 'sk:'.(string) $inst->SKcode,
+            ]);
+        }
 
         $potentialSuggestions = $this->potentialSuggestions($normalizedKeyword);
 

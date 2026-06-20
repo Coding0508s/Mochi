@@ -2,7 +2,7 @@
 @auth
 <div
     class="relative flex shrink-0 items-center"
-    wire:poll.visible.120s="loadCounters"
+    wire:poll.visible.120s="refreshUnreadCount"
     x-data="{ open: false }"
     @click.outside="open = false"
 >
@@ -12,7 +12,7 @@
         :aria-expanded="open ? 'true' : 'false'"
         aria-haspopup="true"
         aria-label="알림 열기"
-        @click="if (!open) { $wire.loadCounters() }; open = !open"
+        @click="if (!open) { $wire.loadPanelData() }; open = !open"
     >
         {{-- Lucide 스타일 벨: 종 몸통 + 하단 클래퍼 --}}
         <svg

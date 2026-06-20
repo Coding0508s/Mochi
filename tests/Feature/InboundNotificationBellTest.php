@@ -38,6 +38,7 @@ class InboundNotificationBellTest extends TestCase
             ->test(InboundNotificationBell::class)
             ->assertSet('unreadCount', 1)
             ->assertSee('1')
+            ->call('loadPanelData')
             ->assertSee('TEA 기관 정보가 반영되었습니다.');
     }
 
@@ -103,6 +104,7 @@ class InboundNotificationBellTest extends TestCase
         Livewire::actingAs($bob)
             ->test(InboundNotificationBell::class)
             ->assertSet('unreadCount', 2)
+            ->call('loadPanelData')
             ->assertSee('공동 알림 1')
             ->assertSee('공동 알림 2');
 
@@ -131,6 +133,7 @@ class InboundNotificationBellTest extends TestCase
         Livewire::actingAs($user)
             ->test(InboundNotificationBell::class)
             ->assertSet('unreadCount', 1)
+            ->call('loadPanelData')
             ->assertSee('[긴급] 긴급 기관 기관 지원 보고서')
             ->assertSee('긴급 안내 본문');
     }
@@ -258,6 +261,7 @@ class InboundNotificationBellTest extends TestCase
         $component
             ->dispatch('notifications-updated')
             ->assertSet('unreadCount', 1)
+            ->call('loadPanelData')
             ->assertSee('[긴급] 이벤트 갱신 기관 기관 지원 보고서');
     }
 

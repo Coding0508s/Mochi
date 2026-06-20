@@ -809,46 +809,72 @@ class SharedSupplyManager extends Component
             ->orderBy('starts_at')
             ->orderBy('id');
 
-        $totalSupplies = (clone $suppliesQuery)->count();
+        $isListTab = in_array($this->activeTab, ['user', 'basic'], true);
+        $isDailyTab = $this->activeTab === 'daily';
+        $isItemTab = $this->activeTab === 'item';
+        $isMonthlyTab = $this->activeTab === 'monthly';
+        $needsAggregateRows = $isDailyTab || $isItemTab || $isMonthlyTab;
 
-        $supplies = (clone $suppliesQuery)
-            ->limit($this->visibleSupplyLimit)
-            ->get();
+        $supplies = collect();
+        $hasMoreSupplies = false;
+        if ($isListTab) {
+            $supplies = (clone $suppliesQuery)
+                ->limit($this->visibleSupplyLimit)
+                ->get();
 
-        $hasMoreSupplies = $totalSupplies > $supplies->count();
+            $hasMoreSupplies = (clone $suppliesQuery)
+                ->skip($this->visibleSupplyLimit)
+                ->take(1)
+                ->exists();
+        }
 
-        $allSupplies = (clone $baseQuery)
-            ->orderBy('starts_at')
-            ->orderBy('id')
-            ->get();
-
-        $dailyGroups = $allSupplies
-            ->groupBy(static fn (SharedSupply $supply): string => $supply->starts_at->toDateString());
-
-        $itemGroups = $allSupplies
-            ->groupBy(static fn (SharedSupply $supply): string => (string) ($supply->item?->name ?? '-'));
-
+        $dailyGroups = collect();
+        $itemGroups = collect();
         $monthlySummary = [
-            'total_count' => $allSupplies->count(),
-            'user_count' => $allSupplies->pluck('user_id')->filter()->unique()->count(),
-            'item_count' => $allSupplies->pluck('shared_supply_item_id')->filter()->unique()->count(),
-            'reservation_count' => $allSupplies->filter(static fn (SharedSupply $supply): bool => str_contains((string) $supply->title, '신청 및 예약'))->count(),
+            'total_count' => 0,
+            'user_count' => 0,
+            'item_count' => 0,
+            'reservation_count' => 0,
         ];
+        $monthlyByCategory = collect();
 
-        $monthlyByCategory = $allSupplies
-            ->groupBy(static fn (SharedSupply $supply): string => (string) ($supply->schedule_category_code ?? ''))
-            ->map(function ($group, string $code): array {
-                $label = $code !== '' ? ($this->scheduleCategoryOptions()[$code] ?? '기타') : '미분류';
+        if ($needsAggregateRows) {
+            $allSupplies = (clone $suppliesQuery)->get();
 
-                return [
-                    'code' => $code,
-                    'label' => $label,
-                    'count' => $group->count(),
+            if ($isDailyTab) {
+                $dailyGroups = $allSupplies
+                    ->groupBy(static fn (SharedSupply $supply): string => $supply->starts_at->toDateString());
+            }
+
+            if ($isItemTab) {
+                $itemGroups = $allSupplies
+                    ->groupBy(static fn (SharedSupply $supply): string => (string) ($supply->item?->name ?? '-'));
+            }
+
+            if ($isMonthlyTab) {
+                $monthlySummary = [
+                    'total_count' => $allSupplies->count(),
+                    'user_count' => $allSupplies->pluck('user_id')->filter()->unique()->count(),
+                    'item_count' => $allSupplies->pluck('shared_supply_item_id')->filter()->unique()->count(),
+                    'reservation_count' => $allSupplies->filter(static fn (SharedSupply $supply): bool => str_contains((string) $supply->title, '신청 및 예약'))->count(),
                 ];
-            })
-            ->values()
-            ->sortByDesc('count')
-            ->values();
+
+                $monthlyByCategory = $allSupplies
+                    ->groupBy(static fn (SharedSupply $supply): string => (string) ($supply->schedule_category_code ?? ''))
+                    ->map(function ($group, string $code): array {
+                        $label = $code !== '' ? ($this->scheduleCategoryOptions()[$code] ?? '기타') : '미분류';
+
+                        return [
+                            'code' => $code,
+                            'label' => $label,
+                            'count' => $group->count(),
+                        ];
+                    })
+                    ->values()
+                    ->sortByDesc('count')
+                    ->values();
+            }
+        }
 
         return view('livewire.shared-supply-manager', [
             'supplies' => $supplies,
