@@ -122,4 +122,18 @@ class ExcelSerialDateTest extends TestCase
             ExcelSerialDate::completedDisplayParts('2025-07-02', 'Open-Class', 2026),
         );
     }
+
+    public function test_sql_column_in_year_excludes_empty_string_values(): void
+    {
+        $expression = ExcelSerialDate::sqlColumnInYear('Teachers.Plan_1st_Support_Date', 2026);
+
+        $this->assertStringContainsString("Teachers.Plan_1st_Support_Date != ''", $expression);
+    }
+
+    public function test_sql_normalized_date_column_uses_nullif_for_empty_string(): void
+    {
+        $expression = ExcelSerialDate::sqlNormalizedDateColumn('Teachers.Plan_1st_Support_Date');
+
+        $this->assertStringContainsString("NULLIF(Teachers.Plan_1st_Support_Date, '')", $expression);
+    }
 }

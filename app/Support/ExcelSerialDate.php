@@ -222,22 +222,22 @@ final class ExcelSerialDate
     {
         [$minSerial, $maxSerial] = self::serialBoundsForYear($year);
 
-        return "({$column} IS NOT NULL AND (".self::sqlYearEquals($column, $year)." OR ({$column} >= {$minSerial} AND {$column} <= {$maxSerial})))";
+        return "({$column} IS NOT NULL AND {$column} != '' AND (".self::sqlYearEquals($column, $year)." OR ({$column} >= {$minSerial} AND {$column} <= {$maxSerial})))";
     }
 
     public static function sqlYearEquals(string $column, int $year): string
     {
         return match (Schema::getConnection()->getDriverName()) {
-            'sqlite' => "(CAST(strftime('%Y', {$column}) AS INTEGER) = {$year})",
-            default => "(YEAR({$column}) = {$year})",
+            'sqlite' => "(CAST(strftime('%Y', NULLIF({$column}, '')) AS INTEGER) = {$year})",
+            default => "(YEAR(NULLIF({$column}, '')) = {$year})",
         };
     }
 
     public static function sqlYearNotEquals(string $column, int $year): string
     {
         return match (Schema::getConnection()->getDriverName()) {
-            'sqlite' => "(CAST(strftime('%Y', {$column}) AS INTEGER) != {$year})",
-            default => "(YEAR({$column}) != {$year})",
+            'sqlite' => "(CAST(strftime('%Y', NULLIF({$column}, '')) AS INTEGER) != {$year})",
+            default => "(YEAR(NULLIF({$column}, '')) != {$year})",
         };
     }
 
@@ -253,10 +253,10 @@ final class ExcelSerialDate
         return match (Schema::getConnection()->getDriverName()) {
             'sqlite' => "CASE WHEN {$qualifiedColumn} >= {$min} AND {$qualifiedColumn} <= {$max}"
                 ." THEN date('{$epoch}', '+' || CAST({$qualifiedColumn} AS INTEGER) || ' days')"
-                ." ELSE date({$qualifiedColumn}) END",
+                ." ELSE date(NULLIF({$qualifiedColumn}, '')) END",
             default => "CASE WHEN {$qualifiedColumn} >= {$min} AND {$qualifiedColumn} <= {$max}"
                 ." THEN DATE_ADD('{$epoch}', INTERVAL CAST({$qualifiedColumn} AS UNSIGNED) DAY)"
-                .' ELSE DATE('.$qualifiedColumn.') END',
+                ." ELSE DATE(NULLIF({$qualifiedColumn}, '')) END",
         };
     }
 
