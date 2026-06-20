@@ -38,11 +38,8 @@ final class InstitutionCatalog
         $information = DB::table('S_Account_Information')->select(self::informationSelectColumns());
 
         $masterOnly = DB::table('S_AccountName as m')
-            ->whereNotExists(function (QueryBuilder $query): void {
-                $query->select(DB::raw('1'))
-                    ->from('S_Account_Information as i')
-                    ->whereColumn('i.SK_Code', 'm.SKcode');
-            })
+            ->leftJoin('S_Account_Information as i', 'i.SK_Code', '=', 'm.SKcode')
+            ->whereNull('i.SK_Code')
             ->select(self::masterOnlySelectColumns());
 
         if (Schema::hasTable('S_GSNumber')) {

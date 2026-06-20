@@ -211,8 +211,8 @@ final class InstitutionAccountListQuery
 
     public function applyCurrentUserManagerScope(Builder $query): void
     {
-        $aliases = $this->resolveCurrentUserManagerAliases();
-        if ($aliases === []) {
+        $rawAliases = $this->resolveCurrentUserManagerRawAliases();
+        if ($rawAliases === []) {
             $query->whereRaw('1 = 0');
 
             return;
@@ -220,15 +220,10 @@ final class InstitutionAccountListQuery
 
         $column = $this->currentUserManagerColumn();
         if ($column === null) {
-            $query->whereHas('accountInfo', function (Builder $sub) use ($aliases): void {
-                $sub->where(function (Builder $inner) use ($aliases): void {
+            $query->whereHas('accountInfo', function (Builder $sub) use ($rawAliases): void {
+                $sub->where(function (Builder $inner) use ($rawAliases): void {
                     foreach (['CO', 'TR', 'CS'] as $managerColumn) {
-                        $sql = ManagerNameNormalizer::sqlColumnExpression($managerColumn);
-                        $inner->orWhere(function (Builder $columnQuery) use ($aliases, $sql): void {
-                            foreach ($aliases as $alias) {
-                                $columnQuery->orWhereRaw("{$sql} = ?", [$alias]);
-                            }
-                        });
+                        $inner->orWhereIn($managerColumn, $rawAliases);
                     }
                 });
             });
@@ -236,21 +231,15 @@ final class InstitutionAccountListQuery
             return;
         }
 
-        $sqlNormalized = ManagerNameNormalizer::sqlColumnExpression($column);
-
-        $query->whereHas('accountInfo', function (Builder $sub) use ($aliases, $sqlNormalized): void {
-            $sub->where(function (Builder $managerQuery) use ($aliases, $sqlNormalized): void {
-                foreach ($aliases as $alias) {
-                    $managerQuery->orWhereRaw("{$sqlNormalized} = ?", [$alias]);
-                }
-            });
+        $query->whereHas('accountInfo', function (Builder $sub) use ($column, $rawAliases): void {
+            $sub->whereIn($column, $rawAliases);
         });
     }
 
     public function applyCurrentUserManagerScopeOnAccountInformation(Builder $query): void
     {
-        $aliases = $this->resolveCurrentUserManagerAliases();
-        if ($aliases === []) {
+        $rawAliases = $this->resolveCurrentUserManagerRawAliases();
+        if ($rawAliases === []) {
             $query->whereRaw('1 = 0');
 
             return;
@@ -258,21 +247,16 @@ final class InstitutionAccountListQuery
 
         $column = $this->currentUserManagerColumn();
         if ($column === null) {
-            $query->where(function (Builder $inner) use ($aliases): void {
+            $query->where(function (Builder $inner) use ($rawAliases): void {
                 foreach (['CO', 'TR', 'CS'] as $managerColumn) {
-                    $sql = ManagerNameNormalizer::sqlColumnExpression($managerColumn);
-                    $inner->orWhere(function (Builder $columnQuery) use ($aliases, $sql): void {
-                        foreach ($aliases as $alias) {
-                            $columnQuery->orWhereRaw("{$sql} = ?", [$alias]);
-                        }
-                    });
+                    $inner->orWhereIn($managerColumn, $rawAliases);
                 }
             });
 
             return;
         }
 
-        $query->whereManagerMatches($column, $aliases);
+        $query->whereIn($column, $rawAliases);
     }
 
     public function applyManagerAssignedConstraint(Builder $query, string $column): void
@@ -287,7 +271,14 @@ final class InstitutionAccountListQuery
             return;
         }
 
-        $query->whereManagerMatches($column, $this->resolveSelectedManagerAliases($managerName, $deptNo));
+        $rawAliases = $this->resolveSelectedManagerRawAliases($managerName, $deptNo);
+        if ($rawAliases === []) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->whereIn($column, $rawAliases);
     }
 
     /**
@@ -451,6 +442,100 @@ final class InstitutionAccountListQuery
     public function normalizeManagerAlias(string $value): string
     {
         return ManagerNameNormalizer::normalize($value);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function resolveCurrentUserManagerRawAliases(): array
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return [];
+        }
+
+        $aliases = collect([
+            (string) ($user->name ?? ''),
+            (string) ($user->email ?? ''),
+        ]);
+
+        if (Schema::hasTable('employee')) {
+            $employee = Employee::query()
+                ->where('EMAIL', (string) ($user->email ?? ''))
+                ->first(['KOREANAME', 'ENGLISHNAME', 'EMAIL']);
+
+            if ($employee) {
+                $aliases = $aliases->merge([
+                    (string) ($employee->KOREANAME ?? ''),
+                    (string) ($employee->ENGLISHNAME ?? ''),
+                    (string) ($employee->EMAIL ?? ''),
+                ]);
+            }
+        }
+
+        return $aliases
+            ->flatMap(fn (string $value): array => $this->expandManagerAliasVariants($value))
+            ->filter(fn (string $value): bool => $value !== '')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function resolveSelectedManagerRawAliases(string $managerName, string $deptNo): array
+    {
+        $aliases = collect([$managerName]);
+
+        if (Schema::hasTable('employee')) {
+            $targetKey = ManagerNameNormalizer::normalize($managerName);
+
+            $employee = Employee::query()
+                ->where('WORKDEPT', $deptNo)
+                ->where('STATUS', 1)
+                ->get(['KOREANAME', 'ENGLISHNAME'])
+                ->first(function (Employee $employee) use ($targetKey): bool {
+                    return ManagerNameNormalizer::normalize((string) ($employee->ENGLISHNAME ?? '')) === $targetKey
+                        || ManagerNameNormalizer::normalize((string) ($employee->KOREANAME ?? '')) === $targetKey;
+                });
+
+            if ($employee !== null) {
+                $aliases->push(
+                    (string) ($employee->ENGLISHNAME ?? ''),
+                    (string) ($employee->KOREANAME ?? ''),
+                );
+            }
+        }
+
+        return $aliases
+            ->flatMap(fn (string $value): array => $this->expandManagerAliasVariants($value))
+            ->filter(fn (string $value): bool => $value !== '')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function expandManagerAliasVariants(string $value): array
+    {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return [];
+        }
+
+        $spaceNormalized = preg_replace('/\s+/u', ' ', $trimmed) ?? $trimmed;
+
+        return array_values(array_unique(array_filter([
+            $trimmed,
+            $spaceNormalized,
+            str_replace('.', ' ', $spaceNormalized),
+            str_replace(' ', '.', $spaceNormalized),
+            str_replace('_', ' ', $spaceNormalized),
+            str_replace('-', ' ', $spaceNormalized),
+        ], static fn (string $alias): bool => trim($alias) !== '')));
     }
 
     private function paginationCountCacheKey(InstitutionListFilters $filters, int $perPage): string
