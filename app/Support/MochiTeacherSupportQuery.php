@@ -33,7 +33,7 @@ final class MochiTeacherSupportQuery
             $conditions = [
                 "{$table}.teacher_id IS NOT NULL",
                 "{$table}.support_date IS NOT NULL",
-                "{$table}.support_date != ''",
+                self::sqlDateValueIsNotBlank("{$table}.support_date"),
             ];
 
             if ($year !== null) {
@@ -153,7 +153,7 @@ final class MochiTeacherSupportQuery
             $conditions = [
                 "{$table}.teacher_id IS NOT NULL",
                 "{$table}.support_date IS NOT NULL",
-                "{$table}.support_date != ''",
+                self::sqlDateValueIsNotBlank("{$table}.support_date"),
                 ExcelSerialDate::sqlColumnInYear("{$table}.support_date", $year),
             ];
 
@@ -183,7 +183,7 @@ final class MochiTeacherSupportQuery
             $conditions = [
                 "{$table}.teacher_id IS NOT NULL",
                 "{$table}.support_date IS NOT NULL",
-                "{$table}.support_date != ''",
+                self::sqlDateValueIsNotBlank("{$table}.support_date"),
             ];
 
             if ($year !== null) {
@@ -199,5 +199,13 @@ final class MochiTeacherSupportQuery
         }
 
         return '('.implode(' UNION ALL ', $parts).')';
+    }
+
+    private static function sqlDateValueIsNotBlank(string $qualifiedColumn): string
+    {
+        return match (Schema::getConnection()->getDriverName()) {
+            'sqlite' => "NULLIF(TRIM(CAST({$qualifiedColumn} AS TEXT)), '') IS NOT NULL",
+            default => "NULLIF(TRIM(CAST({$qualifiedColumn} AS CHAR)), '') IS NOT NULL",
+        };
     }
 }

@@ -55,6 +55,9 @@ class MochiTeacherSupportQueryTest extends TestCase
         $subquery = MochiTeacherSupportQuery::latestDatePerTeacherSubquerySql(null);
 
         $this->assertNotNull($subquery);
-        $this->assertStringContainsString("teacher_visit_support_reports.support_date != ''", $subquery);
+        $this->assertStringContainsString(
+            "NULLIF(TRIM(CAST(teacher_visit_support_reports.support_date AS TEXT)), '') IS NOT NULL",
+            $subquery
+        );
     }
 }
