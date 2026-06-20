@@ -16,7 +16,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOST="${CONTABO_HOST:-5.104.82.58}"
 USER="${CONTABO_USER:-root}"
 APP_DIR="${APP_DIR:-/var/www/mocchi-platform}"
-REPO="${GIT_REPO:-git@github.com:Coding0508s/Mochi.git}"
+REPO="${GIT_REPO:-https://github.com/Coding0508s/Mochi.git}"
 
 ENV_FILE="${ROOT}/.env.production"
 if [[ ! -f "$ENV_FILE" ]]; then
