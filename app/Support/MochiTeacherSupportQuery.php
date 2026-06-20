@@ -30,7 +30,11 @@ final class MochiTeacherSupportQuery
         $parts = [];
 
         foreach (self::existingReportTables() as $table) {
-            $conditions = ["{$table}.teacher_id IS NOT NULL"];
+            $conditions = [
+                "{$table}.teacher_id IS NOT NULL",
+                "{$table}.support_date IS NOT NULL",
+                "{$table}.support_date != ''",
+            ];
 
             if ($year !== null) {
                 $conditions[] = ExcelSerialDate::sqlColumnInYear("{$table}.support_date", $year);
@@ -149,6 +153,7 @@ final class MochiTeacherSupportQuery
             $conditions = [
                 "{$table}.teacher_id IS NOT NULL",
                 "{$table}.support_date IS NOT NULL",
+                "{$table}.support_date != ''",
                 ExcelSerialDate::sqlColumnInYear("{$table}.support_date", $year),
             ];
 
@@ -175,7 +180,11 @@ final class MochiTeacherSupportQuery
         $parts = [];
 
         foreach (self::existingReportTables() as $table) {
-            $conditions = ["{$table}.teacher_id IS NOT NULL", "{$table}.support_date IS NOT NULL"];
+            $conditions = [
+                "{$table}.teacher_id IS NOT NULL",
+                "{$table}.support_date IS NOT NULL",
+                "{$table}.support_date != ''",
+            ];
 
             if ($year !== null) {
                 $conditions[] = ExcelSerialDate::sqlColumnInYear("{$table}.support_date", $year);

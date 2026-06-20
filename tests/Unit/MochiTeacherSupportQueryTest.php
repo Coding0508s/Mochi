@@ -49,4 +49,12 @@ class MochiTeacherSupportQueryTest extends TestCase
         $this->assertSame('교사 지원 및 참관', $reports[10][0]['type']);
         $this->assertSame('2026-06-01', $reports[20][0]['date']);
     }
+
+    public function test_latest_date_subquery_excludes_empty_string_support_date(): void
+    {
+        $subquery = MochiTeacherSupportQuery::latestDatePerTeacherSubquerySql(null);
+
+        $this->assertNotNull($subquery);
+        $this->assertStringContainsString("teacher_visit_support_reports.support_date != ''", $subquery);
+    }
 }
