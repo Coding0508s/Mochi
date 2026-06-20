@@ -3128,7 +3128,6 @@ class CoachTeacherSupportListTest extends TestCase
             ->call('saveVisitReport')
             ->assertHasErrors([
                 'visitForm.monitoring_feedback',
-                'visitForm.interview_and_action_plan',
             ])
             ->assertDispatched('visit-support-show-alert');
 

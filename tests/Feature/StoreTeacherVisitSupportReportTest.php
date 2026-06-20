@@ -122,7 +122,7 @@ class StoreTeacherVisitSupportReportTest extends TestCase
         );
 
         $teacher->refresh();
-        $this->assertSame(now()->format('Y-m-d'), $teacher->_1st_Support_Date?->format('Y-m-d'));
+        $this->assertSame('2026-06-18', $teacher->_1st_Support_Date?->format('Y-m-d'));
         $this->assertSame('교사 지원 및 참관', $teacher->_1st_Support_Type);
 
         $this->assertDatabaseHas('teacher_visit_support_reports', [
