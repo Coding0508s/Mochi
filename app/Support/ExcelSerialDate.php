@@ -215,6 +215,14 @@ final class ExcelSerialDate
         });
     }
 
+    public static function sqlDateValueIsNotBlank(string $qualifiedColumn): string
+    {
+        return match (Schema::getConnection()->getDriverName()) {
+            'sqlite' => "NULLIF(TRIM(CAST({$qualifiedColumn} AS TEXT)), '') IS NOT NULL",
+            default => "NULLIF(TRIM(CAST({$qualifiedColumn} AS CHAR)), '') IS NOT NULL",
+        };
+    }
+
     /**
      * ISO 날짜·엑셀 serial 혼재 컬럼이 특정 연도에 속하는지 여부 (집계용 raw SQL).
      */
@@ -222,7 +230,7 @@ final class ExcelSerialDate
     {
         [$minSerial, $maxSerial] = self::serialBoundsForYear($year);
 
-        return "({$column} IS NOT NULL AND {$column} != '' AND (".self::sqlYearEquals($column, $year)." OR ({$column} >= {$minSerial} AND {$column} <= {$maxSerial})))";
+        return "({$column} IS NOT NULL AND ".self::sqlDateValueIsNotBlank($column).' AND ('.self::sqlYearEquals($column, $year)." OR ({$column} >= {$minSerial} AND {$column} <= {$maxSerial})))";
     }
 
     public static function sqlYearEquals(string $column, int $year): string

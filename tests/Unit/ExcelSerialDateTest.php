@@ -127,7 +127,7 @@ class ExcelSerialDateTest extends TestCase
     {
         $expression = ExcelSerialDate::sqlColumnInYear('Teachers.Plan_1st_Support_Date', 2026);
 
-        $this->assertStringContainsString("Teachers.Plan_1st_Support_Date != ''", $expression);
+        $this->assertStringContainsString("NULLIF(TRIM(CAST(Teachers.Plan_1st_Support_Date AS TEXT)), '') IS NOT NULL", $expression);
     }
 
     public function test_sql_normalized_date_column_uses_nullif_for_empty_string(): void

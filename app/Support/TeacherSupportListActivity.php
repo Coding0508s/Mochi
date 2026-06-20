@@ -102,7 +102,7 @@ final class TeacherSupportListActivity
                 $parts[] = 'CASE WHEN '.ExcelSerialDate::sqlColumnInYear($qualified, $year)
                     ." THEN {$normalized} END";
             } else {
-                $parts[] = "CASE WHEN {$qualified} IS NOT NULL AND {$qualified} != ''"
+                $parts[] = "CASE WHEN {$qualified} IS NOT NULL AND ".ExcelSerialDate::sqlDateValueIsNotBlank($qualified)
                     ." THEN {$normalized} END";
             }
         }

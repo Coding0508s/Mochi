@@ -203,9 +203,6 @@ final class MochiTeacherSupportQuery
 
     private static function sqlDateValueIsNotBlank(string $qualifiedColumn): string
     {
-        return match (Schema::getConnection()->getDriverName()) {
-            'sqlite' => "NULLIF(TRIM(CAST({$qualifiedColumn} AS TEXT)), '') IS NOT NULL",
-            default => "NULLIF(TRIM(CAST({$qualifiedColumn} AS CHAR)), '') IS NOT NULL",
-        };
+        return ExcelSerialDate::sqlDateValueIsNotBlank($qualifiedColumn);
     }
 }
