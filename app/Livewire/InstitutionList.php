@@ -902,16 +902,26 @@ class InstitutionList extends Component
         }
 
         // 기관 구분 목록 (필터 드롭다운용)
-        $gubunList = Institution::query()
-            ->tap(fn (Builder $query) => $accountListQuery->applyTeamInstitutionScope($query))
-            ->tap(fn (Builder $query) => $accountListQuery->applyStatusFilter($query, $filters))
-            ->when($hiddenInstitutionSkCodes !== [], function ($query) use ($hiddenInstitutionSkCodes): void {
-                $query->whereNotIn('SKcode', $hiddenInstitutionSkCodes);
-            })
-            ->whereNotNull('Gubun')
-            ->where('Gubun', '!=', '')
-            ->distinct()
-            ->pluck('Gubun');
+        $gubunCacheKey = 'institution-list:gubun-options:'.sha1((string) json_encode([
+            'user_id' => auth()->id(),
+            'team_menu' => TeamMenuContext::activeMenu(),
+            'status_filter' => $filters->statusFilter,
+            'hidden_sk_hash' => sha1(implode('|', $hiddenInstitutionSkCodes)),
+        ], JSON_UNESCAPED_UNICODE));
+
+        $gubunList = collect(Cache::remember($gubunCacheKey, now()->addSeconds(30), function () use ($accountListQuery, $filters, $hiddenInstitutionSkCodes): array {
+            return Institution::query()
+                ->tap(fn (Builder $query) => $accountListQuery->applyTeamInstitutionScope($query))
+                ->tap(fn (Builder $query) => $accountListQuery->applyStatusFilter($query, $filters))
+                ->when($hiddenInstitutionSkCodes !== [], function ($query) use ($hiddenInstitutionSkCodes): void {
+                    $query->whereNotIn('SKcode', $hiddenInstitutionSkCodes);
+                })
+                ->whereNotNull('Gubun')
+                ->where('Gubun', '!=', '')
+                ->distinct()
+                ->pluck('Gubun')
+                ->all();
+        }));
 
         // 담당자 드롭다운 옵션 (직원 마스터 기준, 부서 매핑 + 활성 직원만)
         //  - CO    -> Consulting Team (A02)
@@ -923,12 +933,15 @@ class InstitutionList extends Component
         $trManagerOptions = $this->managerOptionsForDept(self::DEPT_TR);
         $csManagerOptions = $this->managerOptionsForDept(self::DEPT_CS);
 
-        $customerTypeOptions = AccountInformation::query()
-            ->whereNotNull('Customer_Type')
-            ->where('Customer_Type', '!=', '')
-            ->distinct()
-            ->orderBy('Customer_Type')
-            ->pluck('Customer_Type');
+        $customerTypeOptions = collect(Cache::remember('institution-list:customer-type-options:v1', now()->addMinutes(1), function (): array {
+            return AccountInformation::query()
+                ->whereNotNull('Customer_Type')
+                ->where('Customer_Type', '!=', '')
+                ->distinct()
+                ->orderBy('Customer_Type')
+                ->pluck('Customer_Type')
+                ->all();
+        }));
 
         return view('livewire.institution-list', [
             'gubunList' => $gubunList,

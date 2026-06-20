@@ -648,9 +648,31 @@ class SupportList extends Component
             ->paginate(20);
 
         // 필터 드롭다운용 데이터 (Year 컬럼 없으면 Support_Date 연도 사용)
-        $years = Cache::remember('support-list:distinct-years', now()->addMinutes(10), fn () => SupportRecord::distinctFilterYears());
+        // 과거 캐시에 배열 형태 값이 섞여 저장된 경우를 대비해 스칼라 연도로 정규화합니다.
+        $years = collect(Cache::remember('support-list:distinct-years:v2', now()->addMinutes(10), fn () => SupportRecord::distinctFilterYears()))
+            ->map(function (mixed $year): ?int {
+                if (is_array($year)) {
+                    $year = $year['filter_year'] ?? $year['year'] ?? null;
+                }
 
-        $trList = Cache::remember('support-list:tr-list', now()->addMinutes(10), function () {
+                if (is_object($year)) {
+                    $year = $year->filter_year ?? $year->year ?? null;
+                }
+
+                if (! is_numeric($year)) {
+                    return null;
+                }
+
+                $normalized = (int) $year;
+
+                return $normalized > 0 ? $normalized : null;
+            })
+            ->filter()
+            ->unique()
+            ->sortDesc()
+            ->values();
+
+        $trList = collect(Cache::remember('support-list:tr-list:v2', now()->addMinutes(10), function () {
             return SupportRecord::tableHasColumn('TR_Name')
                 ? SupportRecord::query()
                     ->whereNotNull('TR_Name')
@@ -659,7 +681,23 @@ class SupportList extends Component
                     ->orderBy('TR_Name')
                     ->pluck('TR_Name')
                 : collect();
-        });
+        }))
+            ->map(function (mixed $tr): ?string {
+                if (is_array($tr)) {
+                    $tr = $tr['TR_Name'] ?? $tr['tr_name'] ?? $tr['name'] ?? null;
+                }
+
+                if (is_object($tr)) {
+                    $tr = $tr->TR_Name ?? $tr->tr_name ?? $tr->name ?? null;
+                }
+
+                $normalized = trim((string) $tr);
+
+                return $normalized !== '' ? $normalized : null;
+            })
+            ->filter()
+            ->unique()
+            ->values();
 
         $shouldLoadInstitutions = $this->showContractModal || $this->showModal;
         $institutions = $shouldLoadInstitutions

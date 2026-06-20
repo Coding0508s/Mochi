@@ -25,6 +25,21 @@ final class InstitutionAccountListQuery
     private ?array $hiddenInstitutionSkCodesCache = null;
 
     /**
+     * @var array<int, string>|null
+     */
+    private ?array $currentUserManagerAliasesCache = null;
+
+    /**
+     * @var array<int, string>|null
+     */
+    private ?array $currentUserManagerRawAliasesCache = null;
+
+    /**
+     * @var array<string, array<int, string>>
+     */
+    private array $selectedManagerRawAliasesCache = [];
+
+    /**
      * @return array<int, string>
      */
     public function hiddenInstitutionSkCodes(): array
@@ -407,6 +422,10 @@ final class InstitutionAccountListQuery
      */
     public function resolveCurrentUserManagerAliases(): array
     {
+        if ($this->currentUserManagerAliasesCache !== null) {
+            return $this->currentUserManagerAliasesCache;
+        }
+
         $user = auth()->user();
         if (! $user) {
             return [];
@@ -431,12 +450,14 @@ final class InstitutionAccountListQuery
             }
         }
 
-        return $aliases
+        $this->currentUserManagerAliasesCache = $aliases
             ->map(fn (string $value): string => $this->normalizeManagerAlias($value))
             ->filter(fn (string $value): bool => $value !== '')
             ->unique()
             ->values()
             ->all();
+
+        return $this->currentUserManagerAliasesCache;
     }
 
     public function normalizeManagerAlias(string $value): string
@@ -449,6 +470,10 @@ final class InstitutionAccountListQuery
      */
     public function resolveCurrentUserManagerRawAliases(): array
     {
+        if ($this->currentUserManagerRawAliasesCache !== null) {
+            return $this->currentUserManagerRawAliasesCache;
+        }
+
         $user = auth()->user();
         if (! $user) {
             return [];
@@ -473,12 +498,14 @@ final class InstitutionAccountListQuery
             }
         }
 
-        return $aliases
+        $this->currentUserManagerRawAliasesCache = $aliases
             ->flatMap(fn (string $value): array => $this->expandManagerAliasVariants($value))
             ->filter(fn (string $value): bool => $value !== '')
             ->unique()
             ->values()
             ->all();
+
+        return $this->currentUserManagerRawAliasesCache;
     }
 
     /**
@@ -486,6 +513,11 @@ final class InstitutionAccountListQuery
      */
     public function resolveSelectedManagerRawAliases(string $managerName, string $deptNo): array
     {
+        $cacheKey = $deptNo.':'.ManagerNameNormalizer::normalize($managerName);
+        if (array_key_exists($cacheKey, $this->selectedManagerRawAliasesCache)) {
+            return $this->selectedManagerRawAliasesCache[$cacheKey];
+        }
+
         $aliases = collect([$managerName]);
 
         if (Schema::hasTable('employee')) {
@@ -508,12 +540,16 @@ final class InstitutionAccountListQuery
             }
         }
 
-        return $aliases
+        $resolved = $aliases
             ->flatMap(fn (string $value): array => $this->expandManagerAliasVariants($value))
             ->filter(fn (string $value): bool => $value !== '')
             ->unique()
             ->values()
             ->all();
+
+        $this->selectedManagerRawAliasesCache[$cacheKey] = $resolved;
+
+        return $resolved;
     }
 
     /**
