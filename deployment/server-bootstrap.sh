@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-PHP_VERSION="${PHP_VERSION:-8.3}"
+PHP_VERSION="${PHP_VERSION:-8.4}"
 
 echo "==> Updating packages..."
 sudo apt update
