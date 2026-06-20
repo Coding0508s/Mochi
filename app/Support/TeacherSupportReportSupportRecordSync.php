@@ -30,7 +30,12 @@ final class TeacherSupportReportSupportRecordSync
         }
 
         if ($existingSupportRecordId === null) {
-            return null;
+            $record = SupportRecord::query()->create($attributes + [
+                'CreatedDate' => now(),
+                ...SupportRecord::completionAttributes(false),
+            ]);
+
+            return (int) $record->ID;
         }
 
         $record = SupportRecord::query()->find($existingSupportRecordId);

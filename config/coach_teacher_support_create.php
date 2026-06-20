@@ -21,6 +21,7 @@ return [
         ['label' => 'Open-Class', 'action' => 'open_class'],
         ['label' => 'Unit 21+', 'action' => 'unit21_plus'],
         ['label' => 'Unit 31+', 'action' => 'unit31_plus'],
+        ['label' => '교사 지원 및 참관', 'action' => 'visit'],
     ],
 
 ];

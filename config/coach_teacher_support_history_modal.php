@@ -28,6 +28,7 @@ return [
         'teacher_open_class_support_reports' => 'open_class',
         'teacher_unit21_plus_support_reports' => 'unit21_plus',
         'teacher_unit31_plus_support_reports' => 'unit31_plus',
+        'teacher_visit_support_reports' => 'visit',
     ],
 
     'support_type_actions' => [
@@ -45,6 +46,7 @@ return [
         'Open-Class' => 'open_class',
         'Unit 21+' => 'unit21_plus',
         'Unit 31+' => 'unit31_plus',
+        '교사 지원 및 참관' => 'visit',
     ],
 
 ];

@@ -60,6 +60,7 @@ return [
         'teacher_open_class_support_reports' => 'Open-Class',
         'teacher_unit21_plus_support_reports' => 'Unit 21+',
         'teacher_unit31_plus_support_reports' => 'Unit 31+',
+        'teacher_visit_support_reports' => '교사 지원 및 참관',
     ],
 
     'lva_report_types' => [

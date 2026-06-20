@@ -2,6 +2,7 @@
     'closeAction',
     'saveAction',
     'markCompletedModel',
+    'showRoundPicker' => true,
 ])
 
 @php
@@ -38,27 +39,29 @@
             @error('supportReportEdit')
                 <p class="text-sm text-red-600">{{ $message }}</p>
             @enderror
-            @error('support_round')
-                <p class="text-sm text-red-600">{{ $message }}</p>
-            @enderror
-            @if($markCompleted)
-                <label class="flex items-center gap-2 text-sm text-gray-700">
-                    <span class="whitespace-nowrap">현황 차수</span>
-                    @if($referenceYear !== null)
-                        <span class="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-                            기준 연도 {{ $referenceYear }}
-                        </span>
-                    @endif
-                    <select wire:model="supportRound"
-                            class="min-w-[7rem] rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
-                        <option value="">기록 안 함</option>
-                        @foreach($roundOptions as $option)
-                            <option value="{{ $option['value'] }}" @disabled((bool) ($option['disabled'] ?? false))>
-                                {{ $option['label'] }}
-                            </option>
-                        @endforeach
-                    </select>
-                </label>
+            @if($showRoundPicker)
+                @error('support_round')
+                    <p class="text-sm text-red-600">{{ $message }}</p>
+                @enderror
+                @if($markCompleted)
+                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                        <span class="whitespace-nowrap">현황 차수</span>
+                        @if($referenceYear !== null)
+                            <span class="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                                기준 연도 {{ $referenceYear }}
+                            </span>
+                        @endif
+                        <select wire:model="supportRound"
+                                class="min-w-[7rem] rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                            <option value="">기록 안 함</option>
+                            @foreach($roundOptions as $option)
+                                <option value="{{ $option['value'] }}" @disabled((bool) ($option['disabled'] ?? false))>
+                                    {{ $option['label'] }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+                @endif
             @endif
             <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                 <input type="checkbox" wire:model.live="{{ $markCompletedModel }}" class="sr-only peer">

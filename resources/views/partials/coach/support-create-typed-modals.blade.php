@@ -8,3 +8,4 @@
 @include('components.coach.open-class-support-modal', ['openClassConfig' => $openClassConfig])
 @include('components.coach.unit21-plus-support-modal', ['unit21PlusConfig' => $unit21PlusConfig])
 @include('components.coach.unit31-plus-support-modal', ['unit31PlusConfig' => $unit31PlusConfig])
+@include('components.coach.visit-support-modal', ['visitConfig' => $visitConfig])

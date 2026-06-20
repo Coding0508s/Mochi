@@ -284,6 +284,26 @@ final class TeamMenuContext
         };
     }
 
+    public static function teacherSupportReportMailOpening(?User $user = null, ?string $teamMenuOverride = null): string
+    {
+        return match (self::institutionSupportReportBrand($user, $teamMenuOverride)) {
+            'Coach Team' => 'Coach Team 교사 지원 보고서',
+            'CS Team' => 'CS Team 교사 지원 보고서',
+            'CO' => 'CO 교사 지원 보고서',
+            default => '교사 지원 보고서',
+        };
+    }
+
+    public static function teacherSupportReportMailSubjectPrefix(?User $user = null, ?string $teamMenuOverride = null): string
+    {
+        return match (self::institutionSupportReportBrand($user, $teamMenuOverride)) {
+            'Coach Team' => '[Coach Team 교사 지원 보고서]',
+            'CS Team' => '[CS Team 교사 지원 보고서]',
+            'CO' => '[CO 교사 지원 보고서]',
+            default => '[교사 지원 보고서]',
+        };
+    }
+
     /**
      * @return self::MENU_*|null
      */

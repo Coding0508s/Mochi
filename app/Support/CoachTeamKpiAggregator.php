@@ -234,6 +234,24 @@ final class CoachTeamKpiAggregator
                     $outer->orWhere($clause);
                 }
             }
+            if (! $planOnly) {
+                $mochiTeacherIds = self::teacherIdsWithMochiSupportInYear($year);
+                if ($mochiTeacherIds !== []) {
+                    if ($first) {
+                        $outer->whereIn('Teachers.ID', $mochiTeacherIds);
+                    } else {
+                        $outer->orWhereIn('Teachers.ID', $mochiTeacherIds);
+                    }
+                }
+            }
         });
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function teacherIdsWithMochiSupportInYear(int $year): array
+    {
+        return MochiTeacherSupportQuery::teacherIdsInYear($year);
     }
 }

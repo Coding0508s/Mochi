@@ -141,4 +141,18 @@ class TeacherSupportSlotSyncTest extends TestCase
         $this->assertFalse(TeacherSupportSlotSync::isRoundRecorded($teacher, 1));
         $this->assertSame(1, TeacherSupportSlotSync::firstEmptyRound($teacher));
     }
+
+    public function test_clear_matching_completion_removes_synced_round(): void
+    {
+        $teacher = $this->createTeacher([
+            '_1st_Support_Date' => '2026-06-18',
+            '_1st_Support_Type' => '교사 지원 및 참관',
+        ]);
+
+        TeacherSupportSlotSync::clearMatchingCompletion($teacher, '교사 지원 및 참관', '2026-06-18');
+
+        $teacher->refresh();
+        $this->assertNull($teacher->_1st_Support_Date);
+        $this->assertNull($teacher->_1st_Support_Type);
+    }
 }

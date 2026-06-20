@@ -32,6 +32,7 @@ class SupportReportStoredMail extends Mailable
         public SupportRecord $supportRecord,
         public ?User $submittedBy = null,
         public ?string $teamMenu = null,
+        public string $reportMode = 'institution',
     ) {
         $sd = $supportRecord->Support_Date;
         $this->supportDate = $sd instanceof DateTimeInterface
@@ -56,17 +57,23 @@ class SupportReportStoredMail extends Mailable
             };
         }
 
-        $this->reportSavedOpening = TeamMenuContext::institutionSupportReportMailOpening($submittedBy, $this->teamMenu);
-        $this->reportAssigneeColumnLabel = TeamMenuContext::institutionSupportReportMailAssigneeColumnLabel($submittedBy, $this->teamMenu);
+        $this->reportSavedOpening = $reportMode === 'teacher'
+            ? TeamMenuContext::teacherSupportReportMailOpening($submittedBy, $this->teamMenu)
+            : TeamMenuContext::institutionSupportReportMailOpening($submittedBy, $this->teamMenu);
+        $this->reportAssigneeColumnLabel = $reportMode === 'teacher'
+            ? TeamMenuContext::institutionSupportReportAssigneeLabel($submittedBy, $this->teamMenu)
+            : TeamMenuContext::institutionSupportReportMailAssigneeColumnLabel($submittedBy, $this->teamMenu);
     }
 
     public function envelope(): Envelope
     {
         $label = filled($this->supportRecord->Account_Name)
             ? (string) $this->supportRecord->Account_Name
-            : '기관';
+            : ($this->reportMode === 'teacher' ? '교사' : '기관');
 
-        $prefix = TeamMenuContext::institutionSupportReportMailSubjectPrefix($this->submittedBy, $this->teamMenu);
+        $prefix = $this->reportMode === 'teacher'
+            ? TeamMenuContext::teacherSupportReportMailSubjectPrefix($this->submittedBy, $this->teamMenu)
+            : TeamMenuContext::institutionSupportReportMailSubjectPrefix($this->submittedBy, $this->teamMenu);
 
         return new Envelope(
             subject: $prefix.' '.$label,

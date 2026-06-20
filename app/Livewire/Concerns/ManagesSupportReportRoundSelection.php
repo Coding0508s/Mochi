@@ -72,6 +72,21 @@ trait ManagesSupportReportRoundSelection
         return null;
     }
 
+    protected function syncVisitSessionFromSupportRound(bool $markCompleted): void
+    {
+        if (! property_exists($this, 'visitForm') || ! is_array($this->visitForm)) {
+            return;
+        }
+
+        if ($markCompleted && $this->supportRound !== '') {
+            $this->visitForm['session_number'] = (int) $this->supportRound;
+
+            return;
+        }
+
+        $this->visitForm['session_number'] = null;
+    }
+
     /**
      * @return array{support_round?: int}
      */

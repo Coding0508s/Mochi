@@ -382,6 +382,27 @@ class TeacherSupportHistoryFormLoader
             ]);
         }
 
+        if ($action === 'visit') {
+            return array_merge($base, [
+                'support_location' => '',
+                'support_purpose' => '',
+                'observe_unit' => null,
+                'observe_lesson' => null,
+                'observe_summary_extra' => '',
+                'observe_class' => '',
+                'observe_age' => '',
+                'session_number' => 1,
+                'semester_label' => '1학기 지원',
+                'interview_date' => $base['support_date'],
+                'interview_time' => $this->formatTimeInput($record->Meet_Time),
+                'meeting_type' => (string) ($record->Support_Type ?? config('coach_teacher_visit.method_options.0', '신규교사 시연수업')),
+                'pre_request_notes' => '',
+                'monitoring_feedback' => (string) ($record->Issue ?? ''),
+                'interview_and_action_plan' => '',
+                'special_notes' => '',
+            ]);
+        }
+
         return array_merge($base, [
             'teacher_experience' => '1-2 Years',
             'session_number' => 1,

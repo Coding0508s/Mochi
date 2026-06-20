@@ -12,6 +12,7 @@ use App\Actions\StoreTeacherOpenClassSupportReport;
 use App\Actions\StoreTeacherProConSupportReport;
 use App\Actions\StoreTeacherUnit21PlusSupportReport;
 use App\Actions\StoreTeacherUnit31PlusSupportReport;
+use App\Actions\StoreTeacherVisitSupportReport;
 use App\Actions\UpdateLegacyTeacherSupportReport;
 use App\Actions\UpdateTeacherSupportReport;
 use App\Models\Institution;
@@ -20,10 +21,13 @@ use App\Models\User;
 use App\Support\SkCodeNormalizer;
 use App\Support\TeacherSupportReportEditAuthorization;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 trait ManagesCoachTeacherSupportCreateModals
 {
+    use HandlesVisitSupportReportValidationFailures;
+
     public function openCoachTeacherSupportCreateModal(string $action, int $teacherId): void
     {
         $methodMap = [
@@ -37,6 +41,7 @@ trait ManagesCoachTeacherSupportCreateModals
             'open_class' => 'openOpenClassModal',
             'unit21_plus' => 'openUnit21PlusModal',
             'unit31_plus' => 'openUnit31PlusModal',
+            'visit' => 'openVisitModal',
         ];
 
         $method = $methodMap[$action] ?? null;
@@ -1157,6 +1162,118 @@ trait ManagesCoachTeacherSupportCreateModals
             'procedures' => [],
             'strength_areas' => [],
             'growth_areas' => [],
+        ];
+    }
+
+    public function openVisitModal(int $teacherId): void
+    {
+        $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
+        if (! $teacher) {
+            return;
+        }
+
+        $this->clearSupportReportViewContext();
+
+        $institution = $teacher->institution;
+        if (! $institution) {
+            $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
+            if ($normalizedSkCode) {
+                $institution = Institution::query()
+                    ->with('accountInfo')
+                    ->where('SKcode', $normalizedSkCode)
+                    ->first();
+            }
+        }
+
+        $accountInfo = $institution?->accountInfo;
+        $user = auth()->user();
+        $coachName = $accountInfo?->TR ?? ($user?->nameForCoReports() ?? '');
+
+        $this->visitTeacherId = $teacherId;
+        $this->visitMarkCompleted = true;
+        $this->visitForm = $this->defaultVisitForm(
+            skCode: SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
+            coachName: $coachName,
+            institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
+            teacherName: (string) $teacher->Name,
+        );
+        $this->seedSupportRoundSelection($teacher);
+        $this->showVisitModal = true;
+    }
+
+    public function saveVisitReport(): void
+    {
+        if (! $this->visitTeacherId) {
+            return;
+        }
+
+        $user = auth()->user();
+        if (! $user) {
+            return;
+        }
+
+        $this->syncVisitSessionFromSupportRound($this->visitMarkCompleted);
+
+        $payload = array_merge($this->visitForm, [
+            'mark_completed' => $this->visitMarkCompleted,
+        ], $this->supportReportRoundPayload($this->visitMarkCompleted));
+
+        try {
+            if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
+                if ($this->getErrorBag()->isNotEmpty()) {
+                    return;
+                }
+
+                $this->finishSupportReportPersistence((int) $this->visitTeacherId, fn () => $this->closeVisitModal());
+
+                return;
+            }
+
+            $action = new StoreTeacherVisitSupportReport;
+            $action->execute($this->visitTeacherId, $payload, $user);
+
+            session()->flash('success', $this->visitMarkCompleted
+                ? '교사 지원 및 참관 보고서가 저장되었습니다.'
+                : '임시 저장되었습니다.');
+
+            $teacherId = (int) $this->visitTeacherId;
+            $this->finalizeCoachTeacherSupportReportSave($teacherId, fn () => $this->closeVisitModal());
+        } catch (ValidationException $exception) {
+            $this->failVisitReportValidation($exception);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function defaultVisitForm(
+        string $skCode,
+        string $coachName,
+        string $institutionName,
+        string $teacherName,
+    ): array {
+        return [
+            'sk_code' => $skCode,
+            'coach_name' => $coachName,
+            'institution_name' => $institutionName,
+            'teacher_name' => $teacherName,
+            'support_date' => now()->format('Y-m-d'),
+            'support_location' => '',
+            'support_purpose' => '',
+            'observe_unit' => null,
+            'observe_lesson' => null,
+            'observe_summary_extra' => '',
+            'observe_class' => '',
+            'observe_age' => '',
+            'session_number' => 1,
+            'semester_label' => config('coach_teacher_visit.semester_options.0', '1학기 지원'),
+            'interview_date' => now()->format('Y-m-d'),
+            'interview_time' => now()->format('H:i'),
+            'meeting_type' => config('coach_teacher_visit.method_options.0', '신규교사 시연수업'),
+            'pre_request_notes' => '',
+            'monitoring_feedback' => '',
+            'interview_and_action_plan' => '',
+            'special_notes' => '',
         ];
     }
 }

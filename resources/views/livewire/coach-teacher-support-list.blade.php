@@ -1,4 +1,4 @@
-<div class="mochi-page">
+<div class="mochi-page" x-data @visit-support-show-alert.window="alert($event.detail.message)">
     @if(session('success'))
         <div class="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm" data-mochi-flash-dismiss="3000" role="status">
             {{ session('success') }}
@@ -47,6 +47,17 @@
                       aria-label="총 지원 횟수">
                     총 지원 횟수
                     <span class="font-semibold">{{ $totalSupportCount }}</span>
+                </span>
+                <span wire:loading.delay
+                      wire:loading.class.remove="hidden"
+                      wire:loading.class="inline-flex"
+                      wire:target="search,filterYear,filterRound,filterMonth,filterCoach,kpiFilter,showAllTeachers,showAllInstitutionsView,showExtendedColumns,setKpiFilter,resetFilters,clearSearch,clearRoundFilter,clearMonthFilter,clearKpiFilter,clearCoachFilter"
+                      class="hidden items-center gap-1.5 rounded-full border border-mochi-header/20 bg-mochi-header/5 px-2.5 py-1 text-xs font-medium text-mochi-header">
+                    <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                    </svg>
+                    목록 갱신 중
                 </span>
             </div>
 
@@ -166,7 +177,7 @@
                         </button>
                         <button type="button" wire:click="$set('showAllInstitutionsView', true)"
                                 class="mochi-toggle-btn {{ $showAllInstitutionsView ? 'mochi-toggle-btn--active' : '' }}">
-                            전체 지원 보기
+                            전체 기관 보기
                         </button>
                     </div>
                 </div>
@@ -230,16 +241,6 @@
         }
     @endphp
     <div class="mochi-table-card relative">
-        <div wire:loading.flex wire:target="search,filterYear,filterRound,filterMonth,filterCoach,kpiFilter,showAllTeachers,showAllInstitutionsView,showExtendedColumns,setKpiFilter,resetFilters,clearSearch,clearRoundFilter,clearMonthFilter,clearKpiFilter,openEditModal,saveEditForm"
-             class="absolute inset-0 z-20 hidden items-center justify-center bg-white/70 backdrop-blur-[1px]">
-            <div class="flex items-center gap-2 rounded-full border border-mochi-header/20 bg-white px-3 py-2 text-sm font-medium text-mochi-header shadow-sm">
-                <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                </svg>
-                목록을 불러오는 중
-            </div>
-        </div>
         <div class="md:hidden space-y-3 p-3">
             @forelse($items as $teacher)
                 @php
@@ -252,6 +253,7 @@
                     'cols' => $cols,
                     'canOpenEditModal' => $canOpenEditModal,
                     'showExtendedColumns' => $showExtendedColumns,
+                    'displayYear' => $displayYear,
                 ])
             @empty
                 <div class="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500">
@@ -448,7 +450,7 @@
                                 @endif
                             </td>
                         @endif
-                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\ExcelSerialDate::matchesFilterYear($teacher->getRawOriginal($cols['completed_1st']), $displayYear) ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\TeacherSupportCompletionDisplay::parts($teacher, 1, $displayYear)['date'] !== '' ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
                                 wire:click="openEditModal({{ $teacher->ID }})"
                                 role="button"
@@ -456,12 +458,12 @@
                                 aria-label="{{ $teacher->Name }} 지원 일정 수정"
                             @endif>
                             @include('partials.coach.teacher-support-completed-cell', [
-                                'dateValue' => $teacher->getRawOriginal($cols['completed_1st']),
-                                'type' => $teacher->{$cols['type_1st']},
+                                'teacher' => $teacher,
+                                'round' => 1,
                                 'displayYear' => $displayYear,
                             ])
                         </td>
-                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\ExcelSerialDate::matchesFilterYear($teacher->getRawOriginal($cols['completed_2nd']), $displayYear) ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\TeacherSupportCompletionDisplay::parts($teacher, 2, $displayYear)['date'] !== '' ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
                                 wire:click="openEditModal({{ $teacher->ID }})"
                                 role="button"
@@ -469,12 +471,12 @@
                                 aria-label="{{ $teacher->Name }} 지원 일정 수정"
                             @endif>
                             @include('partials.coach.teacher-support-completed-cell', [
-                                'dateValue' => $teacher->getRawOriginal($cols['completed_2nd']),
-                                'type' => $teacher->{$cols['type_2nd']},
+                                'teacher' => $teacher,
+                                'round' => 2,
                                 'displayYear' => $displayYear,
                             ])
                         </td>
-                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\ExcelSerialDate::matchesFilterYear($teacher->getRawOriginal($cols['completed_3rd']), $displayYear) ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\TeacherSupportCompletionDisplay::parts($teacher, 3, $displayYear)['date'] !== '' ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
                                 wire:click="openEditModal({{ $teacher->ID }})"
                                 role="button"
@@ -482,12 +484,12 @@
                                 aria-label="{{ $teacher->Name }} 지원 일정 수정"
                             @endif>
                             @include('partials.coach.teacher-support-completed-cell', [
-                                'dateValue' => $teacher->getRawOriginal($cols['completed_3rd']),
-                                'type' => $teacher->{$cols['type_3rd']},
+                                'teacher' => $teacher,
+                                'round' => 3,
                                 'displayYear' => $displayYear,
                             ])
                         </td>
-                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\ExcelSerialDate::matchesFilterYear($teacher->getRawOriginal($cols['completed_4th']), $displayYear) ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\TeacherSupportCompletionDisplay::parts($teacher, 4, $displayYear)['date'] !== '' ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
                                 wire:click="openEditModal({{ $teacher->ID }})"
                                 role="button"
@@ -495,8 +497,8 @@
                                 aria-label="{{ $teacher->Name }} 지원 일정 수정"
                             @endif>
                             @include('partials.coach.teacher-support-completed-cell', [
-                                'dateValue' => $teacher->getRawOriginal($cols['completed_4th']),
-                                'type' => $teacher->{$cols['type_4th']},
+                                'teacher' => $teacher,
+                                'round' => 4,
                                 'displayYear' => $displayYear,
                             ])
                         </td>
@@ -1180,6 +1182,12 @@
                                                 class="w-full inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-full border border-blue-300 text-blue-800 bg-blue-100 hover:bg-blue-200 transition cursor-pointer">
                                             {{ $pillLabel }}
                                         </button>
+                                    @elseif($pillAction === 'visit')
+                                        <button type="button"
+                                                wire:click.stop="openVisitModal({{ $teacherDetailInfo['id'] }})"
+                                                class="w-full inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-full border border-blue-300 text-blue-800 bg-blue-100 hover:bg-blue-200 transition cursor-pointer">
+                                            {{ $pillLabel }}
+                                        </button>
                                     @endif
                                 @endforeach
                             </div>
@@ -1219,6 +1227,7 @@
     @include('components.coach.open-class-support-modal', ['openClassConfig' => $openClassConfig])
     @include('components.coach.unit21-plus-support-modal', ['unit21PlusConfig' => $unit21PlusConfig])
     @include('components.coach.unit31-plus-support-modal', ['unit31PlusConfig' => $unit31PlusConfig])
+    @include('components.coach.visit-support-modal', ['visitConfig' => $visitConfig])
 
     <x-coach.teacher-support-history-detail-modal
         :show="$showTeacherSupportHistoryDetailModal"

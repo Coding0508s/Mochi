@@ -261,22 +261,32 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Session/Semester</label>
-                            <div class="flex gap-2">
-                                <select wire:model="visitForm.session_number"
-                                        class="w-1/2 py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    <option value="">차수 선택</option>
-                                    @foreach(($visitConfig['session_options'] ?? []) as $session)
-                                        <option value="{{ $session }}">{{ $session }}차</option>
-                                    @endforeach
-                                </select>
-                                <select wire:model="visitForm.semester_label"
-                                        class="w-1/2 py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    @foreach(($visitConfig['semester_options'] ?? []) as $semester)
-                                        <option value="{{ $semester }}">{{ $semester }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                현황 차수
+                                @php
+                                    $referenceYear = method_exists($this, 'supportRoundReferenceYear') ? $this->supportRoundReferenceYear() : null;
+                                @endphp
+                                @if($referenceYear !== null)
+                                    <span class="ml-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                                        기준 연도 {{ $referenceYear }}
+                                    </span>
+                                @endif
+                            </label>
+                            @php
+                                $roundOptions = method_exists($this, 'supportRoundOptions') ? $this->supportRoundOptions() : [];
+                            @endphp
+                            <select wire:model="supportRound"
+                                    class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">기록 안 함</option>
+                                @foreach($roundOptions as $option)
+                                    <option value="{{ $option['value'] }}" @disabled((bool) ($option['disabled'] ?? false))>
+                                        {{ $option['label'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('support_round')
+                                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                            @enderror
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">면담 시간</label>
@@ -315,28 +325,18 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">사전 요청 및 주요 이슈</label>
                         <textarea wire:model="visitForm.pre_request_notes"
                                   rows="4"
-                                  placeholder="교사 사전 요청 사항과 지원 배경을 작성해 주세요."
+                                  placeholder="교사의 사전 요청 사항과 이번 지원이 필요했던 배경/이유를 간략히 기록 (예:학생 발화 참여율 저하, 신규 커리큘럼 도입 등)"
                                   class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
                     </div>
 
                     <div class="border-t border-gray-100 pt-3">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">세부 지원 내용 <span class="text-red-500">*</span></label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">세부 지원 내용(수업 모니터링 및 피드백) <span class="text-red-500">*</span></label>
                         <textarea wire:model="visitForm.monitoring_feedback"
                                   rows="5"
-                                  placeholder="수업 모니터링 결과와 Strengths/개선점을 작성해 주세요."
+                                  placeholder="수업 모니터링(커리큘럼 이행, 교수법, 학생 반응) 결과와 잘된 점(Strengths) 및 개선점(Areas for Improvement)을 통합하여 기록.
+수업 후 교사 면담 내용, 현장 건의사항 및 애로사항, 코치의 후속 조치(Action Plan) 계획을 함께 작성."
                                   class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
                         @error('visitForm.monitoring_feedback')
-                            <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
-                        @enderror
-                    </div>
-
-                    <div class="border-t border-gray-100 pt-3">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">면담 내용 및 Action Plan <span class="text-red-500">*</span></label>
-                        <textarea wire:model="visitForm.interview_and_action_plan"
-                                  rows="5"
-                                  placeholder="면담 내용, 현장 건의사항, 후속 조치 계획을 작성해 주세요."
-                                  class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
-                        @error('visitForm.interview_and_action_plan')
                             <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                         @enderror
                     </div>
@@ -345,7 +345,7 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">특이사항</label>
                         <textarea wire:model="visitForm.special_notes"
                                   rows="4"
-                                  placeholder="추가 공유가 필요한 특이사항을 작성해 주세요."
+                                  placeholder="상기 내용 외에 공유가 필요한 추가적인 특이점이나 보안 사항 기록"
                                   class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
                     </div>
                 @elseif($reportMode === 'issue')
@@ -644,34 +644,6 @@
                         </span>
                     </label>
 
-                    @if($coachTypedTeacherSupportForm && $formCompleted)
-                        @php
-                            $roundOptions = method_exists($this, 'supportRoundOptions') ? $this->supportRoundOptions() : [];
-                            $referenceYear = method_exists($this, 'supportRoundReferenceYear') ? $this->supportRoundReferenceYear() : null;
-                        @endphp
-                        <div class="flex flex-col gap-1.5">
-                            <label class="flex items-center gap-2 text-xs text-gray-600">
-                                <span>현황 차수</span>
-                                @if($referenceYear !== null)
-                                    <span class="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
-                                        기준 연도 {{ $referenceYear }}
-                                    </span>
-                                @endif
-                            </label>
-                            <select wire:model="supportRound"
-                                    class="min-w-[13rem] rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
-                                <option value="">기록 안 함</option>
-                                @foreach($roundOptions as $option)
-                                    <option value="{{ $option['value'] }}" @disabled((bool) ($option['disabled'] ?? false))>
-                                        {{ $option['label'] }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('support_round')
-                                <p class="text-xs text-red-500">{{ $message }}</p>
-                            @enderror
-                        </div>
-                    @endif
                 </div>
 
                 <div class="flex items-center gap-3">

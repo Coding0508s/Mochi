@@ -113,8 +113,22 @@ class TeamMenuContextTest extends TestCase
             TeamMenuContext::institutionSupportReportMailOpening()
         );
         $this->assertSame(
-            '[Coach Team 기관 지원 보고서]',
-            TeamMenuContext::institutionSupportReportMailSubjectPrefix()
+            '[Coach Team 교사 지원 보고서]',
+            TeamMenuContext::teacherSupportReportMailSubjectPrefix()
+        );
+    }
+
+    public function test_teacher_support_report_mail_uses_coach_labels_for_coach_menu(): void
+    {
+        $this->get('/supports/create?team_menu=coach');
+
+        $this->assertSame(
+            'Coach Team 교사 지원 보고서',
+            TeamMenuContext::teacherSupportReportMailOpening()
+        );
+        $this->assertSame(
+            '담당 Coach',
+            TeamMenuContext::institutionSupportReportAssigneeLabel()
         );
     }
 

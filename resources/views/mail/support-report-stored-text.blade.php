@@ -6,10 +6,12 @@
 지원 유형: {{ $supportRecord->Support_Type ?: '—' }}  |  {{ $reportAssigneeColumnLabel }}: {{ $supportRecord->TR_Name ?: '—' }}
 참석자: {{ $supportRecord->Target ?: '—' }}  |  상태: {{ $supportRecord->Status ?: '—' }}
 
---- 기관 이슈 및 논의 사항 ---
-{{ $supportRecord->TO_Account ?: '—' }}
+--- {{ $reportMode === 'teacher' ? '지원 내용' : '기관 이슈 및 논의 사항' }} ---
+{{ $supportRecord->TO_Account ?: ($supportRecord->Issue ?: '—') }}
 
+@if($reportMode !== 'teacher' || filled($supportRecord->TO_Depart))
 --- 본사/타 부서 공유 내용 ---
 {{ $supportRecord->TO_Depart ?: '—' }}
+@endif
 
 GrapeSEED

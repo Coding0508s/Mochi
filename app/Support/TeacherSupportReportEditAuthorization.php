@@ -13,6 +13,7 @@ use App\Models\TeacherOpenClassSupportReport;
 use App\Models\TeacherProConSupportReport;
 use App\Models\TeacherUnit21PlusSupportReport;
 use App\Models\TeacherUnit31PlusSupportReport;
+use App\Models\TeacherVisitSupportReport;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
@@ -33,6 +34,7 @@ final class TeacherSupportReportEditAuthorization
         'teacher_open_class_support_reports' => TeacherOpenClassSupportReport::class,
         'teacher_unit21_plus_support_reports' => TeacherUnit21PlusSupportReport::class,
         'teacher_unit31_plus_support_reports' => TeacherUnit31PlusSupportReport::class,
+        'teacher_visit_support_reports' => TeacherVisitSupportReport::class,
     ];
 
     public static function findMochiReport(string $table, int $reportId): ?Model

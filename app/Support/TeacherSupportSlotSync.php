@@ -28,8 +28,12 @@ final class TeacherSupportSlotSync
     /**
      * 완료 처리된 보고서의 차수 기록을 Teachers 테이블에 반영한다.
      */
-    public static function apply(Teacher $teacher, ?int $round, string $supportTypeLabel): void
-    {
+    public static function apply(
+        Teacher $teacher,
+        ?int $round,
+        string $supportTypeLabel,
+        mixed $completedAt = null,
+    ): void {
         if ($round === null) {
             return;
         }
@@ -46,8 +50,10 @@ final class TeacherSupportSlotSync
             ]);
         }
 
+        $completedDate = $completedAt ?? now();
+
         $teacher->forceFill([
-            self::completedDateColumn($round) => now(),
+            self::completedDateColumn($round) => $completedDate,
             self::completedTypeColumn($round) => $supportTypeLabel,
         ])->save();
     }
@@ -82,6 +88,41 @@ final class TeacherSupportSlotSync
     public static function isRoundRecorded(Teacher $teacher, int $round): bool
     {
         return $teacher->getAttribute(self::completedDateColumn($round)) !== null;
+    }
+
+    /**
+     * 연결된 교사 지원 보고서 삭제 시, 동일 날짜·유형으로 기록된 N차 완료 칸을 비운다.
+     */
+    public static function clearMatchingCompletion(Teacher $teacher, string $typeLabel, mixed $supportDate): void
+    {
+        $normalizedDate = ExcelSerialDate::toStorageString($supportDate);
+        $normalizedType = trim($typeLabel);
+
+        if ($normalizedDate === null || $normalizedType === '') {
+            return;
+        }
+
+        foreach (array_keys(self::ROUND_SUFFIXES) as $round) {
+            if (! self::isRoundRecorded($teacher, $round)) {
+                continue;
+            }
+
+            $slotDate = ExcelSerialDate::toStorageString(
+                $teacher->getRawOriginal(self::completedDateColumn($round)),
+            );
+            $slotType = trim((string) ($teacher->getAttribute(self::completedTypeColumn($round)) ?? ''));
+
+            if ($slotDate !== $normalizedDate || $slotType !== $normalizedType) {
+                continue;
+            }
+
+            $teacher->forceFill([
+                self::completedDateColumn($round) => null,
+                self::completedTypeColumn($round) => null,
+            ])->save();
+
+            return;
+        }
     }
 
     public static function completedDateColumn(int $round): string

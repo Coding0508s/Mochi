@@ -215,34 +215,74 @@ class TeacherSupportKpiCalculator
      */
     private static function calculateWithoutYearFilter(Builder $baseQuery): array
     {
+        $teacherTable = (new Teacher)->getTable();
+        $teacherIdColumn = "{$teacherTable}.ID";
+        $columnPrefix = "{$teacherTable}.";
         $cols = config('coach_teacher_support.columns');
         $rounds = config('coach_teacher_support.kpi_rounds', []);
-        $result = [
-            'teacher_count' => (clone $baseQuery)->count(),
-            'institution_count' => (clone $baseQuery)
-                ->whereNotNull('SK_Code')
-                ->where('SK_Code', '!=', '')
-                ->distinct()
-                ->count('SK_Code'),
+
+        $selects = [
+            DB::raw(self::sqlCountDistinctTeachersWhen($teacherIdColumn, '1 = 1').' as teacher_count'),
+            DB::raw(self::sqlCountDistinctInstitutionsWhen($columnPrefix.'SK_Code', '1 = 1').' as institution_count'),
         ];
 
         foreach ($rounds as $key => $round) {
-            $completedCol = $cols[$round['completed']];
-            $result[$key] = (clone $baseQuery)->whereNotNull($completedCol)->count();
+            $completedCol = $columnPrefix.$cols[$round['completed']];
+            $selects[] = DB::raw(
+                self::sqlCountDistinctTeachersWhen($teacherIdColumn, "{$completedCol} IS NOT NULL").' as '.$key
+            );
         }
 
-        $completedQuery = clone $baseQuery;
-        foreach ($rounds as $round) {
-            $completedCol = $cols[$round['completed']];
-            $completedQuery->whereNotNull($completedCol);
-        }
-        $result['completed'] = $completedQuery->count();
+        $completedColumns = array_map(
+            fn (array $round): string => $columnPrefix.$cols[$round['completed']],
+            $rounds,
+        );
+        $completedCondition = $completedColumns === []
+            ? '0 = 1'
+            : '('.implode(' AND ', array_map(
+                fn (string $column): string => "{$column} IS NOT NULL",
+                $completedColumns,
+            )).')';
 
-        $unsupportedQuery = clone $baseQuery;
-        self::applyUnsupportedWithoutYearScope($unsupportedQuery);
-        $result['unsupported'] = $unsupportedQuery->count();
+        $selects[] = DB::raw(
+            self::sqlCountDistinctTeachersWhen($teacherIdColumn, $completedCondition).' as completed'
+        );
+        $selects[] = DB::raw(
+            self::sqlCountDistinctTeachersWhen(
+                $teacherIdColumn,
+                self::sqlAnyRoundUnsupportedWithoutYear($columnPrefix),
+            ).' as unsupported'
+        );
+
+        $row = (clone $baseQuery)->select($selects)->toBase()->first();
+        $result = [
+            'teacher_count' => (int) ($row?->teacher_count ?? 0),
+            'institution_count' => (int) ($row?->institution_count ?? 0),
+        ];
+
+        foreach (array_merge(self::roundKpiKeys(), ['completed', 'unsupported']) as $key) {
+            $result[$key] = (int) ($row?->{$key} ?? 0);
+        }
 
         return $result;
+    }
+
+    private static function sqlAnyRoundUnsupportedWithoutYear(string $columnPrefix): string
+    {
+        $cols = config('coach_teacher_support.columns');
+        $clauses = [];
+
+        foreach (config('coach_teacher_support.kpi_rounds', []) as $round) {
+            $planCol = $columnPrefix.$cols[$round['plan']];
+            $completedCol = $columnPrefix.$cols[$round['completed']];
+            $clauses[] = "({$planCol} IS NOT NULL AND ({$completedCol} IS NULL))";
+        }
+
+        if ($clauses === []) {
+            return '0 = 1';
+        }
+
+        return '('.implode(' OR ', $clauses).')';
     }
 
     public static function applyKpiFilterWithoutYear(Builder $query, string $kpiKey): void

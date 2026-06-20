@@ -238,11 +238,18 @@
             </div>
 
             {{-- ── 일정 관리 ── --}}
+            @php
+                $scheduleMenuEnabled = false;
+            @endphp
             <div class="sidebar-group">
                 <button type="button"
-                        @click="openScheduleManagement = !openScheduleManagement"
+                        @if($scheduleMenuEnabled)
+                            @click="openScheduleManagement = !openScheduleManagement"
+                        @endif
                         class="sidebar-item sidebar-focusable
-                               {{ request()->routeIs('schedules.*', 'shared-supplies.*', 'vehicle-usage-history.*') ? 'sidebar-item-active' : 'sidebar-item-default' }}">
+                               {{ request()->routeIs('schedules.*', 'shared-supplies.*', 'vehicle-usage-history.*') ? 'sidebar-item-active' : 'sidebar-item-default' }}
+                               {{ $scheduleMenuEnabled ? '' : 'cursor-not-allowed opacity-50' }}"
+                        @if(! $scheduleMenuEnabled) aria-disabled="true" @endif>
                     <span class="sidebar-item-lead">
                         @include('partials.sidebar-menu-icon', ['name' => 'calendar'])
                         <span class="font-medium">일정 관리</span>
@@ -255,24 +262,36 @@
                 </button>
 
                 <div x-show="openScheduleManagement" class="sidebar-sublist">
-                    <a href="{{ route('schedules.index') }}"
-                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                              {{ request()->routeIs('schedules.*') ? 'sidebar-subitem-active' : '' }}"
-                       @if(request()->routeIs('schedules.*')) aria-current="page" @endif>
-                        <span class="sidebar-subitem-label">일정 캘린더</span>
-                    </a>
-                    <a href="{{ route('shared-supplies.index') }}"
-                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                              {{ request()->routeIs('shared-supplies.*') ? 'sidebar-subitem-active' : '' }}"
-                       @if(request()->routeIs('shared-supplies.*')) aria-current="page" @endif>
-                        <span class="sidebar-subitem-label">공용품 관리</span>
-                    </a>
-                    <a href="{{ route('vehicle-usage-history.index') }}"
-                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                              {{ request()->routeIs('vehicle-usage-history.*') ? 'sidebar-subitem-active' : '' }}"
-                       @if(request()->routeIs('vehicle-usage-history.*')) aria-current="page" @endif>
-                        <span class="sidebar-subitem-label">차량별 사용 내역</span>
-                    </a>
+                    @if($scheduleMenuEnabled)
+                        <a href="{{ route('schedules.index') }}"
+                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable
+                                  {{ request()->routeIs('schedules.*') ? 'sidebar-subitem-active' : '' }}"
+                           @if(request()->routeIs('schedules.*')) aria-current="page" @endif>
+                            <span class="sidebar-subitem-label">일정 캘린더</span>
+                        </a>
+                        <a href="{{ route('shared-supplies.index') }}"
+                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable
+                                  {{ request()->routeIs('shared-supplies.*') ? 'sidebar-subitem-active' : '' }}"
+                           @if(request()->routeIs('shared-supplies.*')) aria-current="page" @endif>
+                            <span class="sidebar-subitem-label">공용품 관리</span>
+                        </a>
+                        <a href="{{ route('vehicle-usage-history.index') }}"
+                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable
+                                  {{ request()->routeIs('vehicle-usage-history.*') ? 'sidebar-subitem-active' : '' }}"
+                           @if(request()->routeIs('vehicle-usage-history.*')) aria-current="page" @endif>
+                            <span class="sidebar-subitem-label">차량별 사용 내역</span>
+                        </a>
+                    @else
+                        <span class="sidebar-subitem sidebar-subitem-row opacity-50 cursor-not-allowed">
+                            <span class="sidebar-subitem-label">일정 캘린더</span>
+                        </span>
+                        <span class="sidebar-subitem sidebar-subitem-row opacity-50 cursor-not-allowed">
+                            <span class="sidebar-subitem-label">공용품 관리</span>
+                        </span>
+                        <span class="sidebar-subitem sidebar-subitem-row opacity-50 cursor-not-allowed">
+                            <span class="sidebar-subitem-label">차량별 사용 내역</span>
+                        </span>
+                    @endif
                 </div>
             </div>
 

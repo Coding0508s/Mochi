@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Jobs\ProcessAssignmentChangeRequestsJob;
 use App\Jobs\SyncInstitutionOutboundJob;
 use App\Livewire\InstitutionList;
+use App\Livewire\InstitutionTable;
 use App\Models\AccountInformation;
 use App\Models\AssignmentChangeRequest;
 use App\Models\ContractDocument;
@@ -285,6 +286,23 @@ class InstitutionListTest extends TestCase
             ->assertCount('timelineVisibleItems', 3)
             ->assertSee('통합 타임라인')
             ->assertSee('계약 문서');
+    }
+
+    public function test_timeline_tab_hides_detail_edit_button(): void
+    {
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-TIMELINE-EDIT',
+            'AccountName' => '수정 버튼 숨김 테스트',
+        ]);
+
+        Livewire::actingAs(User::factory()->admin()->create())
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->assertSee('수정')
+            ->call('setDetailTab', 'timeline')
+            ->assertDontSee('wire:click="startDetailEdit"', false)
+            ->call('setDetailTab', 'overview')
+            ->assertSee('수정');
     }
 
     public function test_timeline_type_filter_changes_visible_events(): void
@@ -1022,7 +1040,40 @@ class InstitutionListTest extends TestCase
             ->set('statusFilter', 'all');
 
         $this->assertSame(2, $component->viewData('allInstitutionCount'));
-        $this->assertSame(2, $component->viewData('institutions')->total());
+        $this->assertSame(2, $component->get('institutionTableTotal'));
+    }
+
+    public function test_open_detail_modal_for_account_without_master_record(): void
+    {
+        $user = User::factory()->create();
+
+        $account = AccountInformation::query()->create([
+            'SK_Code' => 'SK-ACCOUNT-ONLY-DETAIL',
+            'Account_Name' => '마스터 없는 기관',
+            'CO' => '담당 CO',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $account->ID)
+            ->assertSet('showDetailModal', true)
+            ->assertSee('마스터 없는 기관');
+    }
+
+    public function test_open_detail_modal_for_master_only_catalog_row(): void
+    {
+        $user = User::factory()->create();
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-MASTER-ONLY-DETAIL',
+            'AccountName' => '마스터만 상세 기관',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->assertSet('showDetailModal', true)
+            ->assertSee('마스터만 상세 기관');
     }
 
     public function test_all_status_filter_count_matches_account_information_rows(): void
@@ -1049,7 +1100,7 @@ class InstitutionListTest extends TestCase
             ->set('statusFilter', 'all');
 
         $this->assertSame(2, $component->viewData('allInstitutionCount'));
-        $this->assertSame(2, $component->viewData('institutions')->total());
+        $this->assertSame(2, $component->get('institutionTableTotal'));
         $this->assertSame('전체 기관', $component->viewData('statusScopeLabel'));
     }
 
@@ -1075,7 +1126,7 @@ class InstitutionListTest extends TestCase
             ->set('statusFilter', 'active');
 
         $this->assertSame(1, $component->viewData('allInstitutionCount'));
-        $this->assertSame(1, $component->viewData('institutions')->total());
+        $this->assertSame(1, $component->get('institutionTableTotal'));
         $this->assertSame('운영 기관', $component->viewData('statusScopeLabel'));
     }
 
@@ -1097,7 +1148,7 @@ class InstitutionListTest extends TestCase
         ]);
 
         $institutions = Livewire::actingAs($user)
-            ->test(InstitutionList::class)
+            ->test(InstitutionTable::class)
             ->viewData('institutions');
 
         $this->assertSame('SK-OLDER', $institutions->first()->SK_Code);
@@ -1129,7 +1180,7 @@ class InstitutionListTest extends TestCase
         ]);
 
         $component = Livewire::actingAs($user)
-            ->test(InstitutionList::class)
+            ->test(InstitutionTable::class)
             ->set('sortField', 'AccountName')
             ->set('sortDirection', 'asc');
 
