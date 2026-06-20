@@ -5,11 +5,13 @@ namespace Tests\Feature;
 use App\Actions\UpdateTeacherSupportReport;
 use App\Models\SupportRecord;
 use App\Models\TeacherOnsiteSupportReport;
+use App\Models\TeacherVisitSupportReport;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class UpdateTeacherSupportReportTest extends TestCase
@@ -25,6 +27,7 @@ class UpdateTeacherSupportReportTest extends TestCase
     protected function createRequiredTables(): void
     {
         Schema::dropIfExists('teacher_onsite_support_reports');
+        Schema::dropIfExists('teacher_visit_support_reports');
         Schema::dropIfExists('S_SupportInfo_Account');
         Schema::dropIfExists('Teachers');
         Schema::dropIfExists('S_Account_Information');
@@ -49,6 +52,14 @@ class UpdateTeacherSupportReportTest extends TestCase
             $table->string('SK_Code', 100)->nullable();
             $table->string('Name', 255)->nullable();
             $table->boolean('ClassInOut')->default(true);
+            $table->string('_1st_Support_Date')->nullable();
+            $table->string('_2nd_Support_Date')->nullable();
+            $table->string('_3rd_Support_Date')->nullable();
+            $table->string('_4th_Support_Date')->nullable();
+            $table->string('_1st_Support_Type')->nullable();
+            $table->string('_2nd_Support_Type')->nullable();
+            $table->string('_3rd_Support_Type')->nullable();
+            $table->string('_4th_Support_Type')->nullable();
         });
 
         Schema::create('S_SupportInfo_Account', function ($table): void {
@@ -79,6 +90,36 @@ class UpdateTeacherSupportReportTest extends TestCase
             $table->json('procedures')->nullable();
             $table->json('strength_areas')->nullable();
             $table->json('growth_areas')->nullable();
+            $table->string('status', 20)->default('임시');
+            $table->unsignedBigInteger('support_record_id')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('teacher_visit_support_reports', function ($table): void {
+            $table->id();
+            $table->unsignedInteger('teacher_id');
+            $table->string('sk_code', 100);
+            $table->string('coach_name', 255);
+            $table->string('institution_name', 255);
+            $table->string('teacher_name', 255);
+            $table->date('support_date');
+            $table->string('support_location', 255)->nullable();
+            $table->string('support_purpose', 100);
+            $table->unsignedTinyInteger('observe_unit')->nullable();
+            $table->unsignedTinyInteger('observe_lesson')->nullable();
+            $table->string('observe_summary_extra', 255)->nullable();
+            $table->string('observe_class', 50)->nullable();
+            $table->string('observe_age', 50)->nullable();
+            $table->unsignedTinyInteger('session_number')->nullable();
+            $table->string('semester_label', 100)->nullable();
+            $table->date('interview_date')->nullable();
+            $table->string('interview_time', 10)->nullable();
+            $table->string('meeting_type', 50)->nullable();
+            $table->text('pre_request_notes')->nullable();
+            $table->text('monitoring_feedback')->nullable();
+            $table->text('interview_and_action_plan')->nullable();
+            $table->text('special_notes')->nullable();
             $table->string('status', 20)->default('임시');
             $table->unsignedBigInteger('support_record_id')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
@@ -141,6 +182,54 @@ class UpdateTeacherSupportReportTest extends TestCase
         ));
     }
 
+    public function test_rejects_visit_duplicate_completed_date_on_update(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $this->actingAs($admin);
+
+        $teacherId = $this->createTeacher('SK001', '홍길동');
+
+        $existing = TeacherVisitSupportReport::query()->create([
+            'teacher_id' => $teacherId,
+            'sk_code' => 'SK001',
+            'coach_name' => 'Coach A',
+            'institution_name' => '기관A',
+            'teacher_name' => '홍길동',
+            'support_date' => '2026-06-18',
+            'support_purpose' => '정기 참관',
+            'monitoring_feedback' => '기존 피드백',
+            'interview_and_action_plan' => '기존 계획',
+            'status' => '완료',
+            'created_by' => $admin->id,
+        ]);
+
+        $target = TeacherVisitSupportReport::query()->create([
+            'teacher_id' => $teacherId,
+            'sk_code' => 'SK001',
+            'coach_name' => 'Coach A',
+            'institution_name' => '기관A',
+            'teacher_name' => '홍길동',
+            'support_date' => '2026-06-18',
+            'support_purpose' => '정기 참관',
+            'status' => '임시',
+            'created_by' => $admin->id,
+        ]);
+
+        $this->expectException(ValidationException::class);
+
+        app(UpdateTeacherSupportReport::class)->execute(
+            'teacher_visit_support_reports',
+            (int) $target->id,
+            $this->visitPayload(markCompleted: true),
+            $admin,
+        );
+
+        $this->assertDatabaseHas('teacher_visit_support_reports', [
+            'id' => $existing->id,
+            'status' => '완료',
+        ]);
+    }
+
     private function createTeacher(string $skCode, string $name): int
     {
         \DB::table('S_AccountName')->insert([
@@ -193,6 +282,29 @@ class UpdateTeacherSupportReportTest extends TestCase
             'support_record_id' => $supportRecord->ID,
             'created_by' => $createdBy,
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function visitPayload(bool $markCompleted): array
+    {
+        return [
+            'sk_code' => 'SK001',
+            'coach_name' => 'Coach A',
+            'institution_name' => '기관A',
+            'teacher_name' => '홍길동',
+            'support_date' => '2026-06-18',
+            'support_location' => '분당',
+            'support_purpose' => '정기 참관',
+            'meeting_type' => 'On-Site',
+            'pre_request_notes' => '사전 요청',
+            'monitoring_feedback' => '모니터링 피드백',
+            'interview_and_action_plan' => '면담 계획',
+            'special_notes' => '특이사항',
+            'mark_completed' => $markCompleted,
+            'support_round' => 1,
+        ];
     }
 
     /**

@@ -31,26 +31,10 @@
             $plan2 = \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_2nd']});
             $plan3 = \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_3rd']});
             $plan4 = \App\Support\ExcelSerialDate::formatPlanMonth($teacher->{$cols['plan_4th']});
-            $done1 = \App\Support\ExcelSerialDate::displayCompletedWithType(
-                $teacher->getRawOriginal($cols['completed_1st']),
-                $teacher->{$cols['type_1st']},
-                null,
-            );
-            $done2 = \App\Support\ExcelSerialDate::displayCompletedWithType(
-                $teacher->getRawOriginal($cols['completed_2nd']),
-                $teacher->{$cols['type_2nd']},
-                null,
-            );
-            $done3 = \App\Support\ExcelSerialDate::displayCompletedWithType(
-                $teacher->getRawOriginal($cols['completed_3rd']),
-                $teacher->{$cols['type_3rd']},
-                null,
-            );
-            $done4 = \App\Support\ExcelSerialDate::displayCompletedWithType(
-                $teacher->getRawOriginal($cols['completed_4th']),
-                $teacher->{$cols['type_4th']},
-                null,
-            );
+            $done1 = \App\Support\TeacherSupportCompletionDisplay::displayWithType($teacher, 1, $displayYear ?? null);
+            $done2 = \App\Support\TeacherSupportCompletionDisplay::displayWithType($teacher, 2, $displayYear ?? null);
+            $done3 = \App\Support\TeacherSupportCompletionDisplay::displayWithType($teacher, 3, $displayYear ?? null);
+            $done4 = \App\Support\TeacherSupportCompletionDisplay::displayWithType($teacher, 4, $displayYear ?? null);
         @endphp
 
         <button type="button"

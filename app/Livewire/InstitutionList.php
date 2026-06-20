@@ -2,19 +2,20 @@
 
 namespace App\Livewire;
 
-use App\Enums\SyncOrigin;
-use App\Jobs\SyncInstitutionOutboundJob;
+use App\Actions\UpdateInstitutionDetail;
+use App\Actions\UpdateInstitutionManagers;
+use App\DataTransferObjects\InstitutionListFilters;
 use App\Livewire\Concerns\ManagesInstitutionSupportDetailEdit;
 use App\Livewire\Concerns\OpensTeacherSupportHistoryDetail;
+use App\Livewire\Concerns\PersistsInstitutionDetailForm;
+use App\Livewire\Concerns\PersistsInstitutionManagerForm;
+use App\Livewire\Concerns\ResolvesInstitutionFormPermissions;
 use App\Models\AccountInformation;
 use App\Models\AssignmentChangeRequest;
 use App\Models\Employee;
-use App\Models\GsNumber;
 use App\Models\Institution;
-use App\Models\SkCodeRequest;
 use App\Models\SupportRecord;
-use App\Models\Teacher;
-use App\Support\InstitutionCatalog;
+use App\Support\InstitutionAccountListQuery;
 use App\Support\InstitutionTeamSupportHistoryBuilder;
 use App\Support\InstitutionUnifiedTimelineBuilder;
 use App\Support\ManagerNameNormalizer;
@@ -25,9 +26,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Validation\Rule;
+use Livewire\Attributes\On;
 use Livewire\Component;
-use Livewire\WithPagination;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -36,18 +36,11 @@ class InstitutionList extends Component
 {
     use ManagesInstitutionSupportDetailEdit;
     use OpensTeacherSupportHistoryDetail;
-    use WithPagination;
-    // WithPagination: "다음 페이지", "이전 페이지" 기능을 자동으로 제공합니다.
+    use PersistsInstitutionDetailForm;
+    use PersistsInstitutionManagerForm;
+    use ResolvesInstitutionFormPermissions;
 
-    // ─── 담당자 드롭다운 부서 매핑 ─────────────────────────────────
-    // 상세 모달의 CO / Coach / CS 드롭다운은 아래 부서(WORKDEPT) 활성 직원만 후보로 노출합니다.
-    private const DEPT_CO = 'A02'; // Consulting Team
-
-    private const DEPT_TR = 'A05'; // Coach Team
-
-    private const DEPT_CS = 'A03'; // Customer Support Team
-
-    // ─── 검색/필터 상태 ────────────────────────────────────────────
+    // ─── 검색/필터 상태 (InstitutionFilter·InstitutionTable과 공유) ───
     public string $search = '';
     // 상단 검색창에 입력된 텍스트. 빈 문자열로 시작합니다.
 
@@ -68,6 +61,8 @@ class InstitutionList extends Component
 
     public string $sortDirection = 'asc';
     // 정렬 방향: asc(오름차순) / desc(내림차순)
+
+    public int $institutionTableTotal = 0;
 
     // ─── 상세 모달 상태 ───────────────────────────────────────────────
     public bool $showDetailModal = false;
@@ -150,9 +145,7 @@ class InstitutionList extends Component
 
     public string $editDetailAddress = '';
 
-    // ─── 담당자 변경 모달 상태 ───────────────────────────────────────
-    public bool $showManagerModal = false;
-
+    // ─── 담당자 변경 모달 (InstitutionFormModal 테스트 호환 미러) ─────
     public ?int $editingInstitutionId = null;
 
     public string $editSkCode = '';
@@ -165,83 +158,55 @@ class InstitutionList extends Component
 
     public string $editCs = '';
 
-    // ─── 검색어가 바뀌면 자동으로 1페이지로 돌아가기 ──────────────
-    public function updatingSearch(): void
-    {
-        $this->resetPage();
-        // 검색어가 바뀌었을 때 2페이지에 있다면 자동으로 1페이지로 이동합니다.
-    }
-
-    public function updatingStatusFilter(): void
-    {
-        $this->resetPage();
-    }
-
     public function updatingAssignmentFilter(): void
     {
-        $this->resetPage();
+        $this->dispatch('institution-table-reset-page');
     }
 
-    public function updatingFilterCo(): void
-    {
-        $this->resetPage();
+    #[On('filter-updated')]
+    public function onFilterUpdated(
+        string $search,
+        string $statusFilter,
+        string $filterCo,
+        string $filterTr,
+        string $filterCs,
+        bool $resetAssignment = false,
+    ): void {
+        $this->search = $search;
+        $this->statusFilter = $statusFilter;
+        $this->filterCo = $filterCo;
+        $this->filterTr = $filterTr;
+        $this->filterCs = $filterCs;
+
+        if ($resetAssignment) {
+            $this->assignmentFilter = '';
+        }
     }
 
-    public function updatingFilterTr(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatingFilterCs(): void
-    {
-        $this->resetPage();
-    }
-
-    public function clearListFilters(): void
-    {
-        $this->search = '';
-        $this->assignmentFilter = '';
-        $this->statusFilter = 'all';
-        $this->filterCo = '';
-        $this->filterTr = '';
-        $this->filterCs = '';
-        $this->resetPage();
-    }
-
-    public function clearSearchFilter(): void
-    {
-        $this->search = '';
-        $this->resetPage();
-    }
-
-    public function clearStatusFilter(): void
-    {
-        $this->statusFilter = 'all';
-        $this->resetPage();
-    }
-
+    #[On('institution-filter-assignment-cleared')]
     public function clearAssignmentFilter(): void
     {
         $this->assignmentFilter = '';
-        $this->resetPage();
+        $this->dispatch('institution-table-reset-page');
     }
 
-    public function clearCoFilter(): void
+    #[On('institution-row-selected')]
+    public function onInstitutionRowSelected(int $institutionId): void
     {
-        $this->filterCo = '';
-        $this->resetPage();
+        $this->openDetailModal($institutionId);
     }
 
-    public function clearTrFilter(): void
+    /** @deprecated 테스트·레거시 호출 호환. UI는 InstitutionFilter가 처리합니다. */
+    public function clearListFilters(): void
     {
-        $this->filterTr = '';
-        $this->resetPage();
-    }
-
-    public function clearCsFilter(): void
-    {
-        $this->filterCs = '';
-        $this->resetPage();
+        $this->onFilterUpdated(
+            search: '',
+            statusFilter: 'all',
+            filterCo: '',
+            filterTr: '',
+            filterCs: '',
+            resetAssignment: true,
+        );
     }
 
     public function updatedTimelineTypeFilter(): void
@@ -276,16 +241,37 @@ class InstitutionList extends Component
             $this->sortField = $field;
             $this->sortDirection = 'asc';
         }
-        $this->resetPage();
+        $this->dispatch('institution-table-reset-page');
+    }
+
+    public function updatedSortField(): void
+    {
+        $this->dispatch('institution-table-reset-page');
+    }
+
+    public function updatedSortDirection(): void
+    {
+        $this->dispatch('institution-table-reset-page');
     }
 
     // ─── 기관 행 클릭 시 상세 모달 열기 ────────────────────────────────
     public function openDetailModal(int $id): void
     {
-        $institution = $this->resolveInstitutionForDetailModal($id)
-            ->load($this->institutionEagerLoads())
-            ->loadCount(['teachers', 'supportRecords'])
-            ->loadMax('supportRecords', 'Support_Date');
+        $institution = $this->resolveInstitutionForDetailModal($id);
+
+        if ($institution->exists) {
+            $institution->load($this->institutionEagerLoads());
+        } else {
+            if ($institution->relationLoaded('accountInfo') === false && filled($institution->SKcode)) {
+                $institution->load('accountInfo');
+            }
+
+            if (Schema::hasTable('S_GSNumber') && filled($institution->SKcode)) {
+                $institution->load('gsNumber');
+            }
+        }
+
+        $this->hydrateInstitutionDetailMetrics($institution);
 
         // 저장된 담당자명 표기(예: "Peter.Kim")가 직원 마스터의 옵션 표기(예: "Peter Kim")와
         // 다를 수 있어, select 옵션과 매칭되지 않으면 모달에 "미지정"으로 보이는 문제가 있었다.
@@ -358,6 +344,11 @@ class InstitutionList extends Component
         $this->activeDetailTab = 'overview';
 
         $this->showDetailModal = true;
+
+        $this->dispatch(
+            'institution-form-set-detail-context',
+            institution: $this->selectedInstitution,
+        );
     }
 
     public function closeDetailModal(): void
@@ -389,6 +380,8 @@ class InstitutionList extends Component
         $this->resetValidation();
         $this->closeSupportDetailModal();
         $this->closeAllTeacherSupportReportModals();
+
+        $this->dispatch('institution-form-reset-detail');
     }
 
     public function setDetailTab(string $tab): void
@@ -398,6 +391,10 @@ class InstitutionList extends Component
         }
 
         $this->activeDetailTab = $tab;
+
+        if ($tab === 'timeline') {
+            $this->isEditingDetail = false;
+        }
 
         if ($tab === 'timeline' && $this->timelineAllItems === []) {
             $this->loadTimeline();
@@ -544,6 +541,34 @@ class InstitutionList extends Component
         return count($bucket['institution'] ?? []) + count($bucket['teacher'] ?? []) > 0;
     }
 
+    #[On('institution-form-detail-edit-state')]
+    public function onDetailEditState(bool $isEditing): void
+    {
+        $this->isEditingDetail = $isEditing;
+    }
+
+    #[On('institution-saved')]
+    public function onInstitutionSaved(string $mode, int $institutionId, string $skCode): void
+    {
+        if ($mode === 'detail') {
+            $this->isEditingDetail = false;
+            $this->refreshDetailModalAfterSave($institutionId);
+
+            return;
+        }
+
+        if ($mode !== 'manager' || ! $this->showDetailModal || ! $this->selectedInstitution) {
+            return;
+        }
+
+        $currentId = (int) ($this->selectedInstitution['id'] ?? 0);
+        $currentSk = (string) ($this->selectedInstitution['skcode'] ?? '');
+
+        if ($currentId === $institutionId || $currentSk === $skCode) {
+            $this->openDetailModal($institutionId > 0 ? $institutionId : $currentId);
+        }
+    }
+
     public function startDetailEdit(): void
     {
         if (! $this->selectedInstitution) {
@@ -568,6 +593,11 @@ class InstitutionList extends Component
         $this->editDetailAccountTel = (string) ($this->selectedInstitution['account_tel'] ?? '');
         $this->editDetailAddress = (string) ($this->selectedInstitution['address'] ?? '');
         $this->resetValidation();
+
+        $this->dispatch(
+            'institution-form-start-detail-edit',
+            institution: $this->selectedInstitution,
+        );
     }
 
     public function cancelDetailEdit(): void
@@ -594,155 +624,28 @@ class InstitutionList extends Component
         $this->editDetailAccountTel = (string) ($this->selectedInstitution['account_tel'] ?? '');
         $this->editDetailAddress = (string) ($this->selectedInstitution['address'] ?? '');
         $this->resetValidation();
+
+        $this->dispatch('institution-form-cancel-detail-edit');
     }
 
-    public function saveDetailFields(): void
+    public function saveDetailFields(UpdateInstitutionDetail $updateInstitutionDetail): void
     {
-        if (! $this->selectedInstitution) {
+        $result = $this->persistInstitutionDetailFields($updateInstitutionDetail);
+
+        if ($result === null) {
             return;
         }
 
-        if (! $this->canEditInstitutionDetail()) {
-            $this->addError('detailEdit', '기관 상세 정보를 수정할 권한이 없습니다.');
+        $this->refreshDetailModalAfterSave($result['institution_id']);
+    }
 
-            return;
-        }
-
-        $institutionId = (int) ($this->selectedInstitution['id'] ?? 0);
-        $originalSk = trim((string) ($this->selectedInstitution['skcode'] ?? ''));
-
-        if ($institutionId <= 0 || $originalSk === '') {
-            return;
-        }
-
-        $this->applyInstitutionDetailEditFieldLocks();
-
-        $this->validate([
-            'editDetailSkCode' => [
-                'required',
-                'string',
-                'max:100',
-                Rule::unique('S_AccountName', 'SKcode')->ignore($institutionId, 'ID'),
-            ],
-            'editDetailInstitutionName' => ['required', 'string', 'max:255'],
-            'editDetailEnglishName' => ['nullable', 'string', 'max:255'],
-            'editDetailPortalName' => ['nullable', 'string', 'max:255'],
-            'editDetailPortalCampusId' => ['nullable', 'string', 'max:100'],
-            'editDetailAccountNo' => ['nullable', 'string', 'max:100'],
-            'editDetailGubun' => ['nullable', 'string', 'max:100'],
-            'editDetailDirector' => ['nullable', 'string', 'max:255'],
-            'editDetailPhone' => ['nullable', 'string', 'max:100'],
-            'editDetailAccountTel' => ['nullable', 'string', 'max:100'],
-            'editDetailAddress' => ['nullable', 'string', 'max:500'],
-            'editCustomerType' => ['nullable', 'string', 'max:255'],
-            'editGsNo' => ['nullable', 'string', 'max:255'],
-            'editDetailCo' => ['nullable', 'string', 'max:255'],
-            'editDetailTr' => ['nullable', 'string', 'max:255'],
-            'editDetailCs' => ['nullable', 'string', 'max:255'],
-        ], [
-            'editDetailSkCode.required' => 'SK 코드를 입력해 주세요.',
-            'editDetailSkCode.unique' => '이미 사용 중인 SK 코드입니다.',
-            'editDetailInstitutionName.required' => '기관명을 입력해 주세요.',
-        ]);
-
-        $institution = Institution::query()->findOrFail($institutionId);
-        $oldSk = trim((string) $institution->SKcode);
-        $newSk = trim($this->editDetailSkCode);
-        $trimmedGs = trim($this->editGsNo);
-        $accountName = trim($this->editDetailInstitutionName);
-        $beforeAccountInfo = AccountInformation::query()
-            ->where('SK_Code', $newSk)
-            ->first();
-
-        DB::transaction(function () use ($institution, $oldSk, $newSk, $accountName, $trimmedGs, $beforeAccountInfo): void {
-            if ($oldSk !== $newSk) {
-                if (Schema::hasTable('Teachers')) {
-                    Teacher::query()->where('SK_Code', $oldSk)->update(['SK_Code' => $newSk]);
-                }
-                SupportRecord::query()->where('SK_Code', $oldSk)->update(['SK_Code' => $newSk]);
-                if (Schema::hasTable('S_GSNumber')) {
-                    GsNumber::query()->where('SKCode', $oldSk)->update(['SKCode' => $newSk]);
-                }
-                AccountInformation::query()->where('SK_Code', $oldSk)->update(['SK_Code' => $newSk]);
-                if (Schema::hasTable('institution_visibility_overrides')) {
-                    DB::table('institution_visibility_overrides')
-                        ->where('sk_code', $oldSk)
-                        ->update(['sk_code' => $newSk, 'updated_at' => now()]);
-                }
-            }
-
-            $institution->update([
-                'SKcode' => $newSk,
-                'AccountName' => $accountName,
-                'EnglishName' => trim($this->editDetailEnglishName) !== '' ? trim($this->editDetailEnglishName) : null,
-                'PortalAccountName' => trim($this->editDetailPortalName) !== '' ? trim($this->editDetailPortalName) : null,
-                'PortalCampusID' => trim($this->editDetailPortalCampusId) !== '' ? trim($this->editDetailPortalCampusId) : null,
-                'AccountNo' => trim($this->editDetailAccountNo) !== '' ? trim($this->editDetailAccountNo) : null,
-                'Director' => trim($this->editDetailDirector) !== '' ? trim($this->editDetailDirector) : null,
-                'Phone' => trim($this->editDetailPhone) !== '' ? trim($this->editDetailPhone) : null,
-                'AccountTel' => trim($this->editDetailAccountTel) !== '' ? trim($this->editDetailAccountTel) : null,
-                'Address' => trim($this->editDetailAddress) !== '' ? trim($this->editDetailAddress) : null,
-                'Gubun' => trim($this->editDetailGubun) !== '' ? trim($this->editDetailGubun) : null,
-                'GSno' => $trimmedGs !== '' ? $trimmedGs : null,
-            ]);
-
-            AccountInformation::query()->updateOrCreate(
-                ['SK_Code' => $newSk],
-                [
-                    'Account_Name' => $accountName,
-                    'Customer_Type' => trim($this->editCustomerType) ?: null,
-                    'CO' => trim($this->editDetailCo) ?: null,
-                    'TR' => trim($this->editDetailTr) ?: null,
-                    'CS' => trim($this->editDetailCs) ?: null,
-                    'Address' => trim($this->editDetailAddress) !== '' ? trim($this->editDetailAddress) : null,
-                ]
-            );
-
-            $this->reverseSyncToSkCodeRequest($newSk, [
-                'institution_name' => $accountName,
-                'portal_campus_id' => trim($this->editDetailPortalCampusId) !== '' ? trim($this->editDetailPortalCampusId) : null,
-                'account_no' => trim($this->editDetailAccountNo) !== '' ? trim($this->editDetailAccountNo) : null,
-                'co' => trim($this->editDetailCo) ?: null,
-                'tr' => trim($this->editDetailTr) ?: null,
-                'cs' => trim($this->editDetailCs) ?: null,
-            ]);
-            $this->enqueueAssignmentChangeRequestIfNeeded(
-                $newSk,
-                $beforeAccountInfo,
-                [
-                    'co' => trim($this->editDetailCo) ?: null,
-                    'tr' => trim($this->editDetailTr) ?: null,
-                    'cs' => trim($this->editDetailCs) ?: null,
-                ]
-            );
-
-            if (Schema::hasTable('S_GSNumber')) {
-                GsNumber::query()->updateOrCreate(
-                    ['SKCode' => $newSk],
-                    [
-                        'AccountName' => $accountName !== '' ? $accountName : null,
-                        'GSnumber' => $trimmedGs !== '' ? $trimmedGs : null,
-                    ]
-                );
-            }
-
-            DB::afterCommit(function () use ($newSk): void {
-                SyncInstitutionOutboundJob::dispatchIf(
-                    (bool) config('services.institution_outbound.enabled'),
-                    $newSk,
-                    SyncOrigin::Local
-                );
-            });
-        });
-
+    private function refreshDetailModalAfterSave(int $institutionId): void
+    {
         if ($this->institutionDetailModalIsVisible($institutionId)) {
             $this->openDetailModal($institutionId);
         } else {
             $this->closeDetailModal();
         }
-
-        $this->resetValidation();
-        session()->flash('success', '기관 상세 정보가 저장되었습니다.');
     }
 
     private function institutionDetailModalIsVisible(int $institutionId): bool
@@ -751,14 +654,16 @@ class InstitutionList extends Component
             return false;
         }
 
-        return AccountInformation::query()
-            ->tap(fn (Builder $query) => $this->applyTeamAccountInformationScope($query))
-            ->whereKey($institutionId)
-            ->exists()
-            || Institution::query()
-                ->tap(fn (Builder $query) => $this->applyTeamInstitutionScope($query))
-                ->whereKey($institutionId)
-                ->exists();
+        if ($this->catalogRowExistsById($institutionId)) {
+            return true;
+        }
+
+        $institution = Institution::query()->find($institutionId);
+        if ($institution === null) {
+            return false;
+        }
+
+        return $this->catalogRowExistsBySkCode((string) $institution->SKcode);
     }
 
     // ─── 지원/소통 이력 상세 모달 ─────────────────────────────────────
@@ -844,12 +749,20 @@ class InstitutionList extends Component
             $institution->accountInfo?->CS,
             $this->managerOptionsForDept(self::DEPT_CS),
         );
-        $this->showManagerModal = true;
+
+        $this->dispatch(
+            'institution-form-open-manager',
+            institutionId: $institution->ID,
+            skCode: (string) ($institution->SKcode ?? ''),
+            institutionName: $institution->resolvedAccountName(),
+            co: $this->editCo,
+            tr: $this->editTr,
+            cs: $this->editCs,
+        );
     }
 
     public function closeManagerModal(): void
     {
-        $this->showManagerModal = false;
         $this->editingInstitutionId = null;
         $this->editSkCode = '';
         $this->editInstitutionName = '';
@@ -857,109 +770,23 @@ class InstitutionList extends Component
         $this->editTr = '';
         $this->editCs = '';
         $this->resetValidation();
+
+        $this->dispatch('institution-form-close-manager');
     }
 
-    public function saveManagers(): void
+    public function saveManagers(UpdateInstitutionManagers $updateInstitutionManagers): void
     {
-        if (! $this->canEditInstitutionDetail()) {
-            $this->addError('managerEdit', '담당자 정보를 수정할 권한이 없습니다.');
-
-            return;
-        }
-
-        $existing = AccountInformation::query()
-            ->where('SK_Code', $this->editSkCode)
-            ->first();
-
-        $co = $this->canEditInstitutionDetailCo()
-            ? trim($this->editCo) ?: null
-            : ($existing?->CO);
-        $tr = $this->canEditInstitutionDetailTr()
-            ? trim($this->editTr) ?: null
-            : ($existing?->TR);
-        $cs = $this->canEditInstitutionDetailCs()
-            ? trim($this->editCs) ?: null
-            : ($existing?->CS);
-
-        $this->validate([
-            'editSkCode' => 'required',
-            'editInstitutionName' => 'required|string|max:255',
-            'editCo' => 'nullable|string|max:255',
-            'editTr' => 'nullable|string|max:255',
-            'editCs' => 'nullable|string|max:255',
-        ], [
-            'editSkCode.required' => '기관 코드가 필요합니다.',
-            'editInstitutionName.required' => '기관명이 필요합니다.',
-        ]);
-
-        $accountName = trim($this->editInstitutionName);
-
-        DB::transaction(function () use ($accountName, $co, $tr, $cs, $existing): void {
-            Institution::query()
-                ->where('SKcode', $this->editSkCode)
-                ->update(['AccountName' => $accountName]);
-
-            AccountInformation::query()->updateOrCreate(
-                ['SK_Code' => $this->editSkCode],
-                [
-                    'Account_Name' => $accountName,
-                    'CO' => $co,
-                    'TR' => $tr,
-                    'CS' => $cs,
-                ]
-            );
-
-            if (Schema::hasTable('S_GSNumber')) {
-                GsNumber::query()->updateOrCreate(
-                    ['SKCode' => $this->editSkCode],
-                    ['AccountName' => $accountName !== '' ? $accountName : null],
-                );
-            }
-
-            $this->reverseSyncToSkCodeRequest($this->editSkCode, [
-                'institution_name' => $accountName,
-                'co' => $co,
-                'tr' => $tr,
-                'cs' => $cs,
-            ]);
-            $this->enqueueAssignmentChangeRequestIfNeeded(
-                $this->editSkCode,
-                $existing,
-                ['co' => $co, 'tr' => $tr, 'cs' => $cs]
-            );
-
-            DB::afterCommit(function (): void {
-                SyncInstitutionOutboundJob::dispatchIf(
-                    (bool) config('services.institution_outbound.enabled'),
-                    $this->editSkCode,
-                    SyncOrigin::Local
-                );
-            });
-        });
-
-        // 상세 모달 열려 있으면 즉시 표시값도 갱신
-        if ($this->selectedInstitution && $this->selectedInstitution['skcode'] === $this->editSkCode) {
-            $this->selectedInstitution['name'] = $accountName;
-            $this->selectedInstitution['co'] = $co;
-            $this->selectedInstitution['tr'] = $tr;
-            $this->selectedInstitution['cs'] = $cs;
-        }
-
-        session()->flash('success', '담당자 정보가 저장되었습니다.');
+        $this->persistInstitutionManagers($updateInstitutionManagers);
         $this->closeManagerModal();
     }
 
     public function exportInstitutionsExcel(): ?StreamedResponse
     {
         try {
-            $hiddenInstitutionSkCodes = $this->hiddenInstitutionSkCodes();
-            $managerColumn = $this->currentUserManagerColumn();
-            $assignmentColumn = $managerColumn ?? 'CO';
+            $accountListQuery = $this->accountListQuery();
+            $filters = $this->listFilters();
 
-            $accounts = $this->accountInformationListQuery($hiddenInstitutionSkCodes, $assignmentColumn)
-                ->with($this->accountInformationEagerLoads())
-                ->tap(fn (Builder $query) => $this->applyAccountInformationListSort($query))
-                ->get();
+            $accounts = $accountListQuery->listQueryForExport($filters)->get();
 
             if ($accounts->isEmpty()) {
                 session()->flash('error', '다운로드할 데이터가 없습니다.');
@@ -1033,37 +860,35 @@ class InstitutionList extends Component
     // ─── 화면에 표시할 데이터 가져오기 ───────────────────────────────
     public function render()
     {
-        $hiddenInstitutionSkCodes = $this->hiddenInstitutionSkCodes();
+        $accountListQuery = $this->accountListQuery();
+        $filters = $this->listFilters();
+        $hiddenInstitutionSkCodes = $accountListQuery->hiddenInstitutionSkCodes();
 
         // 상단 요약 카드용 집계 (S_Account_Information 기준)
-        $managerColumn = $this->currentUserManagerColumn();
+        $managerColumn = $accountListQuery->currentUserManagerColumn();
 
-        $summaryQuery = fn (): Builder => $this->accountInformationSummaryQuery($hiddenInstitutionSkCodes);
+        $summaryQuery = fn (): Builder => $accountListQuery->accountInformationSummaryQuery($filters);
 
         $allInstitutionCount = $summaryQuery()->count();
 
         $assignmentColumn = $managerColumn ?? 'CO';
 
         $assignedCoCount = $summaryQuery()
-            ->tap(fn (Builder $query) => $this->applyManagerAssignedConstraint($query, $assignmentColumn))
+            ->tap(fn (Builder $query) => $accountListQuery->applyManagerAssignedConstraint($query, $assignmentColumn))
             ->count();
 
         $myAssignedCoCount = $summaryQuery()
-            ->tap(fn (Builder $query) => $this->applyCurrentUserManagerScopeOnAccountInformation($query))
+            ->tap(fn (Builder $query) => $accountListQuery->applyCurrentUserManagerScopeOnAccountInformation($query))
             ->count();
 
         $unassignedCoCount = max(0, $allInstitutionCount - $assignedCoCount);
 
-        $institutions = $this->accountInformationListQuery($hiddenInstitutionSkCodes, $assignmentColumn)
-            ->with($this->accountInformationEagerLoads())
-            ->tap(fn (Builder $query) => $this->applyAccountInformationListSort($query))
-            ->paginate(20);
-        // 한 페이지에 20개씩 표시합니다. (목록 SSOT: S_Account_Information)
+        $this->institutionTableTotal = $accountListQuery->accountInformationListQuery($filters)->count();
 
         // 기관 구분 목록 (필터 드롭다운용)
         $gubunList = Institution::query()
-            ->tap(fn (Builder $query) => $this->applyTeamInstitutionScope($query))
-            ->tap(fn (Builder $query) => $this->applyStatusFilter($query))
+            ->tap(fn (Builder $query) => $accountListQuery->applyTeamInstitutionScope($query))
+            ->tap(fn (Builder $query) => $accountListQuery->applyStatusFilter($query, $filters))
             ->when($hiddenInstitutionSkCodes !== [], function ($query) use ($hiddenInstitutionSkCodes): void {
                 $query->whereNotIn('SKcode', $hiddenInstitutionSkCodes);
             })
@@ -1090,9 +915,8 @@ class InstitutionList extends Component
             ->pluck('Customer_Type');
 
         return view('livewire.institution-list', [
-            'institutions' => $institutions,
             'gubunList' => $gubunList,
-            'statusScopeLabel' => $this->statusScopeLabel(),
+            'statusScopeLabel' => $accountListQuery->statusScopeLabel($filters),
             'allInstitutionCount' => $allInstitutionCount,
             'assignedCoCount' => $assignedCoCount,
             'myAssignedCoCount' => $myAssignedCoCount,
@@ -1110,79 +934,14 @@ class InstitutionList extends Component
         ]);
     }
 
-    public function canEditInstitutionDetail(): bool
+    private function listFilters(): InstitutionListFilters
     {
-        return $this->canEditInstitutionDetailCore()
-            || $this->canEditInstitutionDetailCo()
-            || $this->canEditInstitutionDetailTr()
-            || $this->canEditInstitutionDetailCs();
+        return InstitutionListFilters::fromComponent($this);
     }
 
-    public function canEditInstitutionDetailCore(): bool
+    private function accountListQuery(): InstitutionAccountListQuery
     {
-        return (bool) auth()->user()?->hasFullAccess();
-    }
-
-    public function canEditInstitutionDetailCo(): bool
-    {
-        if ($this->canEditInstitutionDetailCore()) {
-            return true;
-        }
-
-        return $this->resolveCurrentUserManagerDept() === self::DEPT_CO;
-    }
-
-    public function canEditInstitutionDetailTr(): bool
-    {
-        if ($this->canEditInstitutionDetailCore()) {
-            return true;
-        }
-
-        return $this->resolveCurrentUserManagerDept() === self::DEPT_TR;
-    }
-
-    public function canEditInstitutionDetailCs(): bool
-    {
-        if ($this->canEditInstitutionDetailCore()) {
-            return true;
-        }
-
-        return $this->resolveCurrentUserManagerDept() === self::DEPT_CS;
-    }
-
-    protected function applyInstitutionDetailEditFieldLocks(): void
-    {
-        if (! $this->selectedInstitution) {
-            return;
-        }
-
-        if (! $this->canEditInstitutionDetailCore()) {
-            $this->editDetailSkCode = (string) ($this->selectedInstitution['skcode'] ?? '');
-            $this->editDetailInstitutionName = (string) ($this->selectedInstitution['name'] ?? '');
-            $this->editDetailEnglishName = (string) ($this->selectedInstitution['english_name'] ?? '');
-            $this->editDetailPortalName = (string) ($this->selectedInstitution['portal_name'] ?? '');
-            $this->editDetailPortalCampusId = (string) ($this->selectedInstitution['portal_campus_id'] ?? '');
-            $this->editDetailAccountNo = (string) ($this->selectedInstitution['account_no'] ?? '');
-            $this->editDetailGubun = (string) ($this->selectedInstitution['gubun'] ?? '');
-            $this->editDetailDirector = (string) ($this->selectedInstitution['director'] ?? '');
-            $this->editDetailPhone = (string) ($this->selectedInstitution['phone'] ?? '');
-            $this->editDetailAccountTel = (string) ($this->selectedInstitution['account_tel'] ?? '');
-            $this->editDetailAddress = (string) ($this->selectedInstitution['address'] ?? '');
-            $this->editCustomerType = (string) ($this->selectedInstitution['customer_type'] ?? '');
-            $this->editGsNo = (string) ($this->selectedInstitution['gs_no'] ?? '');
-        }
-
-        if (! $this->canEditInstitutionDetailCo()) {
-            $this->editDetailCo = (string) ($this->selectedInstitution['co'] ?? '');
-        }
-
-        if (! $this->canEditInstitutionDetailTr()) {
-            $this->editDetailTr = (string) ($this->selectedInstitution['tr'] ?? '');
-        }
-
-        if (! $this->canEditInstitutionDetailCs()) {
-            $this->editDetailCs = (string) ($this->selectedInstitution['cs'] ?? '');
-        }
+        return app(InstitutionAccountListQuery::class);
     }
 
     private function formatSupportMeetTime(mixed $meetTime): string
@@ -1207,36 +966,6 @@ class InstitutionList extends Component
         return '-';
     }
 
-    private function resolveCurrentUserManagerDept(): ?string
-    {
-        $user = auth()->user();
-        if ($user === null) {
-            return null;
-        }
-
-        $workdept = $user->employee?->WORKDEPT;
-        if (filled($workdept)) {
-            $dept = (string) $workdept;
-            if (in_array($dept, [self::DEPT_CO, self::DEPT_TR, self::DEPT_CS], true)) {
-                return $dept;
-            }
-        }
-
-        if ($user->isCoTeam()) {
-            return self::DEPT_CO;
-        }
-
-        if ($user->isCoachTeam()) {
-            return self::DEPT_TR;
-        }
-
-        if ($user->isCsTeam()) {
-            return self::DEPT_CS;
-        }
-
-        return null;
-    }
-
     /**
      * @return array<int, string>
      */
@@ -1250,79 +979,87 @@ class InstitutionList extends Component
         return $loads;
     }
 
-    /**
-     * @return list<string>
-     */
-    private function accountInformationEagerLoads(): array
-    {
-        $loads = ['institution'];
-        if (Schema::hasTable('S_GSNumber')) {
-            $loads[] = 'institution.gsNumber';
-        }
-
-        return $loads;
-    }
-
-    /**
-     * @param  list<string>  $hiddenInstitutionSkCodes
-     */
-    private function accountInformationSummaryQuery(array $hiddenInstitutionSkCodes): Builder
-    {
-        return InstitutionCatalog::query()
-            ->when($hiddenInstitutionSkCodes !== [], function (Builder $query) use ($hiddenInstitutionSkCodes): void {
-                $query->whereNotIn('SK_Code', $hiddenInstitutionSkCodes);
-            })
-            ->tap(fn (Builder $query) => $this->applyStatusFilterOnAccountInformation($query))
-            ->tap(fn (Builder $query) => $this->applyTeamAccountInformationScope($query));
-    }
-
-    /**
-     * @param  list<string>  $hiddenInstitutionSkCodes
-     */
-    private function accountInformationListQuery(array $hiddenInstitutionSkCodes, string $assignmentColumn): Builder
-    {
-        return $this->accountInformationSummaryQuery($hiddenInstitutionSkCodes)
-            ->search($this->search)
-            ->when($this->assignmentFilter === 'assigned', function (Builder $query) use ($assignmentColumn): void {
-                $this->applyManagerAssignedConstraint($query, $assignmentColumn);
-            })
-            ->when($this->assignmentFilter === 'unassigned', function (Builder $query) use ($assignmentColumn): void {
-                $query->where(function (Builder $unassignedQuery) use ($assignmentColumn): void {
-                    $unassignedQuery->whereNull($assignmentColumn)
-                        ->orWhere($assignmentColumn, '');
-                });
-            })
-            ->when($this->assignmentFilter === 'my_assigned', function (Builder $query): void {
-                $this->applyCurrentUserManagerScopeOnAccountInformation($query);
-            })
-            ->when(filled($this->filterCo), function (Builder $query): void {
-                $this->applyManagerColumnFilter($query, 'CO', $this->filterCo, self::DEPT_CO);
-            })
-            ->when(filled($this->filterTr), function (Builder $query): void {
-                $this->applyManagerColumnFilter($query, 'TR', $this->filterTr, self::DEPT_TR);
-            })
-            ->when(filled($this->filterCs), function (Builder $query): void {
-                $this->applyManagerColumnFilter($query, 'CS', $this->filterCs, self::DEPT_CS);
-            });
-    }
-
     private function resolveInstitutionForDetailModal(int $id): Institution
     {
-        $scopedInstitutionQuery = fn (): Builder => Institution::query()
-            ->tap(fn (Builder $query) => $this->applyTeamInstitutionScope($query));
+        if ($this->catalogRowExistsById($id)) {
+            $accountInfo = AccountInformation::query()->find($id);
+            if ($accountInfo !== null) {
+                return $this->institutionForAccountInformation($accountInfo);
+            }
 
-        $institution = $scopedInstitutionQuery()->find($id);
-        if ($institution !== null) {
+            return Institution::query()->findOrFail($id);
+        }
+
+        $institution = Institution::query()->find($id);
+        if ($institution !== null && $this->catalogRowExistsBySkCode((string) $institution->SKcode)) {
+            $institution->loadMissing('accountInfo');
+
             return $institution;
         }
 
-        $accountInfo = AccountInformation::query()
-            ->tap(fn (Builder $query) => $this->applyTeamAccountInformationScope($query))
-            ->findOrFail($id);
+        abort(404);
+    }
 
-        return $scopedInstitutionQuery()
+    private function catalogRowExistsById(int $id): bool
+    {
+        return $this->accountListQuery()
+            ->accountInformationListQuery($this->listFilters())
+            ->where('ID', $id)
+            ->exists();
+    }
+
+    private function catalogRowExistsBySkCode(string $skCode): bool
+    {
+        if ($skCode === '') {
+            return false;
+        }
+
+        return $this->accountListQuery()
+            ->accountInformationListQuery($this->listFilters())
+            ->where('SK_Code', $skCode)
+            ->exists();
+    }
+
+    private function institutionForAccountInformation(AccountInformation $accountInfo): Institution
+    {
+        $institution = Institution::query()
             ->where('SKcode', $accountInfo->SK_Code)
-            ->firstOrFail();
+            ->first();
+
+        if ($institution === null) {
+            $institution = new Institution([
+                'SKcode' => $accountInfo->SK_Code,
+                'AccountName' => $accountInfo->Account_Name,
+                'Address' => $accountInfo->Address,
+            ]);
+        }
+
+        $institution->setRelation('accountInfo', $accountInfo);
+
+        return $institution;
+    }
+
+    private function hydrateInstitutionDetailMetrics(Institution $institution): void
+    {
+        if ($institution->exists) {
+            $institution->loadCount(['teachers', 'supportRecords'])
+                ->loadMax('supportRecords', 'Support_Date');
+
+            return;
+        }
+
+        $skCode = (string) $institution->SKcode;
+        if ($skCode === '') {
+            $institution->teachers_count = 0;
+            $institution->support_records_count = 0;
+            $institution->support_records_max_support_date = null;
+
+            return;
+        }
+
+        $institution->teachers_count = $institution->teachers()->count();
+        $institution->support_records_count = $institution->supportRecords()->count();
+        $institution->support_records_max_support_date = $institution->supportRecords()->max('Support_Date');
     }
 
     /**
@@ -1356,127 +1093,6 @@ class InstitutionList extends Component
             ->unique()
             ->sort()
             ->values();
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function hiddenInstitutionSkCodes(): array
-    {
-        if (! Schema::hasTable('institution_visibility_overrides')) {
-            return [];
-        }
-
-        return DB::table('institution_visibility_overrides')
-            ->whereNotNull('hidden_at')
-            ->pluck('sk_code')
-            ->filter(fn ($value): bool => filled($value))
-            ->map(fn ($value): string => (string) $value)
-            ->unique()
-            ->values()
-            ->all();
-    }
-
-    /**
-     * 로컬에서 마스터 데이터를 수정하면 sk_code_requests도 같은 값으로 맞춥니다.
-     * applied_at을 함께 갱신해 queued job이 동일 값을 다시 적용하지 않게 합니다.
-     *
-     * @param  array<string, mixed>  $values
-     */
-    private function reverseSyncToSkCodeRequest(string $skCode, array $values): void
-    {
-        $request = SkCodeRequest::query()
-            ->where('final_sk_code', $skCode)
-            ->where('status', 'completed')
-            ->orderByDesc('id')
-            ->first();
-
-        if (! $request) {
-            return;
-        }
-
-        $patch = [];
-        foreach ($values as $column => $value) {
-            if ($value === null) {
-                continue;
-            }
-
-            $trimmed = trim((string) $value);
-            if ($trimmed === '') {
-                continue;
-            }
-
-            $patch[$column] = $trimmed;
-        }
-
-        if ($patch === []) {
-            return;
-        }
-
-        $syncedAt = now();
-
-        $request->timestamps = false;
-        $request->update(array_merge($patch, [
-            'applied_at' => $syncedAt,
-            'updated_at' => $syncedAt,
-        ]));
-        $request->timestamps = true;
-    }
-
-    private function enqueueAssignmentChangeRequestIfNeeded(
-        string $skCode,
-        ?AccountInformation $before,
-        array $after
-    ): void {
-        if (! (bool) config('services.assignment_sync.enabled', false)) {
-            return;
-        }
-
-        $beforeValues = [
-            'co' => $this->normalizeManagerValue($before?->CO),
-            'tr' => $this->normalizeManagerValue($before?->TR),
-            'cs' => $this->normalizeManagerValue($before?->CS),
-        ];
-        $afterValues = [
-            'co' => $this->normalizeManagerValue($after['co'] ?? null),
-            'tr' => $this->normalizeManagerValue($after['tr'] ?? null),
-            'cs' => $this->normalizeManagerValue($after['cs'] ?? null),
-        ];
-
-        $patch = [];
-        foreach (['co', 'tr', 'cs'] as $key) {
-            if ($beforeValues[$key] === $afterValues[$key]) {
-                continue;
-            }
-
-            $patch[$key] = $afterValues[$key];
-        }
-
-        if ($patch === []) {
-            return;
-        }
-
-        AssignmentChangeRequest::query()->create([
-            'sk_code' => $skCode,
-            'co' => $patch['co'] ?? null,
-            'tr' => $patch['tr'] ?? null,
-            'cs' => $patch['cs'] ?? null,
-            'changed_by' => auth()->user()?->nameForCoReports(),
-            'origin' => AssignmentChangeRequest::ORIGIN_LOCAL,
-            'status' => AssignmentChangeRequest::STATUS_PENDING,
-            'requested_at' => now(),
-        ]);
-    }
-
-    private function normalizeManagerValue(mixed $value): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        $normalized = trim((string) $value);
-
-        return $normalized === '' ? null : $normalized;
     }
 
     /**
@@ -1555,337 +1171,6 @@ class InstitutionList extends Component
         return $request->origin === AssignmentChangeRequest::ORIGIN_EXTERNAL
             ? 'External Sync'
             : 'Internal Update';
-    }
-
-    private function applyStatusFilter(Builder $query): void
-    {
-        if ($this->statusFilter === 'all') {
-            return;
-        }
-
-        if ($this->statusFilter === 'terminated') {
-            $query->whereHas('accountInfo', function (Builder $sub): void {
-                $sub->where('Customer_Type', 'like', '%해지%');
-            });
-
-            return;
-        }
-
-        $query->where(function (Builder $statusQuery): void {
-            $statusQuery->whereDoesntHave('accountInfo')
-                ->orWhereHas('accountInfo', function (Builder $sub): void {
-                    $sub->where(function (Builder $customerTypeQuery): void {
-                        $customerTypeQuery->whereNull('Customer_Type')
-                            ->orWhere('Customer_Type', '')
-                            ->orWhere('Customer_Type', 'not like', '%해지%');
-                    });
-                });
-        });
-    }
-
-    private function statusScopeLabel(): string
-    {
-        return match ($this->statusFilter) {
-            'terminated' => '해지 기관',
-            'active' => '운영 기관',
-            default => '전체 기관',
-        };
-    }
-
-    private function applyStatusFilterOnAccountInformation(Builder $query): void
-    {
-        if ($this->statusFilter === 'all') {
-            return;
-        }
-
-        if ($this->statusFilter === 'terminated') {
-            $query->terminatedCustomers();
-
-            return;
-        }
-
-        $query->activeCustomers();
-    }
-
-    private function applyTeamInstitutionScope(Builder $query): void
-    {
-        if (! $this->shouldScopeToAssignedInstitutions()) {
-            return;
-        }
-
-        $this->applyCurrentUserManagerScope($query);
-    }
-
-    private function applyTeamAccountInformationScope(Builder $query): void
-    {
-        if (! $this->shouldScopeToAssignedInstitutions()) {
-            return;
-        }
-
-        $this->applyCurrentUserManagerScopeOnAccountInformation($query);
-    }
-
-    private function applyCurrentUserManagerScope(Builder $query): void
-    {
-        $aliases = $this->resolveCurrentUserManagerAliases();
-        if ($aliases === []) {
-            $query->whereRaw('1 = 0');
-
-            return;
-        }
-
-        $column = $this->currentUserManagerColumn();
-        if ($column === null) {
-            $query->whereHas('accountInfo', function (Builder $sub) use ($aliases): void {
-                $sub->where(function (Builder $inner) use ($aliases): void {
-                    foreach (['CO', 'TR', 'CS'] as $managerColumn) {
-                        $sql = ManagerNameNormalizer::sqlColumnExpression($managerColumn);
-                        $inner->orWhere(function (Builder $columnQuery) use ($aliases, $sql): void {
-                            foreach ($aliases as $alias) {
-                                $columnQuery->orWhereRaw("{$sql} = ?", [$alias]);
-                            }
-                        });
-                    }
-                });
-            });
-
-            return;
-        }
-
-        $sqlNormalized = ManagerNameNormalizer::sqlColumnExpression($column);
-
-        $query->whereHas('accountInfo', function (Builder $sub) use ($aliases, $sqlNormalized): void {
-            $sub->where(function (Builder $managerQuery) use ($aliases, $sqlNormalized): void {
-                foreach ($aliases as $alias) {
-                    $managerQuery->orWhereRaw("{$sqlNormalized} = ?", [$alias]);
-                }
-            });
-        });
-    }
-
-    private function applyCurrentUserManagerScopeOnAccountInformation(Builder $query): void
-    {
-        $aliases = $this->resolveCurrentUserManagerAliases();
-        if ($aliases === []) {
-            $query->whereRaw('1 = 0');
-
-            return;
-        }
-
-        $column = $this->currentUserManagerColumn();
-        if ($column === null) {
-            $query->where(function (Builder $inner) use ($aliases): void {
-                foreach (['CO', 'TR', 'CS'] as $managerColumn) {
-                    $sql = ManagerNameNormalizer::sqlColumnExpression($managerColumn);
-                    $inner->orWhere(function (Builder $columnQuery) use ($aliases, $sql): void {
-                        foreach ($aliases as $alias) {
-                            $columnQuery->orWhereRaw("{$sql} = ?", [$alias]);
-                        }
-                    });
-                }
-            });
-
-            return;
-        }
-
-        $query->whereManagerMatches($column, $aliases);
-    }
-
-    private function applyManagerAssignedConstraint(Builder $query, string $column): void
-    {
-        $query->whereNotNull($column)
-            ->where($column, '!=', '');
-    }
-
-    private function applyManagerColumnFilter(Builder $query, string $column, string $managerName, string $deptNo): void
-    {
-        if (blank($managerName)) {
-            return;
-        }
-
-        $query->whereManagerMatches($column, $this->resolveSelectedManagerAliases($managerName, $deptNo));
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function resolveSelectedManagerAliases(string $managerName, string $deptNo): array
-    {
-        $aliases = collect([$managerName]);
-
-        if (Schema::hasTable('employee')) {
-            $targetKey = ManagerNameNormalizer::normalize($managerName);
-
-            $employee = Employee::query()
-                ->where('WORKDEPT', $deptNo)
-                ->where('STATUS', 1)
-                ->get(['KOREANAME', 'ENGLISHNAME'])
-                ->first(function (Employee $employee) use ($targetKey): bool {
-                    return ManagerNameNormalizer::normalize((string) ($employee->ENGLISHNAME ?? '')) === $targetKey
-                        || ManagerNameNormalizer::normalize((string) ($employee->KOREANAME ?? '')) === $targetKey;
-                });
-
-            if ($employee !== null) {
-                $aliases->push(
-                    (string) ($employee->ENGLISHNAME ?? ''),
-                    (string) ($employee->KOREANAME ?? ''),
-                );
-            }
-        }
-
-        return $aliases
-            ->map(fn (string $value): string => ManagerNameNormalizer::normalize($value))
-            ->filter(fn (string $value): bool => $value !== '')
-            ->unique()
-            ->values()
-            ->all();
-    }
-
-    private function applyInstitutionSort(Builder $query): void
-    {
-        $direction = $this->sortDirection === 'desc' ? 'desc' : 'asc';
-
-        if ($this->sortField === 'AccountName') {
-            $query->leftJoin('S_Account_Information', 'S_AccountName.SKcode', '=', 'S_Account_Information.SK_Code')
-                ->orderByRaw(
-                    "COALESCE(NULLIF(S_Account_Information.Account_Name, ''), S_AccountName.AccountName) {$direction}"
-                )
-                ->orderBy('S_AccountName.SKcode');
-
-            return;
-        }
-
-        $sortableFields = ['SKcode', 'GSno', 'Gubun', 'Director', 'Phone', 'AccountTel'];
-        $field = in_array($this->sortField, $sortableFields, true) ? $this->sortField : 'SKcode';
-        $query->orderBy("S_AccountName.{$field}", $direction);
-    }
-
-    private function applyAccountInformationListSort(Builder $query): void
-    {
-        $direction = $this->sortDirection === 'desc' ? 'desc' : 'asc';
-
-        if ($this->sortField === 'FGC_CreateDate' && Schema::hasColumn('S_Account_Information', 'FGC_CreateDate')) {
-            $nullsOrder = $direction === 'asc' ? 'ASC' : 'DESC';
-            $query->orderByRaw("FGC_CreateDate IS NULL {$nullsOrder}")
-                ->orderBy('FGC_CreateDate', $direction);
-
-            if (Schema::hasColumn('S_Account_Information', 'ID')) {
-                $query->orderBy('ID', $direction);
-            }
-
-            return;
-        }
-
-        if ($this->sortField === 'AccountName') {
-            $query->orderBy('Account_Name', $direction)
-                ->orderBy('SK_Code');
-
-            return;
-        }
-
-        if ($this->sortField === 'SKcode') {
-            $query->orderBy('SK_Code', $direction);
-
-            return;
-        }
-
-        $sortableOnMaster = ['GSno', 'Gubun', 'Director', 'Phone', 'AccountTel'];
-        if (in_array($this->sortField, $sortableOnMaster, true)) {
-            $field = $this->sortField;
-            $query->leftJoin('S_AccountName', 'S_Account_Information.SK_Code', '=', 'S_AccountName.SKcode')
-                ->orderBy("S_AccountName.{$field}", $direction)
-                ->select('S_Account_Information.*');
-
-            return;
-        }
-
-        if (Schema::hasColumn('S_Account_Information', 'FGC_CreateDate')) {
-            $nullsOrder = $direction === 'asc' ? 'ASC' : 'DESC';
-            $query->orderByRaw("FGC_CreateDate IS NULL {$nullsOrder}")
-                ->orderBy('FGC_CreateDate', $direction);
-
-            if (Schema::hasColumn('S_Account_Information', 'ID')) {
-                $query->orderBy('ID', $direction);
-            }
-
-            return;
-        }
-
-        $query->orderBy('SK_Code', $direction);
-    }
-
-    private function shouldScopeToAssignedInstitutions(): bool
-    {
-        $user = auth()->user();
-        if (! $user || $user->hasPlatformWideViewAccess()) {
-            return false;
-        }
-
-        return $user->isCoTeam() || $user->isCoachTeam() || $user->isCsTeam();
-    }
-
-    private function currentUserManagerColumn(): ?string
-    {
-        $user = auth()->user();
-        if (! $user) {
-            return null;
-        }
-
-        if ($user->isCoTeam()) {
-            return 'CO';
-        }
-
-        if ($user->isCoachTeam()) {
-            return 'TR';
-        }
-
-        if ($user->isCsTeam()) {
-            return 'CS';
-        }
-
-        return null;
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function resolveCurrentUserManagerAliases(): array
-    {
-        $user = auth()->user();
-        if (! $user) {
-            return [];
-        }
-
-        $aliases = collect([
-            (string) ($user->name ?? ''),
-            (string) ($user->email ?? ''),
-        ]);
-
-        if (Schema::hasTable('employee')) {
-            $employee = Employee::query()
-                ->where('EMAIL', (string) ($user->email ?? ''))
-                ->first(['KOREANAME', 'ENGLISHNAME', 'EMAIL']);
-
-            if ($employee) {
-                $aliases = $aliases->merge([
-                    (string) ($employee->KOREANAME ?? ''),
-                    (string) ($employee->ENGLISHNAME ?? ''),
-                    (string) ($employee->EMAIL ?? ''),
-                ]);
-            }
-        }
-
-        return $aliases
-            ->map(fn (string $value): string => $this->normalizeManagerAlias($value))
-            ->filter(fn (string $value): bool => $value !== '')
-            ->unique()
-            ->values()
-            ->all();
-    }
-
-    private function normalizeManagerAlias(string $value): string
-    {
-        return ManagerNameNormalizer::normalize($value);
     }
 
     /**

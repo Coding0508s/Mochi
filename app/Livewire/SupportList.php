@@ -5,6 +5,8 @@ namespace App\Livewire;
 use App\Models\ContractDocument;
 use App\Models\Institution;
 use App\Models\SupportRecord;
+use App\Support\SupportRecordCascadeDeleter;
+use App\Support\SupportReportStoredMailNotifier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
@@ -551,6 +553,7 @@ class SupportList extends Component
 
         $record = SupportRecord::query()->findOrFail($this->editingId);
         Gate::authorize('updateSupportRecord', $record);
+        $wasCompleted = $record->isCompleted();
 
         $this->formSupportTime = $this->normalizeTimeForInput($this->formSupportTime);
         $this->validate();
@@ -572,6 +575,13 @@ class SupportList extends Component
 
             SupportRecord::where('ID', $this->editingId)->update($data);
         });
+
+        SupportReportStoredMailNotifier::notifyWhenMarkedComplete(
+            SupportRecord::query()->findOrFail($this->editingId),
+            auth()->user(),
+            $wasCompleted,
+        );
+
         session()->flash('success', '지원 내역이 수정되었습니다.');
 
         $this->closeModal();
@@ -582,7 +592,14 @@ class SupportList extends Component
     {
         $record = SupportRecord::query()->findOrFail($id);
         Gate::authorize('updateSupportRecord', $record);
-        $record->toggleComplete(! $record->isCompleted());
+        $wasCompleted = $record->isCompleted();
+        $record->toggleComplete(! $wasCompleted);
+
+        SupportReportStoredMailNotifier::notifyWhenMarkedComplete(
+            $record->fresh() ?? $record,
+            auth()->user(),
+            $wasCompleted,
+        );
     }
 
     /**
@@ -593,7 +610,7 @@ class SupportList extends Component
         Gate::authorize('deleteSupportRecords');
 
         $record = SupportRecord::query()->findOrFail($id);
-        $record->delete();
+        app(SupportRecordCascadeDeleter::class)->delete($record);
 
         if ($this->editingId === $id) {
             $this->closeModal();
@@ -606,6 +623,7 @@ class SupportList extends Component
     public function render()
     {
         $records = SupportRecord::query()
+            ->excludeIssues()
             ->ofYear($this->filterYear ? (int) $this->filterYear : null)
             ->ofTr($this->filterTr)
             ->keyword($this->search)

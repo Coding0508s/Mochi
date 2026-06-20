@@ -125,6 +125,7 @@ return [
         'Unit 21+',
         'Unit 31+',
         'LittleSEED Con',
+        '교사 지원 및 참관',
         '교사 지원(신규교사)',
         '교사 지원 On-Site',
         '신규교사 시연수업',

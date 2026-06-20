@@ -109,6 +109,15 @@ trait OpensTeacherSupportHistoryDetail
 
     public bool $unit31PlusMarkCompleted = true;
 
+    public bool $showVisitModal = false;
+
+    public ?int $visitTeacherId = null;
+
+    /** @var array<string, mixed> */
+    public array $visitForm = [];
+
+    public bool $visitMarkCompleted = true;
+
     abstract protected function expectedSupportHistorySkCodeForDetail(): ?string;
 
     public function openTeacherSupportHistoryDetail(string $detailKey, ?int $teacherId = null): void
@@ -196,6 +205,7 @@ trait OpensTeacherSupportHistoryDetail
         }
 
         $this->supportReportViewMode = false;
+        $this->seedSupportRoundSelectionForEdit();
     }
 
     public function closeDemoLessonModal(): void
@@ -308,6 +318,17 @@ trait OpensTeacherSupportHistoryDetail
         $this->afterCoachTeacherSupportModalClosed();
     }
 
+    public function closeVisitModal(): void
+    {
+        $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
+        $this->showVisitModal = false;
+        $this->visitTeacherId = null;
+        $this->visitForm = [];
+        $this->visitMarkCompleted = true;
+        $this->afterCoachTeacherSupportModalClosed();
+    }
+
     protected function afterCoachTeacherSupportModalClosed(): void {}
 
     protected function allowsEditingViewingSupportReport(): bool
@@ -339,6 +360,7 @@ trait OpensTeacherSupportHistoryDetail
             'open_class' => $this->openOpenClassView($teacherId, $form, $markCompleted),
             'unit21_plus' => $this->openUnit21PlusView($teacherId, $form, $markCompleted),
             'unit31_plus' => $this->openUnit31PlusView($teacherId, $form, $markCompleted),
+            'visit' => $this->openVisitView($teacherId, $form, $markCompleted),
             default => $this->supportReportViewMode = false,
         };
     }
@@ -359,6 +381,7 @@ trait OpensTeacherSupportHistoryDetail
             'openClassConfig' => config('coach_teacher_open_class'),
             'unit21PlusConfig' => config('coach_teacher_unit21_plus'),
             'unit31PlusConfig' => config('coach_teacher_unit31_plus'),
+            'visitConfig' => config('coach_teacher_visit'),
         ];
     }
 
@@ -386,6 +409,7 @@ trait OpensTeacherSupportHistoryDetail
         $this->showOpenClassModal = false;
         $this->showUnit21PlusModal = false;
         $this->showUnit31PlusModal = false;
+        $this->showVisitModal = false;
     }
 
     /**
@@ -496,5 +520,16 @@ trait OpensTeacherSupportHistoryDetail
         $this->unit31PlusForm = $form;
         $this->unit31PlusMarkCompleted = $markCompleted;
         $this->showUnit31PlusModal = true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $form
+     */
+    private function openVisitView(int $teacherId, array $form, bool $markCompleted): void
+    {
+        $this->visitTeacherId = $teacherId;
+        $this->visitForm = $form;
+        $this->visitMarkCompleted = $markCompleted;
+        $this->showVisitModal = true;
     }
 }

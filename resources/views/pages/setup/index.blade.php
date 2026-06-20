@@ -7,17 +7,11 @@
             </p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <a href="{{ route('setup.team') }}"
                class="block bg-white rounded-xl shadow-sm border border-gray-200 px-5 py-4 hover:border-[#2b78c5]/40 hover:shadow-md transition-colors">
                 <h3 class="text-sm font-semibold text-gray-800">팀 관리</h3>
                 <p class="mt-2 text-sm text-gray-600 leading-5">부서·팀 코드 및 소속 인원</p>
-                <span class="mt-3 inline-block text-xs font-medium text-[#2b78c5]">이동 →</span>
-            </a>
-            <a href="{{ route('setup.roles') }}"
-               class="block bg-white rounded-xl shadow-sm border border-gray-200 px-5 py-4 hover:border-[#2b78c5]/40 hover:shadow-md transition-colors">
-                <h3 class="text-sm font-semibold text-gray-800">역할·권한</h3>
-                <p class="mt-2 text-sm text-gray-600 leading-5">역할 및 메뉴 권한</p>
                 <span class="mt-3 inline-block text-xs font-medium text-[#2b78c5]">이동 →</span>
             </a>
         </div>

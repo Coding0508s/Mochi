@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Models\SupportRecord;
 use App\Models\Teacher;
 use App\Models\TeacherDemoLessonSupportReport;
 use App\Models\TeacherLittleseedConSupportReport;
@@ -13,11 +14,16 @@ use App\Models\TeacherOpenClassSupportReport;
 use App\Models\TeacherProConSupportReport;
 use App\Models\TeacherUnit21PlusSupportReport;
 use App\Models\TeacherUnit31PlusSupportReport;
+use App\Models\TeacherVisitSupportReport;
 use App\Models\User;
 use App\Support\CoachTeacherSupportPayload;
+use App\Support\SupportReportStoredMailNotifier;
 use App\Support\TeacherSupportReportEditAuthorization;
 use App\Support\TeacherSupportReportSupportRecordBuilder;
 use App\Support\TeacherSupportReportSupportRecordSync;
+use App\Support\TeacherSupportSlotSync;
+use App\Support\TeamMenuContext;
+use App\Support\VisitSupportReportUniquenessGuard;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -37,6 +43,7 @@ final class UpdateTeacherSupportReport
         'open_class' => StoreTeacherOpenClassSupportReport::class,
         'unit21_plus' => StoreTeacherUnit21PlusSupportReport::class,
         'unit31_plus' => StoreTeacherUnit31PlusSupportReport::class,
+        'visit' => StoreTeacherVisitSupportReport::class,
     ];
 
     /** @var array<string, class-string<Model>> */
@@ -51,6 +58,7 @@ final class UpdateTeacherSupportReport
         'teacher_open_class_support_reports' => TeacherOpenClassSupportReport::class,
         'teacher_unit21_plus_support_reports' => TeacherUnit21PlusSupportReport::class,
         'teacher_unit31_plus_support_reports' => TeacherUnit31PlusSupportReport::class,
+        'teacher_visit_support_reports' => TeacherVisitSupportReport::class,
     ];
 
     /**
@@ -93,8 +101,17 @@ final class UpdateTeacherSupportReport
 
         $markCompleted = (bool) ($validated['mark_completed'] ?? false);
         $status = $markCompleted ? '완료' : '임시';
+        $previousStatus = (string) $report->getAttribute('status');
 
-        return DB::transaction(function () use ($report, $action, $validated, $status, $markCompleted): Model {
+        return DB::transaction(function () use ($report, $action, $validated, $status, $markCompleted, $previousStatus, $user, $teacher): Model {
+            if ($action === 'visit' && $markCompleted) {
+                VisitSupportReportUniquenessGuard::assertNoCompletedDuplicate(
+                    (int) $teacher->ID,
+                    $validated['support_date'] ?? null,
+                    (int) $report->getKey(),
+                );
+            }
+
             $existingSupportRecordId = filled($report->getAttribute('support_record_id'))
                 ? (int) $report->getAttribute('support_record_id')
                 : null;
@@ -114,6 +131,41 @@ final class UpdateTeacherSupportReport
                 ->only($attributeKeys)
                 ->only($report->getFillable())
                 ->all());
+
+            if ($markCompleted && $previousStatus !== '완료') {
+                $round = isset($validated['support_round']) ? (int) $validated['support_round'] : null;
+                if ($round === null) {
+                    $round = TeacherSupportSlotSync::firstEmptyRound($teacher);
+                }
+
+                if ($round !== null) {
+                    TeacherSupportSlotSync::apply(
+                        $teacher,
+                        $round,
+                        TeacherSupportReportSupportRecordBuilder::supportTypeLabelForAction($action),
+                        $validated['support_date'] ?? null,
+                    );
+                }
+            }
+
+            if (
+                $action === 'visit'
+                && $markCompleted
+                && $previousStatus === '임시'
+                && $supportRecordId !== null
+            ) {
+                DB::afterCommit(function () use ($supportRecordId, $user): void {
+                    $supportRecord = SupportRecord::query()->find($supportRecordId);
+                    if ($supportRecord !== null) {
+                        SupportReportStoredMailNotifier::send(
+                            $supportRecord,
+                            $user,
+                            teamMenu: TeamMenuContext::MENU_COACH,
+                            reportMode: 'teacher',
+                        );
+                    }
+                });
+            }
 
             return $report->fresh() ?? $report;
         });
@@ -243,6 +295,24 @@ final class UpdateTeacherSupportReport
                 'verbal_comments' => $validated['verbal_comments'] ?? null,
                 'language_arts_comments' => $validated['language_arts_comments'] ?? null,
                 'overall_comments' => $validated['overall_comments'] ?? null,
+            ]),
+            'visit' => array_merge($base, [
+                'support_location' => $validated['support_location'] ?? null,
+                'support_purpose' => $validated['support_purpose'] ?? null,
+                'observe_unit' => $validated['observe_unit'] ?? null,
+                'observe_lesson' => $validated['observe_lesson'] ?? null,
+                'observe_summary_extra' => $validated['observe_summary_extra'] ?? null,
+                'observe_class' => $validated['observe_class'] ?? null,
+                'observe_age' => $validated['observe_age'] ?? null,
+                'session_number' => $validated['session_number'] ?? null,
+                'semester_label' => $validated['semester_label'] ?? null,
+                'interview_date' => $validated['interview_date'] ?? null,
+                'interview_time' => $validated['interview_time'] ?? null,
+                'meeting_type' => $validated['meeting_type'] ?? null,
+                'pre_request_notes' => $validated['pre_request_notes'] ?? null,
+                'monitoring_feedback' => $validated['monitoring_feedback'] ?? null,
+                'interview_and_action_plan' => $validated['interview_and_action_plan'] ?? null,
+                'special_notes' => $validated['special_notes'] ?? null,
             ]),
             default => throw new InvalidArgumentException('지원하지 않는 교사 지원 보고서 유형입니다.'),
         };

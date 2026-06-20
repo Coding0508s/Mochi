@@ -41,6 +41,7 @@ class CoachTeacherSupportListTest extends TestCase
         Schema::dropIfExists('teacher_open_class_support_reports');
         Schema::dropIfExists('teacher_pro_con_support_reports');
         Schema::dropIfExists('teacher_onsite_support_reports');
+        Schema::dropIfExists('teacher_visit_support_reports');
         Schema::dropIfExists('teacher_littleseed_con_support_reports');
         Schema::dropIfExists('teacher_ls_onsite_lva_support_reports');
         Schema::dropIfExists('teacher_lva_fb_support_reports');
@@ -375,6 +376,36 @@ class CoachTeacherSupportListTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('teacher_visit_support_reports', function ($table): void {
+            $table->id();
+            $table->unsignedInteger('teacher_id');
+            $table->string('sk_code', 100);
+            $table->string('coach_name', 255);
+            $table->string('institution_name', 255);
+            $table->string('teacher_name', 255);
+            $table->date('support_date');
+            $table->string('support_location', 255)->nullable();
+            $table->string('support_purpose', 100);
+            $table->unsignedTinyInteger('observe_unit')->nullable();
+            $table->unsignedTinyInteger('observe_lesson')->nullable();
+            $table->string('observe_summary_extra', 255)->nullable();
+            $table->string('observe_class', 50)->nullable();
+            $table->string('observe_age', 50)->nullable();
+            $table->unsignedTinyInteger('session_number')->nullable();
+            $table->string('semester_label', 100)->nullable();
+            $table->date('interview_date')->nullable();
+            $table->string('interview_time', 10)->nullable();
+            $table->string('meeting_type', 50)->nullable();
+            $table->text('pre_request_notes')->nullable();
+            $table->text('monitoring_feedback')->nullable();
+            $table->text('interview_and_action_plan')->nullable();
+            $table->text('special_notes')->nullable();
+            $table->string('status', 20)->default('임시');
+            $table->unsignedBigInteger('support_record_id')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->timestamps();
+        });
+
         Schema::create('teacher_littleseed_con_support_reports', function ($table): void {
             $table->id();
             $table->unsignedInteger('teacher_id');
@@ -573,13 +604,60 @@ class CoachTeacherSupportListTest extends TestCase
         ]);
     }
 
-    protected function createTeacher(string $skCode, string $name, array $extra = []): int
+    protected function createTeacher(string $skCode, string $name, array $extra = [], bool $forLatestView = true): int
     {
+        if ($forLatestView) {
+            $extra = $this->withLatestViewSupportHistory($extra);
+        }
+
         return \DB::table('Teachers')->insertGetId(array_merge([
             'SK_Code' => $skCode,
             'Name' => $name,
             'ClassInOut' => true,
         ], $extra));
+    }
+
+    /**
+     * 최신 지원 보기(기본) 목록에는 완료·MOCHI가 있는 교사만 노출된다.
+     *
+     * @param  array<string, mixed>  $extra
+     * @return array<string, mixed>
+     */
+    protected function withLatestViewSupportHistory(array $extra): array
+    {
+        $completionColumns = [
+            '_1st_Support_Date',
+            '_2nd_Support_Date',
+            '_3rd_Support_Date',
+            '_4th_Support_Date',
+        ];
+
+        foreach ($completionColumns as $column) {
+            if (filled($extra[$column] ?? null)) {
+                return $extra;
+            }
+        }
+
+        $planDate = $extra['Plan_1st_Support_Date']
+            ?? $extra['Plan_2nd_Support_Date']
+            ?? $extra['Plan_3rd_Support_Date']
+            ?? $extra['Plan_4th_Support_Date']
+            ?? null;
+
+        if ($planDate === null) {
+            $extra['_1st_Support_Date'] = now()->format('Y-m-d');
+
+            return $extra;
+        }
+
+        $extra['_1st_Support_Date'] = $this->normalizeTeacherSupportDateForTests($planDate);
+
+        return $extra;
+    }
+
+    private function normalizeTeacherSupportDateForTests(mixed $value): string
+    {
+        return ExcelSerialDate::toStorageString($value) ?? now()->format('Y-m-d');
     }
 
     public function test_admin_sees_all_teachers(): void
@@ -589,7 +667,10 @@ class CoachTeacherSupportListTest extends TestCase
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
         $this->createInstitution('SK002', '기관B', 'Coach B');
-        $this->createTeacher('SK001', '김교사', ['Plan_1st_Support_Date' => "{$year}-03-01"]);
+        $this->createTeacher('SK001', '김교사', [
+            '_1st_Support_Date' => "{$year}-03-10",
+            'Plan_2nd_Support_Date' => "{$year}-06-01",
+        ]);
         $this->createTeacher('SK002', '이교사', ['Plan_1st_Support_Date' => "{$year}-04-01"]);
 
         Livewire::actingAs($admin)
@@ -605,7 +686,10 @@ class CoachTeacherSupportListTest extends TestCase
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
         $this->createInstitution('SK002', '기관B', 'Coach B');
-        $this->createTeacher('SK001', '김교사', ['Plan_1st_Support_Date' => "{$year}-03-01"]);
+        $this->createTeacher('SK001', '김교사', [
+            '_1st_Support_Date' => "{$year}-03-10",
+            'Plan_2nd_Support_Date' => "{$year}-06-01",
+        ]);
         $this->createTeacher('SK002', '이교사', ['Plan_1st_Support_Date' => "{$year}-04-01"]);
 
         Livewire::actingAs($coach)
@@ -621,7 +705,10 @@ class CoachTeacherSupportListTest extends TestCase
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
         $this->createInstitution('SK002', '기관B', 'Coach B');
-        $this->createTeacher('SK001', '김교사', ['Plan_1st_Support_Date' => "{$year}-03-01"]);
+        $this->createTeacher('SK001', '김교사', [
+            '_1st_Support_Date' => "{$year}-03-10",
+            'Plan_2nd_Support_Date' => "{$year}-06-01",
+        ]);
         $this->createTeacher('SK002', '이교사', ['Plan_1st_Support_Date' => "{$year}-04-01"]);
 
         $component = Livewire::actingAs($admin)
@@ -643,7 +730,10 @@ class CoachTeacherSupportListTest extends TestCase
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
         $this->createInstitution('SK002', '기관B', 'Coach B');
-        $this->createTeacher('SK001', '김교사', ['Plan_1st_Support_Date' => "{$year}-03-01"]);
+        $this->createTeacher('SK001', '김교사', [
+            '_1st_Support_Date' => "{$year}-03-10",
+            'Plan_2nd_Support_Date' => "{$year}-06-01",
+        ]);
         $this->createTeacher('SK002', '이교사', ['Plan_1st_Support_Date' => "{$year}-04-01"]);
 
         Livewire::actingAs($coach)
@@ -661,7 +751,10 @@ class CoachTeacherSupportListTest extends TestCase
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
         $this->createInstitution('SK002', '기관B', 'Coach B');
-        $this->createTeacher('SK001', '김교사', ['Plan_1st_Support_Date' => "{$year}-03-01"]);
+        $this->createTeacher('SK001', '김교사', [
+            '_1st_Support_Date' => "{$year}-03-10",
+            'Plan_2nd_Support_Date' => "{$year}-06-01",
+        ]);
         $this->createTeacher('SK002', '이교사', ['Plan_1st_Support_Date' => "{$year}-04-01"]);
 
         $options = Livewire::actingAs($admin)
@@ -678,7 +771,10 @@ class CoachTeacherSupportListTest extends TestCase
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
         $this->createInstitution('SK002', '기관B', 'Coach B');
-        $this->createTeacher('SK001', '김교사', ['Plan_1st_Support_Date' => "{$year}-03-01"]);
+        $this->createTeacher('SK001', '김교사', [
+            '_1st_Support_Date' => "{$year}-03-10",
+            'Plan_2nd_Support_Date' => "{$year}-06-01",
+        ]);
         $this->createTeacher('SK002', '이교사', ['Plan_1st_Support_Date' => "{$year}-04-01"]);
 
         Livewire::actingAs($coach)
@@ -697,7 +793,10 @@ class CoachTeacherSupportListTest extends TestCase
 
         $this->createInstitution('SK001', '한국기관', 'Coach A');
         $this->createInstitution('SK002', '가나기관', 'Coach A');
-        $this->createTeacher('SK001', '김교사', ['Plan_1st_Support_Date' => "{$year}-03-01"]);
+        $this->createTeacher('SK001', '김교사', [
+            '_1st_Support_Date' => "{$year}-03-10",
+            'Plan_2nd_Support_Date' => "{$year}-06-01",
+        ]);
         $this->createTeacher('SK002', '이교사', ['Plan_1st_Support_Date' => "{$year}-04-01"]);
 
         $skCodes = collect(
@@ -726,7 +825,10 @@ class CoachTeacherSupportListTest extends TestCase
             'SKcode' => 'Sk001',
             'AccountName' => '기관A',
         ]);
-        $this->createTeacher('SK001', '김교사', ['Plan_1st_Support_Date' => "{$year}-03-01"]);
+        $this->createTeacher('SK001', '김교사', [
+            '_1st_Support_Date' => "{$year}-03-10",
+            'Plan_2nd_Support_Date' => "{$year}-06-01",
+        ]);
 
         $component = Livewire::actingAs($admin)
             ->test(CoachTeacherSupportList::class)
@@ -739,19 +841,19 @@ class CoachTeacherSupportListTest extends TestCase
         $this->assertSame(1, $component->viewData('teachers')->total());
     }
 
-    public function test_default_view_keeps_created_date_order(): void
+    public function test_latest_support_view_orders_by_latest_support_date(): void
     {
         $admin = $this->createAdminUser();
         $year = now()->year;
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
-        $this->createTeacher('SK001', '오래된교사', [
-            'Plan_1st_Support_Date' => "{$year}-03-01",
-            'Created_Date' => '2025-01-01 10:00:00',
+        $this->createTeacher('SK001', '먼저완료', [
+            '_1st_Support_Date' => "{$year}-03-01",
+            'Created_Date' => '2026-06-01 10:00:00',
         ]);
-        $this->createTeacher('SK001', '최근교사', [
-            'Plan_1st_Support_Date' => "{$year}-04-01",
-            'Created_Date' => '2026-01-01 10:00:00',
+        $this->createTeacher('SK001', '나중완료', [
+            '_1st_Support_Date' => "{$year}-05-21",
+            'Created_Date' => '2025-01-01 10:00:00',
         ]);
 
         $names = collect(
@@ -762,7 +864,59 @@ class CoachTeacherSupportListTest extends TestCase
                 ->items()
         )->pluck('Name')->all();
 
-        $this->assertSame(['최근교사', '오래된교사'], $names);
+        $this->assertSame(['나중완료', '먼저완료'], $names);
+    }
+
+    public function test_latest_support_view_hides_teachers_without_support_history(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '지원있음', ['_1st_Support_Date' => "{$year}-05-21"]);
+        $this->createTeacher('SK001', '지원없음', forLatestView: false);
+        $this->createTeacher('SK001', '계획만', ['Plan_1st_Support_Date' => "{$year}-05-01"], forLatestView: false);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->set('filterYear', $year)
+            ->assertSee('지원있음')
+            ->assertDontSee('지원없음')
+            ->assertDontSee('계획만')
+            ->set('showAllInstitutionsView', true)
+            ->set('filterYear', '')
+            ->assertSee('지원있음')
+            ->assertSee('지원없음')
+            ->assertSee('계획만');
+    }
+
+    public function test_latest_support_view_includes_teacher_with_mochi_report_only(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = 2026;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createTeacher('SK001', '참관교사', forLatestView: false);
+
+        \DB::table('teacher_visit_support_reports')->insert([
+            'teacher_id' => $teacherId,
+            'sk_code' => 'SK001',
+            'coach_name' => 'Coach A',
+            'institution_name' => '기관A',
+            'teacher_name' => '참관교사',
+            'support_date' => '2026-06-18',
+            'support_purpose' => '신임',
+            'status' => '완료',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->set('filterYear', $year)
+            ->assertSee('참관교사')
+            ->assertSee('2026-06-18')
+            ->assertSee('교사 지원 및 참관');
     }
 
     public function test_coach_with_no_alias_sees_nothing(): void
@@ -771,7 +925,10 @@ class CoachTeacherSupportListTest extends TestCase
         $year = now()->year;
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
-        $this->createTeacher('SK001', '김교사', ['Plan_1st_Support_Date' => "{$year}-03-01"]);
+        $this->createTeacher('SK001', '김교사', [
+            '_1st_Support_Date' => "{$year}-03-10",
+            'Plan_2nd_Support_Date' => "{$year}-06-01",
+        ]);
 
         Livewire::actingAs($coach)
             ->test(CoachTeacherSupportList::class)
@@ -801,7 +958,7 @@ class CoachTeacherSupportListTest extends TestCase
 
         $this->createTeacher('SK001', '교사3', [
             'Plan_1st_Support_Date' => "{$year}-05-01",
-        ]);
+        ], forLatestView: false);
 
         $component = Livewire::actingAs($admin)
             ->test(CoachTeacherSupportList::class);
@@ -813,10 +970,10 @@ class CoachTeacherSupportListTest extends TestCase
         $this->assertSame(0, $kpis['third_round']);
         $this->assertSame(0, $kpis['fourth_round']);
         $this->assertSame(0, $kpis['completed']);
-        $this->assertSame(2, $kpis['unsupported']);
+        $this->assertSame(1, $kpis['unsupported']);
         $this->assertSame(3, TeacherSupportKpiCalculator::totalSupportCount($kpis));
         $this->assertSame(1, $kpis['institution_count']);
-        $this->assertSame(3, $kpis['teacher_count']);
+        $this->assertSame(2, $kpis['teacher_count']);
 
         $component->assertSee('총 지원 횟수')
             ->assertSee('기관 수')
@@ -865,16 +1022,18 @@ class CoachTeacherSupportListTest extends TestCase
             'Plan_1st_Support_Date' => (string) ExcelSerialDate::dateToSerial(
                 Carbon::create($year, 6, 1),
             ),
-        ]);
+        ], forLatestView: false);
 
         $component = Livewire::actingAs($admin)
             ->test(CoachTeacherSupportList::class)
+            ->set('showAllInstitutionsView', true)
             ->set('filterYear', $year);
 
         $this->assertSame(1, $component->viewData('kpis')['unsupported']);
 
         Livewire::actingAs($admin)
             ->test(CoachTeacherSupportList::class)
+            ->set('showAllInstitutionsView', true)
             ->set('filterYear', $year)
             ->call('setKpiFilter', 'unsupported')
             ->assertSee('엑셀미지원');
@@ -987,7 +1146,10 @@ class CoachTeacherSupportListTest extends TestCase
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
         $this->createInstitution('SK002', '기관B', 'Coach B');
-        $this->createTeacher('SK001', '김교사', ['Plan_1st_Support_Date' => "{$year}-03-01"]);
+        $this->createTeacher('SK001', '김교사', [
+            '_1st_Support_Date' => "{$year}-03-10",
+            'Plan_2nd_Support_Date' => "{$year}-06-01",
+        ]);
         $this->createTeacher('SK002', '이교사', ['Plan_1st_Support_Date' => "{$year}-03-01"]);
 
         \DB::table('institution_visibility_overrides')->insert([
@@ -1007,7 +1169,10 @@ class CoachTeacherSupportListTest extends TestCase
         $year = now()->year;
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
-        $this->createTeacher('SK001', '김교사', ['Plan_1st_Support_Date' => "{$year}-03-01"]);
+        $this->createTeacher('SK001', '김교사', [
+            '_1st_Support_Date' => "{$year}-03-10",
+            'Plan_2nd_Support_Date' => "{$year}-06-01",
+        ]);
         $this->createTeacher('SK001', '박선생', ['Plan_1st_Support_Date' => "{$year}-04-01"]);
 
         Livewire::actingAs($admin)
@@ -1563,7 +1728,7 @@ class CoachTeacherSupportListTest extends TestCase
         $admin = $this->createAdminUser();
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
-        $id = $this->createTeacher('SK001', '홍길동');
+        $id = $this->createTeacher('SK001', '홍길동', forLatestView: false);
 
         \Illuminate\Support\Facades\DB::table('S_Support_NewTeacher')->insert([
             'TR_Name' => 'Selly Kim',
@@ -2367,7 +2532,7 @@ class CoachTeacherSupportListTest extends TestCase
         $admin = $this->createAdminUser();
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
-        $id = $this->createTeacher('SK001', '홍길동');
+        $id = $this->createTeacher('SK001', '홍길동', forLatestView: false);
 
         Livewire::actingAs($admin)
             ->test(CoachTeacherSupportList::class)
@@ -2946,5 +3111,119 @@ class CoachTeacherSupportListTest extends TestCase
             'Other' => '수정된 레거시 메모',
             'Status' => '임시',
         ]);
+    }
+
+    public function test_save_visit_report_shows_alert_when_required_fields_missing(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $id = $this->createTeacher('SK001', '홍길동');
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openVisitModal', $id)
+            ->set('visitForm.support_purpose', '정기 참관')
+            ->set('visitMarkCompleted', true)
+            ->call('saveVisitReport')
+            ->assertHasErrors([
+                'visitForm.monitoring_feedback',
+            ])
+            ->assertDispatched('visit-support-show-alert');
+
+        $this->assertDatabaseCount('teacher_visit_support_reports', 0);
+    }
+
+    public function test_save_visit_report_updates_teacher_completion_slot(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $id = $this->createTeacher('SK001', '홍길동', forLatestView: false);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openVisitModal', $id)
+            ->set('visitForm.support_purpose', '정기 참관')
+            ->set('visitForm.monitoring_feedback', '모니터링 내용')
+            ->set('visitForm.interview_and_action_plan', '후속 조치')
+            ->set('visitMarkCompleted', true)
+            ->call('saveVisitReport')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('Teachers', [
+            'ID' => $id,
+            '_1st_Support_Type' => '교사 지원 및 참관',
+        ]);
+
+        $this->assertNotNull(
+            Teacher::query()->find($id)?->getRawOriginal('_1st_Support_Date'),
+        );
+    }
+
+    public function test_completing_in_progress_visit_report_updates_teacher_completion_slot(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $id = $this->createTeacher('SK001', '홍길동', forLatestView: false);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openVisitModal', $id)
+            ->set('visitForm.support_purpose', '정기 참관')
+            ->set('visitMarkCompleted', false)
+            ->call('saveVisitReport')
+            ->assertHasNoErrors();
+
+        $reportId = (int) \DB::table('teacher_visit_support_reports')->max('id');
+        $detailKey = 'mochi:teacher_visit_support_reports:'.$reportId;
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openTeacherModal', $id)
+            ->call('openTeacherSupportHistoryDetail', $detailKey, $id)
+            ->call('startSupportReportEdit')
+            ->set('visitForm.monitoring_feedback', '모니터링 내용')
+            ->set('visitForm.interview_and_action_plan', '후속 조치')
+            ->set('visitMarkCompleted', true)
+            ->call('saveVisitReport')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('Teachers', [
+            'ID' => $id,
+            '_1st_Support_Type' => '교사 지원 및 참관',
+        ]);
+    }
+
+    public function test_main_list_shows_completed_visit_report_when_teacher_slot_is_empty(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = 2026;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $id = $this->createTeacher('SK001', '홍길동');
+
+        \DB::table('teacher_visit_support_reports')->insert([
+            'teacher_id' => $id,
+            'sk_code' => 'SK001',
+            'coach_name' => 'Coach A',
+            'institution_name' => '기관A',
+            'teacher_name' => '홍길동',
+            'support_date' => '2026-03-15',
+            'support_purpose' => '정기 참관',
+            'monitoring_feedback' => '모니터링 내용',
+            'interview_and_action_plan' => '후속 조치',
+            'status' => '완료',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->set('filterYear', $year)
+            ->assertSee('홍길동')
+            ->assertSee('2026-03-15')
+            ->assertSee('교사 지원 및 참관');
     }
 }

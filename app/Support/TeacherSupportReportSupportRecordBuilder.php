@@ -26,6 +26,11 @@ final class TeacherSupportReportSupportRecordBuilder
             'Issue' => self::resolveIssue($action, $validated),
         ];
 
+        if ($action === 'visit') {
+            $attributes['Issue'] = null;
+            $attributes['TO_Account'] = self::visitIssueSummary($validated);
+        }
+
         if ($action === 'demo_lesson') {
             $attributes['Others'] = filled($validated['other_notes'] ?? null)
                 ? (string) $validated['other_notes']
@@ -66,6 +71,7 @@ final class TeacherSupportReportSupportRecordBuilder
                 : null,
             'pro_con', 'littleseed_con' => self::proConIssueSummary($validated),
             'unit21_plus', 'unit31_plus' => self::unitPlusIssueSummary($validated),
+            'visit' => null,
             default => filled($validated['other_notes'] ?? null)
                 ? (string) $validated['other_notes']
                 : null,
@@ -100,6 +106,27 @@ final class TeacherSupportReportSupportRecordBuilder
         return $summary !== '' ? $summary : null;
     }
 
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private static function visitIssueSummary(array $validated): ?string
+    {
+        /** @var array<string, string> $sections */
+        $sections = config('coach_teacher_visit.to_account_section_labels', []);
+
+        $parts = [];
+        foreach ($sections as $field => $label) {
+            $value = trim((string) ($validated[$field] ?? ''));
+            if ($value === '') {
+                continue;
+            }
+
+            $parts[] = $label."\n".$value;
+        }
+
+        return $parts !== [] ? implode("\n\n", $parts) : null;
+    }
+
     public static function supportTypeLabelForAction(string $action): string
     {
         return self::supportTypeLabel($action);
@@ -118,6 +145,7 @@ final class TeacherSupportReportSupportRecordBuilder
             'open_class' => 'coach_teacher_open_class',
             'unit21_plus' => 'coach_teacher_unit21_plus',
             'unit31_plus' => 'coach_teacher_unit31_plus',
+            'visit' => 'coach_teacher_visit',
             default => null,
         };
 

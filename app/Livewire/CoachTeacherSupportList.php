@@ -13,10 +13,12 @@ use App\Actions\StoreTeacherOpenClassSupportReport;
 use App\Actions\StoreTeacherProConSupportReport;
 use App\Actions\StoreTeacherUnit21PlusSupportReport;
 use App\Actions\StoreTeacherUnit31PlusSupportReport;
+use App\Actions\StoreTeacherVisitSupportReport;
 use App\Actions\UpdateLegacyTeacherSupportReport;
 use App\Actions\UpdateTeacherProfile;
 use App\Actions\UpdateTeacherSupport;
 use App\Actions\UpdateTeacherSupportReport;
+use App\Livewire\Concerns\HandlesVisitSupportReportValidationFailures;
 use App\Livewire\Concerns\ManagesSupportReportRoundSelection;
 use App\Models\AccountInformation;
 use App\Models\Institution;
@@ -30,10 +32,12 @@ use App\Support\InstitutionResolver;
 use App\Support\ManagerNameNormalizer;
 use App\Support\SkCodeNormalizer;
 use App\Support\TeacherRetirementRecommendation;
+use App\Support\TeacherSupportCompletionDisplay;
 use App\Support\TeacherSupportHistoryAggregator;
 use App\Support\TeacherSupportHistoryDetailResolver;
 use App\Support\TeacherSupportHistoryFormLoader;
 use App\Support\TeacherSupportKpiCalculator;
+use App\Support\TeacherSupportListActivity;
 use App\Support\TeacherSupportReportEditAuthorization;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -42,12 +46,14 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class CoachTeacherSupportList extends Component
 {
+    use HandlesVisitSupportReportValidationFailures;
     use ManagesSupportReportRoundSelection;
     use WithPagination;
 
@@ -192,6 +198,14 @@ class CoachTeacherSupportList extends Component
 
     public bool $unit31PlusMarkCompleted = true;
 
+    public bool $showVisitModal = false;
+
+    public ?int $visitTeacherId = null;
+
+    public array $visitForm = [];
+
+    public bool $visitMarkCompleted = true;
+
     public function mount(): void
     {
         $year = request()->query('filterYear');
@@ -242,6 +256,7 @@ class CoachTeacherSupportList extends Component
             'open_class' => 'openOpenClassModal',
             'unit21_plus' => 'openUnit21PlusModal',
             'unit31_plus' => 'openUnit31PlusModal',
+            'visit' => 'openVisitModal',
         ];
 
         $method = $methodMap[$action] ?? null;
@@ -505,6 +520,7 @@ class CoachTeacherSupportList extends Component
             'open_class' => $this->openOpenClassView($teacherId, $form, $markCompleted),
             'unit21_plus' => $this->openUnit21PlusView($teacherId, $form, $markCompleted),
             'unit31_plus' => $this->openUnit31PlusView($teacherId, $form, $markCompleted),
+            'visit' => $this->openVisitView($teacherId, $form, $markCompleted),
             default => $this->supportReportViewMode = false,
         };
     }
@@ -546,6 +562,9 @@ class CoachTeacherSupportList extends Component
         }
 
         $this->supportReportViewMode = false;
+        $this->seedSupportRoundSelectionForEdit(
+            (int) ($this->teacherDetailInfo['id'] ?? 0) ?: null,
+        );
     }
 
     public function cancelSupportReportEdit(): void
@@ -596,6 +615,7 @@ class CoachTeacherSupportList extends Component
         $this->showOpenClassModal = false;
         $this->showUnit21PlusModal = false;
         $this->showUnit31PlusModal = false;
+        $this->showVisitModal = false;
     }
 
     /**
@@ -749,6 +769,17 @@ class CoachTeacherSupportList extends Component
         $this->unit31PlusForm = $form;
         $this->unit31PlusMarkCompleted = $markCompleted;
         $this->showUnit31PlusModal = true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $form
+     */
+    private function openVisitView(int $teacherId, array $form, bool $markCompleted): void
+    {
+        $this->visitTeacherId = $teacherId;
+        $this->visitForm = $form;
+        $this->visitMarkCompleted = $markCompleted;
+        $this->showVisitModal = true;
     }
 
     private function canViewTeacher(int $teacherId): bool
@@ -2153,6 +2184,133 @@ class CoachTeacherSupportList extends Component
         ];
     }
 
+    public function openVisitModal(int $teacherId): void
+    {
+        $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
+        if (! $teacher) {
+            return;
+        }
+
+        $this->clearSupportReportViewContext();
+
+        $institution = $teacher->institution;
+        if (! $institution) {
+            $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
+            if ($normalizedSkCode) {
+                $institution = Institution::query()
+                    ->with('accountInfo')
+                    ->where('SKcode', $normalizedSkCode)
+                    ->first();
+            }
+        }
+
+        $accountInfo = $institution?->accountInfo;
+        $user = auth()->user();
+        $coachName = $accountInfo?->TR ?? ($user?->nameForCoReports() ?? '');
+
+        $this->visitTeacherId = $teacherId;
+        $this->visitMarkCompleted = true;
+        $this->visitForm = $this->defaultVisitForm(
+            skCode: SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
+            coachName: $coachName,
+            institutionName: $this->institutionDisplayName($institution, $teacher->School_Name),
+            teacherName: (string) $teacher->Name,
+        );
+        $this->seedSupportRoundSelection($teacher);
+        $this->showVisitModal = true;
+    }
+
+    public function closeVisitModal(): void
+    {
+        $this->endSupportReportViewMode();
+        $this->resetSupportRoundSelection();
+        $this->showVisitModal = false;
+        $this->visitTeacherId = null;
+        $this->visitForm = [];
+        $this->visitMarkCompleted = true;
+    }
+
+    public function saveVisitReport(): void
+    {
+        if (! $this->visitTeacherId) {
+            return;
+        }
+
+        $user = auth()->user();
+        if (! $user) {
+            return;
+        }
+
+        $this->syncVisitSessionFromSupportRound($this->visitMarkCompleted);
+
+        $payload = array_merge($this->visitForm, [
+            'mark_completed' => $this->visitMarkCompleted,
+        ], $this->supportReportRoundPayload($this->visitMarkCompleted));
+
+        try {
+            if ($this->updateViewingSupportReportIfEditing($payload, $user)) {
+                if ($this->getErrorBag()->isNotEmpty()) {
+                    return;
+                }
+
+                $this->finishSupportReportPersistence((int) $this->visitTeacherId, fn () => $this->closeVisitModal());
+
+                return;
+            }
+
+            $action = new StoreTeacherVisitSupportReport;
+            $action->execute($this->visitTeacherId, $payload, $user);
+
+            session()->flash('success', $this->visitMarkCompleted
+                ? '교사 지원 및 참관 보고서가 저장되었습니다.'
+                : '임시 저장되었습니다.');
+
+            $teacherId = $this->visitTeacherId;
+            $this->closeVisitModal();
+            $this->closeTeacherModal();
+
+            if ($teacherId) {
+                $this->openTeacherModal($teacherId);
+            }
+        } catch (ValidationException $exception) {
+            $this->failVisitReportValidation($exception);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function defaultVisitForm(
+        string $skCode,
+        string $coachName,
+        string $institutionName,
+        string $teacherName,
+    ): array {
+        return [
+            'sk_code' => $skCode,
+            'coach_name' => $coachName,
+            'institution_name' => $institutionName,
+            'teacher_name' => $teacherName,
+            'support_date' => now()->format('Y-m-d'),
+            'support_location' => '',
+            'support_purpose' => '',
+            'observe_unit' => null,
+            'observe_lesson' => null,
+            'observe_summary_extra' => '',
+            'observe_class' => '',
+            'observe_age' => '',
+            'session_number' => 1,
+            'semester_label' => config('coach_teacher_visit.semester_options.0', '1학기 지원'),
+            'interview_date' => now()->format('Y-m-d'),
+            'interview_time' => now()->format('H:i'),
+            'meeting_type' => config('coach_teacher_visit.method_options.0', '신규교사 시연수업'),
+            'pre_request_notes' => '',
+            'monitoring_feedback' => '',
+            'interview_and_action_plan' => '',
+            'special_notes' => '',
+        ];
+    }
+
     public function updatedSearch(): void
     {
         $this->resetPage();
@@ -2328,6 +2486,12 @@ class CoachTeacherSupportList extends Component
             ->select('Teachers.*')
             ->paginate(50);
 
+        TeacherSupportCompletionDisplay::flushRequestCache();
+        TeacherSupportCompletionDisplay::preloadForTeachers(
+            $teachers->getCollection(),
+            $this->resolvedFilterYear(),
+        );
+
         $this->hydrateTeacherInstitutions($teachers);
         $this->editModalAllowedByTeacherId = $this->buildEditModalAllowedMap($teachers->getCollection());
 
@@ -2348,6 +2512,7 @@ class CoachTeacherSupportList extends Component
             'openClassConfig' => config('coach_teacher_open_class'),
             'unit21PlusConfig' => config('coach_teacher_unit21_plus'),
             'unit31PlusConfig' => config('coach_teacher_unit31_plus'),
+            'visitConfig' => config('coach_teacher_visit'),
             'displayYear' => $this->resolvedFilterYear(),
         ]);
     }
@@ -2445,6 +2610,10 @@ class CoachTeacherSupportList extends Component
         }
 
         $this->applyCoachFilter($query);
+
+        if (! $this->showAllInstitutionsView) {
+            TeacherSupportListActivity::applyHasSupportHistoryScope($query, $this->resolvedFilterYear());
+        }
 
         return $query;
     }
@@ -2575,8 +2744,7 @@ class CoachTeacherSupportList extends Component
     private function applyTeacherListOrdering(Builder $query): void
     {
         if (! $this->showAllInstitutionsView) {
-            $query->orderByDesc('Teachers.Created_Date')
-                ->orderByDesc('Teachers.ID');
+            TeacherSupportListActivity::applyLatestSupportOrdering($query, $this->resolvedFilterYear());
 
             return;
         }

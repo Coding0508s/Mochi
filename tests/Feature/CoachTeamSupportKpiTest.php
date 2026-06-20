@@ -66,7 +66,7 @@ class CoachTeamSupportKpiTest extends CoachTeacherSupportListTest
         $this->createInstitution('SK001', '기관A', 'Coach A');
         $this->createTeacher('SK001', '계획교사', [
             'Plan_1st_Support_Date' => "{$year}-03-01",
-        ]);
+        ], forLatestView: false);
         $this->createTeacher('SK001', '미계획교사', [
             '_1st_Support_Date' => "{$year}-03-10",
         ]);
@@ -132,7 +132,7 @@ class CoachTeamSupportKpiTest extends CoachTeacherSupportListTest
         ]);
         $this->createTeacher('SK-SPLIT-TR', '단일교사', [
             'Plan_1st_Support_Date' => "{$year}-03-01",
-        ]);
+        ], forLatestView: false);
 
         $component = Livewire::actingAs($lead)
             ->test(CoachTeamSupportKpiDashboard::class)

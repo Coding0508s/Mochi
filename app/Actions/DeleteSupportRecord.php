@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Models\SupportRecord;
+use App\Support\SupportRecordCascadeDeleter;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Gate;
 
@@ -19,6 +20,6 @@ class DeleteSupportRecord
             throw new AuthorizationException('해당 기관의 지원 내역만 삭제할 수 있습니다.');
         }
 
-        $record->delete();
+        app(SupportRecordCascadeDeleter::class)->delete($record);
     }
 }

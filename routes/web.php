@@ -96,6 +96,10 @@ Route::middleware(['auth'])->group(function () {
         return view('pages.supports.create');
     })->name('supports.create');
 
+    Route::get('/institution-issues', function () {
+        return view('pages.institution-issues.index');
+    })->middleware('can:accessCsTeamFeatures')->name('institution-issues.index');
+
     Route::get('/schedules', function () {
         return view('pages.schedules.index');
     })->name('schedules.index');
@@ -202,10 +206,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/setup/common-codes', function () {
             return view('pages.setup.common-codes');
         })->name('setup.common-codes');
-
-        Route::get('/setup/roles', function () {
-            return view('pages.setup.roles');
-        })->name('setup.roles');
 
         Route::get('/setup/employees/create', function () {
             return view('pages.setup.employee-create');

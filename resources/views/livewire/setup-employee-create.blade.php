@@ -75,7 +75,7 @@
 
                 <p class="mt-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-700">
                     직원 등록 시 로그인 계정이 자동으로 생성되며, 비밀번호 재설정 링크 메일이 발송됩니다.
-                    특수 권한은 등록 후 <a href="{{ route('setup.roles') }}" class="underline font-medium">Setup &gt; 역할·권한</a>에서 역할로 할당하세요.
+                    특수 권한은 계정 생성 후 관리자 화면에서 직접 설정하세요.
                 </p>
             </div>
 

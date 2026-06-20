@@ -59,6 +59,7 @@ return [
         'teacher_open_class_support_reports' => 'coach_teacher_open_class',
         'teacher_unit21_plus_support_reports' => 'coach_teacher_unit21_plus',
         'teacher_unit31_plus_support_reports' => 'coach_teacher_unit31_plus',
+        'teacher_visit_support_reports' => 'coach_teacher_visit',
     ],
 
     'mochi_field_labels' => [
@@ -83,8 +84,15 @@ return [
         'interview_date' => '미팅 날짜',
         'interview_time' => '미팅 시간',
         'method' => '지원 방법',
+        'meeting_type' => '미팅 유형',
         'video_length_minutes' => '영상 길이(분)',
         'sk_code' => 'SK 코드',
+        'support_purpose' => '지원 목적',
+        'support_location' => '장소',
+        'pre_request_notes' => '사전 요청 및 주요 이슈',
+        'monitoring_feedback' => '수업 모니터링 및 피드백',
+        'interview_and_action_plan' => '면담 내용 및 후속 조치 계획',
+        'special_notes' => '특이사항',
     ],
 
     'account_field_labels' => [

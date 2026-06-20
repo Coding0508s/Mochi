@@ -1,5 +1,5 @@
 @php
-    $parts = \App\Support\ExcelSerialDate::completedDisplayParts($dateValue, $type, $displayYear);
+    $parts = \App\Support\TeacherSupportCompletionDisplay::parts($teacher, $round, $displayYear);
 @endphp
 @if($parts['date'] !== '')
     <div class="coach-support-completed-cell">

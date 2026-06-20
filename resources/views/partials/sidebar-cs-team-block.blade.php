@@ -16,6 +16,13 @@
     </button>
 
     <div x-show="openCS" class="sidebar-sublist">
-        @include('partials.sidebar-shared-team-menus', ['teamMenuQuery' => 'cs'])
+        @include('partials.sidebar-shared-team-menus', [
+            'teamMenuQuery' => 'cs',
+            'sharedTeamMenus' => [
+                ['label' => '기관리스트', 'path' => '/institutions', 'route' => 'institutions', 'icon' => 'building'],
+                ['label' => '교직원 연락처보기', 'path' => '/contacts', 'route' => 'contacts', 'icon' => 'phone'],
+                ['label' => '기관지원보고서', 'path' => '/supports', 'route' => 'supports', 'icon' => 'document'],
+            ],
+        ])
     </div>
 </div>

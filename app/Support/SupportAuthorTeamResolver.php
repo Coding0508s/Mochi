@@ -27,6 +27,17 @@ final class SupportAuthorTeamResolver
     /** @var array<string, User|null> */
     private array $userByNormalizedName = [];
 
+    /** @var array<string, string> EMPNO → ENGLISHNAME(비어있지 않은 값) */
+    private array $employeeEnglishByEmpno = [];
+
+    /** @var array<string, string> EMPNO → KOREANAME(비어있지 않은 값) */
+    private array $employeeKoreanByEmpno = [];
+
+    /** @var array<string, string> lower(trim(EMAIL)) → ENGLISHNAME(첫 매칭 행) */
+    private array $employeeEnglishByEmail = [];
+
+    private bool $employeeTableExists = false;
+
     private bool $indexesLoaded = false;
 
     public function resolve(string $authorName): string
@@ -89,7 +100,11 @@ final class SupportAuthorTeamResolver
             return;
         }
 
-        $employees = Employee::query()->get(['EMPNO', 'KOREANAME', 'ENGLISHNAME', 'WORKDEPT', 'JOB']);
+        $this->employeeTableExists = true;
+
+        // EMAIL 을 함께 읽어, 유저별 nameForCoReports() 재조회(N+1) 없이
+        // EMPNO/EMAIL → 표시명을 메모리에서 해결할 수 있게 한다.
+        $employees = Employee::query()->get(['EMPNO', 'KOREANAME', 'ENGLISHNAME', 'WORKDEPT', 'JOB', 'EMAIL']);
 
         foreach ($employees as $employee) {
             foreach ([$employee->KOREANAME, $employee->ENGLISHNAME] as $name) {
@@ -97,6 +112,25 @@ final class SupportAuthorTeamResolver
                 if ($key !== '' && ! array_key_exists($key, $this->employeeByNormalizedName)) {
                     $this->employeeByNormalizedName[$key] = $employee;
                 }
+            }
+
+            $empno = trim((string) ($employee->EMPNO ?? ''));
+            if ($empno !== '') {
+                $english = trim((string) ($employee->ENGLISHNAME ?? ''));
+                if ($english !== '' && ! isset($this->employeeEnglishByEmpno[$empno])) {
+                    $this->employeeEnglishByEmpno[$empno] = $english;
+                }
+
+                $korean = trim((string) ($employee->KOREANAME ?? ''));
+                if ($korean !== '' && ! isset($this->employeeKoreanByEmpno[$empno])) {
+                    $this->employeeKoreanByEmpno[$empno] = $korean;
+                }
+            }
+
+            // value('ENGLISHNAME') 와 동일하게 같은 이메일의 "첫 행" 값을 보존한다(빈 값 포함).
+            $email = mb_strtolower(trim((string) ($employee->EMAIL ?? '')));
+            if ($email !== '' && ! array_key_exists($email, $this->employeeEnglishByEmail)) {
+                $this->employeeEnglishByEmail[$email] = trim((string) ($employee->ENGLISHNAME ?? ''));
             }
         }
     }
@@ -117,7 +151,7 @@ final class SupportAuthorTeamResolver
         foreach ($users as $user) {
             $keys = [ManagerNameNormalizer::normalize($user->name)];
 
-            $reportName = ManagerNameNormalizer::normalize($user->nameForCoReports());
+            $reportName = ManagerNameNormalizer::normalize($this->reportNameKey($user));
             if ($reportName !== '') {
                 $keys[] = $reportName;
             }
@@ -134,5 +168,53 @@ final class SupportAuthorTeamResolver
                 }
             }
         }
+    }
+
+    /**
+     * User::nameForCoReports() + preferredDisplayName() 와 동일한 표시명을,
+     * 미리 적재한 employee 맵으로 추가 쿼리 없이 계산한다.
+     *
+     * 기존에는 유저마다 Employee 를 재조회(N+1)했다. 동작(반환 문자열)은 동일하게 보존한다.
+     */
+    private function reportNameKey(User $user): string
+    {
+        $empno = trim((string) ($user->employee_empno ?? ''));
+        $email = mb_strtolower(trim((string) $user->email));
+
+        if ($this->employeeTableExists) {
+            if ($empno !== '' && ($byEmpNo = $this->employeeEnglishByEmpno[$empno] ?? '') !== '') {
+                return $byEmpNo;
+            }
+
+            if ($email !== '' && trim($byEmail = ($this->employeeEnglishByEmail[$email] ?? '')) !== '') {
+                return trim($byEmail);
+            }
+        }
+
+        $fromUser = trim((string) $user->name);
+        if ($fromUser !== '') {
+            return $fromUser;
+        }
+
+        if ($empno !== '' && $this->employeeTableExists
+            && ($korean = $this->employeeKoreanByEmpno[$empno] ?? '') !== '') {
+            return $korean;
+        }
+
+        // preferredDisplayName() 포팅
+        if ($email !== '' && $this->employeeTableExists
+            && trim($english = ($this->employeeEnglishByEmail[$email] ?? '')) !== '') {
+            return trim($english);
+        }
+
+        if ($fromUser !== '') {
+            return $fromUser;
+        }
+
+        if ($email !== '') {
+            return trim((string) $user->email);
+        }
+
+        return 'User';
     }
 }

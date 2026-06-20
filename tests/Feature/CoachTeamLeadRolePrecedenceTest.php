@@ -2,28 +2,41 @@
 
 namespace Tests\Feature;
 
-use App\Models\SetupRole;
+use App\Models\Employee;
 use App\Models\User;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class CoachTeamLeadRolePrecedenceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_sync_command_skips_users_with_setup_role(): void
+    protected function setUp(): void
     {
-        $role = SetupRole::query()->create([
-            'role_key' => 'standard',
-            'role_name' => '일반',
-            'description' => '',
-            'is_active' => true,
-            'permissions' => [],
-            'account_flags' => [],
+        parent::setUp();
+
+        if (! Schema::hasTable('employee')) {
+            Schema::create('employee', function (Blueprint $table): void {
+                $table->string('EMPNO')->primary();
+                $table->string('JOB')->nullable();
+                $table->string('WORKDEPT')->nullable();
+                $table->integer('STATUS')->nullable();
+            });
+        }
+    }
+
+    public function test_sync_command_updates_eligible_users_regardless_of_previous_role_assignment(): void
+    {
+        Employee::query()->create([
+            'EMPNO' => 'E001',
+            'JOB' => 'Department Manager',
+            'WORKDEPT' => 'A05',
+            'STATUS' => 1,
         ]);
 
-        $userWithRole = User::factory()->create([
-            'setup_role_id' => $role->id,
+        $user = User::factory()->create([
             'employee_empno' => 'E001',
             'is_coach_team_lead' => false,
         ]);
@@ -31,8 +44,7 @@ class CoachTeamLeadRolePrecedenceTest extends TestCase
         $this->artisan('users:sync-coach-team-lead-from-jobs')
             ->assertSuccessful();
 
-        $userWithRole->refresh();
-
-        $this->assertFalse((bool) $userWithRole->is_coach_team_lead);
+        $user->refresh();
+        $this->assertTrue((bool) $user->is_coach_team_lead);
     }
 }

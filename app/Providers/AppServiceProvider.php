@@ -11,7 +11,6 @@ use App\Observers\SharedSupplyObserver;
 use App\Policies\SharedSupplyPolicy;
 use App\Policies\TeamSchedulePolicy;
 use App\Support\ManagerNameNormalizer;
-use App\Support\SetupRolePermissions;
 use App\Support\TeacherSupportReportEditAuthorization;
 use App\Support\TeamMenuContext;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -47,9 +46,9 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::define('manageEmployeeDepartment', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
 
-        Gate::define('accessSetup', fn (?User $user): bool => (bool) SetupRolePermissions::allowsAbility($user, 'accessSetup'));
+        Gate::define('accessSetup', fn (?User $user): bool => (bool) $user?->canAccessSetup());
 
-        Gate::define('manageTeamStructure', fn (?User $user): bool => (bool) SetupRolePermissions::allowsAbility($user, 'manageTeamStructure'));
+        Gate::define('manageTeamStructure', fn (?User $user): bool => (bool) $user?->canManageSetup());
 
         Gate::define('manageStoreInventory', fn (?User $user): bool => (bool) ($user?->hasFullAccess() || $user?->can_manage_store_inventory));
 
@@ -64,6 +63,10 @@ class AppServiceProvider extends ServiceProvider
         SharedSupply::observe(SharedSupplyObserver::class);
 
         Gate::define('accessCoTeamFeatures', fn (?User $user): bool => TeamMenuContext::canAccessCoOnlyFeatures($user));
+
+        /** CS 기관 이슈 — CS 팀·관리자(및 팀 미지정 레거시 계정) */
+        Gate::define('accessCsTeamFeatures', fn (?User $user): bool => $user !== null
+            && ($user->hasPlatformWideViewAccess() || in_array(TeamMenuContext::resolveTeamCode($user), ['CS', ''], true)));
 
         /** 잠재기관 리스트/보기 — CO 팀·관리자(및 팀 미지정 레거시 계정) */
         Gate::define('managePotentialInstitutions', fn (?User $user): bool => TeamMenuContext::canAccessCoOnlyFeatures($user));

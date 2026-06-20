@@ -242,6 +242,25 @@ final class ExcelSerialDate
     }
 
     /**
+     * ISO 날짜·엑셀 serial 혼재 컬럼을 SQL DATE 로 정규화한다(정렬·집계용).
+     */
+    public static function sqlNormalizedDateColumn(string $qualifiedColumn): string
+    {
+        $epoch = self::EPOCH;
+        $min = self::SERIAL_MIN;
+        $max = self::SERIAL_MAX;
+
+        return match (Schema::getConnection()->getDriverName()) {
+            'sqlite' => "CASE WHEN {$qualifiedColumn} >= {$min} AND {$qualifiedColumn} <= {$max}"
+                ." THEN date('{$epoch}', '+' || CAST({$qualifiedColumn} AS INTEGER) || ' days')"
+                ." ELSE date({$qualifiedColumn}) END",
+            default => "CASE WHEN {$qualifiedColumn} >= {$min} AND {$qualifiedColumn} <= {$max}"
+                ." THEN DATE_ADD('{$epoch}', INTERVAL CAST({$qualifiedColumn} AS UNSIGNED) DAY)"
+                .' ELSE DATE('.$qualifiedColumn.') END',
+        };
+    }
+
+    /**
      * Unix 에포크(1970-01-01)로 잘못 캐스팅된 placeholder 여부.
      */
     public static function isEpochArtifact(CarbonInterface $value): bool

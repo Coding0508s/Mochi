@@ -77,7 +77,11 @@ class SupportRecord extends Model
         'CreatedDate',
         'CompletedDate',
         'is_urgent',
+        'record_kind',
     ];
+
+    /** record_kind 값: CS 기관 이슈 */
+    public const KIND_ISSUE = 'issue';
 
     // ─── 날짜/타입 자동 변환 ──────────────────────────────────────────
     protected function casts(): array
@@ -344,6 +348,39 @@ class SupportRecord extends Model
         }
 
         return $query->where('is_urgent', true);
+    }
+
+    /**
+     * CS 기관 이슈만 조회 (record_kind = 'issue').
+     */
+    public function scopeOnlyIssues(Builder $query): Builder
+    {
+        if (! static::tableHasColumn('record_kind')) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where('record_kind', self::KIND_ISSUE);
+    }
+
+    /**
+     * 기관 이슈를 제외한 일반 기관 지원 보고서만 조회.
+     */
+    public function scopeExcludeIssues(Builder $query): Builder
+    {
+        if (! static::tableHasColumn('record_kind')) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $inner): void {
+            $inner->whereNull('record_kind')
+                ->orWhere('record_kind', '!=', self::KIND_ISSUE);
+        });
+    }
+
+    public function isIssue(): bool
+    {
+        return static::tableHasColumn('record_kind')
+            && (string) ($this->record_kind ?? '') === self::KIND_ISSUE;
     }
 
     /**
