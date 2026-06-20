@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Support\TeamMenuContext;
+
 trait ResolvesInstitutionFormPermissions
 {
     protected const DEPT_CO = 'A02';
@@ -25,6 +27,10 @@ trait ResolvesInstitutionFormPermissions
 
     public function canEditInstitutionDetailCo(): bool
     {
+        if ($this->isCrossTeamReadOnlyContext()) {
+            return false;
+        }
+
         if ($this->canEditInstitutionDetailCore()) {
             return true;
         }
@@ -34,6 +40,10 @@ trait ResolvesInstitutionFormPermissions
 
     public function canEditInstitutionDetailTr(): bool
     {
+        if ($this->isCrossTeamReadOnlyContext()) {
+            return false;
+        }
+
         if ($this->canEditInstitutionDetailCore()) {
             return true;
         }
@@ -43,11 +53,20 @@ trait ResolvesInstitutionFormPermissions
 
     public function canEditInstitutionDetailCs(): bool
     {
+        if ($this->isCrossTeamReadOnlyContext()) {
+            return false;
+        }
+
         if ($this->canEditInstitutionDetailCore()) {
             return true;
         }
 
         return $this->resolveCurrentUserManagerDept() === self::DEPT_CS;
+    }
+
+    private function isCrossTeamReadOnlyContext(): bool
+    {
+        return TeamMenuContext::isCrossTeamReadOnlyContext(auth()->user());
     }
 
     private function resolveCurrentUserManagerDept(): ?string

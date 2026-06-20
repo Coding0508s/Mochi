@@ -651,6 +651,7 @@
                        class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
                         취소하기
                     </a>
+                    @unless($crossTeamReadOnly ?? false)
                     <button type="submit"
                             @disabled(!$institutionSelected)
                             class="px-5 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
@@ -662,6 +663,7 @@
                         </span>
                         <span wire:loading wire:target="save">저장 중...</span>
                     </button>
+                    @endunless
                 </div>
                 @endif
             </div>

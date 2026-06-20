@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 
 /**
  * Teams 사이드바(team_menu) 및 CO 전용 기능 접근.
@@ -145,12 +146,78 @@ final class TeamMenuContext
         $user ??= auth()->user();
         $team = self::resolveTeamCode($user);
 
-        return match ($team) {
+        return self::menuForTeamCode($team);
+    }
+
+    /**
+     * @return self::MENU_*|null
+     */
+    public static function menuForTeamCode(string $teamCode): ?string
+    {
+        return match (mb_strtoupper(trim($teamCode))) {
             'CS' => self::MENU_CS,
             'COACH', 'TR', 'TRAINING' => self::MENU_COACH,
             'CO' => self::MENU_CO,
             default => null,
         };
+    }
+
+    /**
+     * team_menu 컨텍스트가 본인 소속 팀과 다르면 조회 전용.
+     * Full Access(관리자)는 모든 컨텍스트에서 편집 가능.
+     */
+    public static function isCrossTeamReadOnlyContext(?User $user, ?string $teamMenuOverride = null): bool
+    {
+        if ($user === null || $user->hasFullAccess()) {
+            return false;
+        }
+
+        $activeMenu = self::normalizeTeamMenu($teamMenuOverride) ?? self::activeMenu($user);
+        if ($activeMenu === null) {
+            return false;
+        }
+
+        $homeTeamCode = self::resolveTeamCode($user);
+        if ($homeTeamCode === '') {
+            return false;
+        }
+
+        $homeMenu = self::menuForTeamCode($homeTeamCode);
+        if ($homeMenu === null) {
+            return false;
+        }
+
+        return $activeMenu !== $homeMenu;
+    }
+
+    /**
+     * 타 팀 메뉴 조회 시 관리자급 READ 스코프(WRITE는 별도 차단).
+     */
+    public static function hasExpandedReadScope(?User $user, ?string $teamMenuOverride = null): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        return $user->hasPlatformWideViewAccess()
+            || self::isCrossTeamReadOnlyContext($user, $teamMenuOverride);
+    }
+
+    public static function abortIfCrossTeamReadOnly(?User $user = null, ?string $teamMenuOverride = null): void
+    {
+        $user ??= auth()->user();
+
+        if (self::isCrossTeamReadOnlyContext($user, $teamMenuOverride)) {
+            throw new AuthorizationException('다른 팀 메뉴에서는 조회만 가능합니다.');
+        }
+    }
+
+    /**
+     * Teams 사이드바: 로그인 사용자에게 CS·Coach·CO 블록 모두 노출.
+     */
+    public static function showAllTeamSidebars(?User $user): bool
+    {
+        return $user !== null;
     }
 
     /**

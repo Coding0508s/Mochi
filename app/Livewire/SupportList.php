@@ -7,6 +7,7 @@ use App\Models\Institution;
 use App\Models\SupportRecord;
 use App\Support\SupportRecordCascadeDeleter;
 use App\Support\SupportReportStoredMailNotifier;
+use App\Support\TeamMenuContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
@@ -177,6 +178,8 @@ class SupportList extends Component
 
     public function saveContractDocument(): void
     {
+        TeamMenuContext::abortIfCrossTeamReadOnly();
+
         if ($this->contractSelectedId === null) {
             $this->uploadContractDocument();
 
@@ -348,6 +351,8 @@ class SupportList extends Component
 
     public function deleteSelectedContractDocument(): void
     {
+        TeamMenuContext::abortIfCrossTeamReadOnly();
+
         if ($this->contractSelectedId === null) {
             return;
         }
@@ -547,6 +552,8 @@ class SupportList extends Component
     // ─── 저장 (수정 전용) ────────────────────────────────────────
     public function save(): void
     {
+        TeamMenuContext::abortIfCrossTeamReadOnly();
+
         if ($this->editingId === null || $this->modalViewOnly) {
             return;
         }
@@ -590,6 +597,8 @@ class SupportList extends Component
     // ─── 완료처리 토글 (모달 밖 리스트에서 바로 클릭) ────────────
     public function toggleComplete(int $id): void
     {
+        TeamMenuContext::abortIfCrossTeamReadOnly();
+
         $record = SupportRecord::query()->findOrFail($id);
         Gate::authorize('updateSupportRecord', $record);
         $wasCompleted = $record->isCompleted();
@@ -607,6 +616,8 @@ class SupportList extends Component
      */
     public function deleteRecord(int $id): void
     {
+        TeamMenuContext::abortIfCrossTeamReadOnly();
+
         Gate::authorize('deleteSupportRecords');
 
         $record = SupportRecord::query()->findOrFail($id);
@@ -683,6 +694,7 @@ class SupportList extends Component
             'institutions' => $institutions,
             'institutionSuggestions' => $institutionSuggestions,
             'contractDocumentRows' => $contractDocumentRows,
+            'crossTeamReadOnly' => TeamMenuContext::isCrossTeamReadOnlyContext(auth()->user()),
         ]);
     }
 

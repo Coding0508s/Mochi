@@ -16,6 +16,7 @@ use App\Models\SkCodeRequest;
 use App\Models\SupportRecord;
 use App\Models\User;
 use App\Support\ManagerNameNormalizer;
+use App\Support\TeamMenuContext;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
@@ -1099,7 +1100,7 @@ class PotentialInstitutionList extends Component
             return;
         }
 
-        if ($user->hasPlatformWideViewAccess()) {
+        if (TeamMenuContext::hasExpandedReadScope($user)) {
             return;
         }
 

@@ -21,10 +21,8 @@
         || request()->is('coach/*');
     $sidebarUser = auth()->user();
     $activeTeamMenu = \App\Support\TeamMenuContext::activeMenu($sidebarUser);
-    $showCoTeamMenu = \App\Support\TeamMenuContext::showCoTeamSidebar($sidebarUser);
-    $showMultiTeamSidebar = \App\Support\TeamMenuContext::showMultiTeamSidebar($sidebarUser);
-    $showExclusiveCoachSidebar = \App\Support\TeamMenuContext::showExclusiveCoachSidebar($sidebarUser);
-    $showExclusiveCsSidebar = \App\Support\TeamMenuContext::showExclusiveCsSidebar($sidebarUser);
+    $showAllTeamSidebars = \App\Support\TeamMenuContext::showAllTeamSidebars($sidebarUser);
+    $crossTeamReadOnly = \App\Support\TeamMenuContext::isCrossTeamReadOnlyContext($sidebarUser);
 @endphp
 
 {{-- Alpine.js: 사이드바 아코디언(열고 닫기) 에 사용 --}}
@@ -337,7 +335,7 @@
                         };
                     @endphp
 
-                    @if($showMultiTeamSidebar)
+                    @if($showAllTeamSidebars)
                         @include('partials.sidebar-cs-team-block')
 
                         @if($canSeeManagementMenus)
@@ -354,13 +352,9 @@
                         @endif
 
                         @include('partials.sidebar-coach-team-block')
-                    @elseif($showExclusiveCsSidebar)
-                        @include('partials.sidebar-cs-team-block')
-                    @elseif($showExclusiveCoachSidebar)
-                        @include('partials.sidebar-coach-team-block')
                     @endif
 
-                    @if($showCoTeamMenu)
+                    @if($showAllTeamSidebars)
                     {{-- CO Team (하위 메뉴 포함) --}}
                     <div>
                         <button type="button"
@@ -527,6 +521,11 @@
 
         {{-- 페이지 콘텐츠 --}}
         <main class="mochi-content-wrap flex-1 overflow-y-auto">
+            @if($crossTeamReadOnly ?? false)
+                <div class="mx-4 mt-4 mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+                    타 팀 메뉴에서는 조회만 가능합니다.
+                </div>
+            @endif
             {{ $slot }}
         </main>
 

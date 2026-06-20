@@ -10,7 +10,7 @@ class TeamMenuVisibilityTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_coach_user_cannot_access_potential_institutions_route(): void
+    public function test_coach_user_can_access_potential_institutions_route(): void
     {
         $coach = User::factory()->create([
             'team' => 'COACH',
@@ -19,10 +19,10 @@ class TeamMenuVisibilityTest extends TestCase
 
         $this->actingAs($coach)
             ->get('/potential-institutions')
-            ->assertForbidden();
+            ->assertOk();
     }
 
-    public function test_coach_user_cannot_access_store_inventory_route(): void
+    public function test_coach_user_can_access_store_inventory_route(): void
     {
         $coach = User::factory()->create([
             'team' => 'COACH',
@@ -31,7 +31,7 @@ class TeamMenuVisibilityTest extends TestCase
 
         $this->actingAs($coach)
             ->get('/store/inventory')
-            ->assertForbidden();
+            ->assertOk();
     }
 
     public function test_co_user_can_access_potential_institutions_route(): void
@@ -46,7 +46,7 @@ class TeamMenuVisibilityTest extends TestCase
             ->assertOk();
     }
 
-    public function test_cs_user_cannot_access_store_sales_route(): void
+    public function test_cs_user_can_access_store_sales_route(): void
     {
         $cs = User::factory()->create([
             'team' => 'CS',
@@ -55,6 +55,6 @@ class TeamMenuVisibilityTest extends TestCase
 
         $this->actingAs($cs)
             ->get('/store/sales')
-            ->assertForbidden();
+            ->assertOk();
     }
 }

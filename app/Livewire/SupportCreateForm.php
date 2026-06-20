@@ -867,6 +867,8 @@ class SupportCreateForm extends Component
 
     public function save(): void
     {
+        TeamMenuContext::abortIfCrossTeamReadOnly(auth()->user(), $this->formTeamMenu);
+
         if ($this->reportMode === 'issue') {
             $this->saveInstitutionIssue();
 
@@ -1313,6 +1315,7 @@ class SupportCreateForm extends Component
             'supportTypeOptions' => $this->supportTypeOptions(),
             'institutionTeachers' => $this->institutionTeachers(),
             'coachTeacherSupportCreateTypes' => config('coach_teacher_support_create.types', []),
+            'crossTeamReadOnly' => TeamMenuContext::isCrossTeamReadOnlyContext(auth()->user(), $this->formTeamMenu),
         ], $this->coachTeacherSupportReportModalConfigs()));
     }
 
