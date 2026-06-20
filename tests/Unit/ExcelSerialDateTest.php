@@ -134,6 +134,14 @@ class ExcelSerialDateTest extends TestCase
     {
         $expression = ExcelSerialDate::sqlNormalizedDateColumn('Teachers.Plan_1st_Support_Date');
 
-        $this->assertStringContainsString("NULLIF(Teachers.Plan_1st_Support_Date, '')", $expression);
+        $this->assertStringContainsString("NULLIF(TRIM(CAST(Teachers.Plan_1st_Support_Date AS TEXT)), '')", $expression);
+    }
+
+    public function test_sql_year_equals_casts_datetime_column_to_text_before_blank_check(): void
+    {
+        $expression = ExcelSerialDate::sqlYearEquals('Teachers._1st_Support_Date', 2026);
+
+        $this->assertStringContainsString("NULLIF(TRIM(CAST(Teachers._1st_Support_Date AS TEXT)), '')", $expression);
+        $this->assertStringNotContainsString("NULLIF(Teachers._1st_Support_Date, '')", $expression);
     }
 }

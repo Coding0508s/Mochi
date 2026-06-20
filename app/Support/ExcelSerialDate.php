@@ -217,9 +217,19 @@ final class ExcelSerialDate
 
     public static function sqlDateValueIsNotBlank(string $qualifiedColumn): string
     {
+        return self::sqlBlankSafeText($qualifiedColumn).' IS NOT NULL';
+    }
+
+    /**
+     * datetime/varchar 혼재 컬럼을 strict 모드에서도 안전하게 "빈 값이면 NULL"로 만든다.
+     * datetime 컬럼을 곧바로 '' 와 비교하면 1525 Incorrect DATETIME value 가 발생하므로
+     * 항상 문자열로 캐스팅한 뒤 공백을 제거해 비교한다.
+     */
+    public static function sqlBlankSafeText(string $qualifiedColumn): string
+    {
         return match (Schema::getConnection()->getDriverName()) {
-            'sqlite' => "NULLIF(TRIM(CAST({$qualifiedColumn} AS TEXT)), '') IS NOT NULL",
-            default => "NULLIF(TRIM(CAST({$qualifiedColumn} AS CHAR)), '') IS NOT NULL",
+            'sqlite' => "NULLIF(TRIM(CAST({$qualifiedColumn} AS TEXT)), '')",
+            default => "NULLIF(TRIM(CAST({$qualifiedColumn} AS CHAR)), '')",
         };
     }
 
@@ -235,17 +245,21 @@ final class ExcelSerialDate
 
     public static function sqlYearEquals(string $column, int $year): string
     {
+        $safe = self::sqlBlankSafeText($column);
+
         return match (Schema::getConnection()->getDriverName()) {
-            'sqlite' => "(CAST(strftime('%Y', NULLIF({$column}, '')) AS INTEGER) = {$year})",
-            default => "(YEAR(NULLIF({$column}, '')) = {$year})",
+            'sqlite' => "(CAST(strftime('%Y', {$safe}) AS INTEGER) = {$year})",
+            default => "(YEAR({$safe}) = {$year})",
         };
     }
 
     public static function sqlYearNotEquals(string $column, int $year): string
     {
+        $safe = self::sqlBlankSafeText($column);
+
         return match (Schema::getConnection()->getDriverName()) {
-            'sqlite' => "(CAST(strftime('%Y', NULLIF({$column}, '')) AS INTEGER) != {$year})",
-            default => "(YEAR(NULLIF({$column}, '')) != {$year})",
+            'sqlite' => "(CAST(strftime('%Y', {$safe}) AS INTEGER) != {$year})",
+            default => "(YEAR({$safe}) != {$year})",
         };
     }
 
@@ -257,14 +271,15 @@ final class ExcelSerialDate
         $epoch = self::EPOCH;
         $min = self::SERIAL_MIN;
         $max = self::SERIAL_MAX;
+        $safe = self::sqlBlankSafeText($qualifiedColumn);
 
         return match (Schema::getConnection()->getDriverName()) {
             'sqlite' => "CASE WHEN {$qualifiedColumn} >= {$min} AND {$qualifiedColumn} <= {$max}"
                 ." THEN date('{$epoch}', '+' || CAST({$qualifiedColumn} AS INTEGER) || ' days')"
-                ." ELSE date(NULLIF({$qualifiedColumn}, '')) END",
+                ." ELSE date({$safe}) END",
             default => "CASE WHEN {$qualifiedColumn} >= {$min} AND {$qualifiedColumn} <= {$max}"
                 ." THEN DATE_ADD('{$epoch}', INTERVAL CAST({$qualifiedColumn} AS UNSIGNED) DAY)"
-                ." ELSE DATE(NULLIF({$qualifiedColumn}, '')) END",
+                ." ELSE DATE({$safe}) END",
         };
     }
 
