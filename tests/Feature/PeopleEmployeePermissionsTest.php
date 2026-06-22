@@ -257,7 +257,17 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->assertDontSee('직원 등록');
     }
 
-    public function test_people_sidebar_replaces_online_department_with_inactive_employees_submenu(): void
+    public function test_people_sidebar_always_shows_inactive_employees_submenu(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)
+            ->get(route('people.index'))
+            ->assertOk()
+            ->assertSee('비활성화 직원', false);
+    }
+
+    public function test_people_sidebar_hides_online_team_department_from_team_list(): void
     {
         Department::query()->insert([
             'DEPTNO' => 'A99',
@@ -268,12 +278,11 @@ class PeopleEmployeePermissionsTest extends TestCase
 
         $admin = User::factory()->admin()->create();
 
-        $response = $this->actingAs($admin)
+        $this->actingAs($admin)
             ->get(route('people.index'))
-            ->assertOk();
-
-        $response->assertSee('비활성화 직원', false);
-        $response->assertDontSee('>Online Team<', false);
+            ->assertOk()
+            ->assertSee('비활성화 직원', false)
+            ->assertDontSee('>Online Team<', false);
     }
 
     public function test_people_sidebar_lists_ceo_before_board_of_directors(): void
