@@ -65,9 +65,9 @@
                 <select wire:model.live="filterYear"
                         class="py-1.5 px-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                     <option value="">전체</option>
-                    @for($y = now()->year; $y >= now()->year - 3; $y--)
+                    @foreach($yearFilterOptions as $y)
                         <option value="{{ $y }}">{{ $y }}년</option>
-                    @endfor
+                    @endforeach
                 </select>
                 <a href="{{ \App\Support\TeamMenuContext::route('supports.create') }}"
                    class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600">

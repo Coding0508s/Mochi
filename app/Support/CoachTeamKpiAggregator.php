@@ -3,11 +3,9 @@
 namespace App\Support;
 
 use App\Models\AccountInformation;
-use App\Models\Institution;
 use App\Models\Teacher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Coach 팀 KPI — 담당 Coach(TR)별 지원 완료 차수 집계.
@@ -50,7 +48,11 @@ final class CoachTeamKpiAggregator
         $query = clone $baseQuery;
         self::applyScheduleFilters($query, $year, $filterMonth, $filterRound);
 
-        return TeacherSupportKpiCalculator::calculateAggregated($query, $year);
+        $teachers = (clone $query)
+            ->select('Teachers.*')
+            ->get();
+
+        return TeacherSupportKpiCalculator::calculateFromTeachers($teachers, $year);
     }
 
     /**
@@ -61,55 +63,38 @@ final class CoachTeamKpiAggregator
         $query = clone $baseQuery;
         self::applyScheduleFilters($query, $year, $filterMonth, $filterRound);
 
-        $teacherTable = (new Teacher)->getTable();
-        $institutionTable = (new Institution)->getTable();
-        $accountTable = (new AccountInformation)->getTable();
-        $sqlNormalizedTr = ManagerNameNormalizer::sqlColumnExpression('team_kpi_ai.TR');
-        $teacherIdColumn = "{$teacherTable}.ID";
+        $teachers = (clone $query)
+            ->with(['institution.accountInfo'])
+            ->select('Teachers.*')
+            ->get();
 
-        $accountBySkSubquery = DB::table($accountTable)
-            ->selectRaw('SK_Code, MAX(TR) as TR')
-            ->whereNotNull('TR')
-            ->where('TR', '!=', '')
-            ->groupBy('SK_Code');
+        return $teachers
+            ->groupBy(function (Teacher $teacher): string {
+                $coach = trim((string) ($teacher->institution?->accountInfo?->TR ?? ''));
 
-        $query
-            ->join($institutionTable.' as team_kpi_inst', "{$teacherTable}.SK_Code", '=', 'team_kpi_inst.SKcode')
-            ->joinSub($accountBySkSubquery, 'team_kpi_ai', 'team_kpi_inst.SKcode', '=', 'team_kpi_ai.SK_Code');
-
-        $aggregates = TeacherSupportKpiCalculator::aggregateSelectExpressions(
-            $teacherIdColumn,
-            "{$teacherTable}.",
-            $year,
-        );
-
-        $selects = [
-            DB::raw("{$sqlNormalizedTr} as normalized_tr"),
-            DB::raw('MIN(team_kpi_ai.TR) as coach'),
-            ...array_values($aggregates),
-        ];
-
-        return $query
-            ->select($selects)
-            ->groupBy(DB::raw($sqlNormalizedTr))
-            ->orderBy('coach')
-            ->toBase()
-            ->get()
-            ->map(static function ($row): array {
-                $mapped = [
-                    'coach' => (string) $row->coach,
-                    'teacher_count' => (int) $row->teacher_count,
-                ];
-
-                foreach (TeacherSupportKpiCalculator::roundKpiKeys() as $key) {
-                    $mapped[$key] = (int) ($row->{$key} ?? 0);
+                return $coach === '' ? '(미배정)' : ManagerNameNormalizer::normalize($coach);
+            })
+            ->map(function (Collection $groupedTeachers) use ($year): array {
+                $firstTeacher = $groupedTeachers->first();
+                $coachLabel = trim((string) ($firstTeacher?->institution?->accountInfo?->TR ?? ''));
+                if ($coachLabel === '') {
+                    $coachLabel = '(미배정)';
                 }
 
-                $mapped['completed'] = (int) ($row->completed ?? 0);
-                $mapped['unsupported'] = (int) ($row->unsupported ?? 0);
+                $kpis = TeacherSupportKpiCalculator::calculateFromTeachers($groupedTeachers, $year);
 
-                return $mapped;
+                return [
+                    'coach' => $coachLabel,
+                    'teacher_count' => (int) ($kpis['teacher_count'] ?? 0),
+                    'first_round' => (int) ($kpis['first_round'] ?? 0),
+                    'second_round' => (int) ($kpis['second_round'] ?? 0),
+                    'third_round' => (int) ($kpis['third_round'] ?? 0),
+                    'fourth_round' => (int) ($kpis['fourth_round'] ?? 0),
+                    'completed' => (int) ($kpis['completed'] ?? 0),
+                    'unsupported' => (int) ($kpis['unsupported'] ?? 0),
+                ];
             })
+            ->sortBy('coach')
             ->values();
     }
 

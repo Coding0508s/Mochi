@@ -1139,6 +1139,28 @@ class CoachTeacherSupportListTest extends TestCase
             ->assertSee('작년교사');
     }
 
+    public function test_year_filter_options_use_existing_support_years_from_data(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+
+        $this->createTeacher('SK001', '과거연도교사', [
+            '_1st_Support_Date' => '2020-02-01',
+        ]);
+        $this->createTeacher('SK001', '최근연도교사', [
+            '_1st_Support_Date' => '2026-03-01',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->assertSee('2026년')
+            ->assertSee('2020년')
+            ->set('filterYear', 2020)
+            ->assertSee('과거연도교사')
+            ->assertDontSee('최근연도교사');
+    }
+
     public function test_hidden_institution_excluded(): void
     {
         $admin = $this->createAdminUser();
