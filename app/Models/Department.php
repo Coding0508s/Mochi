@@ -46,7 +46,7 @@ class Department extends Model
     }
 
     /**
-     * People 사이드바에서 Online Team 부서 메뉴 슬롯 → 비활성 직원 목록으로 대체.
+     * People 사이드바 팀 목록에서 Online Team 부서는 숨긴다(비활성 직원 메뉴로 대체).
      */
     public function showsInactiveEmployeesInSidebar(): bool
     {

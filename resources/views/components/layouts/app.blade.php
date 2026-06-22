@@ -237,12 +237,6 @@
                         <span class="sidebar-subitem-label">전체 Employees</span>
                     </a>
 
-                    @php
-                        $hasInactiveEmployeesMenu = $peopleTeams->contains(
-                            fn ($team) => $team->showsInactiveEmployeesInSidebar()
-                        );
-                    @endphp
-
                     @foreach($peopleTeams as $team)
                         @if($team->showsInactiveEmployeesInSidebar())
                             @continue
@@ -256,15 +250,13 @@
                         </a>
                     @endforeach
 
-                    @if($hasInactiveEmployeesMenu)
-                        <a href="{{ route('people.index', ['status' => '0']) }}"
-                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable
-                                  {{ request()->routeIs('people.*') && $activePeopleStatus === '0'
-                                      ? 'sidebar-subitem-active'
-                                      : '' }}">
-                            <span class="sidebar-subitem-label">비활성화 직원</span>
-                        </a>
-                    @endif
+                    <a href="{{ route('people.index', ['status' => '0']) }}"
+                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable
+                              {{ request()->routeIs('people.*') && $activePeopleStatus === '0'
+                                  ? 'sidebar-subitem-active'
+                                  : '' }}">
+                        <span class="sidebar-subitem-label">비활성화 직원</span>
+                    </a>
                 </div>
             </div>
 
