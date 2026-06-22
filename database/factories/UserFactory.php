@@ -25,6 +25,7 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => 'password',
             'is_admin' => false,
+            'can_view_all_institutions' => false,
             'can_manage_store_inventory' => false,
             'is_active' => true,
             'remember_token' => Str::random(10),
@@ -61,6 +62,13 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'is_admin' => false,
             'is_deputy_admin' => true,
+        ]);
+    }
+
+    public function canViewAllInstitutions(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'can_view_all_institutions' => true,
         ]);
     }
 }

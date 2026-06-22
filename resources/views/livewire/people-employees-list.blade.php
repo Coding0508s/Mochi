@@ -536,9 +536,16 @@
                                         <input type="checkbox" wire:model.defer="editCanManageStoreInventory" class="rounded border-gray-300 text-mochi-header focus:ring-mochi-header">
                                         <span>Store 재고관리</span>
                                     </label>
+                                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                                        <input type="checkbox" wire:model.defer="editCanViewAllInstitutions" class="rounded border-gray-300 text-mochi-header focus:ring-mochi-header">
+                                        <span>모든 기관 조회 가능</span>
+                                    </label>
                                 </div>
                                 <p class="text-[11px] text-gray-500">
                                     관리자 선택 시 Setup 조회/관리는 자동 활성화되며, 준관리자와 중복 지정되지 않습니다.
+                                </p>
+                                <p class="text-[11px] text-gray-500">
+                                    모든 기관 조회 가능은 조회 범위만 확장하며, 수정 권한은 기존 팀/관리자 규칙을 그대로 따릅니다.
                                 </p>
 
                                 @if(! $hasLinkedLoginAccount)

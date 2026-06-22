@@ -657,6 +657,28 @@ class InstitutionListTest extends TestCase
             ->assertHasErrors('detailEdit');
     }
 
+    public function test_view_all_permission_does_not_grant_detail_edit_for_user_without_team(): void
+    {
+        $user = User::factory()->canViewAllInstitutions()->create([
+            'team' => '',
+            'is_admin' => false,
+        ]);
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-NO-TEAM-VIEW-ALL',
+            'AccountName' => '팀 없음 조회 확장',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->assertDontSee('wire:click="startDetailEdit"', false)
+            ->call('startDetailEdit')
+            ->set('editDetailCo', 'Should Fail')
+            ->call('saveDetailFields')
+            ->assertHasErrors('detailEdit');
+    }
+
     public function test_index_renders_and_has_no_inline_register_button(): void
     {
         $user = User::factory()->create();
@@ -751,6 +773,65 @@ class InstitutionListTest extends TestCase
             ->assertOk()
             ->assertSee('담당 기관')
             ->assertDontSee('비담당 기관');
+    }
+
+    public function test_co_team_user_with_view_all_permission_sees_all_institutions(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-CO-ALL-1',
+            'AccountName' => '담당 기관',
+        ]);
+        Institution::query()->create([
+            'SKcode' => 'SK-CO-ALL-2',
+            'AccountName' => '비담당 기관',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            [
+                'SK_Code' => 'SK-CO-ALL-1',
+                'Account_Name' => '담당 기관',
+                'CO' => 'Peter Kim',
+            ],
+            [
+                'SK_Code' => 'SK-CO-ALL-2',
+                'Account_Name' => '비담당 기관',
+                'CO' => 'James Kwak',
+            ],
+        ]);
+
+        $coUser = User::factory()->canViewAllInstitutions()->create([
+            'name' => 'Peter Kim',
+            'email' => 'peter.kim@grapeseed.com',
+            'team' => 'CO',
+            'is_admin' => false,
+        ]);
+
+        $this->actingAs($coUser)
+            ->get(route('institutions.index'))
+            ->assertOk()
+            ->assertSee('담당 기관')
+            ->assertSee('비담당 기관');
+    }
+
+    public function test_user_can_toggle_view_all_institutions_from_list_filter(): void
+    {
+        $user = User::factory()->create([
+            'team' => 'CO',
+            'is_admin' => false,
+            'is_deputy_admin' => false,
+            'can_view_all_institutions' => false,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('toggleViewAllInstitutions')
+            ->assertSet('canViewAllInstitutions', true)
+            ->assertSet('canToggleViewAllInstitutions', true);
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'can_view_all_institutions' => true,
+        ]);
     }
 
     public function test_co_team_user_sees_institution_when_co_uses_dotted_english_name(): void

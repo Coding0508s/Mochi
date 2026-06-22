@@ -87,10 +87,16 @@
         @endif
     </div>
 
-    <div class="mt-3 flex flex-nowrap items-center gap-3 border-t border-gray-100 pt-3 max-md:gap-2">
+    @if(! $canToggleViewAllInstitutions && $canViewAllInstitutions)
+        <p class="mt-2 text-xs text-gray-500">
+            현재 계정은 조회 범위 토글을 사용할 수 없습니다.
+        </p>
+    @endif
+
+    <div class="mt-3 flex flex-nowrap items-center gap-2 border-t border-gray-100 pt-3 overflow-x-auto">
         <span class="shrink-0 text-xs font-medium text-gray-500">담당자</span>
         <select wire:model.live="filterCo"
-                class="min-w-0 flex-1 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header max-md:px-2 max-md:text-xs">
+                class="min-w-[180px] flex-1 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header max-md:px-2 max-md:text-xs">
             <option value="">CO 전체</option>
             @foreach($coManagerOptions as $managerName)
                 <option value="{{ $managerName }}">{{ $managerName }}</option>
@@ -98,7 +104,7 @@
         </select>
 
         <select wire:model.live="filterTr"
-                class="min-w-0 flex-1 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header max-md:px-2 max-md:text-xs">
+                class="min-w-[180px] flex-1 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header max-md:px-2 max-md:text-xs">
             <option value="">Coach 전체</option>
             @foreach($trManagerOptions as $managerName)
                 <option value="{{ $managerName }}">{{ $managerName }}</option>
@@ -106,12 +112,22 @@
         </select>
 
         <select wire:model.live="filterCs"
-                class="min-w-0 flex-1 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header max-md:px-2 max-md:text-xs">
+                class="min-w-[180px] flex-1 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header max-md:px-2 max-md:text-xs">
             <option value="">CS 전체</option>
             @foreach($csManagerOptions as $managerName)
                 <option value="{{ $managerName }}">{{ $managerName }}</option>
             @endforeach
         </select>
+
+        <button type="button"
+                wire:click="toggleViewAllInstitutions"
+                @disabled(! $canToggleViewAllInstitutions)
+                class="inline-flex min-w-[170px] shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 transition max-md:px-2 max-md:text-xs disabled:cursor-not-allowed disabled:opacity-60">
+            <span class="relative h-6 w-11 rounded-full transition-colors {{ $canViewAllInstitutions ? 'bg-mochi-header' : 'bg-gray-200' }}">
+                <span class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform {{ $canViewAllInstitutions ? 'translate-x-5' : 'translate-x-0' }}"></span>
+            </span>
+            <span class="whitespace-nowrap text-[13px] font-medium">{{ $canViewAllInstitutions ? '모든 기관 조회' : '담당 기관 조회' }}</span>
+        </button>
     </div>
 
     @if($activeFilterChips !== [])

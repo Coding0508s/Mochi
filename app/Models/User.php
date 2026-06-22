@@ -14,7 +14,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Schema;
 
-#[Fillable(['name', 'email', 'employee_empno', 'password', 'must_change_password', 'is_admin', 'team', 'is_gs_brochure_admin', 'can_manage_store_inventory', 'is_coach_team_lead', 'is_deputy_admin', 'setup_view', 'setup_manage', 'is_active'])]
+#[Fillable(['name', 'email', 'employee_empno', 'password', 'must_change_password', 'is_admin', 'team', 'is_gs_brochure_admin', 'can_manage_store_inventory', 'is_coach_team_lead', 'is_deputy_admin', 'can_view_all_institutions', 'setup_view', 'setup_manage', 'is_active'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -77,6 +77,12 @@ class User extends Authenticatable
     public function hasPlatformWideViewAccess(): bool
     {
         return $this->hasFullAccess() || (bool) $this->is_deputy_admin;
+    }
+
+    /** 기관 목록 전용 전체 조회 권한 */
+    public function canViewAllInstitutions(): bool
+    {
+        return $this->hasPlatformWideViewAccess() || (bool) $this->can_view_all_institutions;
     }
 
     /** 삭제 등 파괴적 작업 — Full Access(관리자)만 */
@@ -170,6 +176,7 @@ class User extends Authenticatable
             'can_manage_store_inventory' => 'boolean',
             'is_coach_team_lead' => 'boolean',
             'is_deputy_admin' => 'boolean',
+            'can_view_all_institutions' => 'boolean',
             'setup_view' => 'boolean',
             'setup_manage' => 'boolean',
             'is_active' => 'boolean',

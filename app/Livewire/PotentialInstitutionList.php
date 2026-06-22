@@ -1104,6 +1104,10 @@ class PotentialInstitutionList extends Component
             return;
         }
 
+        if ($user->canViewAllInstitutions()) {
+            return;
+        }
+
         $normalizedUserName = ManagerNameNormalizer::normalize($user->nameForCoReports());
         $normalizedAccountManager = ManagerNameNormalizer::sqlColumnExpression('AccountManager');
 

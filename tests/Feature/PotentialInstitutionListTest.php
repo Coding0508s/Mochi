@@ -1117,6 +1117,71 @@ class PotentialInstitutionListTest extends TestCase
         $this->assertNotContains('Unrelated Manager', $component->viewData('managerList')->all());
     }
 
+    public function test_regular_user_with_view_all_permission_sees_all_potential_targets(): void
+    {
+        $viewer = User::factory()->canViewAllInstitutions()->create([
+            'name' => 'Viewer User',
+            'email' => 'viewer@example.test',
+            'is_admin' => false,
+        ]);
+        $other = User::factory()->create([
+            'name' => 'Other User',
+            'email' => 'other-all@example.test',
+            'is_admin' => false,
+        ]);
+
+        $own = '조회확장 내 기관 '.uniqid('', true);
+        $others = '조회확장 타인 기관 '.uniqid('', true);
+
+        CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-01',
+            'AccountName' => $own,
+            'AccountManager' => 'Viewer User',
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'A',
+            'created_by' => $viewer->id,
+        ]);
+        CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-02',
+            'AccountName' => $others,
+            'AccountManager' => 'Other User',
+            'Type' => '신규(25년)',
+            'Gubun' => '신규기관방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'Approaching' => 0,
+            'Presenting' => 0,
+            'Consulting' => 0,
+            'Closing' => 0,
+            'DroppedOut' => 0,
+            'IsContract' => false,
+            'ContractedDate' => null,
+            'Possibility' => 'B',
+            'created_by' => $other->id,
+        ]);
+
+        Livewire::actingAs($viewer)
+            ->test(PotentialInstitutionList::class)
+            ->assertSee($own)
+            ->assertSee($others);
+    }
+
     public function test_admin_potential_target_list_keeps_full_visibility(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);

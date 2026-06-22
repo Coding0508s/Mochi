@@ -21,6 +21,12 @@ class InstitutionFilter extends Component
     #[Reactive]
     public string $assignmentFilter = '';
 
+    #[Reactive]
+    public bool $canViewAllInstitutions = false;
+
+    #[Reactive]
+    public bool $canToggleViewAllInstitutions = true;
+
     /** @var list<string> */
     public array $coManagerOptions = [];
 
@@ -121,6 +127,11 @@ class InstitutionFilter extends Component
     public function clearAssignmentFilter(): void
     {
         $this->dispatch('institution-filter-assignment-cleared');
+    }
+
+    public function toggleViewAllInstitutions(): void
+    {
+        $this->dispatch('institution-view-all-toggle-requested');
     }
 
     public function render()

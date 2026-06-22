@@ -15,6 +15,7 @@ use App\Models\AssignmentChangeRequest;
 use App\Models\Employee;
 use App\Models\Institution;
 use App\Models\SupportRecord;
+use App\Models\User;
 use App\Support\InstitutionAccountListQuery;
 use App\Support\InstitutionTeamSupportHistoryBuilder;
 use App\Support\InstitutionUnifiedTimelineBuilder;
@@ -56,6 +57,10 @@ class InstitutionList extends Component
     public string $filterTr = '';
 
     public string $filterCs = '';
+
+    public bool $canViewAllInstitutions = false;
+
+    public bool $canToggleViewAllInstitutions = true;
 
     public string $sortField = 'FGC_CreateDate';
     // 현재 정렬 기준 컬럼 (기본: S_Account_Information.FGC_CreateDate)
@@ -164,6 +169,11 @@ class InstitutionList extends Component
         $this->dispatch('institution-table-reset-page');
     }
 
+    public function mount(): void
+    {
+        $this->syncInstitutionViewToggleState();
+    }
+
     #[On('filter-updated')]
     public function onFilterUpdated(
         string $search,
@@ -188,6 +198,29 @@ class InstitutionList extends Component
     public function clearAssignmentFilter(): void
     {
         $this->assignmentFilter = '';
+        $this->dispatch('institution-table-reset-page');
+    }
+
+    #[On('institution-view-all-toggle-requested')]
+    public function toggleViewAllInstitutions(): void
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return;
+        }
+
+        if (! $this->userCanToggleInstitutionViewScope($user)) {
+            $this->syncInstitutionViewToggleState();
+
+            return;
+        }
+
+        $isCurrentlyAssignedScope = $this->accountListQuery()->shouldScopeToAssignedInstitutions();
+        $user->forceFill([
+            'can_view_all_institutions' => $isCurrentlyAssignedScope,
+        ])->save();
+
+        $this->syncInstitutionViewToggleState();
         $this->dispatch('institution-table-reset-page');
     }
 
@@ -861,6 +894,8 @@ class InstitutionList extends Component
     // ─── 화면에 표시할 데이터 가져오기 ───────────────────────────────
     public function render()
     {
+        $this->syncInstitutionViewToggleState();
+
         $accountListQuery = $this->accountListQuery();
         $filters = $this->listFilters();
         $hiddenInstitutionSkCodes = $accountListQuery->hiddenInstitutionSkCodes();
@@ -971,6 +1006,29 @@ class InstitutionList extends Component
     private function accountListQuery(): InstitutionAccountListQuery
     {
         return app(InstitutionAccountListQuery::class);
+    }
+
+    private function syncInstitutionViewToggleState(): void
+    {
+        $user = auth()->user();
+        if (! $user) {
+            $this->canViewAllInstitutions = false;
+            $this->canToggleViewAllInstitutions = false;
+
+            return;
+        }
+
+        $this->canViewAllInstitutions = ! $this->accountListQuery()->shouldScopeToAssignedInstitutions();
+        $this->canToggleViewAllInstitutions = $this->userCanToggleInstitutionViewScope($user);
+    }
+
+    private function userCanToggleInstitutionViewScope(User $user): bool
+    {
+        if ($user->hasPlatformWideViewAccess()) {
+            return false;
+        }
+
+        return $user->isCoTeam() || $user->isCoachTeam() || $user->isCsTeam();
     }
 
     private function formatSupportMeetTime(mixed $meetTime): string

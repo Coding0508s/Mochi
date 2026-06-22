@@ -153,7 +153,11 @@ class PeopleEmployeesList extends Component
 
     public bool $editCanManageStoreInventory = false;
 
+    public bool $editCanViewAllInstitutions = false;
+
     private ?bool $supportsSetupPermissionColumns = null;
+
+    private ?bool $supportsCanViewAllInstitutionsColumn = null;
 
     protected array $queryString = [
         'filterDept' => ['as' => 'team', 'except' => ''],
@@ -253,6 +257,9 @@ class PeopleEmployeesList extends Component
         $this->editSetupManage = (bool) ($linkedUser?->setup_manage);
         $this->editIsGsBrochureAdmin = (bool) ($linkedUser?->is_gs_brochure_admin);
         $this->editCanManageStoreInventory = (bool) ($linkedUser?->can_manage_store_inventory);
+        $this->editCanViewAllInstitutions = $this->supportsCanViewAllInstitutionsColumn()
+            ? (bool) ($linkedUser?->can_view_all_institutions)
+            : false;
 
         $this->resetErrorBag();
         $this->resetValidation();
@@ -280,6 +287,7 @@ class PeopleEmployeesList extends Component
         $this->editSetupManage = false;
         $this->editIsGsBrochureAdmin = false;
         $this->editCanManageStoreInventory = false;
+        $this->editCanViewAllInstitutions = false;
 
         $this->resetErrorBag();
         $this->resetValidation();
@@ -403,6 +411,7 @@ class PeopleEmployeesList extends Component
                             'can_manage_store_inventory' => false,
                             'is_coach_team_lead' => false,
                             'is_deputy_admin' => false,
+                            'can_view_all_institutions' => false,
                             'is_active' => (bool) $this->editUserIsActive,
                             'email_verified_at' => null,
                         ];
@@ -474,6 +483,9 @@ class PeopleEmployeesList extends Component
                 $linkedUserPayload['is_deputy_admin'] = $nextIsDeputyAdmin;
                 $linkedUserPayload['is_gs_brochure_admin'] = (bool) $this->editIsGsBrochureAdmin;
                 $linkedUserPayload['can_manage_store_inventory'] = (bool) $this->editCanManageStoreInventory;
+                if ($this->supportsCanViewAllInstitutionsColumn()) {
+                    $linkedUserPayload['can_view_all_institutions'] = (bool) $this->editCanViewAllInstitutions;
+                }
                 if ($this->supportsSetupPermissionColumns()) {
                     $linkedUserPayload['setup_view'] = $nextSetupView;
                     $linkedUserPayload['setup_manage'] = $nextSetupManage;
@@ -616,6 +628,7 @@ class PeopleEmployeesList extends Component
                 'can_manage_store_inventory' => false,
                 'is_coach_team_lead' => false,
                 'is_deputy_admin' => false,
+                'can_view_all_institutions' => false,
                 'is_active' => true,
                 'email_verified_at' => null,
             ];
@@ -1005,6 +1018,7 @@ class PeopleEmployeesList extends Component
                     'employee_empno' => $empNo,
                     'is_active' => true,
                     'is_coach_team_lead' => false,
+                    'can_view_all_institutions' => false,
                 ];
                 $syncedTeam = TeamMenuContext::inferUserTeamForRegistration(
                     (string) ($employee->WORKDEPT ?? ''),
@@ -1270,6 +1284,10 @@ class PeopleEmployeesList extends Component
             'can_manage_store_inventory',
         ];
 
+        if ($this->supportsCanViewAllInstitutionsColumn()) {
+            $columns[] = 'can_view_all_institutions';
+        }
+
         if ($this->supportsSetupPermissionColumns()) {
             $columns[] = 'setup_view';
             $columns[] = 'setup_manage';
@@ -1287,6 +1305,17 @@ class PeopleEmployeesList extends Component
         $this->supportsSetupPermissionColumns = Schema::hasColumns('users', ['setup_view', 'setup_manage']);
 
         return $this->supportsSetupPermissionColumns;
+    }
+
+    private function supportsCanViewAllInstitutionsColumn(): bool
+    {
+        if ($this->supportsCanViewAllInstitutionsColumn !== null) {
+            return $this->supportsCanViewAllInstitutionsColumn;
+        }
+
+        $this->supportsCanViewAllInstitutionsColumn = Schema::hasColumn('users', 'can_view_all_institutions');
+
+        return $this->supportsCanViewAllInstitutionsColumn;
     }
 
     private function shouldActivateUserFromEmployeeStatus(?string $employeeStatus): bool

@@ -89,6 +89,8 @@
         :filter-tr="$filterTr"
         :filter-cs="$filterCs"
         :assignment-filter="$assignmentFilter"
+        :can-view-all-institutions="$canViewAllInstitutions"
+        :can-toggle-view-all-institutions="$canToggleViewAllInstitutions"
         :co-manager-options="$coManagerOptions->all()"
         :tr-manager-options="$trManagerOptions->all()"
         :cs-manager-options="$csManagerOptions->all()"

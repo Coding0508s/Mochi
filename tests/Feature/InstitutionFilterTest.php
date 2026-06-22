@@ -49,4 +49,14 @@ class InstitutionFilterTest extends TestCase
             ->call('clearAssignmentFilter')
             ->assertDispatched('institution-filter-assignment-cleared');
     }
+
+    public function test_toggle_view_all_dispatches_requested_event(): void
+    {
+        Livewire::test(InstitutionFilter::class, [
+            'canViewAllInstitutions' => false,
+            'canToggleViewAllInstitutions' => true,
+        ])
+            ->call('toggleViewAllInstitutions')
+            ->assertDispatched('institution-view-all-toggle-requested');
+    }
 }
