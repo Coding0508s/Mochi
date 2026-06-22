@@ -130,18 +130,19 @@ class ExcelSerialDateTest extends TestCase
         $this->assertStringContainsString("NULLIF(TRIM(CAST(Teachers.Plan_1st_Support_Date AS TEXT)), '') IS NOT NULL", $expression);
     }
 
-    public function test_sql_normalized_date_column_uses_nullif_for_empty_string(): void
+    public function test_sql_normalized_date_column_applies_date_to_raw_column(): void
     {
         $expression = ExcelSerialDate::sqlNormalizedDateColumn('Teachers.Plan_1st_Support_Date');
 
-        $this->assertStringContainsString("NULLIF(TRIM(CAST(Teachers.Plan_1st_Support_Date AS TEXT)), '')", $expression);
+        $this->assertStringContainsString('date(Teachers.Plan_1st_Support_Date)', $expression);
+        $this->assertStringNotContainsString('NULLIF(TRIM(CAST(', $expression);
     }
 
-    public function test_sql_year_equals_casts_datetime_column_to_text_before_blank_check(): void
+    public function test_sql_year_equals_applies_year_to_raw_column(): void
     {
         $expression = ExcelSerialDate::sqlYearEquals('Teachers._1st_Support_Date', 2026);
 
-        $this->assertStringContainsString("NULLIF(TRIM(CAST(Teachers._1st_Support_Date AS TEXT)), '')", $expression);
-        $this->assertStringNotContainsString("NULLIF(Teachers._1st_Support_Date, '')", $expression);
+        $this->assertStringContainsString("strftime('%Y', Teachers._1st_Support_Date)", $expression);
+        $this->assertStringNotContainsString('NULLIF(TRIM(CAST(', $expression);
     }
 }

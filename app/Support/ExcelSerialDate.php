@@ -243,23 +243,26 @@ final class ExcelSerialDate
         return "({$column} IS NOT NULL AND ".self::sqlDateValueIsNotBlank($column).' AND ('.self::sqlYearEquals($column, $year)." OR ({$column} >= {$minSerial} AND {$column} <= {$maxSerial})))";
     }
 
+    /**
+     * datetime/varchar 혼재 컬럼의 연도 일치 조건.
+     *
+     * MySQL 에서 datetime 컬럼을 CAST(... AS CHAR) 로 감싸 YEAR() 를 적용하면
+     * NULL 이 반환되는 문제가 있어, 연·월 추출은 항상 원본 컬럼에 직접 적용한다.
+     * 엑셀 serial(숫자 문자열)은 호출부(sqlColumnInYear)의 serial 범위 분기에서 처리된다.
+     */
     public static function sqlYearEquals(string $column, int $year): string
     {
-        $safe = self::sqlBlankSafeText($column);
-
         return match (Schema::getConnection()->getDriverName()) {
-            'sqlite' => "(CAST(strftime('%Y', {$safe}) AS INTEGER) = {$year})",
-            default => "(YEAR({$safe}) = {$year})",
+            'sqlite' => "(CAST(strftime('%Y', {$column}) AS INTEGER) = {$year})",
+            default => "(YEAR({$column}) = {$year})",
         };
     }
 
     public static function sqlYearNotEquals(string $column, int $year): string
     {
-        $safe = self::sqlBlankSafeText($column);
-
         return match (Schema::getConnection()->getDriverName()) {
-            'sqlite' => "(CAST(strftime('%Y', {$safe}) AS INTEGER) != {$year})",
-            default => "(YEAR({$safe}) != {$year})",
+            'sqlite' => "(CAST(strftime('%Y', {$column}) AS INTEGER) != {$year})",
+            default => "(YEAR({$column}) != {$year})",
         };
     }
 
@@ -271,15 +274,16 @@ final class ExcelSerialDate
         $epoch = self::EPOCH;
         $min = self::SERIAL_MIN;
         $max = self::SERIAL_MAX;
-        $safe = self::sqlBlankSafeText($qualifiedColumn);
 
+        // datetime 컬럼을 CAST(... AS CHAR) 로 감싼 뒤 DATE()/YEAR() 를 적용하면
+        // MySQL 에서 NULL 이 반환되므로, serial 이 아닌 값은 원본 컬럼에 직접 DATE() 를 적용한다.
         return match (Schema::getConnection()->getDriverName()) {
             'sqlite' => "CASE WHEN {$qualifiedColumn} >= {$min} AND {$qualifiedColumn} <= {$max}"
                 ." THEN date('{$epoch}', '+' || CAST({$qualifiedColumn} AS INTEGER) || ' days')"
-                ." ELSE date({$safe}) END",
+                ." ELSE date({$qualifiedColumn}) END",
             default => "CASE WHEN {$qualifiedColumn} >= {$min} AND {$qualifiedColumn} <= {$max}"
                 ." THEN DATE_ADD('{$epoch}', INTERVAL CAST({$qualifiedColumn} AS UNSIGNED) DAY)"
-                ." ELSE DATE({$safe}) END",
+                ." ELSE DATE({$qualifiedColumn}) END",
         };
     }
 

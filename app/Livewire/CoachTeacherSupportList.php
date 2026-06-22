@@ -2570,6 +2570,7 @@ class CoachTeacherSupportList extends Component
         $this->editModalAllowedByTeacherId = null;
 
         $baseQuery = $this->buildBaseQuery();
+
         $this->applyDefaultYearScope($baseQuery);
 
         $kpiQuery = clone $baseQuery;
@@ -2577,6 +2578,9 @@ class CoachTeacherSupportList extends Component
         $this->applyMonthFilter($kpiQuery);
 
         $kpis = TeacherSupportKpiCalculator::calculate($kpiQuery, $this->resolvedFilterYear());
+        if ($this->resolvedFilterYear() !== null) {
+            $kpis = $this->synchronizeRoundKpisWithDisplay($kpiQuery, $kpis, $this->resolvedFilterYear());
+        }
 
         $teachers = (clone $baseQuery)
             ->tap(fn (Builder $q) => $this->applyKpiFilter($q))
@@ -2593,12 +2597,25 @@ class CoachTeacherSupportList extends Component
             $this->resolvedFilterYear(),
         );
 
+        $displayYear = $this->resolvedFilterYear();
+        $visibleRound1CompletionCount = $teachers->getCollection()
+            ->filter(function (Teacher $teacher) use ($displayYear): bool {
+                return TeacherSupportCompletionDisplay::parts($teacher, 1, $displayYear)['date'] !== '';
+            })
+            ->count();
+        $visibleRound2CompletionCount = $teachers->getCollection()
+            ->filter(function (Teacher $teacher) use ($displayYear): bool {
+                return TeacherSupportCompletionDisplay::parts($teacher, 2, $displayYear)['date'] !== '';
+            })
+            ->count();
+
         $this->hydrateTeacherInstitutions($teachers);
         $this->editModalAllowedByTeacherId = $this->buildEditModalAllowedMap($teachers->getCollection());
 
         return view('livewire.coach-teacher-support-list', [
             'teachers' => $teachers,
             'kpis' => $kpis,
+            'yearFilterOptions' => $this->yearFilterOptions(),
             'coachFilterOptions' => $this->coachFilterOptions(),
             'supportTypes' => config('coach_teacher_support.support_types', []),
             'planSupportTypes' => config('coach_teacher_support.plan_support_types', []),
@@ -2626,6 +2643,71 @@ class CoachTeacherSupportList extends Component
         }
 
         return (int) $this->filterYear;
+    }
+
+    /**
+     * 현재 사용자 스코프에서 실제 지원 데이터(계획/완료/Essentials)에 존재하는 연도 목록.
+     *
+     * @return Collection<int, int>
+     */
+    private function yearFilterOptions(): Collection
+    {
+        $baseQuery = Teacher::query();
+        $this->applyTeacherListVisibilityFilter($baseQuery);
+        $this->applyTeacherListScope($baseQuery);
+        $this->applyCoachFilter($baseQuery);
+
+        $dateColumns = collect(ExcelSerialDate::teacherSupportDateColumns())
+            ->filter(fn (string $column): bool => Schema::hasColumn('Teachers', $column))
+            ->values();
+
+        if ($dateColumns->isEmpty()) {
+            return collect();
+        }
+
+        $yearSourceQuery = null;
+
+        foreach ($dateColumns as $column) {
+            $qualifiedColumn = "Teachers.{$column}";
+            $normalizedDateExpression = ExcelSerialDate::sqlNormalizedDateColumn($qualifiedColumn);
+            $extractYearExpression = $this->sqlExtractYearExpression($normalizedDateExpression);
+
+            $columnQuery = (clone $baseQuery)
+                ->toBase()
+                ->selectRaw("{$extractYearExpression} AS filter_year")
+                ->whereRaw(ExcelSerialDate::sqlDateValueIsNotBlank($qualifiedColumn));
+
+            if ($yearSourceQuery === null) {
+                $yearSourceQuery = $columnQuery;
+            } else {
+                $yearSourceQuery->unionAll($columnQuery);
+            }
+        }
+
+        if ($yearSourceQuery === null) {
+            return collect();
+        }
+
+        $years = DB::query()
+            ->fromSub($yearSourceQuery, 'teacher_support_years')
+            ->whereNotNull('filter_year')
+            ->where('filter_year', '>=', 1900)
+            ->where('filter_year', '<=', now()->year + 1)
+            ->distinct()
+            ->orderByDesc('filter_year')
+            ->pluck('filter_year')
+            ->map(fn (mixed $year): int => (int) $year)
+            ->values();
+
+        return $years;
+    }
+
+    private function sqlExtractYearExpression(string $dateExpression): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'sqlite' => "CAST(strftime('%Y', {$dateExpression}) AS INTEGER)",
+            default => "YEAR({$dateExpression})",
+        };
     }
 
     /**
@@ -2714,7 +2796,11 @@ class CoachTeacherSupportList extends Component
         $this->applyCoachFilter($query);
 
         if (! $this->showAllInstitutionsView) {
-            TeacherSupportListActivity::applyHasSupportHistoryScope($query, $this->resolvedFilterYear());
+            // 최신 지원 보기의 기본 집합은 "지원 이력 있는 교사"만 유지하되,
+            // 연도 필터는 아래 applyDefaultYearScope/applyKpiFilter 등에서 일관되게 처리한다.
+            // 여기서 연도를 함께 넣으면 완료/MOCHI 이력 기준으로 먼저 0건이 되어
+            // 계획/완료 통합 연도 필터가 무력화될 수 있다.
+            TeacherSupportListActivity::applyHasSupportHistoryScope($query, null);
         }
 
         return $query;
@@ -2921,7 +3007,7 @@ class CoachTeacherSupportList extends Component
         match ($this->kpiFilter) {
             'completed' => TeacherSupportKpiCalculator::applyAllRoundsCompletedScope($query, $year),
             'unsupported' => TeacherSupportKpiCalculator::applyUnsupportedScope($query, $year),
-            default => TeacherSupportKpiCalculator::applyRoundCompletedScope($query, $this->kpiFilter, $year),
+            default => $this->applyRoundCompletedDisplayScope($query, $this->kpiFilter, $year),
         };
     }
 
@@ -2967,6 +3053,81 @@ class CoachTeacherSupportList extends Component
 
                 $nested->whereMonth($planColumn, $month);
             });
+    }
+
+    /**
+     * @param  array<string, int>  $kpis
+     * @return array<string, int>
+     */
+    private function synchronizeRoundKpisWithDisplay(Builder $query, array $kpis, int $year): array
+    {
+        $displayCounts = $this->calculateDisplayRoundCounts($query, $year);
+
+        foreach ($displayCounts as $kpiKey => $count) {
+            $kpis[$kpiKey] = $count;
+        }
+
+        return $kpis;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function calculateDisplayRoundCounts(Builder $query, int $year): array
+    {
+        $teacherRows = (clone $query)
+            ->select('Teachers.*')
+            ->get();
+
+        TeacherSupportCompletionDisplay::preloadForTeachers($teacherRows, $year);
+
+        $counts = [];
+        foreach (config('coach_teacher_support.kpi_rounds', []) as $kpiKey => $round) {
+            $roundNumber = (int) ($round['filter_round'] ?? 0);
+            if ($roundNumber < 1 || $roundNumber > 4) {
+                continue;
+            }
+
+            $counts[$kpiKey] = $teacherRows
+                ->filter(fn (Teacher $teacher): bool => TeacherSupportCompletionDisplay::parts($teacher, $roundNumber, $year)['date'] !== '')
+                ->count();
+        }
+
+        return $counts;
+    }
+
+    private function applyRoundCompletedDisplayScope(Builder $query, string $kpiKey, int $year): void
+    {
+        $round = config('coach_teacher_support.kpi_rounds.'.$kpiKey);
+        if (! is_array($round)) {
+            return;
+        }
+
+        $roundNumber = (int) ($round['filter_round'] ?? 0);
+        if ($roundNumber < 1 || $roundNumber > 4) {
+            return;
+        }
+
+        $teacherRows = (clone $query)
+            ->select('Teachers.*')
+            ->get();
+
+        TeacherSupportCompletionDisplay::preloadForTeachers($teacherRows, $year);
+
+        $matchedTeacherIds = $teacherRows
+            ->filter(fn (Teacher $teacher): bool => TeacherSupportCompletionDisplay::parts($teacher, $roundNumber, $year)['date'] !== '')
+            ->pluck('ID')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->values()
+            ->all();
+
+        if ($matchedTeacherIds === []) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->whereIn('Teachers.ID', $matchedTeacherIds);
     }
 
     private function institutionDisplayName(?Institution $institution, ?string $schoolName = null): string

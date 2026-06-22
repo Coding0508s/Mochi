@@ -27,6 +27,11 @@
                     교사 수
                     <span class="font-semibold">{{ $kpis['teacher_count'] ?? 0 }}</span>
                 </span>
+                <span class="mochi-toggle-btn cursor-default pointer-events-none text-green-800"
+                      aria-label="완료 교사 수" title="선택 연도에 1~4차 중 하나라도 완료한 교사 수">
+                    완료 교사
+                    <span class="font-semibold">{{ $kpis['any_completed'] ?? 0 }}</span>
+                </span>
                 @foreach($kpiToggleLabels as $kpiKey => $kpiLabel)
                     <button type="button"
                             wire:click="setKpiFilter('{{ $kpiKey }}')"
@@ -65,9 +70,9 @@
                 <select wire:model.live="filterYear"
                         class="py-1.5 px-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                     <option value="">전체</option>
-                    @for($y = now()->year; $y >= now()->year - 3; $y--)
+                    @foreach($yearFilterOptions as $y)
                         <option value="{{ $y }}">{{ $y }}년</option>
-                    @endfor
+                    @endforeach
                 </select>
                 <a href="{{ \App\Support\TeamMenuContext::route('supports.create') }}"
                    class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600">
