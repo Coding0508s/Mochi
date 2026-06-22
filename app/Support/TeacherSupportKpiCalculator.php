@@ -99,7 +99,7 @@ class TeacherSupportKpiCalculator
         $result['teacher_count'] = (int) ($row?->teacher_count ?? 0);
         $result['institution_count'] = (int) ($row?->institution_count ?? 0);
 
-        foreach (array_merge(self::roundKpiKeys(), ['completed', 'unsupported']) as $key) {
+        foreach (array_merge(self::roundKpiKeys(), ['completed', 'any_completed', 'unsupported']) as $key) {
             $result[$key] = (int) ($row?->{$key} ?? 0);
         }
 
@@ -145,6 +145,13 @@ class TeacherSupportKpiCalculator
             ).' as completed'
         );
 
+        $expressions['any_completed'] = DB::raw(
+            self::sqlCountDistinctTeachersWhen(
+                $teacherIdColumn,
+                self::sqlAnyRoundCompletedInYear($completedColumns, $year),
+            ).' as any_completed'
+        );
+
         $expressions['unsupported'] = DB::raw(
             self::sqlCountDistinctTeachersWhen(
                 $teacherIdColumn,
@@ -175,6 +182,25 @@ class TeacherSupportKpiCalculator
         );
 
         return '('.implode(' AND ', $parts).')';
+    }
+
+    /**
+     * 1~4차 중 하나라도 완료일이 선택 연도에 있는 조건.
+     *
+     * @param  list<string>  $qualifiedCompletedColumns
+     */
+    private static function sqlAnyRoundCompletedInYear(array $qualifiedCompletedColumns, int $year): string
+    {
+        if ($qualifiedCompletedColumns === []) {
+            return '0 = 1';
+        }
+
+        $parts = array_map(
+            fn (string $column): string => self::sqlColumnCompletedInYear($column, $year),
+            $qualifiedCompletedColumns,
+        );
+
+        return '('.implode(' OR ', $parts).')';
     }
 
     private static function sqlAnyRoundUnsupportedInYear(string $columnPrefix, int $year): string
@@ -244,8 +270,18 @@ class TeacherSupportKpiCalculator
                 $completedColumns,
             )).')';
 
+        $anyCompletedCondition = $completedColumns === []
+            ? '0 = 1'
+            : '('.implode(' OR ', array_map(
+                fn (string $column): string => "{$column} IS NOT NULL",
+                $completedColumns,
+            )).')';
+
         $selects[] = DB::raw(
             self::sqlCountDistinctTeachersWhen($teacherIdColumn, $completedCondition).' as completed'
+        );
+        $selects[] = DB::raw(
+            self::sqlCountDistinctTeachersWhen($teacherIdColumn, $anyCompletedCondition).' as any_completed'
         );
         $selects[] = DB::raw(
             self::sqlCountDistinctTeachersWhen(
@@ -260,7 +296,7 @@ class TeacherSupportKpiCalculator
             'institution_count' => (int) ($row?->institution_count ?? 0),
         ];
 
-        foreach (array_merge(self::roundKpiKeys(), ['completed', 'unsupported']) as $key) {
+        foreach (array_merge(self::roundKpiKeys(), ['completed', 'any_completed', 'unsupported']) as $key) {
             $result[$key] = (int) ($row?->{$key} ?? 0);
         }
 
@@ -375,6 +411,17 @@ class TeacherSupportKpiCalculator
             }
 
             return true;
+        })->count();
+
+        $result['any_completed'] = $rows->filter(function ($teacher) use ($cols, $rounds, $year): bool {
+            foreach ($rounds as $round) {
+                $completedCol = $cols[$round['completed']];
+                if (ExcelSerialDate::isInYear(data_get($teacher, $completedCol), $year)) {
+                    return true;
+                }
+            }
+
+            return false;
         })->count();
 
         $result['unsupported'] = $rows->filter(function ($teacher) use ($cols, $rounds, $year): bool {

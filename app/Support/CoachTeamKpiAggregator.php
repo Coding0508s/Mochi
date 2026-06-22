@@ -18,6 +18,7 @@ use Illuminate\Support\Collection;
  *     third_round: int,
  *     fourth_round: int,
  *     completed: int,
+ *     any_completed: int,
  *     unsupported: int,
  * }
  */
@@ -91,6 +92,7 @@ final class CoachTeamKpiAggregator
                     'third_round' => (int) ($kpis['third_round'] ?? 0),
                     'fourth_round' => (int) ($kpis['fourth_round'] ?? 0),
                     'completed' => (int) ($kpis['completed'] ?? 0),
+                    'any_completed' => (int) ($kpis['any_completed'] ?? 0),
                     'unsupported' => (int) ($kpis['unsupported'] ?? 0),
                 ];
             })

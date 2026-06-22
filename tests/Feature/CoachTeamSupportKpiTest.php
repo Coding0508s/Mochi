@@ -160,9 +160,36 @@ class CoachTeamSupportKpiTest extends CoachTeacherSupportListTest
         $teamKpis = $component->viewData('teamKpis');
         $coachRows = $component->viewData('coachRows');
 
-        foreach (['first_round', 'second_round', 'third_round', 'fourth_round', 'completed', 'unsupported'] as $key) {
+        foreach (['first_round', 'second_round', 'third_round', 'fourth_round', 'completed', 'any_completed', 'unsupported'] as $key) {
             $this->assertSame($teamKpis[$key], $coachRows->sum($key), "팀 합계와 Coach 행 합이 {$key}에서 일치해야 합니다.");
         }
+    }
+
+    public function test_any_completed_counts_teachers_with_at_least_one_completed_round(): void
+    {
+        $year = now()->year;
+        $lead = User::factory()->coachTeamLead()->create();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        // 1차만 완료 → any_completed 대상, 전차 완료(completed)는 아님
+        $this->createTeacher('SK001', '1차완료교사', [
+            '_1st_Support_Date' => "{$year}-03-10",
+            'Plan_1st_Support_Date' => "{$year}-03-01",
+        ]);
+        // 계획만 있고 완료 없음 → any_completed 대상 아님(미지원)
+        $this->createTeacher('SK001', '계획만교사', [
+            'Plan_1st_Support_Date' => "{$year}-04-01",
+        ], forLatestView: false);
+
+        $component = Livewire::actingAs($lead)
+            ->test(CoachTeamSupportKpiDashboard::class)
+            ->set('filterYear', $year);
+
+        $teamKpis = $component->viewData('teamKpis');
+
+        $this->assertSame(1, $teamKpis['any_completed']);
+        $this->assertSame(0, $teamKpis['completed']);
+        $this->assertSame(1, $teamKpis['unsupported']);
     }
 
     public function test_team_kpi_includes_third_and_fourth_round_counts(): void

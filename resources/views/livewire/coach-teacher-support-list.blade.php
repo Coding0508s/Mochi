@@ -27,6 +27,11 @@
                     교사 수
                     <span class="font-semibold">{{ $kpis['teacher_count'] ?? 0 }}</span>
                 </span>
+                <span class="mochi-toggle-btn cursor-default pointer-events-none text-green-800"
+                      aria-label="완료 교사 수" title="선택 연도에 1~4차 중 하나라도 완료한 교사 수">
+                    완료 교사
+                    <span class="font-semibold">{{ $kpis['any_completed'] ?? 0 }}</span>
+                </span>
                 @foreach($kpiToggleLabels as $kpiKey => $kpiLabel)
                     <button type="button"
                             wire:click="setKpiFilter('{{ $kpiKey }}')"
