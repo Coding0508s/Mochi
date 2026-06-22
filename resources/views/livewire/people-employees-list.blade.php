@@ -742,13 +742,7 @@
         <div class="mochi-modal-overlay" wire:key="password-reset-confirm-modal">
             <div class="mochi-modal-shell max-w-lg">
                 <x-admin.modal-header
-                    title="
-                        @if($resetTargetMode === 'create_and_send')
-                            계정 발급 + 비밀번호 설정 메일 보내기
-                        @else
-                            비밀번호 재설정 메일 보내기
-                        @endif
-                    "
+                    :title="$resetTargetMode === 'create_and_send' ? '계정 발급 + 비밀번호 설정 메일 보내기' : '비밀번호 재설정 메일 보내기'"
                     close-action="closeSendResetModal"
                 />
 
