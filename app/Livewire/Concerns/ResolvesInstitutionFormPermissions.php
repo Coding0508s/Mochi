@@ -18,6 +18,35 @@ trait ResolvesInstitutionFormPermissions
         return $this->canEditInstitutionDetailCore() || $this->canEditAssignedInstitutionDetailFields();
     }
 
+    public function canEditInstitutionManagers(): bool
+    {
+        if ($this->isCrossTeamReadOnlyContext()) {
+            return false;
+        }
+
+        if ($this->canEditInstitutionDetailCore()) {
+            return true;
+        }
+
+        $skCode = $this->resolveInstitutionSkCodeForPermissions();
+        if ($skCode === null) {
+            return false;
+        }
+
+        $accountListQuery = app(InstitutionAccountListQuery::class);
+
+        if ($accountListQuery->currentUserCanManageInstitution($skCode)) {
+            return true;
+        }
+
+        $user = auth()->user();
+        if ($user === null || ! $user->canViewAllInstitutions()) {
+            return false;
+        }
+
+        return $this->resolveCurrentUserManagerDept() !== null;
+    }
+
     public function canEditInstitutionDetailCore(): bool
     {
         return (bool) auth()->user()?->hasFullAccess();
@@ -133,6 +162,22 @@ trait ResolvesInstitutionFormPermissions
         }
 
         $skCode = trim((string) ($selectedInstitution['skcode'] ?? ''));
+
+        return $skCode !== '' ? $skCode : null;
+    }
+
+    private function resolveInstitutionSkCodeForPermissions(): ?string
+    {
+        $fromSelected = $this->resolveSelectedInstitutionSkCode();
+        if ($fromSelected !== null) {
+            return $fromSelected;
+        }
+
+        if (! property_exists($this, 'editSkCode')) {
+            return null;
+        }
+
+        $skCode = trim((string) $this->editSkCode);
 
         return $skCode !== '' ? $skCode : null;
     }

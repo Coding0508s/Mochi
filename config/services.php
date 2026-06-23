@@ -37,6 +37,8 @@ return [
 
     'gs_brochure_teams' => [
         'webhook_url' => env('GS_BROCHURE_TEAMS_WEBHOOK_URL'),
+        // auto: URL 기준 자동 (logic.azure.com → Adaptive Card, webhook.office.com → MessageCard)
+        'webhook_format' => env('GS_BROCHURE_TEAMS_WEBHOOK_FORMAT', 'auto'),
         // 비우면 APP_URL 기준 관리자 대시보드 운송장 섹션으로 연결
         'logistics_url' => env('GS_BROCHURE_TEAMS_LOGISTICS_URL'),
     ],

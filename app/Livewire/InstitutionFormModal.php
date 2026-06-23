@@ -113,12 +113,20 @@ class InstitutionFormModal extends Component
         if ($this->embedMode !== 'manager') {
             return;
         }
+
         $this->editingInstitutionId = $institutionId;
         $this->editSkCode = $skCode;
         $this->editInstitutionName = $institutionName;
         $this->editCo = $co;
         $this->editTr = $tr;
         $this->editCs = $cs;
+
+        if (! $this->canEditInstitutionManagers()) {
+            $this->showManagerModal = false;
+
+            return;
+        }
+
         $this->showManagerModal = true;
         $this->resetValidation();
     }
@@ -283,6 +291,11 @@ class InstitutionFormModal extends Component
     public function saveManagers(UpdateInstitutionManagers $updateInstitutionManagers): void
     {
         $this->persistInstitutionManagers($updateInstitutionManagers);
+
+        if ($this->getErrorBag()->isNotEmpty()) {
+            return;
+        }
+
         $this->closeManagerModal();
     }
 

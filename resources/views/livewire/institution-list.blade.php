@@ -187,12 +187,28 @@
                     @endif
                 </div>
 
-                @if(($activeDetailTab ?? 'overview') === 'overview' && ! $isEditingDetail && ($canEditInstitutionDetail ?? false))
-                    <div class="shrink-0 border-t border-gray-200 bg-gray-50 px-4 py-3 text-right sm:px-5">
-                        <button wire:click="startDetailEdit"
-                                class="px-4 py-2 text-sm text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer mr-2">
-                            수정
-                        </button>
+                @if(($activeDetailTab ?? 'overview') === 'overview' && ! $isEditingDetail && (($canEditInstitutionDetail ?? false) || ($canEditInstitutionManagers ?? false)))
+                    <div class="shrink-0 border-t border-gray-200 bg-gray-50 px-4 py-3 sm:px-5">
+                        @if($canEditInstitutionManagers ?? false)
+                            @if(! ($canEditInstitutionDetail ?? false))
+                                <p class="mb-2 text-xs text-gray-500 text-left sm:text-right">
+                                    기관 정보 수정은 담당자 또는 관리자만 가능합니다. 담당 CO/Coach/CS는 본인 팀 항목만 변경할 수 있습니다.
+                                </p>
+                            @endif
+                        @endif
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                            @if($canEditInstitutionDetail ?? false)
+                                <button wire:click="startDetailEdit"
+                                        class="px-4 py-2 text-sm text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer">
+                                    수정
+                                </button>
+                            @elseif($canEditInstitutionManagers ?? false)
+                                <button wire:click="openManagerModal({{ (int) ($selectedInstitution['id'] ?? 0) }})"
+                                        class="px-4 py-2 text-sm text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer">
+                                    담당자 변경
+                                </button>
+                            @endif
+                        </div>
                     </div>
                 @endif
             </div>

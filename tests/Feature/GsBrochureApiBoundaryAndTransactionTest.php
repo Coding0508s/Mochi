@@ -368,4 +368,48 @@ class GsBrochureApiBoundaryAndTransactionTest extends TestCase
                 && ($applicantFact['value'] ?? null) === '외부 신청자';
         });
     }
+
+    public function test_teams_notification_uses_adaptive_card_for_workflows_webhook_url(): void
+    {
+        Http::fake();
+        config([
+            'services.gs_brochure_teams.webhook_url' => 'https://prod-01.koreacentral.logic.azure.com/workflows/test/triggers/manual/paths/invoke',
+            'services.gs_brochure_teams.webhook_format' => 'auto',
+        ]);
+
+        $brochure = Brochure::create([
+            'name' => '워크플로 알림 브로셔',
+            'image_url' => null,
+            'stock' => 0,
+            'stock_warehouse' => 200,
+        ]);
+
+        $response = $this->postJson('/api/gs-brochure/requests', [
+            'date' => '2026-06-23',
+            'schoolname' => '워크플로 알림 기관',
+            'address' => '서울시 강남구',
+            'phone' => '010-7777-8888',
+            'contact_id' => null,
+            'contact_name' => null,
+            'brochures' => [[
+                'brochure' => $brochure->id,
+                'brochureName' => $brochure->name,
+                'quantity' => 20,
+            ]],
+            'invoices' => [],
+        ]);
+
+        $response->assertOk();
+
+        Http::assertSent(function ($request) {
+            if (! str_contains($request->url(), 'logic.azure.com')) {
+                return false;
+            }
+
+            $payload = $request->data();
+
+            return ($payload['type'] ?? null) === 'message'
+                && ($payload['attachments'][0]['content']['type'] ?? null) === 'AdaptiveCard';
+        });
+    }
 }
