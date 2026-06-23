@@ -8,6 +8,7 @@ use App\GsBrochure\Models\Institution;
 use App\GsBrochure\Models\Invoice;
 use App\GsBrochure\Models\RequestItem;
 use App\GsBrochure\Models\StockHistory;
+use App\GsBrochure\Services\TeamsWebhookPayloadBuilder;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -383,34 +384,17 @@ class RequestController extends Controller
                 $logisticsUrl = route('co.gs-brochure.admin.dashboard').'?section=logistics';
             }
 
-            $payload = [
-                '@type' => 'MessageCard',
-                '@context' => 'http://schema.org/extensions',
-                'themeColor' => '590091',
-                'summary' => '브로셔 발송 요청',
-                'sections' => [[
-                    'markdown' => true,
-                    'activityTitle' => '**브로셔 발송 요청**',
-                    'facts' => [
-                        ['name' => '신청자', 'value' => $requesterName],
-                        ['name' => '기관명', 'value' => $req->schoolname ?? '-'],
-                        ['name' => '연락처', 'value' => $req->phone ?? '-'],
-                        ['name' => '주소', 'value' => $req->address ?? '-'],
-                        ['name' => '신청일', 'value' => $req->date ?? '-'],
-                    ],
-                ], [
-                    'activityTitle' => '**발송 브로셔 목록**',
-                    'facts' => $brochureFacts,
-                ]],
-                'potentialAction' => [[
-                    '@type' => 'OpenUri',
-                    'name' => '운송장 입력',
-                    'targets' => [[
-                        'os' => 'default',
-                        'uri' => $logisticsUrl,
-                    ]],
-                ]],
-            ];
+            $payload = app(TeamsWebhookPayloadBuilder::class)->buildBrochureRequestPayload(
+                webhookUrl: $webhookUrl,
+                format: (string) config('services.gs_brochure_teams.webhook_format', TeamsWebhookPayloadBuilder::FORMAT_AUTO),
+                requesterName: $requesterName,
+                schoolname: (string) ($req->schoolname ?? '-'),
+                phone: (string) ($req->phone ?? '-'),
+                address: (string) ($req->address ?? '-'),
+                requestDate: (string) ($req->date ?? '-'),
+                brochureFacts: $brochureFacts,
+                logisticsUrl: $logisticsUrl,
+            );
 
             Http::timeout(5)->post($webhookUrl, $payload);
             $this->notifyInvoice($req, $addedInvoiceNumbers);
@@ -429,23 +413,14 @@ class RequestController extends Controller
         try {
             $requesterName = $this->formatTeamsRequesterName($req->contact_name);
             $invoiceFacts = array_map(fn ($num) => ['name' => '운송장 번호', 'value' => $num], $addedNumbers);
-            $payload = [
-                '@type' => 'MessageCard',
-                '@context' => 'http://schema.org/extensions',
-                'themeColor' => '28a745',
-                'summary' => '운송장 등록 완료 (물류창고)',
-                'sections' => [[
-                    'activityTitle' => '**운송장 등록 완료** (물류창고)',
-                    'facts' => [
-                        ['name' => '신청자', 'value' => $requesterName],
-                        ['name' => '기관명', 'value' => $req->schoolname ?? '-'],
-                        ['name' => '신청일', 'value' => $req->date ?? '-'],
-                    ],
-                ], [
-                    'activityTitle' => '**등록된 운송장 번호**',
-                    'facts' => $invoiceFacts,
-                ]],
-            ];
+            $payload = app(TeamsWebhookPayloadBuilder::class)->buildInvoicePayload(
+                webhookUrl: $webhookUrl,
+                format: (string) config('services.gs_brochure_teams.webhook_format', TeamsWebhookPayloadBuilder::FORMAT_AUTO),
+                requesterName: $requesterName,
+                schoolname: (string) ($req->schoolname ?? '-'),
+                requestDate: (string) ($req->date ?? '-'),
+                invoiceFacts: $invoiceFacts,
+            );
 
             Http::timeout(5)->post($webhookUrl, $payload);
         } catch (\Throwable $e) {
