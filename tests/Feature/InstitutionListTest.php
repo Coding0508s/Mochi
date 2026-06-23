@@ -13,9 +13,11 @@ use App\Models\GsNumber;
 use App\Models\Institution;
 use App\Models\SupportRecord;
 use App\Models\User;
+use App\Support\TeamMenuContext;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -2089,5 +2091,277 @@ class InstitutionListTest extends TestCase
             'ENGLISHNAME' => $englishName,
             'STATUS' => $status,
         ]);
+    }
+
+    /**
+     * @return array{user: User, institution: Institution}
+     */
+    private function createNonAssignedInstitutionForViewAllCoUser(): array
+    {
+        $this->insertEmployee('E-CO-NON-ASSIGN', 'A02', 'Peter Kim', 1);
+        $this->insertEmployee('E-CO-OTHER-NON', 'A02', 'Rami Lee', 1);
+
+        $user = User::factory()->canViewAllInstitutions()->create([
+            'name' => 'Peter Kim',
+            'email' => 'peter.nonassigned@example.com',
+            'employee_empno' => 'E-CO-NON-ASSIGN',
+            'team' => 'CO',
+            'is_admin' => false,
+        ]);
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-NON-ASSIGNED-CO',
+            'AccountName' => '비담당 CO 변경 테스트',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-NON-ASSIGNED-CO',
+            'Account_Name' => '비담당 CO 변경 테스트',
+            'CO' => 'James Kwak',
+            'TR' => 'Keep TR',
+            'CS' => 'Keep CS',
+        ]);
+
+        return [
+            'user' => $user,
+            'institution' => $institution,
+        ];
+    }
+
+    public function test_non_assigned_ac1_view_all_co_user_can_change_co_via_manager_modal(): void
+    {
+        ['user' => $user, 'institution' => $institution] = $this->createNonAssignedInstitutionForViewAllCoUser();
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->assertSee('담당자 변경')
+            ->assertSee('기관 정보 수정은 담당자 또는 관리자만 가능합니다')
+            ->assertDontSee('wire:click="startDetailEdit"', false)
+            ->call('openManagerModal', $institution->ID)
+            ->set('editCo', 'Peter Kim')
+            ->call('saveManagers')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_Account_Information', [
+            'SK_Code' => 'SK-NON-ASSIGNED-CO',
+            'CO' => 'Peter Kim',
+            'TR' => 'Keep TR',
+            'CS' => 'Keep CS',
+        ]);
+    }
+
+    public function test_non_assigned_ac2_view_all_co_user_cannot_change_tr_or_cs_via_manager_modal(): void
+    {
+        ['user' => $user, 'institution' => $institution] = $this->createNonAssignedInstitutionForViewAllCoUser();
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openManagerModal', $institution->ID)
+            ->set('editCo', 'Peter Kim')
+            ->set('editTr', 'Hacked TR')
+            ->set('editCs', 'Hacked CS')
+            ->call('saveManagers')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_Account_Information', [
+            'SK_Code' => 'SK-NON-ASSIGNED-CO',
+            'CO' => 'Peter Kim',
+            'TR' => 'Keep TR',
+            'CS' => 'Keep CS',
+        ]);
+    }
+
+    public function test_non_assigned_ac3_view_all_co_user_cannot_edit_institution_detail(): void
+    {
+        ['user' => $user, 'institution' => $institution] = $this->createNonAssignedInstitutionForViewAllCoUser();
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->assertDontSee('wire:click="startDetailEdit"', false)
+            ->call('startDetailEdit')
+            ->set('editDetailInstitutionName', 'Should Fail')
+            ->set('editDetailCo', 'Peter Kim')
+            ->call('saveDetailFields')
+            ->assertHasErrors('detailEdit');
+
+        $this->assertDatabaseHas('S_AccountName', [
+            'ID' => $institution->ID,
+            'AccountName' => '비담당 CO 변경 테스트',
+        ]);
+    }
+
+    public function test_non_assigned_ac4_assigned_user_can_still_edit_full_detail(): void
+    {
+        $this->insertEmployee('E-CO-ASSIGNED-AC4', 'A02', 'Peter Kim', 1);
+
+        $user = User::factory()->create([
+            'name' => 'Peter Kim',
+            'email' => 'peter.assigned.ac4@example.com',
+            'employee_empno' => 'E-CO-ASSIGNED-AC4',
+            'team' => 'CO',
+            'is_admin' => false,
+        ]);
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-ASSIGNED-AC4',
+            'AccountName' => '담당 AC4 테스트',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-ASSIGNED-AC4',
+            'Account_Name' => '담당 AC4 테스트',
+            'CO' => 'Peter Kim',
+            'TR' => 'Keep TR',
+            'CS' => 'Keep CS',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->assertSee('wire:click="startDetailEdit"', false)
+            ->assertDontSee('담당자 변경')
+            ->call('startDetailEdit')
+            ->set('editDetailAddress', 'Updated Address AC4')
+            ->set('editDetailTr', 'Updated TR')
+            ->call('saveDetailFields')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_Account_Information', [
+            'SK_Code' => 'SK-ASSIGNED-AC4',
+            'Address' => 'Updated Address AC4',
+            'TR' => 'Updated TR',
+        ]);
+    }
+
+    public function test_non_assigned_ac5_admin_can_still_edit_all_manager_fields(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-ADMIN-AC5',
+            'AccountName' => '관리자 AC5 테스트',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-ADMIN-AC5',
+            'Account_Name' => '관리자 AC5 테스트',
+            'CO' => 'Old CO',
+            'TR' => 'Old TR',
+            'CS' => 'Old CS',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(InstitutionList::class)
+            ->call('openManagerModal', $institution->ID)
+            ->set('editCo', 'New CO')
+            ->set('editTr', 'New TR')
+            ->set('editCs', 'New CS')
+            ->call('saveManagers')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_Account_Information', [
+            'SK_Code' => 'SK-ADMIN-AC5',
+            'CO' => 'New CO',
+            'TR' => 'New TR',
+            'CS' => 'New CS',
+        ]);
+    }
+
+    public function test_non_assigned_ac6_cross_team_context_blocks_manager_save(): void
+    {
+        $this->insertEmployee('E-CS-CROSS', 'A03', 'Cs Manager', 1);
+
+        $user = User::factory()->canViewAllInstitutions()->create([
+            'name' => 'Cs Manager',
+            'email' => 'cs.cross@example.com',
+            'employee_empno' => 'E-CS-CROSS',
+            'team' => 'CS',
+            'is_admin' => false,
+        ]);
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-CROSS-TEAM-AC6',
+            'AccountName' => '크로스팀 AC6',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-CROSS-TEAM-AC6',
+            'Account_Name' => '크로스팀 AC6',
+            'CS' => 'Other CS',
+        ]);
+
+        $this->assertTrue(TeamMenuContext::isCrossTeamReadOnlyContext($user, TeamMenuContext::MENU_CO));
+
+        $this->actingAs($user);
+        $this->app->instance('request', Request::create(
+            route('institutions.index', ['team_menu' => 'co']),
+            'GET',
+            ['team_menu' => 'co'],
+        ));
+
+        $permissionProbe = new InstitutionList;
+        $permissionProbe->editSkCode = 'SK-CROSS-TEAM-AC6';
+        $this->assertFalse($permissionProbe->canEditInstitutionManagers());
+
+        $this->app->instance('request', Request::create(route('institutions.index'), 'GET', []));
+        $this->assertTrue($permissionProbe->canEditInstitutionManagers());
+    }
+
+    public function test_non_assigned_ac7_view_all_off_user_cannot_see_non_assigned_institution(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-AC7-MINE',
+            'AccountName' => 'AC7 담당 기관',
+        ]);
+        Institution::query()->create([
+            'SKcode' => 'SK-AC7-OTHER',
+            'AccountName' => 'AC7 비담당 기관',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            [
+                'SK_Code' => 'SK-AC7-MINE',
+                'Account_Name' => 'AC7 담당 기관',
+                'CO' => 'Peter Kim',
+            ],
+            [
+                'SK_Code' => 'SK-AC7-OTHER',
+                'Account_Name' => 'AC7 비담당 기관',
+                'CO' => 'James Kwak',
+            ],
+        ]);
+
+        $user = User::factory()->create([
+            'name' => 'Peter Kim',
+            'email' => 'peter.ac7@example.com',
+            'team' => 'CO',
+            'is_admin' => false,
+            'can_view_all_institutions' => false,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->assertSee('AC7 담당 기관')
+            ->assertDontSee('AC7 비담당 기관');
+    }
+
+    public function test_non_assigned_ac8_self_assign_promotes_to_full_detail_edit(): void
+    {
+        ['user' => $user, 'institution' => $institution] = $this->createNonAssignedInstitutionForViewAllCoUser();
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openManagerModal', $institution->ID)
+            ->set('editCo', 'Peter Kim')
+            ->call('saveManagers')
+            ->assertHasNoErrors();
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->assertSee('wire:click="startDetailEdit"', false)
+            ->assertDontSee('담당자 변경');
     }
 }

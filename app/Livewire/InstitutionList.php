@@ -784,6 +784,10 @@ class InstitutionList extends Component
             $this->managerOptionsForDept(self::DEPT_CS),
         );
 
+        if (! $this->canEditInstitutionManagers()) {
+            return;
+        }
+
         $this->dispatch(
             'institution-form-open-manager',
             institutionId: $institution->ID,
@@ -811,6 +815,11 @@ class InstitutionList extends Component
     public function saveManagers(UpdateInstitutionManagers $updateInstitutionManagers): void
     {
         $this->persistInstitutionManagers($updateInstitutionManagers);
+
+        if ($this->getErrorBag()->isNotEmpty()) {
+            return;
+        }
+
         $this->closeManagerModal();
     }
 
@@ -994,6 +1003,7 @@ class InstitutionList extends Component
             'canEditDetailTr' => $this->canEditInstitutionDetailTr(),
             'canEditDetailCs' => $this->canEditInstitutionDetailCs(),
             'canEditInstitutionDetail' => $this->canEditInstitutionDetail(),
+            'canEditInstitutionManagers' => $this->canEditInstitutionManagers(),
             ...$this->coachTeacherSupportReportModalConfigs(),
         ]);
     }

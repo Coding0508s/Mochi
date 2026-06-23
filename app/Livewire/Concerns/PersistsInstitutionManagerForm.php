@@ -9,7 +9,7 @@ trait PersistsInstitutionManagerForm
 {
     public function persistInstitutionManagers(UpdateInstitutionManagers $updateInstitutionManagers): void
     {
-        if (! $this->canEditInstitutionDetail()) {
+        if (! $this->canEditInstitutionManagers()) {
             $this->addError('managerEdit', '담당자 정보를 수정할 권한이 없습니다.');
 
             return;
@@ -18,6 +18,8 @@ trait PersistsInstitutionManagerForm
         $existing = AccountInformation::query()
             ->where('SK_Code', $this->editSkCode)
             ->first();
+
+        $managerOnlyEdit = $this->canEditInstitutionManagers() && ! $this->canEditInstitutionDetail();
 
         $co = $this->canEditInstitutionDetailCo()
             ? trim($this->editCo) ?: null
@@ -40,9 +42,13 @@ trait PersistsInstitutionManagerForm
             'editInstitutionName.required' => '기관명이 필요합니다.',
         ]);
 
+        $institutionName = $managerOnlyEdit
+            ? trim((string) ($existing?->Account_Name ?? $this->editInstitutionName))
+            : trim($this->editInstitutionName);
+
         $updateInstitutionManagers->execute([
             'sk_code' => $this->editSkCode,
-            'institution_name' => trim($this->editInstitutionName),
+            'institution_name' => $institutionName,
             'co' => $co,
             'tr' => $tr,
             'cs' => $cs,
