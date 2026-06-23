@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Notifications\CustomResetPassword;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
@@ -120,6 +121,49 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->assertHasNoErrors();
 
         $this->assertSame('A02', (string) Employee::query()->where('EMPNO', 'E001')->value('WORKDEPT'));
+    }
+
+    public function test_department_change_invalidates_institution_manager_option_caches(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        Cache::put('institution-list:manager-options:A02', ['old-co'], 600);
+        Cache::put('institution-list:manager-options:A05', ['old-coach'], 600);
+        Cache::put('institution-list:manager-options:A03', ['old-cs'], 600);
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openEditModal', 'E001')
+            ->set('editWorkDept', 'A02')
+            ->call('saveEmployee')
+            ->assertHasNoErrors();
+
+        $this->assertFalse(Cache::has('institution-list:manager-options:A02'));
+        $this->assertFalse(Cache::has('institution-list:manager-options:A05'));
+        $this->assertFalse(Cache::has('institution-list:manager-options:A03'));
+    }
+
+    public function test_department_change_syncs_team_for_admin_account(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $linkedAdmin = User::factory()->create([
+            'employee_empno' => 'E001',
+            'email' => 'e001@example.com',
+            'is_admin' => true,
+            'team' => 'CO',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openEditModal', 'E001')
+            ->set('editWorkDept', 'A05')
+            ->call('saveEmployee')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $linkedAdmin->id,
+            'team' => 'COACH',
+        ]);
     }
 
     public function test_country_manager_job_employee_without_admin_cannot_open_edit_modal(): void

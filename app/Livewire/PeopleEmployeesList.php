@@ -13,6 +13,7 @@ use App\Support\EmployeeImportRollback;
 use App\Support\EmployeeSex;
 use App\Support\TeamMenuContext;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
@@ -352,7 +353,8 @@ class PeopleEmployeesList extends Component
                 }
 
                 $previousWorkDept = (string) ($employee->WORKDEPT ?? '');
-                if ($previousWorkDept !== $validated['editWorkDept']) {
+                $departmentChanged = $previousWorkDept !== $validated['editWorkDept'];
+                if ($departmentChanged) {
                     Gate::authorize('manageEmployeeDepartment');
                 }
 
@@ -364,6 +366,10 @@ class PeopleEmployeesList extends Component
                 $employee->WORKDEPT = $validated['editWorkDept'];
                 $employee->STATUS = $validated['editStatus'] === '' ? null : (int) $validated['editStatus'];
                 $employee->save();
+
+                if ($departmentChanged) {
+                    $this->forgetInstitutionManagerOptionCaches();
+                }
 
                 if (! $canManageUserAccounts) {
                     return;
@@ -495,9 +501,7 @@ class PeopleEmployeesList extends Component
                     $validated['editWorkDept'],
                     trim($validated['editJob'])
                 );
-                if ($syncedTeam !== null && ! $nextIsAdmin && ! $nextIsDeputyAdmin) {
-                    $linkedUserPayload['team'] = $syncedTeam;
-                }
+                $linkedUserPayload['team'] = $syncedTeam ?? '';
                 $linkedUser->forceFill($linkedUserPayload)->save();
             });
         } catch (ValidationException $e) {
@@ -1321,6 +1325,13 @@ class PeopleEmployeesList extends Component
     private function shouldActivateUserFromEmployeeStatus(?string $employeeStatus): bool
     {
         return (string) $employeeStatus !== '0';
+    }
+
+    private function forgetInstitutionManagerOptionCaches(): void
+    {
+        Cache::forget('institution-list:manager-options:'.TeamMenuContext::DEPT_CO);
+        Cache::forget('institution-list:manager-options:'.TeamMenuContext::DEPT_COACH);
+        Cache::forget('institution-list:manager-options:'.TeamMenuContext::DEPT_CS);
     }
 
     /**
