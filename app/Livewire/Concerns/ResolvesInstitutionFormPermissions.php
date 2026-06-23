@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Support\InstitutionAccountListQuery;
 use App\Support\TeamMenuContext;
 
 trait ResolvesInstitutionFormPermissions
@@ -14,10 +15,7 @@ trait ResolvesInstitutionFormPermissions
 
     public function canEditInstitutionDetail(): bool
     {
-        return $this->canEditInstitutionDetailCore()
-            || $this->canEditInstitutionDetailCo()
-            || $this->canEditInstitutionDetailTr()
-            || $this->canEditInstitutionDetailCs();
+        return $this->canEditInstitutionDetailCore() || $this->canEditAssignedInstitutionDetailFields();
     }
 
     public function canEditInstitutionDetailCore(): bool
@@ -64,6 +62,29 @@ trait ResolvesInstitutionFormPermissions
         return $this->resolveCurrentUserManagerDept() === self::DEPT_CS;
     }
 
+    public function canEditInstitutionDetailSkCode(): bool
+    {
+        return $this->canEditInstitutionDetailCore();
+    }
+
+    public function canEditAssignedInstitutionDetailFields(): bool
+    {
+        if ($this->isCrossTeamReadOnlyContext()) {
+            return false;
+        }
+
+        if ($this->canEditInstitutionDetailCore()) {
+            return true;
+        }
+
+        $skCode = $this->resolveSelectedInstitutionSkCode();
+        if ($skCode === null) {
+            return false;
+        }
+
+        return app(InstitutionAccountListQuery::class)->currentUserCanManageInstitution($skCode);
+    }
+
     private function isCrossTeamReadOnlyContext(): bool
     {
         return TeamMenuContext::isCrossTeamReadOnlyContext(auth()->user());
@@ -97,5 +118,22 @@ trait ResolvesInstitutionFormPermissions
         }
 
         return null;
+    }
+
+    private function resolveSelectedInstitutionSkCode(): ?string
+    {
+        if (! property_exists($this, 'selectedInstitution')) {
+            return null;
+        }
+
+        /** @var mixed $selectedInstitution */
+        $selectedInstitution = $this->selectedInstitution;
+        if (! is_array($selectedInstitution)) {
+            return null;
+        }
+
+        $skCode = trim((string) ($selectedInstitution['skcode'] ?? ''));
+
+        return $skCode !== '' ? $skCode : null;
     }
 }

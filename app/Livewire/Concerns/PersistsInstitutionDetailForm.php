@@ -100,32 +100,28 @@ trait PersistsInstitutionDetailForm
             return;
         }
 
-        if (! $this->canEditInstitutionDetailCore()) {
+        if (! $this->canEditInstitutionDetailSkCode()) {
             $this->editDetailSkCode = (string) ($this->selectedInstitution['skcode'] ?? '');
-            $this->editDetailInstitutionName = (string) ($this->selectedInstitution['name'] ?? '');
-            $this->editDetailEnglishName = (string) ($this->selectedInstitution['english_name'] ?? '');
-            $this->editDetailPortalName = (string) ($this->selectedInstitution['portal_name'] ?? '');
-            $this->editDetailPortalCampusId = (string) ($this->selectedInstitution['portal_campus_id'] ?? '');
-            $this->editDetailAccountNo = (string) ($this->selectedInstitution['account_no'] ?? '');
-            $this->editDetailGubun = (string) ($this->selectedInstitution['gubun'] ?? '');
-            $this->editDetailDirector = (string) ($this->selectedInstitution['director'] ?? '');
-            $this->editDetailPhone = (string) ($this->selectedInstitution['phone'] ?? '');
-            $this->editDetailAccountTel = (string) ($this->selectedInstitution['account_tel'] ?? '');
-            $this->editDetailAddress = (string) ($this->selectedInstitution['address'] ?? '');
-            $this->editCustomerType = (string) ($this->selectedInstitution['customer_type'] ?? '');
-            $this->editGsNo = (string) ($this->selectedInstitution['gs_no'] ?? '');
         }
 
-        if (! $this->canEditInstitutionDetailCo()) {
-            $this->editDetailCo = (string) ($this->selectedInstitution['co'] ?? '');
+        if ($this->canEditInstitutionDetailCore() || $this->canEditAssignedInstitutionDetailFields()) {
+            return;
         }
 
-        if (! $this->canEditInstitutionDetailTr()) {
-            $this->editDetailTr = (string) ($this->selectedInstitution['tr'] ?? '');
-        }
-
-        if (! $this->canEditInstitutionDetailCs()) {
-            $this->editDetailCs = (string) ($this->selectedInstitution['cs'] ?? '');
-        }
+        $this->editDetailInstitutionName = (string) ($this->selectedInstitution['name'] ?? '');
+        $this->editDetailEnglishName = (string) ($this->selectedInstitution['english_name'] ?? '');
+        $this->editDetailPortalName = (string) ($this->selectedInstitution['portal_name'] ?? '');
+        $this->editDetailPortalCampusId = (string) ($this->selectedInstitution['portal_campus_id'] ?? '');
+        $this->editDetailAccountNo = (string) ($this->selectedInstitution['account_no'] ?? '');
+        $this->editDetailGubun = (string) ($this->selectedInstitution['gubun'] ?? '');
+        $this->editDetailDirector = (string) ($this->selectedInstitution['director'] ?? '');
+        $this->editDetailPhone = (string) ($this->selectedInstitution['phone'] ?? '');
+        $this->editDetailAccountTel = (string) ($this->selectedInstitution['account_tel'] ?? '');
+        $this->editDetailAddress = (string) ($this->selectedInstitution['address'] ?? '');
+        $this->editCustomerType = (string) ($this->selectedInstitution['customer_type'] ?? '');
+        $this->editGsNo = (string) ($this->selectedInstitution['gs_no'] ?? '');
+        $this->editDetailCo = (string) ($this->selectedInstitution['co'] ?? '');
+        $this->editDetailTr = (string) ($this->selectedInstitution['tr'] ?? '');
+        $this->editDetailCs = (string) ($this->selectedInstitution['cs'] ?? '');
     }
 }

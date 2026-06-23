@@ -1,8 +1,6 @@
 @php
-    $editDetailCoreFields = $this->canEditInstitutionDetailCore();
-    $editDetailCoField = $this->canEditInstitutionDetailCo();
-    $editDetailTrField = $this->canEditInstitutionDetailTr();
-    $editDetailCsField = $this->canEditInstitutionDetailCs();
+    $editDetailSkCodeField = $this->canEditInstitutionDetailSkCode();
+    $editDetailAssignedFields = $this->canEditAssignedInstitutionDetailFields();
 @endphp
 
 <div class="col-span-2 border border-gray-200 rounded-lg overflow-hidden">
@@ -11,7 +9,7 @@
             <tr>
                 <th class="w-28 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">SKcode</th>
                 <td class="px-3 py-2 font-mono text-sm text-gray-900">
-                    @if($editDetailCoreFields)
+                    @if($editDetailSkCodeField)
                         <input type="text" wire:model.defer="editDetailSkCode"
                                class="w-full py-1.5 px-2 text-sm font-mono border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                         @error('editDetailSkCode')
@@ -23,7 +21,7 @@
                 </td>
                 <th class="w-28 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">기관명</th>
                 <td class="px-3 py-2 font-medium text-gray-900">
-                    @if($editDetailCoreFields)
+                    @if($editDetailAssignedFields)
                         <input type="text" wire:model.defer="editDetailInstitutionName"
                                class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                         @error('editDetailInstitutionName')
@@ -37,7 +35,7 @@
             <tr>
                 <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">영문명</th>
                 <td colspan="3" class="px-3 py-2 font-medium text-gray-900">
-                    @if($editDetailCoreFields)
+                    @if($editDetailAssignedFields)
                         <input type="text" wire:model.defer="editDetailEnglishName"
                                class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                         @error('editDetailEnglishName')
@@ -51,7 +49,7 @@
             <tr>
                 <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">포털 표시명</th>
                 <td colspan="3" class="px-3 py-2 font-medium text-gray-900">
-                    @if($editDetailCoreFields)
+                    @if($editDetailAssignedFields)
                         <input type="text" wire:model.defer="editDetailPortalName"
                                class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                         @error('editDetailPortalName')
@@ -65,7 +63,7 @@
             <tr>
                 <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">Portal Campus ID</th>
                 <td colspan="3" class="px-3 py-2 font-medium text-gray-900 font-mono text-sm">
-                    @if($editDetailCoreFields)
+                    @if($editDetailAssignedFields)
                         <input type="text" wire:model.defer="editDetailPortalCampusId"
                                class="w-full py-1.5 px-2 text-sm font-mono border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                         @error('editDetailPortalCampusId')
@@ -79,7 +77,7 @@
             <tr>
                 <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">사업자/기관번호</th>
                 <td colspan="3" class="px-3 py-2 font-medium text-gray-900">
-                    @if($editDetailCoreFields)
+                    @if($editDetailAssignedFields)
                         <input type="text" wire:model.defer="editDetailAccountNo"
                                class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                         @error('editDetailAccountNo')
@@ -93,7 +91,7 @@
             <tr>
                 <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">구분</th>
                 <td class="px-3 py-2 font-medium text-gray-900">
-                    @if($editDetailCoreFields)
+                    @if($editDetailAssignedFields)
                         <input type="text" wire:model.defer="editDetailGubun" list="institution-detail-gubun-options"
                                class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                         <datalist id="institution-detail-gubun-options">
@@ -110,7 +108,7 @@
                 </td>
                 <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">고객유형</th>
                 <td class="px-3 py-2 font-medium text-gray-900">
-                    @if($editDetailCoreFields)
+                    @if($editDetailAssignedFields)
                         <select wire:model.defer="editCustomerType"
                                 class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header">
                             <option value="">선택</option>
@@ -129,7 +127,7 @@
             <tr>
                 <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">GS Number</th>
                 <td class="px-3 py-2 font-medium text-gray-900">
-                    @if($editDetailCoreFields)
+                    @if($editDetailAssignedFields)
                         <input type="text" wire:model.defer="editGsNo" placeholder="GS Number 입력"
                                class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                         @error('editGsNo')
@@ -141,7 +139,7 @@
                 </td>
                 <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당 CO</th>
                 <td class="px-3 py-2 font-medium text-gray-900">
-                    @if($editDetailCoField)
+                    @if($editDetailAssignedFields)
                         <select wire:model.defer="editDetailCo"
                                 class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header">
                             <option value="">미지정</option>
@@ -160,7 +158,7 @@
             <tr>
                 <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당 Coach</th>
                 <td class="px-3 py-2 font-medium text-gray-900">
-                    @if($editDetailTrField)
+                    @if($editDetailAssignedFields)
                         <select wire:model.defer="editDetailTr"
                                 class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header">
                             <option value="">미지정</option>
@@ -177,7 +175,7 @@
                 </td>
                 <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당 CS</th>
                 <td class="px-3 py-2 font-medium text-gray-900">
-                    @if($editDetailCsField)
+                    @if($editDetailAssignedFields)
                         <select wire:model.defer="editDetailCs"
                                 class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header">
                             <option value="">미지정</option>
@@ -196,7 +194,7 @@
             <tr>
                 <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">원장명</th>
                 <td class="px-3 py-2 font-medium text-gray-900">
-                    @if($editDetailCoreFields)
+                    @if($editDetailAssignedFields)
                         <input type="text" wire:model.defer="editDetailDirector"
                                class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                         @error('editDetailDirector')
@@ -208,7 +206,7 @@
                 </td>
                 <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">대표전화</th>
                 <td class="px-3 py-2 font-medium text-gray-900">
-                    @if($editDetailCoreFields)
+                    @if($editDetailAssignedFields)
                         <input type="text" wire:model.defer="editDetailPhone"
                                class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                         @error('editDetailPhone')
@@ -222,7 +220,7 @@
             <tr>
                 <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">직통 연락처</th>
                 <td class="px-3 py-2 font-medium text-gray-900">
-                    @if($editDetailCoreFields)
+                    @if($editDetailAssignedFields)
                         <input type="text" wire:model.defer="editDetailAccountTel"
                                class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                         @error('editDetailAccountTel')
@@ -241,7 +239,7 @@
             <tr>
                 <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">주소</th>
                 <td colspan="3" class="px-3 py-2 font-medium text-gray-900">
-                    @if($editDetailCoreFields)
+                    @if($editDetailAssignedFields)
                         <textarea wire:model.defer="editDetailAddress" rows="2"
                                   class="w-full py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mochi-header"></textarea>
                         @error('editDetailAddress')

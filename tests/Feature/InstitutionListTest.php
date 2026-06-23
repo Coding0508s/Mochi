@@ -586,7 +586,7 @@ class InstitutionListTest extends TestCase
             ->assertSee('해지 기관의 지원 내역은 수정·삭제할 수 없습니다');
     }
 
-    public function test_co_team_user_can_update_only_co_field_in_detail_modal(): void
+    public function test_assigned_user_can_update_all_detail_fields_except_sk_code_in_detail_modal(): void
     {
         $this->insertEmployee('E-CO-EDIT', 'A02', 'Peter Kim', 1);
         $this->insertEmployee('E-CO-OTHER', 'A02', 'Rami Lee', 1);
@@ -616,9 +616,12 @@ class InstitutionListTest extends TestCase
             ->test(InstitutionList::class)
             ->call('openDetailModal', $institution->ID)
             ->call('startDetailEdit')
+            ->set('editDetailSkCode', 'SK-CHANGED-BY-CO')
             ->set('editDetailCo', 'Rami Lee')
             ->set('editDetailTr', 'Hacked TR')
+            ->set('editDetailCs', 'Hacked CS')
             ->set('editDetailInstitutionName', 'Hacked Name')
+            ->set('editDetailAddress', 'Updated Address')
             ->call('saveDetailFields')
             ->assertHasNoErrors()
             ->assertSet('showDetailModal', false);
@@ -626,12 +629,64 @@ class InstitutionListTest extends TestCase
         $this->assertDatabaseHas('S_Account_Information', [
             'SK_Code' => 'SK-CO-ONLY',
             'CO' => 'Rami Lee',
-            'TR' => 'Keep TR',
-            'CS' => 'Keep CS',
+            'TR' => 'Hacked TR',
+            'CS' => 'Hacked CS',
+            'Address' => 'Updated Address',
         ]);
         $this->assertDatabaseHas('S_AccountName', [
             'ID' => $institution->ID,
-            'AccountName' => 'CO 팀 수정 테스트',
+            'SKcode' => 'SK-CO-ONLY',
+            'AccountName' => 'Hacked Name',
+            'Address' => 'Updated Address',
+        ]);
+        $this->assertDatabaseMissing('S_AccountName', [
+            'ID' => $institution->ID,
+            'SKcode' => 'SK-CHANGED-BY-CO',
+        ]);
+    }
+
+    public function test_view_all_user_cannot_edit_non_assigned_institution_detail(): void
+    {
+        $this->insertEmployee('E-CO-VIEW-ALL', 'A02', 'Peter Kim', 1);
+
+        $user = User::factory()->canViewAllInstitutions()->create([
+            'name' => 'Peter Kim',
+            'email' => 'peter.viewall@example.com',
+            'employee_empno' => 'E-CO-VIEW-ALL',
+            'team' => 'CO',
+            'is_admin' => false,
+        ]);
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-CO-NOT-MINE',
+            'AccountName' => '비담당 상세 편집 차단',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-CO-NOT-MINE',
+            'Account_Name' => '비담당 상세 편집 차단',
+            'CO' => 'James Kwak',
+            'TR' => 'Keep TR',
+            'CS' => 'Keep CS',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->assertDontSee('wire:click="startDetailEdit"', false)
+            ->call('startDetailEdit')
+            ->set('editDetailInstitutionName', 'Should Fail')
+            ->set('editDetailCo', 'Peter Kim')
+            ->call('saveDetailFields')
+            ->assertHasErrors('detailEdit');
+
+        $this->assertDatabaseHas('S_AccountName', [
+            'ID' => $institution->ID,
+            'AccountName' => '비담당 상세 편집 차단',
+        ]);
+        $this->assertDatabaseHas('S_Account_Information', [
+            'SK_Code' => 'SK-CO-NOT-MINE',
+            'CO' => 'James Kwak',
         ]);
     }
 

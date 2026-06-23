@@ -421,6 +421,38 @@ final class InstitutionAccountListQuery
         return null;
     }
 
+    public function currentUserCanManageInstitution(string $skCode): bool
+    {
+        $skCode = trim($skCode);
+        if ($skCode === '') {
+            return false;
+        }
+
+        $user = auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->hasFullAccess()) {
+            return true;
+        }
+
+        $rawAliases = $this->resolveCurrentUserManagerRawAliases();
+        if ($rawAliases === []) {
+            return false;
+        }
+
+        $column = $this->currentUserManagerColumn();
+        if ($column === null) {
+            return false;
+        }
+
+        return DB::table('S_Account_Information')
+            ->where('SK_Code', $skCode)
+            ->whereIn($column, $rawAliases)
+            ->exists();
+    }
+
     /**
      * @return array<int, string>
      */
