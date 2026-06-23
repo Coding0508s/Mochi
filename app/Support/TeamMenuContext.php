@@ -335,7 +335,7 @@ final class TeamMenuContext
     {
         return match (self::institutionSupportReportBrand($user, $teamMenuOverride)) {
             'Coach Team' => 'Coach',
-            'CS Team' => '담당 CS Team',
+            'CS Team' => '담당 CS',
             'CO' => '담당 CO',
             default => '담당 CO',
         };
