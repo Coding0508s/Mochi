@@ -119,6 +119,21 @@ class TeacherMasterDb extends Model
         return $position !== '' ? $position : null;
     }
 
+    public function displayPhone(): ?string
+    {
+        $phoneColumn = config('coach_retired_teachers.teacher_master.columns.phone', 'Phone');
+        if (Schema::hasColumn($this->getTable(), $phoneColumn)) {
+            $phone = trim((string) ($this->getAttribute($phoneColumn) ?? ''));
+            if ($phone !== '') {
+                return $phone;
+            }
+        }
+
+        $fromTeacher = trim((string) ($this->teacher?->Phone ?? ''));
+
+        return $fromTeacher !== '' ? $fromTeacher : null;
+    }
+
     public function resolveTeacherId(): ?int
     {
         foreach ($this->teacherIdColumns() as $column) {

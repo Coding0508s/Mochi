@@ -13,10 +13,14 @@ use App\Support\CoachTeacherScope;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CoachRetiredTeacherList extends Component
 {
@@ -72,6 +76,70 @@ class CoachRetiredTeacherList extends Component
         $this->search = '';
         $this->filterYear = '';
         $this->resetPage();
+    }
+
+    public function exportToExcel(): ?StreamedResponse
+    {
+        if (! Schema::hasTable($this->listTable())) {
+            session()->flash('error', '퇴직교사 마스터 테이블을 사용할 수 없어 다운로드할 수 없습니다.');
+
+            return null;
+        }
+
+        try {
+            $rows = $this->buildFilteredListQuery()->get();
+
+            if ($rows->isEmpty()) {
+                session()->flash('error', '다운로드할 데이터가 없습니다.');
+
+                return null;
+            }
+
+            $spreadsheet = new Spreadsheet;
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('퇴직교사 리스트');
+
+            $headers = [
+                'SK',
+                '기관명',
+                '교사명',
+                '교사 전화번호',
+                '직급',
+                '퇴직일',
+                'TR',
+                '상태',
+                '추천',
+            ];
+
+            foreach ($headers as $index => $header) {
+                $column = chr(65 + $index);
+                $sheet->setCellValue($column.'1', $header);
+                $sheet->getStyle($column.'1')->getFont()->setBold(true);
+            }
+
+            $rowNumber = 2;
+            foreach ($rows as $row) {
+                $sheet->fromArray($this->exportRowValues($row), null, 'A'.$rowNumber);
+                $rowNumber++;
+            }
+
+            foreach (range('A', 'I') as $column) {
+                $sheet->getColumnDimension($column)->setAutoSize(true);
+            }
+
+            $fileName = '퇴직교사_리스트_'.now()->format('Ymd_His').'.xlsx';
+
+            return response()->streamDownload(function () use ($spreadsheet): void {
+                $writer = new Xlsx($spreadsheet);
+                $writer->save('php://output');
+            }, $fileName, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ]);
+        } catch (\Exception) {
+            session()->flash('error', '엑셀 다운로드 중 오류가 발생했습니다.');
+
+            return null;
+        }
     }
 
     public function openDetailModal(int $retirementId): void
@@ -280,11 +348,25 @@ class CoachRetiredTeacherList extends Component
             ]);
         }
 
+        $retirements = $this->buildFilteredListQuery()->paginate(50);
+
+        return view('livewire.coach-retired-teacher-list', [
+            'retirements' => $retirements,
+            'tableMissing' => false,
+            'reinstateInstitutionSuggestions' => $this->reinstateInstitutionSuggestions(),
+        ]);
+    }
+
+    /**
+     * @return Builder<Model>
+     */
+    private function buildFilteredListQuery(): Builder
+    {
         $eagerLoad = $this->listsFromTeachersStatus()
             ? ['institution.accountInfo', 'masterRecord', 'retirementList']
             : ['teacher', 'institution.accountInfo', 'retirementList'];
 
-        $retirements = $this->buildBaseQuery()
+        return $this->buildBaseQuery()
             ->with($eagerLoad)
             ->tap(fn (Builder $query) => $this->applyYearFilter($query))
             ->tap(fn (Builder $query) => $this->applySearchFilter($query))
@@ -306,14 +388,57 @@ class CoachRetiredTeacherList extends Component
             ->when(! $this->usingTeacherMaster(), function (Builder $query): void {
                 $query->orderByDesc(config('coach_retired_teachers.columns.retirement_date', 'RetirementDate'))
                     ->orderBy('Name');
-            })
-            ->paginate(50);
+            });
+    }
 
-        return view('livewire.coach-retired-teacher-list', [
-            'retirements' => $retirements,
-            'tableMissing' => false,
-            'reinstateInstitutionSuggestions' => $this->reinstateInstitutionSuggestions(),
-        ]);
+    /**
+     * @return list<string>
+     */
+    private function exportRowValues(Model $row): array
+    {
+        return [
+            (string) ($row->SK_Code ?? ''),
+            (string) ($row->displayAccountName() ?: ''),
+            (string) ($row->Name ?? ''),
+            (string) ($row->displayPhone() ?? ''),
+            (string) ($row->displayPosition() ?? ''),
+            $this->exportRetirementDate($row),
+            $this->exportTrName($row),
+            $this->exportStatusLabel($row),
+            $row->displayRecommendYn() ? 'Y' : '',
+        ];
+    }
+
+    private function exportRetirementDate(Model $row): string
+    {
+        if ($row instanceof Teacher) {
+            return $row->listRetirementDate()?->format('Y-m-d') ?? '';
+        }
+
+        $date = $row->getAttribute('RetirementDate');
+        if ($date instanceof Carbon) {
+            return $date->format('Y-m-d');
+        }
+
+        return '';
+    }
+
+    private function exportTrName(Model $row): string
+    {
+        if ($row instanceof Teacher) {
+            return $row->listTrName();
+        }
+
+        return (string) ($row->getAttribute('TR_Name') ?? '');
+    }
+
+    private function exportStatusLabel(Model $row): string
+    {
+        if ($row instanceof Teacher) {
+            return $row->isRetired() ? '퇴직' : '복직';
+        }
+
+        return trim((string) ($row->getAttribute('Status') ?? '')) === '퇴직' ? '퇴직' : '복직';
     }
 
     /**

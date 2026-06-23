@@ -36,6 +36,11 @@
     $canSeeManagementMenus = (bool) ($sidebarUser?->hasFullAccess());
     $canSeeSetupMenus = $canSeeManagementMenus || (bool) ($sidebarUser?->can('accessSetup'));
 
+    $isAdminRetiredTeachersSidebar = request()->routeIs('coach.retired-teachers.*')
+        && request()->query('sidebar_context') === 'admin';
+    $isCoachRetiredTeachersSidebar = request()->routeIs('coach.retired-teachers.*')
+        && request()->query('sidebar_context') !== 'admin';
+
     $peopleTeams = collect();
     $hasDepartmentTable = \Illuminate\Support\Facades\Cache::remember(
         'layout:has-department-table:v1',
@@ -76,8 +81,9 @@
          openScheduleManagement: {{ request()->routeIs('schedules.*', 'shared-supplies.*', 'vehicle-usage-history.*') ? 'true' : 'false' }},
          openTeams: true,
         openCS: {{ $isCoTeamRoute && ($activeTeamMenu === 'cs' || ($activeTeamMenu === null && $sidebarUser?->isCsTeam())) ? 'true' : 'false' }},
-        openCoach: {{ $isCoTeamRoute && ($activeTeamMenu === 'coach' || ($activeTeamMenu === null && $sidebarUser?->isCoachTeam())) ? 'true' : 'false' }},
+        openCoach: {{ $isCoTeamRoute && ! $isAdminRetiredTeachersSidebar && ($activeTeamMenu === 'coach' || ($activeTeamMenu === null && $sidebarUser?->isCoachTeam())) ? 'true' : 'false' }},
         openCO: {{ $isCoTeamRoute && ($activeTeamMenu === 'co' || ($activeTeamMenu === null && ! $sidebarUser?->isCsTeam() && ! $sidebarUser?->isCoachTeam())) ? 'true' : 'false' }},
+        openAdmin: {{ $isAdminRetiredTeachersSidebar ? 'true' : 'false' }},
          openReview: false,
          openGoal: false,
          openSetup: {{ request()->routeIs('setup.*') ? 'true' : 'false' }},
@@ -365,18 +371,37 @@
 
                         @if($canSeeManagementMenus)
                             {{-- Admin --}}
-                            <button type="button" class="sidebar-item sidebar-focusable sidebar-item-default">
-                                <span class="sidebar-item-lead min-w-0 flex-1 break-words text-left">
-                                    @include('partials.sidebar-menu-icon', ['name' => 'cog'])
-                                    <span>Admin</span>
-                                </span>
-                                <svg class="h-3 w-3 shrink-0 text-[#98a2b3]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
-                                </svg>
-                            </button>
+                            <div>
+                                <button type="button"
+                                        @click="openAdmin = !openAdmin; if (openAdmin) { openCS = false; openCoach = false; openCO = false }"
+                                        class="sidebar-item sidebar-team-toggle sidebar-focusable"
+                                        :class="openAdmin ? 'sidebar-team-toggle-open' : ''"
+                                        :aria-expanded="openAdmin ? 'true' : 'false'">
+                                    <span class="sidebar-item-lead min-w-0 flex-1 break-words text-left">
+                                        @include('partials.sidebar-menu-icon', ['name' => 'cog'])
+                                        <span>Admin</span>
+                                    </span>
+                                    <svg class="h-3 w-3 shrink-0 text-[#98a2b3] transition-transform duration-200"
+                                         :class="openAdmin ? 'rotate-90' : ''"
+                                         fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+                                    </svg>
+                                </button>
+
+                                <div x-show="openAdmin" class="sidebar-sublist">
+                                    <a href="{{ route('coach.retired-teachers.index', ['team_menu' => 'coach', 'sidebar_context' => 'admin']) }}"
+                                       class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ $isAdminRetiredTeachersSidebar ? 'sidebar-subitem-active' : '' }}"
+                                       @if($isAdminRetiredTeachersSidebar) aria-current="page" @endif>
+                                        @include('partials.sidebar-menu-icon', ['name' => 'users', 'small' => true])
+                                        <span class="sidebar-subitem-label">퇴직교사 리스트</span>
+                                    </a>
+                                </div>
+                            </div>
                         @endif
 
-                        @include('partials.sidebar-coach-team-block')
+                        @include('partials.sidebar-coach-team-block', [
+                            'retiredTeachersSidebarActive' => $isCoachRetiredTeachersSidebar,
+                        ])
                     @endif
 
                     @if($showAllTeamSidebars)
