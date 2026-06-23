@@ -3,7 +3,7 @@
     $fs = $fontPx.'px';
     $fsHeading = ($fontPx + 3).'px';
     $wrap = 'word-break: break-word; overflow-wrap: anywhere;';
-    $cellLabel = 'padding: 8px 10px; font-size: '.$fs.'; font-weight: bold; vertical-align: top; white-space: nowrap; background: #f3f4f6; border: 1px solid #e5e7eb;';
+    $cellLabel = 'padding: 8px 10px; font-size: '.$fs.'; font-weight: bold; vertical-align: top; background: #f3f4f6; border: 1px solid #e5e7eb; '.$wrap;
     $cellValue = 'padding: 8px 10px; font-size: '.$fs.'; vertical-align: top; border: 1px solid #e5e7eb; '.$wrap;
 @endphp
 <!DOCTYPE html>
@@ -16,14 +16,13 @@
 <body style="font-family: sans-serif; line-height: 1.5; color: #111; font-size: {{ $fontPx }}px;">
 <p style="margin-bottom: 12px; font-size:18px; font-weight: bold;color:#590091">{{ $reportSavedOpening }}</p>
 
-<table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse; width: 100%; max-width: 720px; table-layout: fixed; font-size: {{ $fontPx }}px;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse; width: 100%; max-width: 720px; font-size: {{ $fontPx }}px;">
     <colgroup>
-        <col style="width: 13%;">
-        <col style="width: 37%;">
-        <col style="width: 13%;">
-        <col style="width: 37%;">
+        <col style="width: 22%;">
+        <col style="width: 28%;">
+        <col style="width: 22%;">
+        <col style="width: 28%;">
     </colgroup>
-    {{-- SK 코드 행 없음: 작성자를 첫 행 오른쪽 쌍에 표시 --}}
     <tr>
         <td style="{{ $cellLabel }}">기관명</td>
         <td style="{{ $cellValue }}">{{ $supportRecord->Account_Name ?: '—' }}</td>
