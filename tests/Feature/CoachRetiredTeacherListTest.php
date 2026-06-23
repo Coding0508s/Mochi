@@ -9,6 +9,7 @@ use App\Models\RetirementList;
 use App\Models\User;
 use App\Support\TeacherRetirementRecommendation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -52,6 +53,7 @@ class CoachRetiredTeacherListTest extends TestCase
             $table->string('School_Name', 255)->nullable();
             $table->string('Name', 255)->nullable();
             $table->string('Position', 100)->nullable();
+            $table->string('Phone', 50)->nullable();
             $table->string('Status', 50)->nullable();
             $table->boolean('ClassInOut')->default(true);
             $table->text('Description')->nullable();
@@ -221,6 +223,86 @@ class CoachRetiredTeacherListTest extends TestCase
             ->test(CoachRetiredTeacherList::class)
             ->assertSee('A퇴직')
             ->assertSee('B퇴직');
+    }
+
+    public function test_retired_teacher_list_shows_teacher_phone(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createMasterRecord([
+            'Name' => '전화있음',
+            'SK_Code' => 'SK001',
+            'TR_Name' => 'Coach A',
+            'RetirementDate' => "{$year}-03-01 00:00:00",
+            'Phone' => '010-9876-5432',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachRetiredTeacherList::class)
+            ->assertSee('교사 전화번호')
+            ->assertSee('010-9876-5432');
+    }
+
+    public function test_retired_teacher_list_prefers_teacher_phone_over_master_phone(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createTeacher('SK001', '우선전화', [
+            'Status' => '퇴직',
+            'Phone' => '010-1111-2222',
+        ]);
+        $this->createMasterRecord([
+            'TearcherID' => $teacherId,
+            'Name' => '우선전화',
+            'SK_Code' => 'SK001',
+            'TR_Name' => 'Coach A',
+            'RetirementDate' => "{$year}-03-01 00:00:00",
+            'Phone' => '010-9999-8888',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachRetiredTeacherList::class)
+            ->assertSee('010-1111-2222')
+            ->assertDontSee('010-9999-8888');
+    }
+
+    public function test_exports_retired_teacher_list_to_excel(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+        $now = now();
+        Carbon::setTestNow($now);
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createMasterRecord([
+            'Name' => '엑셀대상',
+            'SK_Code' => 'SK001',
+            'TR_Name' => 'Coach A',
+            'RetirementDate' => "{$year}-03-01 00:00:00",
+            'Phone' => '010-5555-6666',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachRetiredTeacherList::class)
+            ->assertSee('엑셀 다운로드')
+            ->call('exportToExcel')
+            ->assertFileDownloaded('퇴직교사_리스트_'.$now->format('Ymd_His').'.xlsx');
+    }
+
+    public function test_export_shows_error_when_no_rows_match_filters(): void
+    {
+        $admin = $this->createAdminUser();
+
+        Livewire::actingAs($admin)
+            ->test(CoachRetiredTeacherList::class)
+            ->set('search', '존재하지않는교사')
+            ->call('exportToExcel')
+            ->assertNoFileDownloaded()
+            ->assertSee('다운로드할 데이터가 없습니다.');
     }
 
     public function test_coach_sees_only_own_tr_retirements(): void

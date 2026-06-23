@@ -196,6 +196,19 @@ class Teacher extends Model
         return $position !== '' ? $position : null;
     }
 
+    public function displayPhone(): ?string
+    {
+        $phone = trim((string) ($this->Phone ?? ''));
+        if ($phone !== '') {
+            return $phone;
+        }
+
+        $phoneColumn = config('coach_retired_teachers.teacher_master.columns.phone', 'Phone');
+        $fromMaster = trim((string) ($this->masterRecord?->getAttribute($phoneColumn) ?? ''));
+
+        return $fromMaster !== '' ? $fromMaster : null;
+    }
+
     public function displayRecommendYn(): bool
     {
         if ($this->relationLoaded('retirementList')) {

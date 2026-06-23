@@ -5,6 +5,12 @@
         </div>
     @endif
 
+    @if(session('error'))
+        <div class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm" data-mochi-flash-dismiss="3000" role="alert">
+            {{ session('error') }}
+        </div>
+    @endif
+
     <div class="mochi-summary-card">
         <div class="flex flex-wrap items-center gap-4 text-sm">
             <h2 class="text-base font-semibold text-[#2b78c5]">퇴직교사 리스트</h2>
@@ -57,16 +63,37 @@
                         초기화
                     </button>
                 @endif
+
+                <button type="button"
+                        wire:click="exportToExcel"
+                        wire:loading.attr="disabled"
+                        wire:target="exportToExcel"
+                        class="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60">
+                    <span wire:loading.remove wire:target="exportToExcel" class="inline-flex items-center gap-2">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        엑셀 다운로드
+                    </span>
+                    <span wire:loading.inline-flex wire:target="exportToExcel" class="hidden items-center gap-2">
+                        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                        </svg>
+                        생성 중…
+                    </span>
+                </button>
             </div>
         </div>
 
         <div class="mochi-table-card overflow-x-auto isolate">
-            <table class="w-full min-w-[860px] text-sm border-collapse">
+            <table class="w-full min-w-[980px] text-sm border-collapse">
                 <thead>
                 <tr class="bg-[#f5f0e8] text-gray-700">
                     <th class="px-3 py-2 text-left border border-gray-300">SK</th>
                     <th class="px-3 py-2 text-left border border-gray-300">기관명</th>
                     <th class="px-3 py-2 text-left border border-gray-300">교사명</th>
+                    <th class="px-3 py-2 text-left border border-gray-300">교사 전화번호</th>
                     <th class="px-3 py-2 text-left border border-gray-300">직급</th>
                     <th class="px-3 py-2 text-left border border-gray-300">퇴직일</th>
                     <th class="px-3 py-2 text-left border border-gray-300">TR</th>
@@ -85,6 +112,9 @@
                                     class="text-blue-700 underline text-left hover:text-blue-900 cursor-pointer">
                                 {{ $row->Name }}
                             </button>
+                        </td>
+                        <td class="px-3 py-2 border border-gray-200 whitespace-nowrap">
+                            {{ $row->displayPhone() ?? '-' }}
                         </td>
                         <td class="px-3 py-2 border border-gray-200">
                             @if($position = $row->displayPosition())
@@ -120,7 +150,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="px-4 py-10 text-center text-gray-400">
+                        <td colspan="9" class="px-4 py-10 text-center text-gray-400">
                             조건에 맞는 퇴직 교사가 없습니다.
                         </td>
                     </tr>

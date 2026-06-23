@@ -83,6 +83,25 @@ class RetirementList extends Model
         return $position !== '' ? $position : null;
     }
 
+    public function displayPhone(): ?string
+    {
+        $fromTeacher = trim((string) ($this->teacher?->Phone ?? ''));
+        if ($fromTeacher !== '') {
+            return $fromTeacher;
+        }
+
+        $phoneColumn = config('coach_retired_teachers.teacher_master.columns.phone', 'Phone');
+        $master = $this->teacher?->masterRecord;
+        if ($master instanceof TeacherMasterDb) {
+            $fromMaster = trim((string) ($master->getAttribute($phoneColumn) ?? ''));
+            if ($fromMaster !== '') {
+                return $fromMaster;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * @param  Builder<RetirementList>  $query
      */
