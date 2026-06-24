@@ -392,7 +392,9 @@ final class InstitutionAccountListQuery
             return false;
         }
 
-        if (TeamMenuContext::hasExpandedReadScope($user) || $user->canViewAllInstitutions()) {
+        if (TeamMenuContext::hasExpandedReadScope($user)
+            || $user->canViewAllInstitutions()
+            || TeamMenuContext::hasAdminMenuDataScope($user)) {
             return false;
         }
 

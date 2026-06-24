@@ -37,10 +37,11 @@
     $canSeeAdminMenu = \App\Support\TeamMenuContext::showAdminTeamSidebar($sidebarUser);
     $canSeeSetupMenus = $canSeeManagementMenus || (bool) ($sidebarUser?->can('accessSetup'));
 
+    $isAdminSidebarContext = request()->query('sidebar_context') === 'admin';
     $isAdminRetiredTeachersSidebar = request()->routeIs('coach.retired-teachers.*')
-        && request()->query('sidebar_context') === 'admin';
+        && $isAdminSidebarContext;
     $isCoachRetiredTeachersSidebar = request()->routeIs('coach.retired-teachers.*')
-        && request()->query('sidebar_context') !== 'admin';
+        && ! $isAdminSidebarContext;
 
     $peopleTeams = collect();
     $hasDepartmentTable = \Illuminate\Support\Facades\Cache::remember(
@@ -81,10 +82,10 @@
          openPeople: {{ request()->routeIs('people.*') ? 'true' : 'false' }},
          openScheduleManagement: {{ request()->routeIs('schedules.*', 'shared-supplies.*', 'vehicle-usage-history.*') ? 'true' : 'false' }},
          openTeams: true,
-        openCS: {{ $isCoTeamRoute && ($activeTeamMenu === 'cs' || ($activeTeamMenu === null && $sidebarUser?->isCsTeam())) ? 'true' : 'false' }},
-        openCoach: {{ $isCoTeamRoute && ! $isAdminRetiredTeachersSidebar && ($activeTeamMenu === 'coach' || ($activeTeamMenu === null && $sidebarUser?->isCoachTeam())) ? 'true' : 'false' }},
-        openCO: {{ $isCoTeamRoute && ($activeTeamMenu === 'co' || ($activeTeamMenu === null && ! $sidebarUser?->isCsTeam() && ! $sidebarUser?->isCoachTeam())) ? 'true' : 'false' }},
-        openAdmin: {{ $isAdminRetiredTeachersSidebar ? 'true' : 'false' }},
+        openCS: {{ $isCoTeamRoute && ! $isAdminSidebarContext && ($activeTeamMenu === 'cs' || ($activeTeamMenu === null && $sidebarUser?->isCsTeam())) ? 'true' : 'false' }},
+        openCoach: {{ $isCoTeamRoute && ! $isAdminSidebarContext && ($activeTeamMenu === 'coach' || ($activeTeamMenu === null && $sidebarUser?->isCoachTeam())) ? 'true' : 'false' }},
+        openCO: {{ $isCoTeamRoute && ! $isAdminSidebarContext && ($activeTeamMenu === 'co' || ($activeTeamMenu === null && ! $sidebarUser?->isCsTeam() && ! $sidebarUser?->isCoachTeam())) ? 'true' : 'false' }},
+        openAdmin: {{ $isAdminSidebarContext ? 'true' : 'false' }},
          openReview: false,
          openGoal: false,
          openSetup: {{ request()->routeIs('setup.*') ? 'true' : 'false' }},
@@ -345,7 +346,11 @@
                 <div x-show="openTeams" class="sidebar-sublist">
 
                     @php
-                        $isSidebarMenuActive = function (array $menu, ?string $expectedTeamMenu = null) use ($sidebarUser): bool {
+                        $isSidebarMenuActive = function (array $menu, ?string $expectedTeamMenu = null) use ($sidebarUser, $isAdminSidebarContext): bool {
+                            if ($isAdminSidebarContext) {
+                                return false;
+                            }
+
                             if (! empty($menu['routeIs'] ?? null)) {
                                 $active = request()->routeIs($menu['routeIs']);
                             } elseif (! empty($menu['route'] ?? null)) {
@@ -365,6 +370,27 @@
 
                             return $activeTeamMenu === $expectedTeamMenu;
                         };
+
+                        $isAdminSidebarMenuActive = function (array $menu) use ($isAdminSidebarContext): bool {
+                            if (! $isAdminSidebarContext) {
+                                return false;
+                            }
+
+                            if (! empty($menu['routeIs'] ?? null)) {
+                                return request()->routeIs($menu['routeIs']);
+                            }
+
+                            if (! empty($menu['route'] ?? null)) {
+                                return request()->routeIs($menu['route'].'.*');
+                            }
+
+                            return false;
+                        };
+
+                        $adminTeamMenus = [
+                            ['label' => '기관리스트', 'path' => '/institutions', 'route' => 'institutions', 'icon' => 'building'],
+                            ['label' => '교직원 연락처보기', 'path' => '/contacts', 'route' => 'contacts', 'icon' => 'phone'],
+                        ];
                     @endphp
 
                     @if($showAllTeamSidebars)
@@ -390,6 +416,14 @@
                                 </button>
 
                                 <div x-show="openAdmin" class="sidebar-sublist">
+                                    @foreach($adminTeamMenus as $menu)
+                                        <a href="{{ $menu['path'] }}?sidebar_context=admin"
+                                           class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ $isAdminSidebarMenuActive($menu) ? 'sidebar-subitem-active' : '' }}"
+                                           @if($isAdminSidebarMenuActive($menu)) aria-current="page" @endif>
+                                            @include('partials.sidebar-menu-icon', ['name' => $menu['icon'], 'small' => true])
+                                            <span class="sidebar-subitem-label">{{ $menu['label'] }}</span>
+                                        </a>
+                                    @endforeach
                                     <a href="{{ route('coach.retired-teachers.index', ['sidebar_context' => 'admin']) }}"
                                        class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ $isAdminRetiredTeachersSidebar ? 'sidebar-subitem-active' : '' }}"
                                        @if($isAdminRetiredTeachersSidebar) aria-current="page" @endif>
