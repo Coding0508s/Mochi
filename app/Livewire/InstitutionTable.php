@@ -29,8 +29,24 @@ class InstitutionTable extends Component
     public string $sortDirection = 'asc';
 
     #[On('filter-updated')]
-    public function onFilterUpdated(): void
-    {
+    public function onFilterUpdated(
+        string $search,
+        string $statusFilter,
+        string $filterCo,
+        string $filterTr,
+        string $filterCs,
+        bool $resetAssignment = false,
+    ): void {
+        $this->search = $search;
+        $this->statusFilter = $statusFilter;
+        $this->filterCo = $filterCo;
+        $this->filterTr = $filterTr;
+        $this->filterCs = $filterCs;
+
+        if ($resetAssignment) {
+            $this->assignmentFilter = '';
+        }
+
         $this->resetPage();
     }
 

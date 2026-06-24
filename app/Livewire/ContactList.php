@@ -100,6 +100,14 @@ class ContactList extends Component
         'newSkCode.required' => '기관을 검색하여 선택해 주세요.',
     ];
 
+    public function mount(): void
+    {
+        $sidebarContext = trim((string) request()->query('sidebar_context', ''));
+        if ($sidebarContext !== '') {
+            session(['sidebar_context' => $sidebarContext]);
+        }
+    }
+
     // ─── 검색어가 바뀌면 1페이지로 초기화 ────────────────────────
     public function updatingSearch(): void
     {

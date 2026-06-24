@@ -171,6 +171,11 @@ class InstitutionList extends Component
 
     public function mount(): void
     {
+        $sidebarContext = trim((string) request()->query('sidebar_context', ''));
+        if ($sidebarContext !== '') {
+            session(['sidebar_context' => $sidebarContext]);
+        }
+
         $this->syncInstitutionViewToggleState();
     }
 
@@ -188,6 +193,8 @@ class InstitutionList extends Component
         $this->filterCo = $filterCo;
         $this->filterTr = $filterTr;
         $this->filterCs = $filterCs;
+
+        $this->dispatch('institution-table-reset-page');
 
         if ($resetAssignment) {
             $this->assignmentFilter = '';

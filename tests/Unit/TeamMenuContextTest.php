@@ -158,6 +158,44 @@ class TeamMenuContextTest extends TestCase
         $this->assertTrue(TeamMenuContext::hasAdminMenuDataScope($user));
     }
 
+    public function test_administration_team_can_keep_admin_scope_from_session_on_livewire_update(): void
+    {
+        $user = new User([
+            'team' => 'CO',
+            'is_admin' => false,
+            'employee_empno' => 'ADM002',
+        ]);
+        $user->setRelation('employee', new Employee([
+            'EMPNO' => 'ADM002',
+            'WORKDEPT' => TeamMenuContext::DEPT_ADMINISTRATION,
+        ]));
+
+        $this->withSession(['sidebar_context' => 'admin'])
+            ->post('/livewire/update', [], ['HTTP_X_LIVEWIRE' => 'true']);
+
+        $this->assertTrue(TeamMenuContext::hasAdminMenuDataScope($user));
+    }
+
+    public function test_administration_team_can_keep_admin_scope_from_referer_on_livewire_update(): void
+    {
+        $user = new User([
+            'team' => 'CO',
+            'is_admin' => false,
+            'employee_empno' => 'ADM003',
+        ]);
+        $user->setRelation('employee', new Employee([
+            'EMPNO' => 'ADM003',
+            'WORKDEPT' => TeamMenuContext::DEPT_ADMINISTRATION,
+        ]));
+
+        $this->post('/livewire/update', [], [
+            'HTTP_X_LIVEWIRE' => 'true',
+            'HTTP_REFERER' => 'https://crm.grapeseed.co.kr/contacts?sidebar_context=admin',
+        ]);
+
+        $this->assertTrue(TeamMenuContext::hasAdminMenuDataScope($user));
+    }
+
     public function test_infer_user_team_for_registration_prefers_workdept(): void
     {
         $this->assertSame(

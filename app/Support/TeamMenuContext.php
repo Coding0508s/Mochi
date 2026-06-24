@@ -174,7 +174,7 @@ final class TeamMenuContext
             return false;
         }
 
-        if (self::isAdministrationTeam($user) && request()->query('sidebar_context') === 'admin') {
+        if (self::isAdministrationTeam($user) && self::currentSidebarContext() === 'admin') {
             return false;
         }
 
@@ -236,7 +236,7 @@ final class TeamMenuContext
         }
 
         return self::isAdministrationTeam($user)
-            && request()->query('sidebar_context') === 'admin';
+            && self::currentSidebarContext() === 'admin';
     }
 
     /**
@@ -424,5 +424,32 @@ final class TeamMenuContext
         return in_array($teamMenu, [self::MENU_CS, self::MENU_COACH, self::MENU_CO], true)
             ? $teamMenu
             : null;
+    }
+
+    private static function currentSidebarContext(): string
+    {
+        $fromQuery = trim((string) request()->query('sidebar_context', ''));
+        if ($fromQuery !== '') {
+            return $fromQuery;
+        }
+
+        $fromSession = trim((string) session('sidebar_context', ''));
+        if ($fromSession !== '') {
+            return $fromSession;
+        }
+
+        $referer = trim((string) request()->headers->get('referer', ''));
+        if ($referer === '') {
+            return '';
+        }
+
+        $query = parse_url($referer, PHP_URL_QUERY);
+        if (! is_string($query) || $query === '') {
+            return '';
+        }
+
+        parse_str($query, $queryParams);
+
+        return trim((string) ($queryParams['sidebar_context'] ?? ''));
     }
 }

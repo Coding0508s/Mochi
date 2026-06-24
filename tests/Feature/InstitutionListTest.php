@@ -1348,6 +1348,37 @@ class InstitutionListTest extends TestCase
             ->assertSee('검색용 기관');
     }
 
+    public function test_institution_table_updates_search_state_when_filter_event_is_dispatched(): void
+    {
+        $user = User::factory()->create();
+
+        DB::table('S_Account_Information')->insert([
+            [
+                'SK_Code' => 'SK-EVENT-SEARCH-1',
+                'Account_Name' => '이벤트 검색 대상 기관',
+                'FGC_CreateDate' => '2024-01-11 18:18:51',
+            ],
+            [
+                'SK_Code' => 'SK-EVENT-SEARCH-2',
+                'Account_Name' => '이벤트 미매칭 기관',
+                'FGC_CreateDate' => '2024-01-11 18:18:52',
+            ],
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionTable::class)
+            ->dispatch('filter-updated',
+                search: '검색 대상',
+                statusFilter: 'all',
+                filterCo: '',
+                filterTr: '',
+                filterCs: '',
+                resetAssignment: false,
+            )
+            ->assertSee('이벤트 검색 대상 기관')
+            ->assertDontSee('이벤트 미매칭 기관');
+    }
+
     public function test_coach_team_user_only_sees_tr_assigned_institutions_from_account_information(): void
     {
         Institution::query()->create([

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\ContactList;
 use App\Models\Employee;
 use App\Models\Institution;
 use App\Models\Teacher;
@@ -10,6 +11,7 @@ use App\Support\TeamMenuContext;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class AdminMenuDataScopeTest extends TestCase
@@ -96,6 +98,45 @@ class AdminMenuDataScopeTest extends TestCase
             ->get('/contacts?team_menu=co')
             ->assertOk()
             ->assertDontSee('Hidden Outside Admin Context', false);
+    }
+
+    public function test_administration_team_can_search_contacts_in_admin_sidebar_context(): void
+    {
+        Schema::create('employee', function (Blueprint $table): void {
+            $table->string('EMPNO')->primary();
+            $table->string('WORKDEPT')->nullable();
+            $table->string('KOREANAME')->nullable();
+            $table->string('EMAIL')->nullable();
+        });
+
+        Employee::query()->create([
+            'EMPNO' => 'ADM012',
+            'WORKDEPT' => TeamMenuContext::DEPT_ADMINISTRATION,
+            'KOREANAME' => 'Admin Search',
+            'EMAIL' => 'admin.search@example.com',
+        ]);
+
+        $user = User::factory()->create([
+            'team' => 'CO',
+            'is_admin' => false,
+            'employee_empno' => 'ADM012',
+        ]);
+
+        $this->seedInstitution('SK-ADMIN-SEARCH');
+        Teacher::query()->create([
+            'SK_Code' => 'SK-ADMIN-SEARCH',
+            'Name' => '신현아',
+            'Email' => 'sinhyunah@example.com',
+            'ClassInOut' => true,
+            'Status' => '활성화',
+        ]);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['sidebar_context' => 'admin'])
+            ->test(ContactList::class)
+            ->set('searchType', 'name')
+            ->set('search', '신현아')
+            ->assertSee('신현아');
     }
 
     private function createContactTables(): void
