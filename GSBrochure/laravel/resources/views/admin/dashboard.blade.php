@@ -57,12 +57,13 @@
             $phpPostLimitBytes,
             $appImageLimitBytes,
         ], static fn (int $value): bool => $value > 0) ?: [$appImageLimitBytes]));
+        $gsBrochureApiJsVersion = @filemtime(public_path('js/gs-brochure-api.js')) ?: time();
     @endphp
     <script>
         window.API_BASE_URL = '{{ url("/api/gs-brochure") }}';
         window.GS_BROCHURE_UPLOAD_MAX_BYTES = {{ $effectiveUploadMaxBytes }};
     </script>
-    <script src="{{ asset('js/gs-brochure-api.js') }}"></script>
+    <script src="{{ asset('js/gs-brochure-api.js') }}?v={{ $gsBrochureApiJsVersion }}"></script>
     <style>#dashboardSidebar.open{transform:translateX(0);}</style>
 </head>
 <body class="font-display bg-background-light dark:bg-background-dark text-slate-900 dark:text-white overflow-hidden">
@@ -1082,12 +1083,22 @@
             }
             return '<td class="py-3 px-4 text-center"><span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">활성</span></td>';
         }
+        async function fetchInactiveBrochures() {
+            if (!window.BrochureAPI || typeof BrochureAPI.getInactive !== 'function') {
+                return [];
+            }
+            try {
+                const inactiveBrochures = await BrochureAPI.getInactive();
+                return Array.isArray(inactiveBrochures) ? inactiveBrochures : [];
+            } catch (err) {
+                console.warn('비활성 브로셔 목록을 불러오지 못했습니다.', err);
+                return [];
+            }
+        }
         async function loadBrochures() {
             try {
-                const [activeBrochures, inactiveBrochures] = await Promise.all([
-                    BrochureAPI.getAll(),
-                    BrochureAPI.getInactive(),
-                ]);
+                const activeBrochures = await BrochureAPI.getAll();
+                const inactiveBrochures = await fetchInactiveBrochures();
                 const active = (Array.isArray(activeBrochures) ? activeBrochures : []).map(function(b) {
                     return Object.assign({}, b, { isInactive: false });
                 });
@@ -1644,6 +1655,10 @@
         }
         async function restoreBrochure(id) {
             if (!confirm('이 브로셔를 다시 활성화하시겠습니까?')) return;
+            if (!window.BrochureAPI || typeof BrochureAPI.restore !== 'function') {
+                showAlert('브로셔 API가 최신 버전이 아닙니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.', 'danger');
+                return;
+            }
             try {
                 await BrochureAPI.restore(id);
                 await loadBrochures();
