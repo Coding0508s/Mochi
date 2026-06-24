@@ -202,7 +202,33 @@ class TeamMenuVisibilityTest extends TestCase
             ->assertOk()
             ->assertSee('>Admin<', false)
             ->assertSee('sidebar_context=admin', false)
+            ->assertSee('sidebar-subitem-label">기관리스트<', false)
+            ->assertSee('sidebar-subitem-label">교직원 연락처보기<', false)
             ->assertSee('sidebar-subitem-label">퇴직교사 리스트<', false);
+    }
+
+    public function test_administration_team_member_sees_admin_institution_and_contact_links(): void
+    {
+        $this->ensureEmployeeTableExists();
+
+        Employee::query()->create([
+            'EMPNO' => 'ADM004',
+            'WORKDEPT' => TeamMenuContext::DEPT_ADMINISTRATION,
+            'KOREANAME' => 'Admin User 4',
+            'EMAIL' => 'admin.user4@example.com',
+        ]);
+
+        $administrationUser = User::factory()->create([
+            'team' => 'CO',
+            'is_admin' => false,
+            'employee_empno' => 'ADM004',
+        ]);
+
+        $this->actingAs($administrationUser)
+            ->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee('/institutions?sidebar_context=admin', false)
+            ->assertSee('/contacts?sidebar_context=admin', false);
     }
 
     public function test_administration_team_member_can_access_admin_retired_teachers_route(): void

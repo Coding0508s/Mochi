@@ -227,6 +227,19 @@ final class TeamMenuContext
     }
 
     /**
+     * Admin 사이드바(`sidebar_context=admin`)에서 Administration Team 전체 데이터 조회.
+     */
+    public static function hasAdminMenuDataScope(?User $user): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        return self::isAdministrationTeam($user)
+            && request()->query('sidebar_context') === 'admin';
+    }
+
+    /**
      * Administration Team(A01) 소속 여부 — employee.WORKDEPT 기준.
      */
     public static function isAdministrationTeam(?User $user): bool

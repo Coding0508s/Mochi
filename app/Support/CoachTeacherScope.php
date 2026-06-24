@@ -33,7 +33,7 @@ final class CoachTeacherScope
             return;
         }
 
-        if (TeamMenuContext::hasExpandedReadScope($user)) {
+        if (TeamMenuContext::hasExpandedReadScope($user) || TeamMenuContext::hasAdminMenuDataScope($user)) {
             return;
         }
 

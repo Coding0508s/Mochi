@@ -155,6 +155,7 @@ class TeamMenuContextTest extends TestCase
         $this->assertFalse(
             TeamMenuContext::isCrossTeamReadOnlyContext($user, TeamMenuContext::MENU_COACH)
         );
+        $this->assertTrue(TeamMenuContext::hasAdminMenuDataScope($user));
     }
 
     public function test_infer_user_team_for_registration_prefers_workdept(): void
