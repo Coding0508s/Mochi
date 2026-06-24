@@ -106,6 +106,57 @@ class TeamMenuContextTest extends TestCase
         $this->assertFalse(TeamMenuContext::showCoTeamSidebar($user));
     }
 
+    public function test_administration_team_member_can_see_admin_sidebar(): void
+    {
+        $user = new User([
+            'team' => 'CO',
+            'is_admin' => false,
+            'employee_empno' => 'ADM001',
+        ]);
+        $user->setRelation('employee', new Employee([
+            'EMPNO' => 'ADM001',
+            'WORKDEPT' => TeamMenuContext::DEPT_ADMINISTRATION,
+        ]));
+
+        $this->assertTrue(TeamMenuContext::isAdministrationTeam($user));
+        $this->assertTrue(TeamMenuContext::showAdminTeamSidebar($user));
+    }
+
+    public function test_non_administration_team_member_cannot_see_admin_sidebar(): void
+    {
+        $user = new User([
+            'team' => 'COACH',
+            'is_admin' => false,
+            'employee_empno' => 'COACH01',
+        ]);
+        $user->setRelation('employee', new Employee([
+            'EMPNO' => 'COACH01',
+            'WORKDEPT' => TeamMenuContext::DEPT_COACH,
+        ]));
+
+        $this->assertFalse(TeamMenuContext::isAdministrationTeam($user));
+        $this->assertFalse(TeamMenuContext::showAdminTeamSidebar($user));
+    }
+
+    public function test_administration_team_in_admin_sidebar_context_is_not_cross_team_read_only(): void
+    {
+        $user = new User([
+            'team' => 'CO',
+            'is_admin' => false,
+            'employee_empno' => 'ADM001',
+        ]);
+        $user->setRelation('employee', new Employee([
+            'EMPNO' => 'ADM001',
+            'WORKDEPT' => TeamMenuContext::DEPT_ADMINISTRATION,
+        ]));
+
+        $this->get('/coach/retired-teachers?sidebar_context=admin&team_menu=coach');
+
+        $this->assertFalse(
+            TeamMenuContext::isCrossTeamReadOnlyContext($user, TeamMenuContext::MENU_COACH)
+        );
+    }
+
     public function test_infer_user_team_for_registration_prefers_workdept(): void
     {
         $this->assertSame(

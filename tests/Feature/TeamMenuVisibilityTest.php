@@ -2,8 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Employee;
 use App\Models\User;
+use App\Support\TeamMenuContext;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class TeamMenuVisibilityTest extends TestCase
@@ -174,5 +178,115 @@ class TeamMenuVisibilityTest extends TestCase
             ->get(route('profile.edit'))
             ->assertOk()
             ->assertDontSee('>Admin<', false);
+    }
+
+    public function test_administration_team_member_sees_admin_menu(): void
+    {
+        $this->ensureEmployeeTableExists();
+
+        Employee::query()->create([
+            'EMPNO' => 'ADM001',
+            'WORKDEPT' => TeamMenuContext::DEPT_ADMINISTRATION,
+            'KOREANAME' => 'Admin User',
+            'EMAIL' => 'admin.user@example.com',
+        ]);
+
+        $administrationUser = User::factory()->create([
+            'team' => 'CO',
+            'is_admin' => false,
+            'employee_empno' => 'ADM001',
+        ]);
+
+        $this->actingAs($administrationUser)
+            ->get(route('profile.edit'))
+            ->assertOk()
+            ->assertSee('>Admin<', false)
+            ->assertSee('sidebar_context=admin', false)
+            ->assertSee('sidebar-subitem-label">퇴직교사 리스트<', false);
+    }
+
+    public function test_administration_team_member_can_access_admin_retired_teachers_route(): void
+    {
+        $this->ensureEmployeeTableExists();
+
+        Employee::query()->create([
+            'EMPNO' => 'ADM002',
+            'WORKDEPT' => TeamMenuContext::DEPT_ADMINISTRATION,
+            'KOREANAME' => 'Admin User 2',
+            'EMAIL' => 'admin.user2@example.com',
+        ]);
+
+        $administrationUser = User::factory()->create([
+            'team' => 'CO',
+            'is_admin' => false,
+            'employee_empno' => 'ADM002',
+        ]);
+
+        $this->actingAs($administrationUser)
+            ->get(route('coach.retired-teachers.index', [
+                'sidebar_context' => 'admin',
+            ]))
+            ->assertOk()
+            ->assertDontSee('타 팀 메뉴에서는 조회만 가능합니다', false);
+    }
+
+    public function test_administration_team_member_admin_retired_teachers_not_cross_team_read_only(): void
+    {
+        $this->ensureEmployeeTableExists();
+
+        Employee::query()->create([
+            'EMPNO' => 'ADM003',
+            'WORKDEPT' => TeamMenuContext::DEPT_ADMINISTRATION,
+            'KOREANAME' => 'Admin User 3',
+            'EMAIL' => 'admin.user3@example.com',
+        ]);
+
+        $administrationUser = User::factory()->create([
+            'team' => 'CO',
+            'is_admin' => false,
+            'employee_empno' => 'ADM003',
+        ]);
+
+        $this->actingAs($administrationUser)
+            ->get(route('coach.retired-teachers.index', [
+                'team_menu' => 'coach',
+                'sidebar_context' => 'admin',
+            ]))
+            ->assertOk()
+            ->assertDontSee('타 팀 메뉴에서는 조회만 가능합니다', false);
+
+        $this->assertFalse(
+            TeamMenuContext::isCrossTeamReadOnlyContext($administrationUser, TeamMenuContext::MENU_COACH)
+        );
+    }
+
+    public function test_non_administration_user_cannot_access_admin_retired_teachers_route(): void
+    {
+        $coach = User::factory()->create([
+            'team' => 'COACH',
+            'is_admin' => false,
+        ]);
+
+        $this->actingAs($coach)
+            ->get(route('coach.retired-teachers.index', [
+                'team_menu' => 'coach',
+                'sidebar_context' => 'admin',
+            ]))
+            ->assertForbidden();
+    }
+
+    private function ensureEmployeeTableExists(): void
+    {
+        if (Schema::hasTable('employee')) {
+            return;
+        }
+
+        Schema::create('employee', function (Blueprint $table): void {
+            $table->string('EMPNO')->primary();
+            $table->string('WORKDEPT')->nullable();
+            $table->string('KOREANAME')->nullable();
+            $table->string('ENGLISHNAME')->nullable();
+            $table->string('EMAIL')->nullable();
+        });
     }
 }

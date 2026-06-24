@@ -8,6 +8,7 @@ use App\Support\CoachTeacherScope;
 use App\Support\RetirementListWriter;
 use App\Support\TeacherMasterWriter;
 use App\Support\TeacherRetirementRecommendation;
+use App\Support\TeamMenuContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 
@@ -39,7 +40,7 @@ class RetireTeacher
 
     private function authorize(Teacher $teacher, User $user): void
     {
-        if ($user->hasFullAccess()) {
+        if ($user->hasFullAccess() || TeamMenuContext::isAdministrationTeam($user)) {
             return;
         }
 

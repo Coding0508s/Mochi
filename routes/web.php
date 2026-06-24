@@ -121,6 +121,10 @@ Route::middleware(['auth'])->group(function () {
     })->middleware('can:viewCoachTeamKpi')->name('coach.team-kpi.index');
 
     Route::get('/coach/retired-teachers', function () {
+        if (request()->query('sidebar_context') === 'admin') {
+            Gate::authorize('viewAdminMenu');
+        }
+
         return view('pages.coach.retired-teachers.index');
     })->name('coach.retired-teachers.index');
 

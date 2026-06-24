@@ -32,7 +32,7 @@ final class CoachRetirementListScope
             return;
         }
 
-        if (TeamMenuContext::hasExpandedReadScope($user)) {
+        if (TeamMenuContext::hasExpandedReadScope($user) || TeamMenuContext::isAdministrationTeam($user)) {
             return;
         }
 
