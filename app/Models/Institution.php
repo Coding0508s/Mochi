@@ -110,6 +110,46 @@ class Institution extends Model
         return $this->hasOne(GsNumber::class, 'SKCode', 'SKcode');
     }
 
+    public function externalMapping(): HasOne
+    {
+        return $this->hasOne(InstitutionExternalMapping::class, 'institution_id', 'ID');
+    }
+
+    public function externalMappingBySkCode(): HasOne
+    {
+        return $this->hasOne(InstitutionExternalMapping::class, 'sk_code', 'SKcode');
+    }
+
+    public function resolvedPortalCampusId(): ?string
+    {
+        $masterValue = trim((string) ($this->PortalCampusID ?? ''));
+        if ($masterValue !== '') {
+            return $masterValue;
+        }
+
+        $mappingValue = trim((string) ($this->externalMappingBySkCode?->portal_campus_id ?? ''));
+        if ($mappingValue === '') {
+            $mappingValue = trim((string) ($this->externalMapping?->portal_campus_id ?? ''));
+        }
+
+        return $mappingValue !== '' ? $mappingValue : null;
+    }
+
+    public function resolvedAccountNo(): ?string
+    {
+        $masterValue = trim((string) ($this->AccountNo ?? ''));
+        if ($masterValue !== '') {
+            return $masterValue;
+        }
+
+        $mappingValue = trim((string) ($this->externalMappingBySkCode?->account_no ?? ''));
+        if ($mappingValue === '') {
+            $mappingValue = trim((string) ($this->externalMapping?->account_no ?? ''));
+        }
+
+        return $mappingValue !== '' ? $mappingValue : null;
+    }
+
     /**
      * 목록·상세 표시용 GS 번호: S_GSNumber.GSnumber 우선, 없으면 S_AccountName.GSno.
      */

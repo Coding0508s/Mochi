@@ -337,8 +337,8 @@ class InstitutionList extends Component
             'name' => $institution->resolvedAccountName(),
             'english_name' => $institution->EnglishName,
             'portal_name' => $institution->PortalAccountName,
-            'portal_campus_id' => $institution->PortalCampusID,
-            'account_no' => $institution->AccountNo,
+            'portal_campus_id' => $institution->resolvedPortalCampusId(),
+            'account_no' => $institution->resolvedAccountNo(),
             'gubun' => $institution->Gubun,
             'director' => $institution->Director,
             'phone' => $institution->Phone,
@@ -370,8 +370,8 @@ class InstitutionList extends Component
         $this->editDetailInstitutionName = $institution->resolvedAccountName();
         $this->editDetailEnglishName = (string) ($institution->EnglishName ?? '');
         $this->editDetailPortalName = (string) ($institution->PortalAccountName ?? '');
-        $this->editDetailPortalCampusId = (string) ($institution->PortalCampusID ?? '');
-        $this->editDetailAccountNo = (string) ($institution->AccountNo ?? '');
+        $this->editDetailPortalCampusId = (string) ($institution->resolvedPortalCampusId() ?? '');
+        $this->editDetailAccountNo = (string) ($institution->resolvedAccountNo() ?? '');
         $this->editDetailGubun = (string) ($institution->Gubun ?? '');
         $this->editDetailDirector = (string) ($institution->Director ?? '');
         $this->editDetailPhone = (string) ($institution->Phone ?? '');
@@ -1076,6 +1076,9 @@ class InstitutionList extends Component
     private function institutionEagerLoads(): array
     {
         $loads = ['accountInfo'];
+        if (Schema::hasTable('institution_external_mappings')) {
+            $loads[] = 'externalMappingBySkCode';
+        }
         if (Schema::hasTable('S_GSNumber')) {
             $loads[] = 'gsNumber';
         }
