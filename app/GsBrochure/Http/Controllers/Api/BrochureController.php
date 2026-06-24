@@ -40,7 +40,7 @@ class BrochureController extends Controller
         $conn = (string) config('gs_brochure.connection');
         $table = (new Brochure)->getTable();
         $request->validate([
-            'name' => ['required', 'string', Rule::unique("{$conn}.{$table}", 'name')],
+            'name' => ['required', 'string', Rule::unique("{$conn}.{$table}", 'name')->withoutTrashed()],
             'image_url' => 'sometimes|nullable|string|max:2048',
             'stock' => 'sometimes|integer',
             'stock_warehouse' => 'sometimes|integer',
@@ -52,6 +52,12 @@ class BrochureController extends Controller
         $imageUrl = trim((string) $request->input('image_url', '')) ?: null;
         $stock = (int) $request->input('stock', 0);
         $stockWarehouse = (int) $request->input('stock_warehouse', 0);
+
+        if (Brochure::onlyTrashed()->where('name', $name)->exists()) {
+            return response()->json([
+                'error' => '같은 이름의 비활성 브로셔가 있습니다. 비활성 목록에서 다시 활성화해 주세요.',
+            ], 422);
+        }
 
         try {
             $brochure = Brochure::create([
@@ -155,10 +161,26 @@ class BrochureController extends Controller
 
     public function destroy(string $id): JsonResponse
     {
-        StockHistory::where('brochure_id', $id)->delete();
-        Brochure::findOrFail($id)->delete();
+        $brochure = Brochure::findOrFail($id);
+        $brochure->delete();
 
         return response()->json(['success' => true]);
+    }
+
+    public function inactive(): JsonResponse
+    {
+        return response()->json(Brochure::onlyTrashed()->orderBy('id')->get());
+    }
+
+    public function restore(string $id): JsonResponse
+    {
+        $brochure = Brochure::onlyTrashed()->findOrFail($id);
+        $brochure->restore();
+
+        return response()->json([
+            'success' => true,
+            'id' => $brochure->id,
+        ]);
     }
 
     public function updateStock(Request $request, string $id): JsonResponse

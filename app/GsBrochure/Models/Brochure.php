@@ -3,9 +3,12 @@
 namespace App\GsBrochure\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Brochure extends GsBrochureModel
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'name',
         'image_url',
@@ -22,6 +25,7 @@ class Brochure extends GsBrochureModel
         'stock_warehouse' => 'integer',
         'last_stock_quantity' => 'integer',
         'last_warehouse_stock_quantity' => 'integer',
+        'deleted_at' => 'datetime',
     ];
 
     public function getTable(): string
