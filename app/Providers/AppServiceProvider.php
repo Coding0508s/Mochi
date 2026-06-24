@@ -54,6 +54,8 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::define('manageGsBrochureAdmin', fn (?User $user): bool => (bool) ($user?->hasFullAccess() || $user?->is_gs_brochure_admin));
 
+        Gate::define('viewAdminMenu', fn (?User $user): bool => TeamMenuContext::showAdminTeamSidebar($user));
+
         Gate::define('manageUserAccounts', fn (?User $user): bool => (bool) ($user?->hasFullAccess()));
 
         /** Coach Team 지원 KPI 대시보드 — 팀장·관리자 */

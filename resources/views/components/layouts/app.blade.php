@@ -34,6 +34,7 @@
     }
 
     $canSeeManagementMenus = (bool) ($sidebarUser?->hasFullAccess());
+    $canSeeAdminMenu = \App\Support\TeamMenuContext::showAdminTeamSidebar($sidebarUser);
     $canSeeSetupMenus = $canSeeManagementMenus || (bool) ($sidebarUser?->can('accessSetup'));
 
     $isAdminRetiredTeachersSidebar = request()->routeIs('coach.retired-teachers.*')
@@ -369,7 +370,7 @@
                     @if($showAllTeamSidebars)
                         @include('partials.sidebar-cs-team-block')
 
-                        @if($canSeeManagementMenus)
+                        @if($canSeeAdminMenu)
                             {{-- Admin --}}
                             <div>
                                 <button type="button"
@@ -389,7 +390,7 @@
                                 </button>
 
                                 <div x-show="openAdmin" class="sidebar-sublist">
-                                    <a href="{{ route('coach.retired-teachers.index', ['team_menu' => 'coach', 'sidebar_context' => 'admin']) }}"
+                                    <a href="{{ route('coach.retired-teachers.index', ['sidebar_context' => 'admin']) }}"
                                        class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ $isAdminRetiredTeachersSidebar ? 'sidebar-subitem-active' : '' }}"
                                        @if($isAdminRetiredTeachersSidebar) aria-current="page" @endif>
                                         @include('partials.sidebar-menu-icon', ['name' => 'users', 'small' => true])

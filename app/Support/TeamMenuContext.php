@@ -7,7 +7,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 
 /**
  * Teams 사이드바(team_menu) 및 CO 전용 기능 접근.
- * 부서 코드(A02/A03/A05)는 InstitutionList 담당자 드롭다운과 동일.
+ * 부서 코드(A01/A02/A03/A05)는 Setup 팀 관리·InstitutionList 담당자 드롭다운과 동일.
  */
 final class TeamMenuContext
 {
@@ -16,6 +16,8 @@ final class TeamMenuContext
     public const MENU_COACH = 'coach';
 
     public const MENU_CO = 'co';
+
+    public const DEPT_ADMINISTRATION = 'A01';
 
     public const DEPT_CO = 'A02';
 
@@ -172,6 +174,10 @@ final class TeamMenuContext
             return false;
         }
 
+        if (self::isAdministrationTeam($user) && request()->query('sidebar_context') === 'admin') {
+            return false;
+        }
+
         $activeMenu = self::normalizeTeamMenu($teamMenuOverride) ?? self::activeMenu($user);
         if ($activeMenu === null) {
             return false;
@@ -218,6 +224,32 @@ final class TeamMenuContext
     public static function showAllTeamSidebars(?User $user): bool
     {
         return $user !== null;
+    }
+
+    /**
+     * Administration Team(A01) 소속 여부 — employee.WORKDEPT 기준.
+     */
+    public static function isAdministrationTeam(?User $user): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        $user->loadMissing('employee');
+
+        return mb_strtoupper(trim((string) ($user->employee?->WORKDEPT ?? ''))) === self::DEPT_ADMINISTRATION;
+    }
+
+    /**
+     * Teams 사이드바 Admin 메뉴(퇴직교사 리스트) 노출 — Full Access 또는 Administration Team.
+     */
+    public static function showAdminTeamSidebar(?User $user): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        return $user->hasFullAccess() || self::isAdministrationTeam($user);
     }
 
     /**
