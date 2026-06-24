@@ -56,9 +56,11 @@ async function apiCall(endpoint, method = 'GET', data = null, fetchOpts = {}) {
 
 window.BrochureAPI = {
     getAll: () => apiCall('/brochures?_=' + Date.now(), 'GET', null, { cache: 'no-store' }),
+    getInactive: () => apiCall('/brochures/inactive?_=' + Date.now(), 'GET', null, { cache: 'no-store' }),
     create: (data) => apiCall('/brochures', 'POST', data),
     update: (id, data) => apiCall(`/brochures/${id}`, 'PUT', data),
     delete: (id) => apiCall(`/brochures/${id}`, 'DELETE'),
+    restore: (id) => apiCall(`/brochures/${id}/restore`, 'POST'),
     updateStock: (id, quantity, date, memo) => apiCall(`/brochures/${id}/stock`, 'PUT', { quantity, date, memo: memo || '' }),
     updateWarehouseStock: (id, quantity, date, memo) => apiCall(`/brochures/${id}/stock-warehouse`, 'PUT', { quantity, date, memo: memo || '' }),
     transferToHq: (id, quantity, date, memo) => apiCall(`/brochures/${id}/transfer-to-hq`, 'PUT', { quantity, date, memo: memo || '' }),
