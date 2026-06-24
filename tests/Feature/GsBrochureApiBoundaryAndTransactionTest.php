@@ -59,6 +59,38 @@ class GsBrochureApiBoundaryAndTransactionTest extends TestCase
             ->assertJsonCount(1);
     }
 
+    public function test_request_store_rejects_soft_deleted_brochure_id(): void
+    {
+        $inactiveBrochure = Brochure::create([
+            'name' => '비활성 신청 차단 브로셔',
+            'image_url' => null,
+            'stock' => 0,
+            'stock_warehouse' => 200,
+        ]);
+        $inactiveBrochure->delete();
+
+        Cache::put('phone_verified:01077778888', true, now()->addMinutes(10));
+
+        $response = $this->postJson('/api/gs-brochure/requests', [
+            'date' => '2026-06-24',
+            'schoolname' => '비활성 신청 기관',
+            'address' => '서울시 강동구',
+            'phone' => '010-7777-8888',
+            'contact_id' => null,
+            'contact_name' => null,
+            'brochures' => [[
+                'brochure' => $inactiveBrochure->id,
+                'brochureName' => '비활성 신청 차단 브로셔',
+                'quantity' => 20,
+            ]],
+            'invoices' => [],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['brochures']);
+        $this->assertDatabaseCount((new BrochureRequest)->getTable(), 0);
+    }
+
     public function test_authenticated_staff_request_uses_requester_name_as_contact_name(): void
     {
         $staffUser = User::factory()->create([

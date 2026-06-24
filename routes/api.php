@@ -48,9 +48,11 @@ Route::prefix('gs-brochure')->group(function () {
     });
 
     Route::middleware(['web', 'auth', 'can:manageGsBrochureAdmin'])->group(function () {
+        Route::get('brochures/inactive', [BrochureController::class, 'inactive']);
         Route::post('brochures', [BrochureController::class, 'store']);
         Route::put('brochures/{id}', [BrochureController::class, 'update']);
         Route::delete('brochures/{id}', [BrochureController::class, 'destroy']);
+        Route::post('brochures/{id}/restore', [BrochureController::class, 'restore']);
         Route::put('brochures/{id}/stock', [BrochureController::class, 'updateStock']);
         Route::put('brochures/{id}/stock-warehouse', [BrochureController::class, 'updateWarehouseStock']);
         Route::put('brochures/{id}/transfer-to-hq', [BrochureController::class, 'transferToHq']);

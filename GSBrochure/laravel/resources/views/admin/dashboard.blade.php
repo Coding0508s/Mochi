@@ -241,6 +241,7 @@
                                 <tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
                                     <th class="text-center py-3 px-4 font-medium text-slate-700 dark:text-slate-300 w-16">이미지</th>
                                     <th class="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">브로셔명</th>
+                                    <th class="text-center py-3 px-4 font-medium text-slate-700 dark:text-slate-300">상태</th>
                                     <th class="text-right py-3 px-4 font-medium text-slate-700 dark:text-slate-300">물류센터 재고</th>
                                     <th class="text-center py-3 px-4 font-medium text-slate-700 dark:text-slate-300">물류 상태</th>
                                     <th class="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">마지막 입고</th>
@@ -273,6 +274,7 @@
                                 <tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
                                     <th class="text-center py-3 px-4 font-medium text-slate-700 dark:text-slate-300 w-16">이미지</th>
                                     <th class="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">브로셔명</th>
+                                    <th class="text-center py-3 px-4 font-medium text-slate-700 dark:text-slate-300">상태</th>
                                     <th class="text-right py-3 px-4 font-medium text-slate-700 dark:text-slate-300">본사 재고</th>
                                     <th class="text-center py-3 px-4 font-medium text-slate-700 dark:text-slate-300">본사 상태</th>
                                     <th class="text-left py-3 px-4 font-medium text-slate-700 dark:text-slate-300">마지막 입고</th>
@@ -1072,31 +1074,80 @@
                 : '<span class="w-10 h-10 rounded bg-slate-200 dark:bg-slate-700 inline-flex items-center justify-center text-slate-400 text-xs">-</span>';
             return '<td class="py-3 px-4 text-center">' + img + '</td>';
         }
+        function brochureStatusTd(brochure) {
+            if (brochure.isInactive) {
+                const deletedAt = brochure.deleted_at ? formatDateTime(brochure.deleted_at) : '';
+                const title = deletedAt ? ' title="비활성: ' + deletedAt.replace(/"/g, '&quot;') + '"' : '';
+                return '<td class="py-3 px-4 text-center"><span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300"' + title + '>비활성</span></td>';
+            }
+            return '<td class="py-3 px-4 text-center"><span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">활성</span></td>';
+        }
         async function loadBrochures() {
             try {
-                const brochures = await BrochureAPI.getAll();
+                const [activeBrochures, inactiveBrochures] = await Promise.all([
+                    BrochureAPI.getAll(),
+                    BrochureAPI.getInactive(),
+                ]);
+                const active = (Array.isArray(activeBrochures) ? activeBrochures : []).map(function(b) {
+                    return Object.assign({}, b, { isInactive: false });
+                });
+                const inactive = (Array.isArray(inactiveBrochures) ? inactiveBrochures : []).map(function(b) {
+                    return Object.assign({}, b, { isInactive: true });
+                });
+                const brochures = active.sort(function(a, b) { return a.id - b.id; })
+                    .concat(inactive.sort(function(a, b) { return a.id - b.id; }));
                 const tbody = document.getElementById('brochureTableBody');
                 const tbody2 = document.getElementById('brochureTableBody2');
                 if (tbody) tbody.innerHTML = '';
                 if (tbody2) tbody2.innerHTML = '';
                 const rowHtmlWarehouse = function(brochure) {
+                    const statusTd = brochureStatusTd(brochure);
+                    if (brochure.isInactive) {
+                        const warehouseStock = brochure.stock_warehouse ?? 0;
+                        return brochureThumbTd(brochure)
+                            + '<td class="py-3 px-4 text-slate-500 dark:text-slate-400">' + (brochure.name || '') + '</td>'
+                            + statusTd
+                            + '<td class="py-3 px-4 text-right text-slate-500 dark:text-slate-400">' + warehouseStock + '권</td>'
+                            + '<td class="py-3 px-4 text-center text-slate-400">-</td>'
+                            + '<td class="py-3 px-4 text-slate-400">-</td>'
+                            + '<td class="py-3 px-4 text-center text-slate-400">-</td>'
+                            + '<td class="py-3 px-4"><div class="flex flex-wrap gap-1 justify-center">'
+                            + '<button type="button" onclick="restoreBrochure(\'' + brochure.id + '\')" class="px-2 py-1 rounded bg-primary text-white text-xs font-medium hover:bg-primary/90 whitespace-nowrap">다시 활성화</button>'
+                            + '</div></td>';
+                    }
                     const warehouseStock = brochure.stock_warehouse ?? 0;
                     const warehouseClass = warehouseStock < 10 ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-slate-900 dark:text-white';
                     const warehouseStatus = stockStatusText(warehouseStock);
                     const lastStockQuantity = brochure.last_warehouse_stock_quantity ?? 0;
                     const lastStockDate = brochure.last_warehouse_stock_date || '-';
-                    return brochureThumbTd(brochure) + '<td class="py-3 px-4">' + (brochure.name || '') + '</td><td class="py-3 px-4 text-right ' + warehouseClass + '">' + warehouseStock + '권</td><td class="py-3 px-4 text-center"><span class="font-medium ' + warehouseStatus.color + '">' + warehouseStatus.text + '</span></td><td class="py-3 px-4">' + (lastStockQuantity > 0 ? lastStockQuantity + '권 (' + lastStockDate + ')' : '-') + '</td><td class="py-3 px-4 text-center"><button type="button" onclick="openStockModal(\'' + brochure.id + '\', true)" class="px-2 py-1 rounded bg-green-600 text-white text-xs font-medium hover:bg-green-700 whitespace-nowrap">입고</button></td><td class="py-3 px-4"><div class="flex flex-wrap gap-1 justify-center">' + '<button type="button" onclick="openBrochureImageMenu(event, \'' + brochure.id + '\')" class="px-2 py-1 rounded bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 whitespace-nowrap">이미지 관리</button>' + '<button type="button" onclick="openTransferToHqModal(\'' + brochure.id + '\')" class="px-2 py-1 rounded bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 whitespace-nowrap">→ 본사</button>' + '<button type="button" onclick="openStockEditModal(\'' + brochure.id + '\', true)" class="px-2 py-1 rounded bg-slate-500 text-white text-xs font-medium hover:bg-slate-600 whitespace-nowrap">재고 수정</button>' + '<button type="button" onclick="deleteBrochure(\'' + brochure.id + '\')" class="px-2 py-1 rounded bg-red-600 text-white text-xs font-medium hover:bg-red-700 whitespace-nowrap">삭제</button></div></td>';
+                    return brochureThumbTd(brochure) + '<td class="py-3 px-4">' + (brochure.name || '') + '</td>' + statusTd + '<td class="py-3 px-4 text-right ' + warehouseClass + '">' + warehouseStock + '권</td><td class="py-3 px-4 text-center"><span class="font-medium ' + warehouseStatus.color + '">' + warehouseStatus.text + '</span></td><td class="py-3 px-4">' + (lastStockQuantity > 0 ? lastStockQuantity + '권 (' + lastStockDate + ')' : '-') + '</td><td class="py-3 px-4 text-center"><button type="button" onclick="openStockModal(\'' + brochure.id + '\', true)" class="px-2 py-1 rounded bg-green-600 text-white text-xs font-medium hover:bg-green-700 whitespace-nowrap">입고</button></td><td class="py-3 px-4"><div class="flex flex-wrap gap-1 justify-center">' + '<button type="button" onclick="openBrochureImageMenu(event, \'' + brochure.id + '\')" class="px-2 py-1 rounded bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 whitespace-nowrap">이미지 관리</button>' + '<button type="button" onclick="openTransferToHqModal(\'' + brochure.id + '\')" class="px-2 py-1 rounded bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 whitespace-nowrap">→ 본사</button>' + '<button type="button" onclick="openStockEditModal(\'' + brochure.id + '\', true)" class="px-2 py-1 rounded bg-slate-500 text-white text-xs font-medium hover:bg-slate-600 whitespace-nowrap">재고 수정</button>' + '<button type="button" onclick="deleteBrochure(\'' + brochure.id + '\')" class="px-2 py-1 rounded bg-red-600 text-white text-xs font-medium hover:bg-red-700 whitespace-nowrap">비활성</button></div></td>';
                 };
                 const rowHtmlHq = function(brochure) {
+                    const statusTd = brochureStatusTd(brochure);
+                    if (brochure.isInactive) {
+                        const hqStock = brochure.stock ?? 0;
+                        return brochureThumbTd(brochure)
+                            + '<td class="py-3 px-4 text-slate-500 dark:text-slate-400">' + (brochure.name || '') + '</td>'
+                            + statusTd
+                            + '<td class="py-3 px-4 text-right text-slate-500 dark:text-slate-400">' + hqStock + '권</td>'
+                            + '<td class="py-3 px-4 text-center text-slate-400">-</td>'
+                            + '<td class="py-3 px-4 text-slate-400">-</td>'
+                            + '<td class="py-3 px-4 text-center text-slate-400">-</td>'
+                            + '<td class="py-3 px-4"><div class="flex flex-wrap gap-1 justify-center">'
+                            + '<button type="button" onclick="restoreBrochure(\'' + brochure.id + '\')" class="px-2 py-1 rounded bg-primary text-white text-xs font-medium hover:bg-primary/90 whitespace-nowrap">다시 활성화</button>'
+                            + '</div></td>';
+                    }
                     const hqStock = brochure.stock ?? 0;
                     const hqClass = hqStock < 10 ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-slate-900 dark:text-white';
                     const hqStatus = stockStatusText(hqStock, 'hq');
                     const lastStockQuantity = brochure.last_stock_quantity ?? 0;
                     const lastStockDate = brochure.last_stock_date || '-';
-                    return brochureThumbTd(brochure) + '<td class="py-3 px-4">' + (brochure.name || '') + '</td><td class="py-3 px-4 text-right ' + hqClass + '">' + hqStock + '권</td><td class="py-3 px-4 text-center"><span class="font-medium ' + hqStatus.color + '">' + hqStatus.text + '</span></td><td class="py-3 px-4">' + (lastStockQuantity > 0 ? lastStockQuantity + '권 (' + lastStockDate + ')' : '-') + '</td><td class="py-3 px-4 text-center"><button type="button" onclick="openStockModal(\'' + brochure.id + '\', false)" class="px-2 py-1 rounded bg-green-600 text-white text-xs font-medium hover:bg-green-700 whitespace-nowrap">입고</button></td><td class="py-3 px-4"><div class="flex flex-wrap gap-1 justify-center">' + '<button type="button" onclick="openBrochureImageMenu(event, \'' + brochure.id + '\')" class="px-2 py-1 rounded bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 whitespace-nowrap">이미지 관리</button>' + '<button type="button" onclick="openStockEditModal(\'' + brochure.id + '\', false)" class="px-2 py-1 rounded bg-slate-500 text-white text-xs font-medium hover:bg-slate-600 whitespace-nowrap">재고 수정</button>' + '<button type="button" onclick="deleteBrochure(\'' + brochure.id + '\')" class="px-2 py-1 rounded bg-red-600 text-white text-xs font-medium hover:bg-red-700 whitespace-nowrap">삭제</button></div></td>';
+                    return brochureThumbTd(brochure) + '<td class="py-3 px-4">' + (brochure.name || '') + '</td>' + statusTd + '<td class="py-3 px-4 text-right ' + hqClass + '">' + hqStock + '권</td><td class="py-3 px-4 text-center"><span class="font-medium ' + hqStatus.color + '">' + hqStatus.text + '</span></td><td class="py-3 px-4">' + (lastStockQuantity > 0 ? lastStockQuantity + '권 (' + lastStockDate + ')' : '-') + '</td><td class="py-3 px-4 text-center"><button type="button" onclick="openStockModal(\'' + brochure.id + '\', false)" class="px-2 py-1 rounded bg-green-600 text-white text-xs font-medium hover:bg-green-700 whitespace-nowrap">입고</button></td><td class="py-3 px-4"><div class="flex flex-wrap gap-1 justify-center">' + '<button type="button" onclick="openBrochureImageMenu(event, \'' + brochure.id + '\')" class="px-2 py-1 rounded bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 whitespace-nowrap">이미지 관리</button>' + '<button type="button" onclick="openStockEditModal(\'' + brochure.id + '\', false)" class="px-2 py-1 rounded bg-slate-500 text-white text-xs font-medium hover:bg-slate-600 whitespace-nowrap">재고 수정</button>' + '<button type="button" onclick="deleteBrochure(\'' + brochure.id + '\')" class="px-2 py-1 rounded bg-red-600 text-white text-xs font-medium hover:bg-red-700 whitespace-nowrap">비활성</button></div></td>';
                 };
-                brochures.forEach(brochure => {
-                    const trClass = 'border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50';
+                brochures.forEach(function(brochure) {
+                    const trClass = brochure.isInactive
+                        ? 'border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 opacity-75'
+                        : 'border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50';
                     if (tbody) {
                         const row = document.createElement('tr');
                         row.className = trClass;
@@ -1110,7 +1161,7 @@
                         tbody2.appendChild(row2);
                     }
                 });
-                updateStats(brochures);
+                updateStats(active);
             } catch (err) {
                 console.error(err);
                 showAlert('브로셔 목록을 불러오는 중 오류가 발생했습니다.', 'danger');
@@ -1584,12 +1635,20 @@
         }
         function editBrochure(id) { openBrochureModal(id); }
         async function deleteBrochure(id) {
-            if (!confirm('정말 삭제하시겠습니까?')) return;
+            if (!confirm('이 브로셔를 비활성 처리하시겠습니까? 발송 내역은 유지되며 신청 화면에는 표시되지 않습니다.')) return;
             try {
                 await BrochureAPI.delete(id);
                 await loadBrochures();
-                showAlert('브로셔가 삭제되었습니다.');
-            } catch (err) { showAlert('브로셔 삭제 중 오류: ' + err.message, 'danger'); }
+                showAlert('브로셔가 비활성 처리되었습니다.');
+            } catch (err) { showAlert('브로셔 비활성 처리 중 오류: ' + err.message, 'danger'); }
+        }
+        async function restoreBrochure(id) {
+            if (!confirm('이 브로셔를 다시 활성화하시겠습니까?')) return;
+            try {
+                await BrochureAPI.restore(id);
+                await loadBrochures();
+                showAlert('브로셔가 다시 활성화되었습니다.');
+            } catch (err) { showAlert('브로셔 활성화 중 오류: ' + err.message, 'danger'); }
         }
 
         var currentStockTarget = 'hq';
