@@ -38,11 +38,27 @@
         <div class="mochi-filter-card">
             <div class="flex flex-wrap items-center gap-3">
                 <select wire:model.live="filterYear"
-                        class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                     <option value="">전체</option>
                     @for($y = now()->year; $y >= now()->year - 10; $y--)
                         <option value="{{ $y }}">{{ $y }}년</option>
                     @endfor
+                </select>
+
+                <select wire:model.live="filterStatus"
+                        aria-label="상태 필터"
+                        class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                    <option value="">전체 상태</option>
+                    <option value="retired">퇴직</option>
+                    <option value="reinstated">복직</option>
+                </select>
+
+                <select wire:model.live="filterRecommend"
+                        aria-label="추천 필터"
+                        class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                    <option value="">전체 추천</option>
+                    <option value="yes">추천 (Y)</option>
+                    <option value="no">비추천 (-)</option>
                 </select>
 
                 <div class="relative flex-1 min-w-56">
@@ -54,12 +70,13 @@
                     <input type="text"
                            wire:model.live.debounce.300ms="search"
                            placeholder="이름, 기관명, SK코드 검색"
-                           class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                           class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                 </div>
 
-                @if($search)
+                @if($search || $filterYear !== '' || $filterStatus !== '' || $filterRecommend !== '')
                     <button wire:click="resetFilters"
-                            class="py-2 px-3 text-sm text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                            type="button"
+                            class="py-2 px-3 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50 cursor-pointer">
                         초기화
                     </button>
                 @endif
