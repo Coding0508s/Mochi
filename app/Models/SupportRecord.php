@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Casts\NormalizedMultilineText;
+use App\Support\ExcelSerialDate;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -169,10 +170,12 @@ class SupportRecord extends Model
 
     /**
      * 연도 필터·distinct 목록에 쓸 수 있는 컬럼 (우선순위 순).
+     *
+     * 목록의 지원일(Support_Date)과 필터 기준을 맞추기 위해 Year보다 Support_Date를 우선합니다.
      */
     public static function yearSourceColumn(): ?string
     {
-        foreach (['Year', 'Support_Date', 'CreatedDate', 'FGC_CreateDate'] as $column) {
+        foreach (['Support_Date', 'Year', 'CreatedDate', 'FGC_CreateDate'] as $column) {
             if (static::tableHasColumn($column)) {
                 return $column;
             }
@@ -199,37 +202,62 @@ class SupportRecord extends Model
     }
 
     /**
+     * 연도 필터·드롭다운용 SQL — Support_Date(엑셀 serial 포함) 우선, 비어 있으면 Year.
+     */
+    public static function sqlResolvedFilterYearExpression(): ?string
+    {
+        if (static::tableHasColumn('Support_Date')) {
+            $normalizedDate = ExcelSerialDate::sqlNormalizedDateColumn('Support_Date');
+            $driver = Schema::getConnection()->getDriverName();
+            $yearFromSupportDate = match ($driver) {
+                'sqlite' => "CAST(strftime('%Y', {$normalizedDate}) AS INTEGER)",
+                default => "YEAR({$normalizedDate})",
+            };
+
+            if (! static::tableHasColumn('Year')) {
+                return $yearFromSupportDate;
+            }
+
+            $blankSafeSupportDate = ExcelSerialDate::sqlBlankSafeText('Support_Date');
+
+            return "CASE WHEN {$blankSafeSupportDate} IS NOT NULL THEN {$yearFromSupportDate} ELSE ".static::sqlIntegerCast('Year').' END';
+        }
+
+        if (static::tableHasColumn('Year')) {
+            return static::sqlIntegerCast('Year');
+        }
+
+        $column = static::yearSourceColumn();
+        if ($column === null) {
+            return null;
+        }
+
+        return static::yearExpressionForColumn($column);
+    }
+
+    /**
      * 연도 필터 드롭다운용 distinct 연도 목록.
      *
      * @return Collection<int, int>
      */
     public static function distinctFilterYears(): Collection
     {
-        $column = static::yearSourceColumn();
+        $yearExpression = static::sqlResolvedFilterYearExpression();
 
-        if ($column === null) {
+        if ($yearExpression === null) {
             return collect();
         }
 
-        if ($column === 'Year') {
-            return static::query()
-                ->whereNotNull('Year')
-                ->distinct()
-                ->orderByDesc('Year')
-                ->pluck('Year')
-                ->map(fn (mixed $year): int => (int) $year)
-                ->values();
-        }
-
-        $yearExpression = static::yearExpressionForColumn($column);
-
         return static::query()
-            ->whereNotNull($column)
+            ->excludeIssues()
             ->selectRaw("{$yearExpression} as filter_year")
+            ->whereRaw("({$yearExpression}) IS NOT NULL")
+            ->whereRaw("({$yearExpression}) > 0")
             ->distinct()
             ->orderByDesc('filter_year')
             ->pluck('filter_year')
             ->map(fn (mixed $year): int => (int) $year)
+            ->filter(fn (int $year): bool => $year > 0)
             ->values();
     }
 
@@ -243,24 +271,30 @@ class SupportRecord extends Model
         };
     }
 
+    /**
+     * SQLite는 INTEGER, MySQL/MariaDB는 SIGNED·UNSIGNED만 CAST 타입으로 허용.
+     */
+    private static function sqlIntegerCast(string $expression): string
+    {
+        return match (Schema::getConnection()->getDriverName()) {
+            'sqlite' => "CAST({$expression} AS INTEGER)",
+            default => "CAST({$expression} AS UNSIGNED)",
+        };
+    }
+
     public function scopeOfYear(Builder $query, ?int $year): Builder
     {
         if (blank($year)) {
             return $query;
         }
 
-        $column = static::yearSourceColumn();
+        $yearExpression = static::sqlResolvedFilterYearExpression();
 
-        if ($column === null) {
+        if ($yearExpression === null) {
             return $query;
         }
 
-        if ($column === 'Year') {
-            return $query->where('Year', $year);
-        }
-
-        return $query->whereNotNull($column)
-            ->whereYear($column, $year);
+        return $query->whereRaw("({$yearExpression}) = ?", [$year]);
     }
 
     public function scopeOrderedForList(Builder $query): Builder

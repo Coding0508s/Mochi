@@ -8,6 +8,7 @@ use App\Models\SupportRecord;
 use App\Support\SupportRecordCascadeDeleter;
 use App\Support\SupportReportStoredMailNotifier;
 use App\Support\TeamMenuContext;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -647,57 +648,12 @@ class SupportList extends Component
             ->orderedForList()
             ->paginate(20);
 
-        // 필터 드롭다운용 데이터 (Year 컬럼 없으면 Support_Date 연도 사용)
-        // 과거 캐시에 배열 형태 값이 섞여 저장된 경우를 대비해 스칼라 연도로 정규화합니다.
-        $years = collect(Cache::remember('support-list:distinct-years:v2', now()->addMinutes(10), fn () => SupportRecord::distinctFilterYears()))
-            ->map(function (mixed $year): ?int {
-                if (is_array($year)) {
-                    $year = $year['filter_year'] ?? $year['year'] ?? null;
-                }
+        // 필터 드롭다운용 데이터 (지원일 Support_Date 연도 기준, 없으면 Year 등 fallback)
+        $years = $this->yearFilterOptions();
 
-                if (is_object($year)) {
-                    $year = $year->filter_year ?? $year->year ?? null;
-                }
-
-                if (! is_numeric($year)) {
-                    return null;
-                }
-
-                $normalized = (int) $year;
-
-                return $normalized > 0 ? $normalized : null;
-            })
-            ->filter()
-            ->unique()
-            ->sortDesc()
-            ->values();
-
-        $trList = collect(Cache::remember('support-list:tr-list:v2', now()->addMinutes(10), function () {
-            return SupportRecord::tableHasColumn('TR_Name')
-                ? SupportRecord::query()
-                    ->whereNotNull('TR_Name')
-                    ->where('TR_Name', '!=', '')
-                    ->distinct()
-                    ->orderBy('TR_Name')
-                    ->pluck('TR_Name')
-                : collect();
-        }))
-            ->map(function (mixed $tr): ?string {
-                if (is_array($tr)) {
-                    $tr = $tr['TR_Name'] ?? $tr['tr_name'] ?? $tr['name'] ?? null;
-                }
-
-                if (is_object($tr)) {
-                    $tr = $tr->TR_Name ?? $tr->tr_name ?? $tr->name ?? null;
-                }
-
-                $normalized = trim((string) $tr);
-
-                return $normalized !== '' ? $normalized : null;
-            })
-            ->filter()
-            ->unique()
-            ->values();
+        if ($this->filterYear !== '' && ! $years->contains((int) $this->filterYear)) {
+            $this->filterYear = '';
+        }
 
         $shouldLoadInstitutions = $this->showContractModal || $this->showModal;
         $institutions = $shouldLoadInstitutions
@@ -736,7 +692,6 @@ class SupportList extends Component
         return view('livewire.support-list', [
             'records' => $records,
             'years' => $years,
-            'trList' => $trList,
             'institutions' => $institutions,
             'institutionSuggestions' => $institutionSuggestions,
             'contractDocumentRows' => $contractDocumentRows,
@@ -756,5 +711,45 @@ class SupportList extends Component
         }
 
         return '13:00';
+    }
+
+    /**
+     * @return Collection<int, int>
+     */
+    private function yearFilterOptions(): Collection
+    {
+        return SupportRecord::distinctFilterYears()
+            ->flatMap(function (mixed $year): array {
+                if ($year instanceof Collection) {
+                    return $year->all();
+                }
+
+                return [$year];
+            })
+            ->map(function (mixed $year): ?int {
+                if (is_array($year)) {
+                    $year = $year['filter_year'] ?? $year['year'] ?? $year['Year'] ?? null;
+                }
+
+                if (is_object($year)) {
+                    if ($year instanceof Collection) {
+                        return null;
+                    }
+
+                    $year = $year->filter_year ?? $year->year ?? $year->Year ?? null;
+                }
+
+                if (! is_numeric($year)) {
+                    return null;
+                }
+
+                $normalized = (int) $year;
+
+                return $normalized > 0 ? $normalized : null;
+            })
+            ->filter()
+            ->unique()
+            ->sortDesc()
+            ->values();
     }
 }

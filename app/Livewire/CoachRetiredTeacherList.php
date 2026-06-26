@@ -32,6 +32,12 @@ class CoachRetiredTeacherList extends Component
 
     public string $search = '';
 
+    /** '' 전체, yes 추천(Y), no 비추천(-) */
+    public string $filterRecommend = '';
+
+    /** '' 전체, retired 퇴직, reinstated 복직 */
+    public string $filterStatus = '';
+
     public bool $showDetailModal = false;
 
     public ?array $selectedRetirement = null;
@@ -58,6 +64,16 @@ class CoachRetiredTeacherList extends Component
         $this->resetPage();
     }
 
+    public function updatingFilterRecommend(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterStatus(): void
+    {
+        $this->resetPage();
+    }
+
     public function updatedFilterYear(): void
     {
         if ($this->filterYear === '') {
@@ -75,6 +91,8 @@ class CoachRetiredTeacherList extends Component
     {
         $this->search = '';
         $this->filterYear = '';
+        $this->filterRecommend = '';
+        $this->filterStatus = '';
         $this->resetPage();
     }
 
@@ -370,6 +388,8 @@ class CoachRetiredTeacherList extends Component
             ->with($eagerLoad)
             ->tap(fn (Builder $query) => $this->applyYearFilter($query))
             ->tap(fn (Builder $query) => $this->applySearchFilter($query))
+            ->tap(fn (Builder $query) => $this->applyStatusFilter($query))
+            ->tap(fn (Builder $query) => $this->applyRecommendFilter($query))
             ->when($this->listsFromTeachersStatus(), function (Builder $query): void {
                 $this->applyTeacherStatusRetirementDateOrder($query);
             })
@@ -632,6 +652,133 @@ class CoachRetiredTeacherList extends Component
             $q->whereRaw("REPLACE(Name, ' ', '') LIKE ?", [$term])
                 ->orWhereRaw("REPLACE(Account_Name, ' ', '') LIKE ?", [$term])
                 ->orWhere('SK_Code', 'LIKE', $term);
+        });
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     */
+    private function applyStatusFilter(Builder $query): void
+    {
+        if ($this->filterStatus === '') {
+            return;
+        }
+
+        if (! in_array($this->filterStatus, ['retired', 'reinstated'], true)) {
+            $this->filterStatus = '';
+
+            return;
+        }
+
+        $retiredStatus = config('coach_retired_teachers.statuses.retired', '퇴직');
+        $reinstatedStatus = config('coach_retired_teachers.statuses.reinstated', '복직');
+
+        if ($this->listsFromTeachersStatus()) {
+            if ($this->filterStatus === 'retired') {
+                $query->where('Status', $retiredStatus);
+
+                return;
+            }
+
+            $query->where('Status', '!=', $retiredStatus)
+                ->whereHas('retirementRecords');
+
+            return;
+        }
+
+        if ($this->usingTeacherMaster()) {
+            $statusColumn = config('coach_retired_teachers.teacher_master.columns.status', 'Status');
+            $table = $query->getModel()->getTable();
+
+            if (! Schema::hasColumn($table, $statusColumn)) {
+                return;
+            }
+
+            if ($this->filterStatus === 'retired') {
+                $query->where($statusColumn, $retiredStatus);
+
+                return;
+            }
+
+            $query->where($statusColumn, $reinstatedStatus);
+
+            return;
+        }
+
+        $statusColumn = config('coach_retired_teachers.columns.status', 'Status');
+
+        if ($this->filterStatus === 'retired') {
+            $query->where($statusColumn, $retiredStatus);
+
+            return;
+        }
+
+        $query->where($statusColumn, $reinstatedStatus);
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     */
+    private function applyRecommendFilter(Builder $query): void
+    {
+        if ($this->filterRecommend === '') {
+            return;
+        }
+
+        if (! in_array($this->filterRecommend, ['yes', 'no'], true)) {
+            $this->filterRecommend = '';
+
+            return;
+        }
+
+        if (! $this->usingTeacherMaster()) {
+            if (! Schema::hasTable('S_RetirementList')) {
+                return;
+            }
+
+            $column = config('coach_retired_teachers.columns.recommend_yn', 'RecommendYN');
+
+            if ($this->filterRecommend === 'yes') {
+                $query->where($column, true);
+
+                return;
+            }
+
+            $query->where(function (Builder $q) use ($column): void {
+                $q->where($column, false)->orWhereNull($column);
+            });
+
+            return;
+        }
+
+        if (! Schema::hasTable('S_RetirementList')) {
+            if ($this->filterRecommend === 'yes') {
+                $query->whereRaw('1 = 0');
+            }
+
+            return;
+        }
+
+        if ($this->filterRecommend === 'yes') {
+            $query->whereHas('retirementList', function (Builder $recommendQuery): void {
+                $recommendQuery->where(
+                    config('coach_retired_teachers.columns.recommend_yn', 'RecommendYN'),
+                    true,
+                );
+            });
+
+            return;
+        }
+
+        $recommendColumn = config('coach_retired_teachers.columns.recommend_yn', 'RecommendYN');
+
+        $query->where(function (Builder $q) use ($recommendColumn): void {
+            $q->whereDoesntHave('retirementList')
+                ->orWhereHas('retirementList', function (Builder $recommendQuery) use ($recommendColumn): void {
+                    $recommendQuery->where(function (Builder $inner) use ($recommendColumn): void {
+                        $inner->where($recommendColumn, false)->orWhereNull($recommendColumn);
+                    });
+                });
         });
     }
 

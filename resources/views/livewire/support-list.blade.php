@@ -25,19 +25,10 @@
 
             {{-- 년도 선택 --}}
             <select wire:model.live="filterYear"
-                    class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header max-lg:flex-1">
+                    class="shrink-0 min-w-[7.5rem] py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                 <option value="">전체 년도</option>
                 @foreach($years as $year)
                     <option value="{{ $year }}">{{ $year }}년</option>
-                @endforeach
-            </select>
-
-            {{-- 담당자 필터 --}}
-            <select wire:model.live="filterTr"
-                    class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header max-lg:flex-1">
-                <option value="">전체 담당</option>
-                @foreach($trList as $tr)
-                    <option value="{{ $tr }}">{{ $tr }}</option>
                 @endforeach
             </select>
 

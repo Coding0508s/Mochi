@@ -219,6 +219,48 @@ class SupportListModalModeTest extends TestCase
             ->assertDontSee((string) $normal->Account_Name);
     }
 
+    public function test_year_filter_options_list_distinct_years_from_support_records(): void
+    {
+        $this->createSupportRecord(['Year' => 2026, 'Support_Date' => '2026-06-18']);
+        $this->createSupportRecord([
+            'SK_Code' => 'SK-MODAL-2',
+            'Account_Name' => '두번째 기관',
+            'Year' => 2025,
+            'Support_Date' => '2025-12-01',
+        ]);
+
+        $user = User::factory()->create(['name' => '담당자A']);
+
+        $years = Livewire::actingAs($user)
+            ->test(SupportList::class)
+            ->viewData('years');
+
+        $this->assertSame([2026, 2025], $years->all());
+    }
+
+    public function test_year_filter_matches_support_date_shown_in_list(): void
+    {
+        $this->createSupportRecord([
+            'Year' => 2025,
+            'Support_Date' => '2026-02-27',
+            'Account_Name' => '2026년 지원',
+        ]);
+        $this->createSupportRecord([
+            'SK_Code' => 'SK-MODAL-2',
+            'Account_Name' => '2025년 지원',
+            'Year' => 2025,
+            'Support_Date' => '2025-12-01',
+        ]);
+
+        $user = User::factory()->create(['name' => '담당자A']);
+
+        Livewire::actingAs($user)
+            ->test(SupportList::class)
+            ->set('filterYear', '2026')
+            ->assertSee('2026년 지원')
+            ->assertDontSee('2025년 지원');
+    }
+
     /**
      * @param  array<string, mixed>  $overrides
      */
