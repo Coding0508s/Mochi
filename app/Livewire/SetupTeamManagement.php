@@ -13,6 +13,10 @@ class SetupTeamManagement extends Component
 {
     use WithPagination;
 
+    private const MANAGE_DENIED_MESSAGE = '관리자 또는 Setup 관리 권한이 필요합니다.';
+
+    private const DELETE_DENIED_MESSAGE = '관리자만 삭제할 수 있습니다.';
+
     public string $search = '';
 
     public bool $showCreateModal = false;
@@ -44,7 +48,9 @@ class SetupTeamManagement extends Component
 
     public function openCreateModal(): void
     {
-        Gate::authorize('manageTeamStructure');
+        if (! $this->ensureCanManageTeamStructure()) {
+            return;
+        }
 
         $this->newDeptName = '';
         $this->newAdmrDept = '';
@@ -63,7 +69,9 @@ class SetupTeamManagement extends Component
 
     public function createTeam(): void
     {
-        Gate::authorize('manageTeamStructure');
+        if (! $this->ensureCanManageTeamStructure()) {
+            return;
+        }
 
         $this->newAdmrDept = $this->normalizeOptionalParentDept($this->newAdmrDept);
 
@@ -88,13 +96,17 @@ class SetupTeamManagement extends Component
             'LOCATION' => trim((string) ($validated['newLocation'] ?? '')),
         ]);
 
+        Department::forgetPeopleSidebarCache();
+
         $this->closeCreateModal();
         session()->flash('success', "새 팀({$newDeptNo})이 생성되었습니다.");
     }
 
     public function openEditModal(string $deptNo): void
     {
-        Gate::authorize('manageTeamStructure');
+        if (! $this->ensureCanManageTeamStructure()) {
+            return;
+        }
 
         $team = Department::query()->where('DEPTNO', $deptNo)->first();
         if (! $team) {
@@ -123,7 +135,9 @@ class SetupTeamManagement extends Component
 
     public function updateTeam(): void
     {
-        Gate::authorize('manageTeamStructure');
+        if (! $this->ensureCanManageTeamStructure()) {
+            return;
+        }
 
         $this->editAdmrDept = $this->normalizeOptionalParentDept($this->editAdmrDept);
 
@@ -150,13 +164,17 @@ class SetupTeamManagement extends Component
         $team->LOCATION = trim((string) ($validated['editLocation'] ?? ''));
         $team->save();
 
+        Department::forgetPeopleSidebarCache();
+
         $this->closeEditModal();
         session()->flash('success', "팀({$team->DEPTNO}) 정보가 수정되었습니다.");
     }
 
     public function openDeleteModal(string $deptNo): void
     {
-        Gate::authorize('manageTeamStructure');
+        if (! $this->ensureCanDeleteTeamStructure()) {
+            return;
+        }
 
         $this->deleteDeptNo = $deptNo;
         $this->resetErrorBag();
@@ -174,7 +192,9 @@ class SetupTeamManagement extends Component
 
     public function deleteTeam(): void
     {
-        Gate::authorize('deleteTeamStructure');
+        if (! $this->ensureCanDeleteTeamStructure()) {
+            return;
+        }
 
         $validated = $this->validate([
             'deleteDeptNo' => ['required', 'string', Rule::exists('department', 'DEPTNO')],
@@ -193,6 +213,7 @@ class SetupTeamManagement extends Component
         }
 
         Department::query()->where('DEPTNO', $deptNo)->delete();
+        Department::forgetPeopleSidebarCache();
         $this->closeDeleteModal();
         session()->flash('success', "팀({$deptNo})이 삭제되었습니다.");
     }
@@ -230,6 +251,42 @@ class SetupTeamManagement extends Component
             'teams' => $teams,
             'parentOptions' => $parentOptions,
         ]);
+    }
+
+    private function ensureCanManageTeamStructure(): bool
+    {
+        if (Gate::allows('manageTeamStructure')) {
+            return true;
+        }
+
+        $this->flashTeamStructureDenied(self::MANAGE_DENIED_MESSAGE);
+        $this->closeAllTeamModals();
+
+        return false;
+    }
+
+    private function ensureCanDeleteTeamStructure(): bool
+    {
+        if (Gate::allows('deleteTeamStructure')) {
+            return true;
+        }
+
+        $this->flashTeamStructureDenied(self::DELETE_DENIED_MESSAGE);
+        $this->closeDeleteModal();
+
+        return false;
+    }
+
+    private function flashTeamStructureDenied(string $message): void
+    {
+        session()->flash('warning', $message);
+    }
+
+    private function closeAllTeamModals(): void
+    {
+        $this->closeCreateModal();
+        $this->closeEditModal();
+        $this->closeDeleteModal();
     }
 
     private function nextDeptNo(): string

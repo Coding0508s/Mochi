@@ -687,6 +687,8 @@ class PeopleEmployeesList extends Component
             'LOCATION' => '',
         ]);
 
+        Department::forgetPeopleSidebarCache();
+
         $this->closeCreateTeamModal();
         session()->flash('success', "새 팀({$newDeptNo})이 생성되었습니다.");
     }
@@ -741,6 +743,8 @@ class PeopleEmployeesList extends Component
 
             return;
         }
+
+        Department::forgetPeopleSidebarCache();
 
         if ($this->filterDept === $deptNo) {
             $this->filterDept = '';

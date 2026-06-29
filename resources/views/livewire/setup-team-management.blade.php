@@ -5,6 +5,15 @@
         </div>
     @endif
 
+    @if(session('warning'))
+        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center gap-2" data-mochi-flash-dismiss="5000" role="status">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            {{ session('warning') }}
+        </div>
+    @endif
+
     <div class="mochi-filter-card">
         <div class="flex flex-wrap items-center gap-3">
             <h3 class="text-sm font-semibold text-gray-800">조직/팀 관리</h3>
@@ -20,11 +29,13 @@
                            placeholder="팀코드/팀명 검색"
                            class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
+                @can('manageTeamStructure')
                 <button type="button"
                         wire:click="openCreateModal"
                         class="py-2 px-3 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 cursor-pointer">
                     팀 생성
                 </button>
+                @endcan
             </div>
         </div>
     </div>
@@ -52,16 +63,25 @@
                             <td class="px-3 py-2 text-center text-gray-700">{{ (int) ($team->employee_count ?? 0) }}</td>
                             <td class="px-3 py-2">
                                 <div class="flex items-center justify-center gap-1.5">
+                                    @can('manageTeamStructure')
                                     <button type="button"
                                             wire:click="openEditModal('{{ $team->DEPTNO }}')"
                                             class="px-2 py-1 text-xs rounded border border-blue-200 text-blue-700 hover:bg-blue-50 cursor-pointer">
                                         수정
                                     </button>
+                                    @endcan
+                                    @can('deleteTeamStructure')
                                     <button type="button"
                                             wire:click="openDeleteModal('{{ $team->DEPTNO }}')"
                                             class="px-2 py-1 text-xs rounded border border-rose-200 text-rose-700 hover:bg-rose-50 cursor-pointer">
                                         삭제
                                     </button>
+                                    @endcan
+                                    @cannot('manageTeamStructure')
+                                    @cannot('deleteTeamStructure')
+                                    <span class="text-xs text-gray-400">-</span>
+                                    @endcannot
+                                    @endcannot
                                 </div>
                             </td>
                         </tr>
