@@ -423,6 +423,32 @@ final class InstitutionAccountListQuery
         return null;
     }
 
+    public function hasAnyManageableInstitutionForCurrentUser(): bool
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->hasFullAccess()) {
+            return true;
+        }
+
+        $rawAliases = $this->resolveCurrentUserManagerRawAliases();
+        if ($rawAliases === []) {
+            return false;
+        }
+
+        $column = $this->currentUserManagerColumn();
+        if ($column === null) {
+            return false;
+        }
+
+        return DB::table('S_Account_Information')
+            ->whereIn($column, $rawAliases)
+            ->exists();
+    }
+
     public function currentUserCanManageInstitution(string $skCode): bool
     {
         $skCode = trim($skCode);

@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Observers\SharedSupplyObserver;
 use App\Policies\SharedSupplyPolicy;
 use App\Policies\TeamSchedulePolicy;
+use App\Support\InstitutionAccountListQuery;
 use App\Support\ManagerNameNormalizer;
 use App\Support\TeacherSupportReportEditAuthorization;
 use App\Support\TeamMenuContext;
@@ -76,6 +77,38 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('deleteTeamStructure', fn (?User $user): bool => (bool) ($user?->canDeletePlatformData()));
 
         Gate::define('deleteContactRecords', fn (?User $user): bool => (bool) ($user?->canDeletePlatformData()));
+
+        Gate::define('createContactRecord', function (?User $user, ?string $skCode = null): bool {
+            if ($user === null) {
+                return false;
+            }
+
+            if ($user->hasFullAccess()) {
+                return true;
+            }
+
+            $institutionQuery = app(InstitutionAccountListQuery::class);
+
+            $trimmedSkCode = trim((string) $skCode);
+            if ($trimmedSkCode === '') {
+                return $institutionQuery->hasAnyManageableInstitutionForCurrentUser();
+            }
+
+            return $institutionQuery->currentUserCanManageInstitution($trimmedSkCode);
+        });
+
+        Gate::define('updateContactRecord', function (?User $user, Teacher $teacher): bool {
+            if ($user === null) {
+                return false;
+            }
+
+            if ($user->hasFullAccess()) {
+                return true;
+            }
+
+            return app(InstitutionAccountListQuery::class)
+                ->currentUserCanManageInstitution((string) ($teacher->SK_Code ?? ''));
+        });
 
         /** 기관 지원 보고서(S_SupportInfo_Account) 삭제 — 관리자만 */
         Gate::define('deleteSupportRecords', fn (?User $user): bool => (bool) ($user?->canDeletePlatformData()));
