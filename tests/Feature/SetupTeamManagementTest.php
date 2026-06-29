@@ -7,6 +7,7 @@ use App\Models\Department;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -79,5 +80,76 @@ class SetupTeamManagementTest extends TestCase
             ->test(SetupTeamManagement::class)
             ->call('openEditModal', 'A05')
             ->assertSet('editAdmrDept', '');
+    }
+
+    public function test_update_team_forgets_people_sidebar_cache(): void
+    {
+        Cache::put(Department::PEOPLE_SIDEBAR_CACHE_KEY, [
+            ['DEPTNO' => 'A01', 'DEPTNAME' => 'CEO'],
+        ], 600);
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(SetupTeamManagement::class)
+            ->call('openEditModal', 'A05')
+            ->set('editDeptName', 'Coach Team')
+            ->call('updateTeam')
+            ->assertHasNoErrors();
+
+        $this->assertFalse(Cache::has(Department::PEOPLE_SIDEBAR_CACHE_KEY));
+    }
+
+    public function test_deputy_admin_cannot_update_team_and_sees_warning(): void
+    {
+        $deputy = User::factory()->deputyAdmin()->create();
+
+        Livewire::actingAs($deputy)
+            ->test(SetupTeamManagement::class)
+            ->call('openEditModal', 'A05')
+            ->assertSet('showEditModal', false)
+            ->assertSee('관리자 또는 Setup 관리 권한이 필요합니다.');
+
+        $this->assertSame('Coach', Department::query()->find('A05')?->DEPTNAME);
+    }
+
+    public function test_deputy_admin_cannot_delete_team_and_sees_warning(): void
+    {
+        $deputy = User::factory()->deputyAdmin()->create();
+
+        Livewire::actingAs($deputy)
+            ->test(SetupTeamManagement::class)
+            ->call('openDeleteModal', 'A05')
+            ->assertSet('showDeleteModal', false)
+            ->assertSee('관리자만 삭제할 수 있습니다.');
+
+        $this->assertNotNull(Department::query()->find('A05'));
+    }
+
+    public function test_setup_manage_user_can_update_but_not_delete_team(): void
+    {
+        $manager = User::factory()->create([
+            'setup_view' => true,
+            'setup_manage' => true,
+        ]);
+
+        Livewire::actingAs($manager)
+            ->test(SetupTeamManagement::class)
+            ->call('openEditModal', 'A05')
+            ->assertSet('showEditModal', true)
+            ->set('editDeptName', 'Coach Updated')
+            ->call('updateTeam')
+            ->assertHasNoErrors()
+            ->assertSee('팀(A05) 정보가 수정되었습니다.');
+
+        $this->assertSame('Coach Updated', Department::query()->find('A05')?->DEPTNAME);
+
+        Livewire::actingAs($manager)
+            ->test(SetupTeamManagement::class)
+            ->call('openDeleteModal', 'A05')
+            ->assertSet('showDeleteModal', false)
+            ->assertSee('관리자만 삭제할 수 있습니다.');
+
+        $this->assertNotNull(Department::query()->find('A05'));
     }
 }

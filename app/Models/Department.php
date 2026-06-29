@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\DepartmentDisplay;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class Department extends Model
 {
@@ -30,6 +31,8 @@ class Department extends Model
         'FGC_Creator',
     ];
 
+    public const PEOPLE_SIDEBAR_CACHE_KEY = 'layout:people-teams:v1';
+
     /**
      * People 사이드바 팀 메뉴 상단 고정 순서 (DEPTNAME 기준, 대소문자 무시).
      *
@@ -45,12 +48,9 @@ class Department extends Model
         return DepartmentDisplay::name((string) $this->DEPTNO, $this->DEPTNAME);
     }
 
-    /**
-     * People 사이드바 팀 목록에서 Online Team 부서는 숨긴다(비활성 직원 메뉴로 대체).
-     */
-    public function showsInactiveEmployeesInSidebar(): bool
+    public static function forgetPeopleSidebarCache(): void
     {
-        return strcasecmp(trim((string) $this->DEPTNAME), 'Online Team') === 0;
+        Cache::forget(self::PEOPLE_SIDEBAR_CACHE_KEY);
     }
 
     public function peopleSidebarSortRank(): int

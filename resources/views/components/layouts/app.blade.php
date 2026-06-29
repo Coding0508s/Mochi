@@ -52,7 +52,7 @@
 
     if ($hasDepartmentTable) {
         $cachedTeams = \Illuminate\Support\Facades\Cache::remember(
-            'layout:people-teams:v1',
+            \App\Models\Department::PEOPLE_SIDEBAR_CACHE_KEY,
             now()->addMinutes(10),
             fn (): array => \App\Models\Department::query()
                 ->select('DEPTNO', 'DEPTNAME')
@@ -246,9 +246,6 @@
                     </a>
 
                     @foreach($peopleTeams as $team)
-                        @if($team->showsInactiveEmployeesInSidebar())
-                            @continue
-                        @endif
                         <a href="{{ route('people.index', ['team' => $team->DEPTNO]) }}"
                            class="sidebar-subitem sidebar-subitem-row sidebar-focusable
                                   {{ request()->routeIs('people.*') && $activePeopleTeam === (string) $team->DEPTNO && $activePeopleStatus === ''

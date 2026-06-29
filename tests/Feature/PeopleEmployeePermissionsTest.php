@@ -311,7 +311,7 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->assertSee('비활성화 직원', false);
     }
 
-    public function test_people_sidebar_hides_online_team_department_from_team_list(): void
+    public function test_people_sidebar_lists_online_team_department_in_team_list(): void
     {
         Department::query()->insert([
             'DEPTNO' => 'A99',
@@ -326,7 +326,7 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->get(route('people.index'))
             ->assertOk()
             ->assertSee('비활성화 직원', false)
-            ->assertDontSee('>Online Team<', false);
+            ->assertSee('>Online Team<', false);
     }
 
     public function test_people_sidebar_lists_ceo_before_board_of_directors(): void
