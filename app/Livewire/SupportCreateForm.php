@@ -133,6 +133,7 @@ class SupportCreateForm extends Component
             ? (string) $requestedTeamMenu
             : (TeamMenuContext::activeMenu($user) ?? 'co');
         $this->applyInitialReportMode();
+        $this->applyDefaultCompletionForReportMode();
 
         $prefillId = $potentialTargetId ?? request()->integer('potential_target_id');
         if ($prefillId > 0) {
@@ -163,6 +164,7 @@ class SupportCreateForm extends Component
             $this->formTarget = $prefillTeacherName;
             if ($this->canUseTeacherReportMode()) {
                 $this->reportMode = 'teacher';
+                $this->applyDefaultCompletionForReportMode();
             }
             $this->syncFormTeacherIdFromTargetName();
         }
@@ -233,6 +235,11 @@ class SupportCreateForm extends Component
         $this->reportMode = $this->defaultReportMode();
     }
 
+    private function applyDefaultCompletionForReportMode(): void
+    {
+        $this->formCompleted = $this->reportMode === 'institution';
+    }
+
     public function setReportMode(string $mode): void
     {
         if (! in_array($mode, ['institution', 'teacher', 'issue'], true)) {
@@ -255,6 +262,7 @@ class SupportCreateForm extends Component
         $this->reportMode = $mode;
 
         if ($previousMode !== $this->reportMode) {
+            $this->applyDefaultCompletionForReportMode();
             $this->syncCommunicationTemplatesOnModeChange($previousMode);
             $this->formTeacherId = null;
 

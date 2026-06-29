@@ -25,7 +25,15 @@ final class SupportReportMailBodyFormatter
             return self::visitToAccountHtml($text);
         }
 
-        return '<p style="margin:0; white-space:pre-wrap; line-height:1.5;">'.e($text).'</p>';
+        return '<p style="margin:0; line-height:1.5;">'.self::textWithLineBreaks($text).'</p>';
+    }
+
+    /** Escape user-entered text while making line breaks reliable in HTML emails. */
+    public static function textWithLineBreaks(?string $text, string $empty = '—'): string
+    {
+        $value = filled($text) ? (string) $text : $empty;
+
+        return nl2br(e($value), false);
     }
 
     private static function visitToAccountHtml(string $text): string
@@ -61,25 +69,25 @@ final class SupportReportMailBodyFormatter
 
         return $html !== ''
             ? $html
-            : '<p style="margin:0; white-space:pre-wrap; line-height:1.5;">'.e($text).'</p>';
+            : '<p style="margin:0; line-height:1.5;">'.self::textWithLineBreaks($text).'</p>';
     }
 
     private static function sectionHtml(string $label, string $body, bool $isFirst): string
     {
         $marginTop = $isFirst ? '0' : '14px';
         $headerStyle = 'margin:'.$marginTop.' 0 6px; font-weight:bold; color:'.self::SECTION_HEADER_COLOR.'; font-size:15px;';
-        $bodyStyle = 'margin:0; white-space:pre-wrap; line-height:1.5;';
+        $bodyStyle = 'margin:0; line-height:1.5;';
 
         return '<div style="'.$headerStyle.'">'.e($label).'</div>'
-            .'<div style="'.$bodyStyle.'">'.e($body !== '' ? $body : '—').'</div>';
+            .'<div style="'.$bodyStyle.'">'.self::textWithLineBreaks($body !== '' ? $body : null).'</div>';
     }
 
     private static function plainBlockHtml(string $block, bool $isFirst): string
     {
         $marginTop = $isFirst ? '0' : '14px';
 
-        return '<div style="margin:'.$marginTop.' 0 0; white-space:pre-wrap; line-height:1.5;">'
-            .e($block)
+        return '<div style="margin:'.$marginTop.' 0 0; line-height:1.5;">'
+            .self::textWithLineBreaks($block)
             .'</div>';
     }
 }

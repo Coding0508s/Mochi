@@ -410,6 +410,7 @@ class SupportCreateFormTest extends TestCase
             ->withQueryParams(['team_menu' => 'co'])
             ->test(SupportCreateForm::class)
             ->assertSet('reportMode', 'institution')
+            ->assertSet('formCompleted', true)
             ->call('setReportMode', 'teacher')
             ->assertSet('reportMode', 'institution');
     }
@@ -422,8 +423,26 @@ class SupportCreateFormTest extends TestCase
             ->withQueryParams(['team_menu' => 'coach'])
             ->test(SupportCreateForm::class)
             ->assertSet('reportMode', 'teacher')
+            ->assertSet('formCompleted', false)
             ->assertSet('formCoachTeacherCreateAction', 'visit')
             ->assertSee('Coach Team 교사 지원 및 참관 보고서 작성');
+    }
+
+    public function test_completion_default_updates_when_switching_report_modes(): void
+    {
+        $user = User::factory()->create(['team' => 'COACH']);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'coach'])
+            ->test(SupportCreateForm::class)
+            ->assertSet('reportMode', 'teacher')
+            ->assertSet('formCompleted', false)
+            ->call('setReportMode', 'institution')
+            ->assertSet('reportMode', 'institution')
+            ->assertSet('formCompleted', true)
+            ->call('setReportMode', 'teacher')
+            ->assertSet('reportMode', 'teacher')
+            ->assertSet('formCompleted', false);
     }
 
     public function test_coach_team_teacher_report_mode_stays_on_support_form_page(): void
@@ -810,7 +829,8 @@ class SupportCreateFormTest extends TestCase
         Livewire::actingAs($user)
             ->withQueryParams(['team_menu' => 'cs', 'report_mode' => 'institution'])
             ->test(SupportCreateForm::class)
-            ->assertSet('reportMode', 'institution');
+            ->assertSet('reportMode', 'institution')
+            ->assertSet('formCompleted', true);
     }
 
     public function test_cs_team_cannot_use_teacher_report_mode(): void
