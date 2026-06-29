@@ -42,6 +42,51 @@ class InboundNotificationBellTest extends TestCase
             ->assertSee('TEA 기관 정보가 반영되었습니다.');
     }
 
+    public function test_local_assignment_update_log_is_visible_to_admin_and_regular_users(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $member = User::factory()->create(['is_admin' => false]);
+
+        ExternalAssignmentInboundLog::query()->create([
+            'sk_code' => 'SK-LOCAL-1',
+            'co' => 'New CO',
+            'tr' => 'Old TR',
+            'cs' => 'Old CS',
+            'raw_body' => [
+                'source' => 'mochi_assignment_update',
+                'origin' => 'A',
+                'institution_name' => 'MOCHI 내부 변경 기관',
+                'co' => 'New CO',
+                'tr' => 'Old TR',
+                'cs' => 'Old CS',
+                'before' => [
+                    'co' => 'Old CO',
+                    'tr' => 'Old TR',
+                    'cs' => 'Old CS',
+                ],
+            ],
+            'status' => 'applied',
+            'received_at' => now(),
+            'applied_at' => now(),
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(InboundNotificationBell::class)
+            ->assertSet('unreadCount', 1)
+            ->call('loadPanelData')
+            ->assertSee('MOCHI 내부 변경 기관 기관의 담당자가 변경되었습니다.')
+            ->assertSee('Old CO')
+            ->assertSee('New CO');
+
+        Livewire::actingAs($member)
+            ->test(InboundNotificationBell::class)
+            ->assertSet('unreadCount', 1)
+            ->call('loadPanelData')
+            ->assertSee('MOCHI 내부 변경 기관 기관의 담당자가 변경되었습니다.')
+            ->assertSee('Old CO')
+            ->assertSee('New CO');
+    }
+
     public function test_regular_user_can_mark_inbound_notifications_as_read(): void
     {
         $user = User::factory()->create([

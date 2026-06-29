@@ -6,6 +6,7 @@ use App\Enums\SyncOrigin;
 use App\Jobs\SyncInstitutionOutboundJob;
 use App\Models\AccountInformation;
 use App\Models\AssignmentChangeRequest;
+use App\Models\ExternalAssignmentInboundLog;
 use App\Models\GsNumber;
 use App\Models\Institution;
 use App\Models\SkCodeRequest;
@@ -209,6 +210,16 @@ class InstitutionPersistenceSupport
                     'cs' => filled($payload['cs'] ?? null) ? trim((string) $payload['cs']) : null,
                 ]
             );
+            $this->createLocalAssignmentInboundLogIfNeeded(
+                $newSk,
+                $accountName,
+                $beforeAccountInfo,
+                [
+                    'co' => filled($payload['co'] ?? null) ? trim((string) $payload['co']) : null,
+                    'tr' => filled($payload['tr'] ?? null) ? trim((string) $payload['tr']) : null,
+                    'cs' => filled($payload['cs'] ?? null) ? trim((string) $payload['cs']) : null,
+                ]
+            );
 
             if (Schema::hasTable('S_GSNumber')) {
                 GsNumber::query()->updateOrCreate(
@@ -286,6 +297,12 @@ class InstitutionPersistenceSupport
                 $existing,
                 ['co' => $co, 'tr' => $tr, 'cs' => $cs]
             );
+            $this->createLocalAssignmentInboundLogIfNeeded(
+                $skCode,
+                $accountName,
+                $existing,
+                ['co' => $co, 'tr' => $tr, 'cs' => $cs]
+            );
 
             DB::afterCommit(function () use ($skCode): void {
                 SyncInstitutionOutboundJob::dispatchIf(
@@ -295,5 +312,52 @@ class InstitutionPersistenceSupport
                 );
             });
         });
+    }
+
+    /**
+     * @param  array{co?: string|null, tr?: string|null, cs?: string|null}  $after
+     */
+    private function createLocalAssignmentInboundLogIfNeeded(
+        string $skCode,
+        string $institutionName,
+        ?AccountInformation $before,
+        array $after
+    ): void {
+        $beforeValues = [
+            'co' => $this->normalizeManagerValue($before?->CO),
+            'tr' => $this->normalizeManagerValue($before?->TR),
+            'cs' => $this->normalizeManagerValue($before?->CS),
+        ];
+        $afterValues = [
+            'co' => $this->normalizeManagerValue($after['co'] ?? null),
+            'tr' => $this->normalizeManagerValue($after['tr'] ?? null),
+            'cs' => $this->normalizeManagerValue($after['cs'] ?? null),
+        ];
+
+        if ($beforeValues === $afterValues) {
+            return;
+        }
+
+        $changedBy = trim((string) (auth()->user()?->nameForCoReports() ?? ''));
+        ExternalAssignmentInboundLog::query()->create([
+            'sk_code' => $skCode,
+            'co' => $afterValues['co'],
+            'tr' => $afterValues['tr'],
+            'cs' => $afterValues['cs'],
+            'raw_body' => [
+                'source' => 'mochi_assignment_update',
+                'origin' => AssignmentChangeRequest::ORIGIN_LOCAL,
+                'institution_name' => trim($institutionName) !== '' ? trim($institutionName) : null,
+                'co' => $afterValues['co'],
+                'tr' => $afterValues['tr'],
+                'cs' => $afterValues['cs'],
+                'before' => $beforeValues,
+                'changed_fields' => ['assignee'],
+                'changed_by' => $changedBy !== '' ? $changedBy : 'Internal Update',
+            ],
+            'status' => 'applied',
+            'received_at' => now(),
+            'applied_at' => now(),
+        ]);
     }
 }
