@@ -712,12 +712,7 @@ class SupportCreateFormTest extends TestCase
             '_1st_Support_Type' => '교사 지원 및 참관',
         ]);
 
-        Mail::assertSent(SupportReportStoredMail::class, function (SupportReportStoredMail $mail): bool {
-            return $mail->hasTo('visit-form@test.org')
-                && $mail->supportRecord->Support_Type === '교사 지원 및 참관'
-                && $mail->reportSavedOpening === 'Coach Team 교사 지원 보고서'
-                && $mail->reportAssigneeColumnLabel === '담당 Coach';
-        });
+        Mail::assertNothingSent();
     }
 
     public function test_coach_team_complete_visit_save_shows_alert_when_required_fields_missing(): void
@@ -854,6 +849,32 @@ class SupportCreateFormTest extends TestCase
             ->withQueryParams(['team_menu' => 'cs', 'report_mode' => 'teacher'])
             ->test(SupportCreateForm::class)
             ->assertSet('reportMode', 'issue');
+    }
+
+    public function test_save_does_not_send_mail_when_institution_report_not_completed(): void
+    {
+        Mail::fake();
+
+        config([
+            'support_report_mail.notify_addresses' => ['group@test.org'],
+        ]);
+
+        Institution::query()->create([
+            'SKcode' => 'SK-MAIL-INPROG',
+            'AccountName' => '진행중 메일 테스트',
+        ]);
+
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-MAIL-INPROG')
+            ->set('formCompleted', false)
+            ->set('formToAccount', '기관 소통 본문')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        Mail::assertNothingSent();
     }
 
     public function test_save_sends_mail_when_support_report_notify_addresses_configured(): void

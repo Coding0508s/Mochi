@@ -82,6 +82,14 @@ final class SupportReportStoredMailNotifier
         ?string $teamMenu = null,
         string $reportMode = 'institution',
     ): void {
+        if ($reportMode === 'teacher') {
+            return;
+        }
+
+        if (! $supportRecord->isCompleted()) {
+            return;
+        }
+
         $notify = config('support_report_mail.notify_addresses', []);
         if ($notify === []) {
             return;
