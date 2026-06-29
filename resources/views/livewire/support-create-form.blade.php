@@ -253,7 +253,7 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">지원 방법</label>
-                            <select wire:model="visitForm.meeting_type"
+                            <select wire:model.change.live="visitForm.meeting_type"
                                     class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 @foreach(($visitConfig['method_options'] ?? []) as $method)
                                     <option value="{{ $method }}">{{ $method }}</option>
@@ -419,7 +419,7 @@
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">지원 방법</label>
-                        <select wire:model="formSupportType"
+                        <select wire:model.change.live="formSupportType"
                                 @disabled(!$institutionSelected)
                                 class="w-full py-1.5 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
                                        {{ $institutionSelected ? 'border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}">
