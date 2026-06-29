@@ -2,7 +2,7 @@
 @auth
 <div
     class="relative flex shrink-0 items-center"
-    wire:poll.visible.120s="refreshUnreadCount"
+    wire:poll.keep-alive.120s="refreshUnreadCount"
     x-data="{ open: false }"
     @click.outside="open = false"
 >
