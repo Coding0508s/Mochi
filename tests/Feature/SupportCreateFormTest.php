@@ -473,7 +473,9 @@ class SupportCreateFormTest extends TestCase
             ->withQueryParams(['team_menu' => 'co'])
             ->test(SupportCreateForm::class)
             ->call('selectInstitution', 'SK-SUPPORT-METHOD')
-            ->assertSee('wire:model.change.live="formSupportType"', false);
+            ->assertSee('wire:key="support-create-standard-report"', false)
+            ->assertSee('wire:model.change.live="formSupportType"', false)
+            ->assertSee('<option value="대면">대면</option>', false);
     }
 
     public function test_coach_teacher_selection_accepts_livewire_string_teacher_id(): void

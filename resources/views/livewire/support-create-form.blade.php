@@ -155,7 +155,7 @@
                 </div>
 
                 @if($coachTypedTeacherCreate)
-                    <div class="grid grid-cols-2 gap-3">
+                    <div wire:key="support-create-coach-teacher-picker" class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">
                                 담당 Coach
@@ -194,7 +194,7 @@
                         <p class="text-xs text-gray-500">기관과 교사를 선택하면 11번째 교사 지원 및 참관 보고서 입력 영역이 이 페이지에 바로 표시됩니다.</p>
                     </div>
                 @elseif($coachTypedTeacherSupportForm)
-                    <div class="grid grid-cols-2 gap-3">
+                    <div wire:key="support-create-coach-typed-report" class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">담당 Coach</label>
                             <input type="text"
@@ -350,7 +350,7 @@
                     </div>
                 @elseif($reportMode === 'issue')
                 {{-- ── 기관 이슈(경량) 입력 ── --}}
-                <div class="grid grid-cols-2 gap-3">
+                <div wire:key="support-create-issue-report" class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             발생일 <span class="text-red-500">*</span>
@@ -401,7 +401,7 @@
                 </div>
                 @else
                 {{-- ── 2행~: 나머지 필드 2열 그리드 (기관/CS 교사 지원) ── --}}
-                <div class="grid grid-cols-2 gap-3">
+                <div wire:key="support-create-standard-report" class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             지원 날짜 <span class="text-red-500">*</span>
@@ -424,7 +424,7 @@
                                 class="w-full py-1.5 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
                                        {{ $institutionSelected ? 'border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}">
                             @foreach($supportTypeOptions as $supportTypeOption)
-                                <option>{{ $supportTypeOption }}</option>
+                                <option value="{{ $supportTypeOption }}">{{ $supportTypeOption }}</option>
                             @endforeach
                         </select>
                     </div>
