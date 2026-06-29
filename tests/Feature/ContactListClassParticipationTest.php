@@ -61,7 +61,7 @@ class ContactListClassParticipationTest extends TestCase
     {
         $this->seedInstitution('SK-UNSET-1');
 
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         Livewire::actingAs($user)
             ->test(ContactList::class)
@@ -90,7 +90,7 @@ class ContactListClassParticipationTest extends TestCase
             'Status' => '활성화',
         ]);
 
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         Livewire::actingAs($user)
             ->test(ContactList::class)
@@ -110,7 +110,7 @@ class ContactListClassParticipationTest extends TestCase
             'Status' => '활성화',
         ]);
 
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
 
         Livewire::actingAs($user)
             ->test(ContactList::class)

@@ -8,6 +8,7 @@ use App\Models\Institution;
 use App\Models\Teacher;
 use App\Models\User;
 use App\Support\CoachTeacherScope;
+use App\Support\InstitutionAccountListQuery;
 use App\Support\RetirementListWriter;
 use App\Support\SkCodeNormalizer;
 use App\Support\TeacherMasterWriter;
@@ -128,6 +129,8 @@ class ContactList extends Component
     // ─── 모달 열기 / 닫기 ─────────────────────────────────────────
     public function openCreateModal(): void
     {
+        Gate::authorize('createContactRecord');
+
         $this->resetModal();
         $this->editingId = null;
         $this->showModal = true;
@@ -138,6 +141,7 @@ class ContactList extends Component
         $teacher = Teacher::query()
             ->with('institution.accountInfo')
             ->findOrFail($id);
+        Gate::authorize('updateContactRecord', $teacher);
 
         $this->editingId = $teacher->ID;
         $this->newName = (string) ($teacher->Name ?? '');
@@ -312,6 +316,14 @@ class ContactList extends Component
     // ─── 신규 교사 저장 ───────────────────────────────────────────
     public function save(): void
     {
+        $existingTeacher = $this->editingId
+            ? Teacher::query()->findOrFail($this->editingId)
+            : null;
+
+        if ($existingTeacher) {
+            Gate::authorize('updateContactRecord', $existingTeacher);
+        }
+
         // 사용자가 앞/뒤 공백을 넣어도 동일 이메일로 처리되도록 정리합니다.
         $this->newEmail = trim($this->newEmail);
 
@@ -343,13 +355,11 @@ class ContactList extends Component
             'newLittleSeedEssentials' => ['nullable', 'date'],
         ], $this->messages);
 
+        Gate::authorize('createContactRecord', $this->newSkCode);
+
         $isActive = $this->newEmploymentStatus === 'active';
         $grapeDate = trim($this->newGrapeSeedEssentials);
         $littleDate = trim($this->newLittleSeedEssentials);
-
-        $existingTeacher = $this->editingId
-            ? Teacher::query()->find($this->editingId)
-            : null;
 
         if ($existingTeacher?->isRetired() && $isActive) {
             session()->flash('warning', '퇴직 교사는 「복직 처리」를 사용해 주세요. 연락처 수정만으로 재직 상태가 바뀌지 않습니다.');
@@ -626,7 +636,7 @@ class ContactList extends Component
         $this->hydrateTeacherInstitutions($teachers->getCollection());
 
         $statsQuery = Teacher::query();
-        CoachTeacherScope::apply($statsQuery);
+        $this->applyContactVisibilityScope($statsQuery);
         $totalCount = (clone $statsQuery)->count();
         $activeCount = (clone $statsQuery)->where('ClassInOut', true)->count();
         $inactiveCount = (clone $statsQuery)->where('ClassInOut', false)->count();
@@ -635,9 +645,17 @@ class ContactList extends Component
         if ($this->showModal && blank($this->newSkCode)) {
             $keyword = trim($this->newInstitutionKeyword);
             if ($keyword !== '') {
-                $teacherInstitutionSuggestions = Institution::query()
+                $teacherInstitutionQuery = Institution::query()
                     ->with('accountInfo')
-                    ->whereNotNull('SKcode')
+                    ->whereNotNull('SKcode');
+
+                $user = auth()->user();
+                if (! $user?->hasFullAccess()) {
+                    app(InstitutionAccountListQuery::class)
+                        ->applyCurrentUserManagerScope($teacherInstitutionQuery);
+                }
+
+                $teacherInstitutionSuggestions = $teacherInstitutionQuery
                     ->search($keyword)
                     ->orderBy('AccountName')
                     ->limit(15)
@@ -652,8 +670,24 @@ class ContactList extends Component
             'totalCount' => $totalCount,
             'activeCount' => $activeCount,
             'inactiveCount' => $inactiveCount,
+            'canCreateContactRecords' => Gate::allows('createContactRecord'),
+            'canEditSelectedContact' => $this->canEditSelectedContact(),
             'canReinstateCurrentTeacher' => $this->canReinstateTeacher($this->editingId),
         ]);
+    }
+
+    private function canEditSelectedContact(): bool
+    {
+        if ($this->selectedContact === null || ! isset($this->selectedContact['id'])) {
+            return false;
+        }
+
+        $teacher = Teacher::query()->find((int) $this->selectedContact['id']);
+        if (! $teacher) {
+            return false;
+        }
+
+        return Gate::allows('updateContactRecord', $teacher);
     }
 
     private function formatDate(mixed $value): string
@@ -675,9 +709,19 @@ class ContactList extends Component
             ->when($this->employmentFilter === 'inactive', function ($query) {
                 $query->where('ClassInOut', false);
             });
-        CoachTeacherScope::apply($teachersQuery);
+        $this->applyContactVisibilityScope($teachersQuery);
 
         return $teachersQuery;
+    }
+
+    private function applyContactVisibilityScope(Builder $query): void
+    {
+        CoachTeacherScope::excludeHiddenInstitutions($query);
+
+        $user = auth()->user();
+        if (! $user instanceof User) {
+            $query->whereRaw('1 = 0');
+        }
     }
 
     /**

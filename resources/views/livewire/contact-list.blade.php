@@ -104,14 +104,16 @@
                 </button>
             @endif
 
-            <button type="button"
-                    wire:click="openCreateModal"
-                    class="ml-auto inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 cursor-pointer max-md:w-full max-md:ml-0">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                </svg>
-                신규 생성
-            </button>
+            @if($canCreateContactRecords ?? false)
+                <button type="button"
+                        wire:click="openCreateModal"
+                        class="ml-auto inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 cursor-pointer max-md:w-full max-md:ml-0">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    신규 생성
+                </button>
+            @endif
         </div>
     </div>
 
@@ -550,11 +552,13 @@
                             class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
                         닫기
                     </button>
-                    <button type="button"
-                            wire:click="openEditFromDetail"
-                            class="px-4 py-2 text-sm font-medium text-white bg-mochi-header hover:bg-mochi-header/90 rounded-lg transition-colors cursor-pointer">
-                        수정
-                    </button>
+                    @if($canEditSelectedContact ?? false)
+                        <button type="button"
+                                wire:click="openEditFromDetail"
+                                class="px-4 py-2 text-sm font-medium text-white bg-mochi-header hover:bg-mochi-header/90 rounded-lg transition-colors cursor-pointer">
+                            수정
+                        </button>
+                    @endif
                 </div>
             </div>
         </div>
