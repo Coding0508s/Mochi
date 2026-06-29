@@ -32,3 +32,19 @@ document.addEventListener('DOMContentLoaded', () => {
     initMochiFlashDismiss();
     registerMochiFlashDismissObserver();
 });
+
+/**
+ * 세션/CSRF 토큰 만료(419) 처리: Livewire 기본 영어 안내 대신 한국어로 안내 후 새로고침.
+ * keep-alive 폴링으로 419 자체를 예방하지만, 그래도 발생하면 작성 화면이 멈추지 않도록 한다.
+ */
+document.addEventListener('livewire:init', () => {
+    Livewire.hook('request', ({ fail }) => {
+        fail(({ status, preventDefault }) => {
+            if (status === 419) {
+                preventDefault();
+                alert('페이지가 만료되었습니다. 새로 고침 후 다시 시도해 주세요.');
+                window.location.reload();
+            }
+        });
+    });
+});
