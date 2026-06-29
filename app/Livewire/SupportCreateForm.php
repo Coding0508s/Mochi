@@ -93,7 +93,7 @@ class SupportCreateForm extends Component
 
     public string $reportMode = 'institution';
 
-    public ?int $formTeacherId = null;
+    public int|string|null $formTeacherId = null;
 
     public ?string $formCoachTeacherCreateAction = null;
 
@@ -285,7 +285,8 @@ class SupportCreateForm extends Component
             return;
         }
 
-        if ($this->formTeacherId === null || $this->formTeacherId <= 0) {
+        $teacherId = $this->selectedTeacherId();
+        if ($teacherId === null) {
             $this->addError('formTeacherId', '교사를 선택해 주세요.');
 
             return;
@@ -320,7 +321,7 @@ class SupportCreateForm extends Component
         $this->formSupportType = (string) $selectedType['label'];
 
         if ($action === 'visit') {
-            $teacher = $this->findVisibleTeacherForSupportModal((int) $this->formTeacherId);
+            $teacher = $this->findVisibleTeacherForSupportModal($teacherId);
             if (! $teacher) {
                 $this->addError('formTeacherId', '교사를 선택해 주세요.');
                 $this->formCoachTeacherCreateAction = null;
@@ -343,7 +344,7 @@ class SupportCreateForm extends Component
             $user = auth()->user();
             $coachName = $accountInfo?->TR ?? ($user?->nameForCoReports() ?? '');
 
-            $this->visitTeacherId = (int) $this->formTeacherId;
+            $this->visitTeacherId = $teacherId;
             $this->visitMarkCompleted = $this->formCompleted;
             $this->visitForm = $this->defaultVisitForm(
                 skCode: SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
@@ -357,7 +358,7 @@ class SupportCreateForm extends Component
         }
 
         $this->closeOpenSupportReportModals();
-        $this->openCoachTeacherSupportCreateModal($action, (int) $this->formTeacherId);
+        $this->openCoachTeacherSupportCreateModal($action, $teacherId);
     }
 
     private function defaultCoachTeacherSupportCreateAction(): string
@@ -423,7 +424,7 @@ class SupportCreateForm extends Component
 
     protected function findVisibleTeacherForSupportModal(int $teacherId): ?Teacher
     {
-        if ($this->formTeacherId !== $teacherId || $teacherId <= 0 || blank($this->formSkCode)) {
+        if ($this->selectedTeacherId() !== $teacherId || $teacherId <= 0 || blank($this->formSkCode)) {
             return null;
         }
 
@@ -785,16 +786,19 @@ class SupportCreateForm extends Component
         $this->urgentRecipientIds = array_values(array_unique(array_merge($existing, $autoIds)));
     }
 
-    public function updatedFormTeacherId(?int $value): void
+    public function updatedFormTeacherId(mixed $value): void
     {
-        if ($value === null || $value <= 0) {
+        $teacherId = $this->normalizeTeacherId($value);
+        $this->formTeacherId = $teacherId;
+
+        if ($teacherId === null) {
             $this->formTarget = '';
             $this->syncInlineVisitFormState();
 
             return;
         }
 
-        $teacher = Teacher::query()->find($value);
+        $teacher = Teacher::query()->find($teacherId);
         if ($teacher?->isRetired()) {
             $this->addError('formTeacherId', '퇴직 교사는 선택할 수 없습니다.');
             $this->formTeacherId = null;
@@ -824,6 +828,31 @@ class SupportCreateForm extends Component
 
         $this->formTeacherId = $teacher !== null ? (int) $teacher->ID : null;
         $this->openDefaultCoachTeacherSupportCreateIfReady();
+    }
+
+    private function normalizeTeacherId(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            return $value > 0 ? $value : null;
+        }
+
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $trimmed = trim($value);
+        if ($trimmed === '' || ! ctype_digit($trimmed)) {
+            return null;
+        }
+
+        $teacherId = (int) $trimmed;
+
+        return $teacherId > 0 ? $teacherId : null;
+    }
+
+    private function selectedTeacherId(): ?int
+    {
+        return $this->normalizeTeacherId($this->formTeacherId);
     }
 
     /**
@@ -1340,8 +1369,9 @@ class SupportCreateForm extends Component
         $this->formSupportType = '교사 지원 및 참관';
         $this->visitMarkCompleted = $this->formCompleted;
 
-        $teacher = $this->formTeacherId !== null && $this->formTeacherId > 0
-            ? $this->findVisibleTeacherForSupportModal((int) $this->formTeacherId)
+        $teacherId = $this->selectedTeacherId();
+        $teacher = $teacherId !== null
+            ? $this->findVisibleTeacherForSupportModal($teacherId)
             : null;
 
         if (! $teacher) {

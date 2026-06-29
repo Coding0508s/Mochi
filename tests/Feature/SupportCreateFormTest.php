@@ -460,6 +460,54 @@ class SupportCreateFormTest extends TestCase
             ->assertSet('formTarget', '김교사');
     }
 
+    public function test_coach_teacher_selection_accepts_livewire_string_teacher_id(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-COACH-STRING-ID',
+            'AccountName' => 'Coach 문자열 ID 기관',
+        ]);
+
+        $teacherId = (int) DB::table('Teachers')->insertGetId([
+            'SK_Code' => 'SK-COACH-STRING-ID',
+            'Name' => '문자열교사',
+        ]);
+
+        $user = User::factory()->create(['team' => 'COACH']);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'coach'])
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-COACH-STRING-ID')
+            ->set('formTeacherId', (string) $teacherId)
+            ->assertSet('formTeacherId', $teacherId)
+            ->assertSet('visitTeacherId', $teacherId)
+            ->assertSet('formTarget', '문자열교사');
+    }
+
+    public function test_coach_teacher_selection_ignores_non_numeric_livewire_teacher_id(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-COACH-BAD-ID',
+            'AccountName' => 'Coach 잘못된 ID 기관',
+        ]);
+
+        DB::table('Teachers')->insert([
+            'SK_Code' => 'SK-COACH-BAD-ID',
+            'Name' => '맨일',
+        ]);
+
+        $user = User::factory()->create(['team' => 'COACH']);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'coach'])
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-COACH-BAD-ID')
+            ->set('formTeacherId', '맨일')
+            ->assertSet('formTeacherId', null)
+            ->assertSet('visitTeacherId', null)
+            ->assertSet('formTarget', '');
+    }
+
     public function test_coach_team_support_round_defaults_to_year_matched_plan_round(): void
     {
         $year = now()->year;
