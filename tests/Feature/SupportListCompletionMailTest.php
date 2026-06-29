@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Livewire\SupportList;
-use App\Mail\SupportReportStoredMail;
 use App\Models\Institution;
 use App\Models\SupportRecord;
 use App\Models\User;
@@ -59,7 +58,7 @@ class SupportListCompletionMailTest extends TestCase
         });
     }
 
-    public function test_toggle_complete_sends_teacher_support_mail_for_visit_record(): void
+    public function test_toggle_complete_does_not_send_teacher_support_mail_for_visit_record(): void
     {
         Mail::fake();
 
@@ -83,11 +82,7 @@ class SupportListCompletionMailTest extends TestCase
         $record->refresh();
         $this->assertTrue($record->isCompleted());
 
-        Mail::assertSent(SupportReportStoredMail::class, function (SupportReportStoredMail $mail): bool {
-            return $mail->hasTo('list-complete@test.org')
-                && $mail->reportMode === 'teacher'
-                && $mail->reportSavedOpening === 'Coach Team 교사 지원 보고서';
-        });
+        Mail::assertNothingSent();
     }
 
     public function test_toggle_complete_off_does_not_send_mail(): void

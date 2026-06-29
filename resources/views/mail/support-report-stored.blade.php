@@ -56,7 +56,7 @@
 
 @if($reportMode !== 'teacher' || filled($supportRecord->TO_Depart))
 <h3 style="margin-top: 1.5em; margin-bottom: 0.25em; font-size: {{ $fsHeading }};color:rgb(9, 66, 163);">본사/타 부서 공유 내용</h3>
-<pre style="white-space: pre-wrap; margin: 0; padding: 12px; background:rgb(255, 255, 255); border-radius: 6px; font-size: {{ $fs }}; font-family: sans-serif;">{{ $supportRecord->TO_Depart ?: '—' }}</pre>
+<div style="margin: 0; padding: 12px; background:rgb(255, 255, 255); border-radius: 6px; font-size: {{ $fs }}; font-family: sans-serif; line-height: 1.5;">{!! \App\Support\SupportReportMailBodyFormatter::textWithLineBreaks($supportRecord->TO_Depart) !!}</div>
 @endif
 
 <div style="width: 100%; max-width: 100%; margin-top: 20px; padding: 8px 0 0; text-align: right;">

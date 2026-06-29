@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Actions\StoreTeacherVisitSupportReport;
-use App\Mail\SupportReportStoredMail;
 use App\Models\SupportRecord;
 use App\Models\Teacher;
 use App\Models\TeacherVisitSupportReport;
@@ -206,7 +205,7 @@ class StoreTeacherVisitSupportReportTest extends TestCase
         $this->assertStringContainsString("특이사항\n없음", $toAccount);
     }
 
-    public function test_completed_report_sends_support_report_stored_mail(): void
+    public function test_completed_report_does_not_send_support_report_stored_mail(): void
     {
         Mail::fake();
 
@@ -223,14 +222,7 @@ class StoreTeacherVisitSupportReportTest extends TestCase
             $admin,
         );
 
-        Mail::assertSent(SupportReportStoredMail::class, function (SupportReportStoredMail $mail): bool {
-            return $mail->hasTo('visit-notify@test.org')
-                && $mail->supportRecord->Support_Type === '교사 지원 및 참관'
-                && $mail->supportRecord->Status === '완료'
-                && $mail->reportSavedOpening === 'Coach Team 교사 지원 보고서'
-                && $mail->reportAssigneeColumnLabel === '담당 Coach'
-                && $mail->envelope()->subject === '[Coach Team 교사 지원 보고서] 모찌 어학원';
-        });
+        Mail::assertNothingSent();
     }
 
     public function test_draft_report_does_not_send_support_report_stored_mail(): void

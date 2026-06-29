@@ -5,7 +5,6 @@ namespace App\Livewire;
 use App\Actions\ResolveInstitutionRecipients;
 use App\Livewire\Concerns\ManagesCoachTeacherSupportCreateModals;
 use App\Livewire\Concerns\OpensTeacherSupportHistoryDetail;
-use App\Mail\SupportReportStoredMail;
 use App\Mail\UrgentSupportNotificationMail;
 use App\Models\CoNewTarget;
 use App\Models\CoNewTargetDetail;
@@ -18,6 +17,7 @@ use App\Models\Teacher;
 use App\Models\UrgentSupportNotification;
 use App\Models\User;
 use App\Support\SkCodeNormalizer;
+use App\Support\SupportReportStoredMailNotifier;
 use App\Support\TeamMenuContext;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -133,6 +133,7 @@ class SupportCreateForm extends Component
             ? (string) $requestedTeamMenu
             : (TeamMenuContext::activeMenu($user) ?? 'co');
         $this->applyInitialReportMode();
+        $this->applyDefaultCompletionForReportMode();
 
         $prefillId = $potentialTargetId ?? request()->integer('potential_target_id');
         if ($prefillId > 0) {
@@ -163,6 +164,7 @@ class SupportCreateForm extends Component
             $this->formTarget = $prefillTeacherName;
             if ($this->canUseTeacherReportMode()) {
                 $this->reportMode = 'teacher';
+                $this->applyDefaultCompletionForReportMode();
             }
             $this->syncFormTeacherIdFromTargetName();
         }
@@ -233,6 +235,11 @@ class SupportCreateForm extends Component
         $this->reportMode = $this->defaultReportMode();
     }
 
+    private function applyDefaultCompletionForReportMode(): void
+    {
+        $this->formCompleted = $this->reportMode === 'institution';
+    }
+
     public function setReportMode(string $mode): void
     {
         if (! in_array($mode, ['institution', 'teacher', 'issue'], true)) {
@@ -255,6 +262,7 @@ class SupportCreateForm extends Component
         $this->reportMode = $mode;
 
         if ($previousMode !== $this->reportMode) {
+            $this->applyDefaultCompletionForReportMode();
             $this->syncCommunicationTemplatesOnModeChange($previousMode);
             $this->formTeacherId = null;
 
@@ -1052,25 +1060,13 @@ class SupportCreateForm extends Component
             throw $e;
         }
 
-        $notify = config('support_report_mail.notify_addresses', []);
-        if ($supportRecord instanceof SupportRecord && $notify !== []) {
-            try {
-                Mail::to($notify)->send(new SupportReportStoredMail(
-                    $supportRecord,
-                    auth()->user(),
-                    $this->formTeamMenu,
-                ));
-            } catch (\Throwable $mailException) {
-                report($mailException);
-                Log::warning('기관 지원 보고서 알림 메일 발송 실패', [
-                    'exception' => $mailException->getMessage(),
-                    'notify' => $notify,
-                ]);
-                session()->flash(
-                    'warning',
-                    '지원 보고서는 저장되었지만, 알림 메일 발송에 실패했습니다. Gmail은 앱 비밀번호가 필요할 수 있습니다. `storage/logs/laravel.log`과 `.env`의 MAIL_* 설정을 확인해 주세요.',
-                );
-            }
+        if ($supportRecord instanceof SupportRecord) {
+            SupportReportStoredMailNotifier::send(
+                $supportRecord,
+                auth()->user(),
+                $this->formTeamMenu,
+                $this->reportMode === 'teacher' ? 'teacher' : 'institution',
+            );
         }
 
         if ($supportRecord instanceof SupportRecord && $this->isUrgent) {
