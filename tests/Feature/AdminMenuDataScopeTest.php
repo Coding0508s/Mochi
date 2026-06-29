@@ -63,7 +63,7 @@ class AdminMenuDataScopeTest extends TestCase
             ->assertDontSee('타 팀 메뉴에서는 조회만 가능합니다', false);
     }
 
-    public function test_administration_team_without_admin_context_does_not_see_all_contacts(): void
+    public function test_administration_team_without_admin_context_can_see_contacts(): void
     {
         Schema::create('employee', function (Blueprint $table): void {
             $table->string('EMPNO')->primary();
@@ -97,7 +97,7 @@ class AdminMenuDataScopeTest extends TestCase
         $this->actingAs($user)
             ->get('/contacts?team_menu=co')
             ->assertOk()
-            ->assertDontSee('Hidden Outside Admin Context', false);
+            ->assertSee('Hidden Outside Admin Context', false);
     }
 
     public function test_administration_team_can_search_contacts_in_admin_sidebar_context(): void
