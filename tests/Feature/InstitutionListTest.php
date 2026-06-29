@@ -9,6 +9,7 @@ use App\Livewire\InstitutionTable;
 use App\Models\AccountInformation;
 use App\Models\AssignmentChangeRequest;
 use App\Models\ContractDocument;
+use App\Models\ExternalAssignmentInboundLog;
 use App\Models\GsNumber;
 use App\Models\Institution;
 use App\Models\SupportRecord;
@@ -1733,6 +1734,46 @@ class InstitutionListTest extends TestCase
             'cs' => null,
             'changed_by' => 'Manager Owner',
         ]);
+        $this->assertDatabaseHas('external_assignment_inbound_logs', [
+            'sk_code' => 'SK-ASSIGN-A-1',
+            'co' => 'New CO',
+            'tr' => 'Old TR',
+            'cs' => 'Old CS',
+            'status' => 'applied',
+        ]);
+    }
+
+    public function test_save_managers_does_not_create_inbound_log_when_values_are_same(): void
+    {
+        Config::set('services.assignment_sync.enabled', true);
+        $user = User::factory()->admin()->create(['name' => 'Manager Owner']);
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-ASSIGN-A-2',
+            'AccountName' => '담당자 변경 동일값 테스트',
+        ]);
+
+        AccountInformation::query()->create([
+            'SK_Code' => 'SK-ASSIGN-A-2',
+            'Account_Name' => '담당자 변경 동일값 테스트',
+            'CO' => 'Same CO',
+            'TR' => 'Same TR',
+            'CS' => 'Same CS',
+        ]);
+
+        $beforeCount = ExternalAssignmentInboundLog::query()->count();
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openManagerModal', $institution->ID)
+            ->set('editCo', 'Same CO')
+            ->set('editTr', 'Same TR')
+            ->set('editCs', 'Same CS')
+            ->call('saveManagers')
+            ->assertHasNoErrors();
+
+        $afterCount = ExternalAssignmentInboundLog::query()->count();
+        $this->assertSame($beforeCount, $afterCount);
     }
 
     public function test_process_assignment_change_requests_job_applies_k_origin_to_account_information(): void
