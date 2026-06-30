@@ -750,7 +750,12 @@ class ContactList extends Component
         $this->applyContactVisibilityScope($statsQuery);
         $totalCount = (clone $statsQuery)->count();
         $activeCount = (clone $statsQuery)->where('ClassInOut', true)->count();
-        $inactiveCount = (clone $statsQuery)->where('ClassInOut', false)->count();
+        $inactiveCount = (clone $statsQuery)
+            ->where(function (Builder $query): void {
+                $query->where('ClassInOut', false)
+                    ->orWhereNull('ClassInOut');
+            })
+            ->count();
 
         $teacherInstitutionSuggestions = collect();
         if ($this->showModal && blank($this->newSkCode)) {
@@ -819,7 +824,10 @@ class ContactList extends Component
                 $query->where('ClassInOut', true);
             })
             ->when($this->employmentFilter === 'inactive', function ($query) {
-                $query->where('ClassInOut', false);
+                $query->where(function (Builder $q): void {
+                    $q->where('ClassInOut', false)
+                        ->orWhereNull('ClassInOut');
+                });
             });
         $this->applyContactVisibilityScope($teachersQuery);
 
@@ -886,7 +894,7 @@ class ContactList extends Component
             return '미참여';
         }
 
-        return filter_var($classInOut, FILTER_VALIDATE_BOOLEAN) ? '재직' : '수업 미참여';
+        return filter_var($classInOut, FILTER_VALIDATE_BOOLEAN) ? '수업 참여' : '수업 미참여';
     }
 
     private function accountStatusLabelForDetail(?string $status): string

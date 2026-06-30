@@ -123,7 +123,7 @@ class ContactListClassParticipationTest extends TestCase
         $this->assertNull($teacher->getAttributes()['ClassInOut']);
     }
 
-    public function test_employment_filter_excludes_unspecified_from_active_and_inactive(): void
+    public function test_employment_filter_counts_unspecified_as_not_participating(): void
     {
         $this->seedInstitution('SK-FILTER-1');
 
@@ -155,9 +155,30 @@ class ContactListClassParticipationTest extends TestCase
             ->set('employmentFilter', 'active')
             ->assertViewHas('teachers', fn ($paginator) => $paginator->total() === 1)
             ->set('employmentFilter', 'inactive')
-            ->assertViewHas('teachers', fn ($paginator) => $paginator->total() === 1)
+            ->assertViewHas('teachers', fn ($paginator) => $paginator->total() === 2)
             ->set('employmentFilter', 'all')
             ->assertViewHas('teachers', fn ($paginator) => $paginator->total() === 3);
+    }
+
+    public function test_contact_list_shows_unset_account_status_as_unspecified(): void
+    {
+        $this->seedInstitution('SK-STATUS-1');
+
+        Teacher::query()->create([
+            'SK_Code' => 'SK-STATUS-1',
+            'Name' => '상태 미지정 교사',
+            'Email' => 'unset-status@example.com',
+            'ClassInOut' => true,
+            'Status' => null,
+        ]);
+
+        $user = User::factory()->admin()->create();
+
+        Livewire::actingAs($user)
+            ->test(ContactList::class)
+            ->assertSee('상태 미지정 교사')
+            ->assertSee('미지정')
+            ->assertDontSee('>활성화<', false);
     }
 
     public function test_detail_modal_shows_class_participation_and_account_status_separately(): void
