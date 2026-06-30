@@ -160,7 +160,7 @@ class ContactListClassParticipationTest extends TestCase
             ->assertViewHas('teachers', fn ($paginator) => $paginator->total() === 3);
     }
 
-    public function test_contact_list_shows_unset_account_status_as_unspecified(): void
+    public function test_contact_list_shows_unset_account_status_as_active(): void
     {
         $this->seedInstitution('SK-STATUS-1');
 
@@ -177,8 +177,7 @@ class ContactListClassParticipationTest extends TestCase
         Livewire::actingAs($user)
             ->test(ContactList::class)
             ->assertSee('상태 미지정 교사')
-            ->assertSee('미지정')
-            ->assertDontSee('>활성화<', false);
+            ->assertSee('활성화');
     }
 
     public function test_detail_modal_shows_class_participation_and_account_status_separately(): void
@@ -201,11 +200,33 @@ class ContactListClassParticipationTest extends TestCase
             ->call('openDetailModal', $teacherId)
             ->assertSet('showDetailModal', true)
             ->assertSet('selectedContact.class_participation', '수업 미참여')
-            ->assertSet('selectedContact.account_status', '미지정')
+            ->assertSet('selectedContact.account_status', '활성화')
             ->assertSee('수업참여')
             ->assertSee('Status')
             ->assertSee('수업 미참여')
-            ->assertSee('미지정')
+            ->assertSee('활성화')
+            ->assertDontSee('>퇴직<', false);
+    }
+
+    public function test_contact_list_shows_active_status_when_class_participation_is_out(): void
+    {
+        $this->seedInstitution('SK-STATUS-2');
+
+        Teacher::query()->create([
+            'SK_Code' => 'SK-STATUS-2',
+            'Name' => '수업미참여 활성 교사',
+            'Email' => 'out-active@example.com',
+            'ClassInOut' => false,
+            'Status' => null,
+        ]);
+
+        $user = User::factory()->admin()->create();
+
+        Livewire::actingAs($user)
+            ->test(ContactList::class)
+            ->set('employmentFilter', 'inactive')
+            ->assertSee('수업미참여 활성 교사')
+            ->assertSee('활성화')
             ->assertDontSee('>퇴직<', false);
     }
 

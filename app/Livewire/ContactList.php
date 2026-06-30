@@ -883,7 +883,7 @@ class ContactList extends Component
         });
     }
 
-    private function contactStatusLabel(Teacher $teacher): string
+    public function contactStatusLabel(Teacher $teacher): string
     {
         return $this->accountStatusLabelForDetail($teacher->Status);
     }
@@ -900,9 +900,6 @@ class ContactList extends Component
     private function accountStatusLabelForDetail(?string $status): string
     {
         $normalized = trim((string) ($status ?? ''));
-        if ($normalized === '') {
-            return '미지정';
-        }
 
         if ($normalized === '퇴직') {
             return '퇴직';
@@ -912,6 +909,7 @@ class ContactList extends Component
             return '비활성화';
         }
 
+        // null·빈 값은 수정 폼(normalizeStatusForForm)과 동일하게 활성화로 취급합니다.
         return '활성화';
     }
 

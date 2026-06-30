@@ -167,12 +167,10 @@
                         <td class="px-3 py-2.5 text-gray-600 text-xs">{{ $teacher->Email ?? '-' }}</td>
                         <td class="px-3 py-2.5 text-gray-600">{{ $teacher->Phone ?? '-' }}</td>
                         <td class="px-3 py-2.5 text-center">
-                            @php($normalizedStatus = trim((string) $teacher->Status))
-                            @if($normalizedStatus === '')
-                                <span class="text-xs text-gray-500">미지정</span>
-                            @elseif($normalizedStatus === '퇴직')
+                            @php($statusLabel = $this->contactStatusLabel($teacher))
+                            @if($statusLabel === '퇴직')
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">퇴직</span>
-                            @elseif(in_array($normalizedStatus, ['inactive', '비활성', '비활성화'], true))
+                            @elseif($statusLabel === '비활성화')
                                 <span class="text-xs text-gray-600">비활성화</span>
                             @else
                                 <span class="text-xs text-green-700">활성화</span>
