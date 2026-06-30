@@ -286,6 +286,7 @@
                                         class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                     <option value="">선택</option>
                                     <option value="원장">원장</option>
+                                    <option value="교장">교장</option>
                                     <option value="부원장">부원장</option>
                                     <option value="교사">교사</option>
                                     <option value="행정">행정</option>
