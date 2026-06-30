@@ -179,6 +179,49 @@ class ImportSalesforceFilesCommandTest extends TestCase
         ]);
     }
 
+    public function test_importer_stores_long_original_filenames_with_short_storage_name(): void
+    {
+        $longLabel = str_repeat('가', 120);
+        $basename = '0015i00000oOSBqAAO_0685i00000CMK7YAAX_'.$longLabel.'.pdf';
+        file_put_contents($this->rawDirectory.'/'.$basename, 'long-name');
+
+        $this->artisan('salesforce:import-files', [
+            'directory' => $this->rawDirectory,
+            '--no-interaction' => true,
+        ])->assertSuccessful();
+
+        $document = ContractDocument::query()->where('original_filename', $basename)->first();
+        $this->assertNotNull($document);
+        $this->assertTrue(Storage::disk('local')->exists((string) $document->stored_path));
+        $this->assertLessThanOrEqual(50, strlen(basename((string) $document->stored_path)));
+    }
+
+    public function test_repair_command_restores_missing_physical_files_from_raw(): void
+    {
+        $basename = '0015i00000oOSBqAAO_0685i00000CMK7YAAX_repair-target.pdf';
+        file_put_contents($this->rawDirectory.'/'.$basename, 'repair-me');
+
+        $document = ContractDocument::query()->create([
+            'sk_code' => SalesforceFilesImporter::FALLBACK_SK_CODE,
+            'account_name' => '-',
+            'document_date' => '2026-06-30',
+            'document_time' => '00:00:00',
+            'original_filename' => $basename,
+            'stored_disk' => 'local',
+            'stored_path' => 'contract-documents/'.SalesforceFilesImporter::FALLBACK_SK_CODE.'/missing.pdf',
+            'uploaded_by' => 'salesforce-import',
+        ]);
+
+        $this->artisan('salesforce:repair-import-files', [
+            'directory' => $this->rawDirectory,
+            '--no-interaction' => true,
+        ])->assertSuccessful();
+
+        $document->refresh();
+        $this->assertNotSame('contract-documents/'.SalesforceFilesImporter::FALLBACK_SK_CODE.'/missing.pdf', $document->stored_path);
+        $this->assertTrue(Storage::disk('local')->exists((string) $document->stored_path));
+    }
+
     private function deleteDirectory(string $directory): void
     {
         if (! is_dir($directory)) {

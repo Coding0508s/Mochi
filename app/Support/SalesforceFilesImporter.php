@@ -183,6 +183,128 @@ class SalesforceFilesImporter
     }
 
     /**
+     * @param  callable(int $processed, int $total): void|null  $onProgress
+     * @return array{
+     *   scanned:int,
+     *   repaired:int,
+     *   already_ok:int,
+     *   raw_missing:int,
+     *   errors:array<int, string>
+     * }
+     */
+    public function repairMissingPhysicalFiles(
+        string $rawDirectory,
+        bool $dryRun = false,
+        ?callable $onProgress = null,
+    ): array {
+        $rawDirectory = rtrim($rawDirectory, DIRECTORY_SEPARATOR);
+        if (! is_dir($rawDirectory)) {
+            throw new \InvalidArgumentException("디렉터리를 찾을 수 없습니다: {$rawDirectory}");
+        }
+
+        $rawIndex = $this->buildRawFileIndex($rawDirectory);
+        $documents = ContractDocument::query()
+            ->where('uploaded_by', 'salesforce-import')
+            ->orderBy('id')
+            ->get();
+
+        $result = [
+            'scanned' => $documents->count(),
+            'repaired' => 0,
+            'already_ok' => 0,
+            'raw_missing' => 0,
+            'errors' => [],
+        ];
+
+        $total = $documents->count();
+
+        foreach ($documents as $index => $document) {
+            $disk = (string) ($document->stored_disk ?: 'local');
+            $storedPath = (string) ($document->stored_path ?? '');
+
+            if ($storedPath !== '' && Storage::disk($disk)->exists($storedPath)) {
+                $result['already_ok']++;
+
+                if ($onProgress !== null) {
+                    $onProgress($index + 1, $total);
+                }
+
+                continue;
+            }
+
+            $lookupKey = mb_strtolower((string) $document->original_filename);
+            $sourcePath = $rawIndex[$lookupKey] ?? null;
+            if ($sourcePath === null) {
+                $result['raw_missing']++;
+                $result['errors'][] = 'raw 원본 없음: '.(string) $document->original_filename;
+
+                if ($onProgress !== null) {
+                    $onProgress($index + 1, $total);
+                }
+
+                continue;
+            }
+
+            if ($dryRun) {
+                $result['repaired']++;
+
+                if ($onProgress !== null) {
+                    $onProgress($index + 1, $total);
+                }
+
+                continue;
+            }
+
+            try {
+                $newStoredPath = $this->copyIntoContractStorage(
+                    $sourcePath,
+                    (string) $document->sk_code,
+                    basename($sourcePath),
+                );
+            } catch (\Throwable $e) {
+                $result['errors'][] = (string) $document->original_filename.': '.$e->getMessage();
+
+                if ($onProgress !== null) {
+                    $onProgress($index + 1, $total);
+                }
+
+                continue;
+            }
+
+            $document->update([
+                'stored_disk' => 'local',
+                'stored_path' => $newStoredPath,
+                'mime_type' => $this->guessMimeType($sourcePath, basename($sourcePath)),
+                'size_bytes' => (int) (@filesize($sourcePath) ?: 0) ?: null,
+            ]);
+
+            $result['repaired']++;
+
+            if ($onProgress !== null) {
+                $onProgress($index + 1, $total);
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function buildRawFileIndex(string $directory): array
+    {
+        $index = [];
+        foreach ($this->collectImportableFiles($directory) as $absolutePath) {
+            $key = mb_strtolower(basename($absolutePath));
+            if ($key !== '' && ! isset($index[$key])) {
+                $index[$key] = $absolutePath;
+            }
+        }
+
+        return $index;
+    }
+
+    /**
      * @return list<string>
      */
     private function collectImportableFiles(string $directory): array
@@ -439,27 +561,27 @@ class SalesforceFilesImporter
 
     private function copyIntoContractStorage(string $sourcePath, string $skCode, string $basename): string
     {
-        $safeOriginal = preg_replace('/[^\p{L}\p{N}._\-\s]/u', '_', $basename) ?? 'contract';
-        $storedName = Str::uuid()->toString().'_'.$safeOriginal;
+        $extension = mb_strtolower(pathinfo($basename, PATHINFO_EXTENSION));
+        $storedName = $extension !== ''
+            ? Str::uuid()->toString().'.'.$extension
+            : Str::uuid()->toString();
+
         $relativeDirectory = 'contract-documents/'.$skCode;
         $relativePath = $relativeDirectory.'/'.$storedName;
+        $absoluteDirectory = Storage::disk('local')->path($relativeDirectory);
+        $absolutePath = Storage::disk('local')->path($relativePath);
 
-        Storage::disk('local')->makeDirectory($relativeDirectory);
-
-        $readStream = @fopen($sourcePath, 'rb');
-        if ($readStream === false) {
-            throw new \RuntimeException('원본 파일을 열 수 없습니다.');
+        if (! is_dir($absoluteDirectory) && ! @mkdir($absoluteDirectory, 0755, true) && ! is_dir($absoluteDirectory)) {
+            throw new \RuntimeException('저장 디렉터리를 만들 수 없습니다.');
         }
 
-        try {
-            $written = Storage::disk('local')->writeStream($relativePath, $readStream);
-        } finally {
-            fclose($readStream);
+        if (! @copy($sourcePath, $absolutePath)) {
+            $message = error_get_last()['message'] ?? '알 수 없는 오류';
+
+            throw new \RuntimeException('스토리지 저장에 실패했습니다: '.$message);
         }
 
-        if ($written === false) {
-            throw new \RuntimeException('스토리지 저장에 실패했습니다.');
-        }
+        @chmod($absolutePath, 0644);
 
         return $relativePath;
     }
