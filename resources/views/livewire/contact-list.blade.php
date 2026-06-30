@@ -297,7 +297,7 @@
 
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">eMail <span class="text-red-500">*</span></label>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">eMail</label>
                                 <input type="email" wire:model="newEmail" placeholder="example@email.com"
                                        class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header {{ $errors->has('newEmail') ? 'border-red-400' : 'border-gray-300' }}"/>
                                 @error('newEmail') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
@@ -383,6 +383,13 @@
 
                     <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
                         <div class="flex items-center gap-2">
+                            @if($editingId && ($canRetireCurrentTeacher ?? false))
+                                <button type="button"
+                                        wire:click="openRetireModal"
+                                        class="px-4 py-2 text-sm text-red-700 border border-red-200 rounded-lg hover:bg-red-50 transition-colors cursor-pointer">
+                                    퇴직 처리
+                                </button>
+                            @endif
                             @if($editingId && ($canReinstateCurrentTeacher ?? false))
                                 <button type="button"
                                         wire:click="openReinstateModal"
@@ -410,6 +417,40 @@
                         </button>
                         </div>
                 </form>
+            </div>
+        </div>
+    @endif
+
+    {{-- 퇴직 확인 모달 --}}
+    @if($showRetireModal)
+        <div class="mochi-modal-overlay"
+             wire:click.self="closeRetireModal">
+            <div class="mochi-modal-shell max-w-md"
+                 wire:click.stop>
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-base font-semibold text-gray-900">퇴직 처리</h3>
+                </div>
+                <div class="px-6 py-5 space-y-4 text-sm text-gray-700">
+                    <p>
+                        <span class="font-semibold text-gray-900">{{ $retireTargetName }}</span> 교사를 퇴직 처리합니다.
+                        퇴직교사 리스트에 기록되며, 교사 지원·연락처 목록 기본 조회에서는 숨겨집니다.
+                    </p>
+                    @include('partials.admin.teacher-retire-recommendation-fields')
+                </div>
+                <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+                    <button type="button" wire:click="closeRetireModal"
+                            class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer">
+                        취소
+                    </button>
+                    <button type="button"
+                            wire:click="retire"
+                            wire:loading.attr="disabled"
+                            wire:loading.class="opacity-70 cursor-not-allowed"
+                            class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 cursor-pointer">
+                        <span wire:loading.remove wire:target="retire">퇴직 확인</span>
+                        <span wire:loading wire:target="retire">처리 중...</span>
+                    </button>
+                </div>
             </div>
         </div>
     @endif
@@ -498,28 +539,32 @@
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['position'] ?? '-' }}</td>
                                 </tr>
                                 <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">상태</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['status'] ?? '-' }}</td>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">수업참여</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['class_participation'] ?? '-' }}</td>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">Status</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['account_status'] ?? '-' }}</td>
+                                </tr>
+                                <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">연락처</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['phone'] ?? '-' }}</td>
-                                </tr>
-                                <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">이메일</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['email'] ?? '-' }}</td>
+                                </tr>
+                                <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">기관코드</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['sk_code'] ?? '-' }}</td>
-                                </tr>
-                                <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">기관명</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['school_name'] ?? '-' }}</td>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당 Coach</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['tr'] ?? '-' }}</td>
                                 </tr>
                                 <tr>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당 Coach</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['tr'] ?? '-' }}</td>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당 CO</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['co'] ?? '-' }}</td>
+                                </tr>
+                                <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당 CS</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['cs'] ?? '-' }}</td>
+                                    <td colspan="3" class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['cs'] ?? '-' }}</td>
                                 </tr>
                                 <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">GrapeSEED Essentials</th>
@@ -528,10 +573,8 @@
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['little_seed_essentials'] ?? '-' }}</td>
                                 </tr>
                                 <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">CO 계정명</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['co_name'] ?? '-' }}</td>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">등록일</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['created_date'] ?? '-' }}</td>
+                                    <td colspan="3" class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['created_date'] ?? '-' }}</td>
                                 </tr>
                                 <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">기관 주소</th>
@@ -565,7 +608,7 @@
     @endif
 
     <div wire:loading.delay
-         wire:target="save,delete,reinstate,openDetailModal,openEditModal,openEditFromDetail,gotoPage,nextPage,previousPage"
+         wire:target="save,delete,reinstate,retire,openDetailModal,openEditModal,openEditFromDetail,gotoPage,nextPage,previousPage"
          class="fixed bottom-6 right-6 z-50">
         <div class="bg-white rounded-xl px-4 py-3 shadow-lg border border-gray-200 flex items-center gap-2 text-sm text-gray-700">
             <svg class="animate-spin w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24">

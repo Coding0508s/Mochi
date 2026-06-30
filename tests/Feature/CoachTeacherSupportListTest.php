@@ -2378,6 +2378,49 @@ class CoachTeacherSupportListTest extends TestCase
             ->assertDontSee('퇴직대상');
     }
 
+    public function test_class_out_teacher_with_unset_status_can_retire_from_modal(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $id = $this->createTeacher('SK001', '한민희 교수부장', [
+            'ClassInOut' => false,
+            'Status' => null,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openTeacherModal', $id)
+            ->assertSet('teacherDetailInfo.is_retired', false)
+            ->assertSeeHtml('wire:click="confirmRetireTeacher"')
+            ->call('confirmRetireTeacher')
+            ->set('retireRecommendChoice', 'no')
+            ->call('retireTeacher');
+
+        $teacher = Teacher::find($id);
+        $this->assertSame('퇴직', $teacher->Status);
+        $this->assertFalse($teacher->ClassInOut);
+    }
+
+    public function test_retired_teacher_modal_hides_retire_and_edit_actions(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $id = $this->createTeacher('SK001', '이미퇴직', [
+            'Status' => '퇴직',
+            'ClassInOut' => true,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->set('showAllTeachers', true)
+            ->call('openTeacherModal', $id)
+            ->assertSet('teacherDetailInfo.is_retired', true)
+            ->assertDontSeeHtml('wire:click="confirmRetireTeacher"')
+            ->assertDontSeeHtml('wire:click="startTeacherEdit"');
+    }
+
     public function test_coach_cannot_edit_teacher_outside_scope(): void
     {
         $coach = $this->createCoachUser('Coach A', 'coacha@example.com');

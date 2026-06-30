@@ -160,6 +160,56 @@ class ContactListClassParticipationTest extends TestCase
             ->assertViewHas('teachers', fn ($paginator) => $paginator->total() === 3);
     }
 
+    public function test_detail_modal_shows_class_participation_and_account_status_separately(): void
+    {
+        $this->seedInstitution('SK-DETAIL-1');
+
+        $teacherId = Teacher::query()->create([
+            'SK_Code' => 'SK-DETAIL-1',
+            'Name' => '한민희 교수부장',
+            'Email' => 'detail-status@example.com',
+            'School_Name' => '경기 시흥 예일유치원',
+            'Status' => null,
+            'ClassInOut' => false,
+        ])->ID;
+
+        $user = User::factory()->admin()->create();
+
+        Livewire::actingAs($user)
+            ->test(ContactList::class)
+            ->call('openDetailModal', $teacherId)
+            ->assertSet('showDetailModal', true)
+            ->assertSet('selectedContact.class_participation', '수업 미참여')
+            ->assertSet('selectedContact.account_status', '미지정')
+            ->assertSee('수업참여')
+            ->assertSee('Status')
+            ->assertSee('수업 미참여')
+            ->assertSee('미지정')
+            ->assertDontSee('>퇴직<', false);
+    }
+
+    public function test_detail_modal_shows_unspecified_class_participation_as_not_participating(): void
+    {
+        $this->seedInstitution('SK-DETAIL-2');
+
+        $teacherId = Teacher::query()->create([
+            'SK_Code' => 'SK-DETAIL-2',
+            'Name' => '미참여 표시 교사',
+            'Email' => 'unset-detail@example.com',
+            'ClassInOut' => null,
+            'Status' => '활성화',
+        ])->ID;
+
+        $user = User::factory()->admin()->create();
+
+        Livewire::actingAs($user)
+            ->test(ContactList::class)
+            ->call('openDetailModal', $teacherId)
+            ->assertSet('selectedContact.class_participation', '미참여')
+            ->assertSee('미참여')
+            ->assertDontSee('>미지정<', false);
+    }
+
     private function seedInstitution(string $skCode): void
     {
         Institution::query()->create([

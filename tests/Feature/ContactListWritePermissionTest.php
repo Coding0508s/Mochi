@@ -139,6 +139,51 @@ class ContactListWritePermissionTest extends TestCase
         $this->assertNotNull($teacher);
     }
 
+    public function test_edit_teacher_allows_empty_email(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $this->seedInstitutionWithCo('SK-EDIT-EMAIL', '이메일 선택 기관', 'Admin Manager');
+
+        $teacher = Teacher::query()->create([
+            'SK_Code' => 'SK-EDIT-EMAIL',
+            'Name' => '한민희 교수부장',
+            'Email' => 'had-email@example.com',
+            'School_Name' => '이메일 선택 기관',
+            'Status' => '활성화',
+            'ClassInOut' => false,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(ContactList::class)
+            ->call('openEditModal', $teacher->ID)
+            ->set('newEmail', '')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $teacher->refresh();
+        $this->assertNull($teacher->Email);
+    }
+
+    public function test_create_teacher_allows_empty_email(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $this->seedInstitutionWithCo('SK-CREATE-EMAIL', '신규 이메일 기관', 'Admin Manager');
+
+        Livewire::actingAs($admin)
+            ->test(ContactList::class)
+            ->call('openCreateModal')
+            ->set('newName', '이메일 없는 신규')
+            ->set('newEmail', '')
+            ->set('newSkCode', 'SK-CREATE-EMAIL')
+            ->set('newSchoolName', '신규 이메일 기관')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $teacher = Teacher::query()->where('Name', '이메일 없는 신규')->first();
+        $this->assertNotNull($teacher);
+        $this->assertNull($teacher->Email);
+    }
+
     private function createContactTables(): void
     {
         Schema::dropIfExists('Teachers');

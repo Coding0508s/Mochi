@@ -410,6 +410,7 @@ class CoachTeacherSupportList extends Component
             'phone' => $teacher->Phone,
             'position' => $teacher->Position,
             'class_in_out' => (bool) $teacher->ClassInOut,
+            'is_retired' => $teacher->isRetired(),
             'description' => $teacher->Description,
             'sk_code' => SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
             'school_name' => $this->institutionDisplayName($institution, $teacher->School_Name),

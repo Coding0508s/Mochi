@@ -104,9 +104,6 @@ class ContactListRetireTest extends TestCase
     }
 
     /**
-     * 교사를 퇴직 상태로 만들고 S_RetirementList 행을 함께 생성합니다.
-     *
-     * 퇴직 처리는 더 이상 연락처 화면에서 수행하지 않으므로(교사 지원 현황 전용),
      * 복직/삭제 테스트는 이미 퇴직된 상태를 직접 준비합니다.
      */
     private function createRetiredTeacherWithRecord(string $skCode, string $name): int
@@ -130,9 +127,9 @@ class ContactListRetireTest extends TestCase
         return $teacherId;
     }
 
-    public function test_contact_list_does_not_offer_retire_action(): void
+    public function test_contact_list_offers_retire_action_for_active_teacher(): void
     {
-        $admin = User::factory()->create(['is_admin' => true]);
+        $admin = User::factory()->admin()->create();
 
         $this->createInstitution('SK001', '기관A', 'Coach A');
         $teacherId = $this->createTeacher('SK001', '재직교사');
@@ -140,8 +137,53 @@ class ContactListRetireTest extends TestCase
         Livewire::actingAs($admin)
             ->test(ContactList::class)
             ->call('openEditModal', $teacherId)
-            ->assertDontSee('퇴직 처리')
-            ->assertDontSeeHtml('wire:click="openRetireModal"');
+            ->assertSee('퇴직 처리')
+            ->assertSeeHtml('wire:click="openRetireModal"');
+    }
+
+    public function test_retire_from_contact_list_sets_status_and_retirement_record(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createTeacher('SK001', '한민희 교수부장', [
+            'ClassInOut' => false,
+            'Status' => null,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(ContactList::class)
+            ->call('openEditModal', $teacherId)
+            ->call('openRetireModal')
+            ->set('retireRecommendChoice', 'no')
+            ->call('retire')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('Teachers', [
+            'ID' => $teacherId,
+            'Status' => '퇴직',
+            'ClassInOut' => false,
+        ]);
+
+        $this->assertDatabaseHas('S_RetirementList', [
+            'TearcherID' => $teacherId,
+            'Status' => '퇴직',
+            'RecommendYN' => 0,
+        ]);
+    }
+
+    public function test_retired_teacher_edit_modal_hides_retire_action(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createRetiredTeacherWithRecord('SK001', '이미퇴직');
+
+        Livewire::actingAs($admin)
+            ->test(ContactList::class)
+            ->call('openEditModal', $teacherId)
+            ->assertDontSeeHtml('wire:click="openRetireModal"')
+            ->assertSee('복직 처리');
     }
 
     public function test_delete_removes_teacher_without_retirement_record(): void

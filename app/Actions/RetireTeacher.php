@@ -11,6 +11,7 @@ use App\Support\TeacherRetirementRecommendation;
 use App\Support\TeamMenuContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class RetireTeacher
 {
@@ -41,6 +42,10 @@ class RetireTeacher
     private function authorize(Teacher $teacher, User $user): void
     {
         if ($user->hasFullAccess() || TeamMenuContext::isAdministrationTeam($user)) {
+            return;
+        }
+
+        if (Gate::allows('updateContactRecord', $teacher)) {
             return;
         }
 

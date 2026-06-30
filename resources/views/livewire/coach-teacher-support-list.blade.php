@@ -915,7 +915,7 @@
             <div class="mochi-modal-shell max-w-4xl max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex flex-col" @click.stop>
                 <x-admin.modal-header title="TR 교사정보">
                     <x-slot:actions>
-                        @if(! $teacherModalEditMode && $teacherDetailInfo['class_in_out'])
+                        @if(! $teacherModalEditMode && ! ($teacherDetailInfo['is_retired'] ?? false))
                             <button type="button"
                                     wire:click="confirmRetireTeacher"
                                     class="cursor-pointer rounded-lg border border-red-300 px-3 py-1.5 text-xs text-red-700 hover:bg-red-50">
