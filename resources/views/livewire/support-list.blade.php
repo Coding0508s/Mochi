@@ -538,7 +538,7 @@
                                         class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                     <option value="">기관을 선택하세요</option>
                                     @foreach($institutions as $inst)
-                                        <option value="{{ $inst->SKcode }}">[{{ $inst->SKcode }}] {{ $inst->resolvedAccountName() }}</option>
+                                        <option value="{{ $inst->SKcode }}">[{{ $inst->SKcode }}] {{ $inst->AccountName }}</option>
                                     @endforeach
                                 </select>
                                 @error('contractSkCode') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror

@@ -657,13 +657,7 @@ class SupportList extends Component
 
         $shouldLoadInstitutions = $this->showContractModal || $this->showModal;
         $institutions = $shouldLoadInstitutions
-            ? Cache::remember('support-list:institutions-for-modal', now()->addMinutes(10), function () {
-                return Institution::query()
-                    ->with('accountInfo')
-                    ->whereNotNull('SKcode')
-                    ->orderBy('AccountName')
-                    ->get(['SKcode', 'AccountName']);
-            })
+            ? $this->institutionsForModalOptions()
             : collect();
 
         $keyword = trim($this->formInstitutionKeyword);
@@ -750,6 +744,77 @@ class SupportList extends Component
             ->filter()
             ->unique()
             ->sortDesc()
+            ->values();
+    }
+
+    /**
+     * CO/지원 모달 기관 선택 목록.
+     *
+     * Eloquent 모델을 캐시에 그대로 저장하면 역직렬화 후 문자열 등 잘못된 타입이 섞여
+     * Blade에서 $inst->SKcode 접근 시 500이 날 수 있어 스칼라 배열만 캐시합니다.
+     *
+     * @return Collection<int, object{SKcode: string, AccountName: string}>
+     */
+    private function institutionsForModalOptions(): Collection
+    {
+        $cached = Cache::remember(
+            'support-list:institutions-for-modal:v2',
+            now()->addMinutes(10),
+            function (): array {
+                return Institution::query()
+                    ->with('accountInfo')
+                    ->whereNotNull('SKcode')
+                    ->orderBy('AccountName')
+                    ->get(['SKcode', 'AccountName'])
+                    ->map(fn (Institution $inst): array => [
+                        'SKcode' => (string) $inst->SKcode,
+                        'AccountName' => $inst->resolvedAccountName(),
+                    ])
+                    ->values()
+                    ->all();
+            },
+        );
+
+        return collect($cached)
+            ->map(function (mixed $row): ?object {
+                if ($row instanceof Institution) {
+                    return (object) [
+                        'SKcode' => (string) $row->SKcode,
+                        'AccountName' => $row->resolvedAccountName(),
+                    ];
+                }
+
+                if (is_array($row)) {
+                    $skCode = trim((string) ($row['SKcode'] ?? $row['sk_code'] ?? ''));
+                    $accountName = trim((string) ($row['AccountName'] ?? $row['account_name'] ?? ''));
+
+                    if ($skCode === '') {
+                        return null;
+                    }
+
+                    return (object) [
+                        'SKcode' => $skCode,
+                        'AccountName' => $accountName !== '' ? $accountName : $skCode,
+                    ];
+                }
+
+                if (is_object($row)) {
+                    $skCode = trim((string) ($row->SKcode ?? $row->sk_code ?? ''));
+                    $accountName = trim((string) ($row->AccountName ?? $row->account_name ?? ''));
+
+                    if ($skCode === '') {
+                        return null;
+                    }
+
+                    return (object) [
+                        'SKcode' => $skCode,
+                        'AccountName' => $accountName !== '' ? $accountName : $skCode,
+                    ];
+                }
+
+                return null;
+            })
+            ->filter()
             ->values();
     }
 }

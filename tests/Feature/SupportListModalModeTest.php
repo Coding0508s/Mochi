@@ -8,6 +8,7 @@ use App\Models\SupportRecord;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
@@ -259,6 +260,48 @@ class SupportListModalModeTest extends TestCase
             ->set('filterYear', '2026')
             ->assertSee('2026년 지원')
             ->assertDontSee('2025년 지원');
+    }
+
+    public function test_contract_upload_modal_institution_select_does_not_error(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-CONTRACT-MODAL',
+            'AccountName' => '계약 업로드 기관',
+        ]);
+
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(SupportList::class)
+            ->call('openContractUploadModal')
+            ->set('contractSkCode', 'SK-CONTRACT-MODAL')
+            ->assertSet('contractSkCode', 'SK-CONTRACT-MODAL')
+            ->assertSee('계약 업로드 기관');
+    }
+
+    public function test_contract_upload_modal_tolerates_poisoned_institutions_cache(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-CONTRACT-MODAL',
+            'AccountName' => '계약 업로드 기관',
+        ]);
+
+        Cache::put('support-list:institutions-for-modal:v2', [
+            'SK-POISON-STRING',
+            [
+                'SKcode' => 'SK-CONTRACT-MODAL',
+                'AccountName' => '계약 업로드 기관',
+            ],
+        ], now()->addMinutes(10));
+
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(SupportList::class)
+            ->call('openContractUploadModal')
+            ->set('contractSkCode', 'SK-CONTRACT-MODAL')
+            ->assertSet('contractSkCode', 'SK-CONTRACT-MODAL')
+            ->assertSee('[SK-CONTRACT-MODAL]');
     }
 
     /**
