@@ -181,7 +181,9 @@ class ImportSalesforceFilesCommandTest extends TestCase
 
     public function test_importer_stores_long_original_filenames_with_short_storage_name(): void
     {
-        $longLabel = str_repeat('가', 120);
+        // ext4 등 리눅스 파일시스템은 파일명 한도가 255바이트라 한글(3바이트) 60자로 제한합니다.
+        // 원본명(180바이트+)은 여전히 저장명(UUID 40자)보다 충분히 길어 축약 동작을 검증할 수 있습니다.
+        $longLabel = str_repeat('가', 60);
         $basename = '0015i00000oOSBqAAO_0685i00000CMK7YAAX_'.$longLabel.'.pdf';
         file_put_contents($this->rawDirectory.'/'.$basename, 'long-name');
 
