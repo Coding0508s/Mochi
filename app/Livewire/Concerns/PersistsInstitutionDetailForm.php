@@ -32,13 +32,17 @@ trait PersistsInstitutionDetailForm
 
         $this->applyInstitutionDetailEditFieldLocks();
 
+        // SK 코드 중복 검사는 "SK를 실제로 변경할 때"만 적용한다.
+        // 레거시 데이터에는 동일 SK 행이 2개 이상 존재하는 기관이 있어(예: 중복 마이그레이션),
+        // SK를 그대로 두고 다른 필드만 수정하는데도 unique 규칙이 자기 자신 외의 중복 행과
+        // 충돌해 "이미 사용 중인 SK 코드입니다."로 저장이 막히는 문제가 있었다.
+        $skCodeRules = ['required', 'string', 'max:100'];
+        if (trim($this->editDetailSkCode) !== $originalSk) {
+            $skCodeRules[] = Rule::unique('S_AccountName', 'SKcode')->ignore($institutionId, 'ID');
+        }
+
         $this->validate([
-            'editDetailSkCode' => [
-                'required',
-                'string',
-                'max:100',
-                Rule::unique('S_AccountName', 'SKcode')->ignore($institutionId, 'ID'),
-            ],
+            'editDetailSkCode' => $skCodeRules,
             'editDetailInstitutionName' => ['required', 'string', 'max:255'],
             'editDetailEnglishName' => ['nullable', 'string', 'max:255'],
             'editDetailPortalName' => ['nullable', 'string', 'max:255'],

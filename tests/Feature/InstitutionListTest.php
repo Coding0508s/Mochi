@@ -1993,6 +1993,63 @@ class InstitutionListTest extends TestCase
         ]);
     }
 
+    public function test_save_detail_allows_saving_when_sk_code_is_unchanged(): void
+    {
+        $user = User::factory()->admin()->create();
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-KEEP-1',
+            'AccountName' => '유지 기관',
+        ]);
+
+        DB::table('S_Account_Information')->insert([
+            'SK_Code' => 'SK-KEEP-1',
+            'Account_Name' => '유지 기관',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->call('startDetailEdit')
+            ->set('editDetailInstitutionName', '유지 기관 수정')
+            ->call('saveDetailFields')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_AccountName', [
+            'ID' => $institution->ID,
+            'SKcode' => 'SK-KEEP-1',
+            'AccountName' => '유지 기관 수정',
+        ]);
+    }
+
+    public function test_save_detail_rejects_sk_rename_to_another_institution_sk(): void
+    {
+        $user = User::factory()->admin()->create();
+
+        $institution = Institution::query()->create([
+            'SKcode' => 'SK-SELF',
+            'AccountName' => '수정 대상 기관',
+        ]);
+
+        Institution::query()->create([
+            'SKcode' => 'SK-TAKEN',
+            'AccountName' => '이미 존재하는 기관',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $institution->ID)
+            ->call('startDetailEdit')
+            ->set('editDetailSkCode', 'SK-TAKEN')
+            ->call('saveDetailFields')
+            ->assertHasErrors('editDetailSkCode');
+
+        $this->assertDatabaseHas('S_AccountName', [
+            'ID' => $institution->ID,
+            'SKcode' => 'SK-SELF',
+        ]);
+    }
+
     /**
      * 담당자 드롭다운 옵션이
      *   - 부서 매핑(A02=CO, A05=Coach, A03=CS) 기준으로
