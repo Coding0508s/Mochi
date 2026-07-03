@@ -8,15 +8,15 @@ use Illuminate\Support\Collection;
 /**
  * 교사 지원 현황 메인 표의 N차 완료 칸 표시.
  *
- * Teachers._Nst_Support_Date 가 비어 있어도 MOCHI 완료 보고서가 있으면
- * 기관 모달(지원 내역)과 동일하게 보이도록 보완한다.
+ * Teachers._Nst_Support_Date 가 비어 있어도 MOCHI·레거시 완료 보고서가 있으면
+ * 교사 상세(지원 내역)와 동일하게 보이도록 보완한다.
  */
 final class TeacherSupportCompletionDisplay
 {
     /**
      * @var array<string, list<array{date: string, type: string}>>
      */
-    private static array $mochiReportsByTeacherYear = [];
+    private static array $orphanReportsByTeacherYear = [];
 
     /**
      * @var array<string, array<int, array{date: string, type: string}>>
@@ -24,16 +24,12 @@ final class TeacherSupportCompletionDisplay
     private static array $orphanAssignmentsCache = [];
 
     /**
-     * 현재 페이지 교사들의 MOCHI 완료 보고서를 한 번에 적재한다.
+     * 현재 페이지 교사들의 MOCHI·레거시 완료 보고서를 한 번에 적재한다.
      *
      * @param  Collection<int, Teacher>|iterable<int, Teacher>  $teachers
      */
     public static function preloadForTeachers(iterable $teachers, ?int $year): void
     {
-        if ($year === null) {
-            return;
-        }
-
         $teacherIds = collect($teachers)
             ->pluck('ID')
             ->map(fn (mixed $id): int => (int) $id)
@@ -45,16 +41,16 @@ final class TeacherSupportCompletionDisplay
             return;
         }
 
-        $reportsByTeacher = MochiTeacherSupportQuery::completedReportsForTeacherIds($teacherIds, $year);
+        $reportsByTeacher = self::orphanReportsForTeacherIds($teacherIds, $year);
 
         foreach ($teacherIds as $teacherId) {
-            self::$mochiReportsByTeacherYear[self::cacheKey($teacherId, $year)] = $reportsByTeacher[$teacherId] ?? [];
+            self::$orphanReportsByTeacherYear[self::cacheKey($teacherId, $year)] = $reportsByTeacher[$teacherId] ?? [];
         }
     }
 
     public static function flushRequestCache(): void
     {
-        self::$mochiReportsByTeacherYear = [];
+        self::$orphanReportsByTeacherYear = [];
         self::$orphanAssignmentsCache = [];
     }
 
@@ -65,7 +61,7 @@ final class TeacherSupportCompletionDisplay
     {
         $parts = self::partsFromTeacherSlot($teacher, $round, $year);
 
-        if ($year === null || $parts['date'] !== '') {
+        if ($parts['date'] !== '') {
             return $parts;
         }
 
@@ -89,9 +85,9 @@ final class TeacherSupportCompletionDisplay
     /**
      * @return array<int, array{date: string, type: string}>
      */
-    private static function orphanAssignments(Teacher $teacher, int $year): array
+    private static function orphanAssignments(Teacher $teacher, ?int $year): array
     {
-        $cacheKey = $teacher->ID.':'.$year;
+        $cacheKey = $teacher->ID.':'.($year ?? 'all');
 
         if (array_key_exists($cacheKey, self::$orphanAssignmentsCache)) {
             return self::$orphanAssignmentsCache[$cacheKey];
@@ -106,13 +102,13 @@ final class TeacherSupportCompletionDisplay
     /**
      * @return array<int, array{date: string, type: string}>
      */
-    private static function buildOrphanAssignments(Teacher $teacher, int $year): array
+    private static function buildOrphanAssignments(Teacher $teacher, ?int $year): array
     {
         $orphans = self::dedupeReports(
             self::excludeReportsMatchingTeacherSlots(
                 $teacher,
                 $year,
-                self::completedMochiReportsInYear((int) $teacher->ID, $year),
+                self::completedOrphanReportsInYear((int) $teacher->ID, $year),
             ),
         );
         $assignments = [];
@@ -138,12 +134,12 @@ final class TeacherSupportCompletionDisplay
     }
 
     /**
-     * Teachers N차 완료 칸에 이미 표시되는 MOCHI 보고서는 다른 차수 고아 슬롯에 다시 넣지 않는다.
+     * Teachers N차 완료 칸에 이미 표시되는 보고서는 다른 차수 고아 슬롯에 다시 넣지 않는다.
      *
      * @param  list<array{date: string, type: string}>  $reports
      * @return list<array{date: string, type: string}>
      */
-    private static function excludeReportsMatchingTeacherSlots(Teacher $teacher, int $year, array $reports): array
+    private static function excludeReportsMatchingTeacherSlots(Teacher $teacher, ?int $year, array $reports): array
     {
         $occupiedKeys = [];
 
@@ -169,6 +165,8 @@ final class TeacherSupportCompletionDisplay
      */
     private static function dedupeReports(array $reports): array
     {
+        usort($reports, fn (array $left, array $right): int => strcmp($left['date'], $right['date']));
+
         $seen = [];
         $deduped = [];
 
@@ -191,9 +189,9 @@ final class TeacherSupportCompletionDisplay
         return $date.'|'.trim($type);
     }
 
-    private static function cacheKey(int $teacherId, int $year): string
+    private static function cacheKey(int $teacherId, ?int $year): string
     {
-        return $teacherId.':'.$year;
+        return $teacherId.':'.($year ?? 'all');
     }
 
     /**
@@ -228,7 +226,7 @@ final class TeacherSupportCompletionDisplay
         );
     }
 
-    private static function teacherRoundHasCompletionInYear(Teacher $teacher, int $round, int $year): bool
+    private static function teacherRoundHasCompletionInYear(Teacher $teacher, int $round, ?int $year): bool
     {
         $cols = config('coach_teacher_support.columns');
         $suffix = match ($round) {
@@ -254,17 +252,38 @@ final class TeacherSupportCompletionDisplay
     /**
      * @return list<array{date: string, type: string}>
      */
-    private static function completedMochiReportsInYear(int $teacherId, int $year): array
+    private static function completedOrphanReportsInYear(int $teacherId, ?int $year): array
     {
         $cacheKey = self::cacheKey($teacherId, $year);
 
-        if (array_key_exists($cacheKey, self::$mochiReportsByTeacherYear)) {
-            return self::$mochiReportsByTeacherYear[$cacheKey];
+        if (array_key_exists($cacheKey, self::$orphanReportsByTeacherYear)) {
+            return self::$orphanReportsByTeacherYear[$cacheKey];
         }
 
-        $reports = MochiTeacherSupportQuery::completedReportsForTeacherIds([$teacherId], $year)[$teacherId] ?? [];
-        self::$mochiReportsByTeacherYear[$cacheKey] = $reports;
+        $reports = self::orphanReportsForTeacherIds([$teacherId], $year)[$teacherId] ?? [];
+        self::$orphanReportsByTeacherYear[$cacheKey] = $reports;
 
         return $reports;
+    }
+
+    /**
+     * @param  list<int>  $teacherIds
+     * @return array<int, list<array{date: string, type: string}>>
+     */
+    private static function orphanReportsForTeacherIds(array $teacherIds, ?int $year): array
+    {
+        $mochiReports = MochiTeacherSupportQuery::completedReportsForTeacherIds($teacherIds, $year);
+        $legacyReports = LegacyTeacherSupportQuery::completedReportsForTeacherIds($teacherIds, $year);
+
+        $result = [];
+
+        foreach ($teacherIds as $teacherId) {
+            $result[$teacherId] = self::dedupeReports(array_merge(
+                $mochiReports[$teacherId] ?? [],
+                $legacyReports[$teacherId] ?? [],
+            ));
+        }
+
+        return $result;
     }
 }

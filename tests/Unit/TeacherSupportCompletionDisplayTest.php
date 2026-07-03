@@ -19,6 +19,7 @@ class TeacherSupportCompletionDisplayTest extends TestCase
         TeacherSupportCompletionDisplay::flushRequestCache();
 
         Schema::dropIfExists('teacher_visit_support_reports');
+        Schema::dropIfExists('S_Support_NewTeacher');
         Schema::dropIfExists('Teachers');
 
         Schema::create('Teachers', function ($table): void {
@@ -36,6 +37,13 @@ class TeacherSupportCompletionDisplayTest extends TestCase
             $table->unsignedInteger('teacher_id');
             $table->date('support_date');
             $table->string('status', 20);
+        });
+
+        Schema::create('S_Support_NewTeacher', function ($table): void {
+            $table->increments('ID');
+            $table->unsignedInteger('TeacherId')->nullable();
+            $table->dateTime('SupportDate')->nullable();
+            $table->string('Status', 50)->nullable();
         });
     }
 
@@ -136,6 +144,70 @@ class TeacherSupportCompletionDisplayTest extends TestCase
         $second = TeacherSupportCompletionDisplay::parts($teacher, 2, 2026);
 
         $this->assertSame('2026-03-15', $first['date']);
+        $this->assertSame('', $second['date']);
+    }
+
+    public function test_parts_falls_back_to_legacy_new_teacher_when_teacher_slot_empty(): void
+    {
+        $teacherId = DB::table('Teachers')->insertGetId([
+            'Name' => '신규교사',
+        ]);
+
+        DB::table('S_Support_NewTeacher')->insert([
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2024-02-17 00:00:00',
+            'Status' => '완료',
+        ]);
+
+        $teacher = Teacher::query()->findOrFail($teacherId);
+
+        $parts = TeacherSupportCompletionDisplay::parts($teacher, 1, 2024);
+
+        $this->assertSame('2024-02-17', $parts['date']);
+        $this->assertSame('교사 지원(신규교사)', $parts['type']);
+    }
+
+    public function test_parts_falls_back_to_mochi_report_when_year_filter_is_all(): void
+    {
+        $teacherId = DB::table('Teachers')->insertGetId([
+            'Name' => '전체연도고아',
+        ]);
+
+        DB::table('teacher_visit_support_reports')->insert([
+            'teacher_id' => $teacherId,
+            'support_date' => '2026-03-15',
+            'status' => '완료',
+        ]);
+
+        $teacher = Teacher::query()->findOrFail($teacherId);
+
+        $parts = TeacherSupportCompletionDisplay::parts($teacher, 1, null);
+
+        $this->assertSame('2026-03-15', $parts['date']);
+        $this->assertSame('교사 지원 및 참관', $parts['type']);
+    }
+
+    public function test_legacy_new_teacher_does_not_duplicate_into_second_round(): void
+    {
+        $teacherId = DB::table('Teachers')->insertGetId([
+            'Name' => '레거시중복방지',
+            '_1st_Support_Date' => '2024-02-17',
+            '_1st_Support_Type' => '교사 지원(신규교사)',
+        ]);
+
+        DB::table('S_Support_NewTeacher')->insert([
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2024-02-17 00:00:00',
+            'Status' => '완료',
+        ]);
+
+        $teacher = Teacher::query()->findOrFail($teacherId);
+
+        $first = TeacherSupportCompletionDisplay::parts($teacher, 1, 2024);
+        $second = TeacherSupportCompletionDisplay::parts($teacher, 2, 2024);
+
+        $this->assertSame('2024-02-17', $first['date']);
+        $this->assertSame('교사 지원(신규교사)', $first['type']);
         $this->assertSame('', $second['date']);
     }
 }

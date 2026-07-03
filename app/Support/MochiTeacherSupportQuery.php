@@ -92,7 +92,7 @@ final class MochiTeacherSupportQuery
      * @param  list<int>  $teacherIds
      * @return array<int, list<array{date: string, type: string}>>
      */
-    public static function completedReportsForTeacherIds(array $teacherIds, int $year): array
+    public static function completedReportsForTeacherIds(array $teacherIds, ?int $year): array
     {
         if ($teacherIds === []) {
             return [];
@@ -144,7 +144,7 @@ final class MochiTeacherSupportQuery
         return $result;
     }
 
-    private static function completedReportUnionSql(int $year): ?string
+    private static function completedReportUnionSql(?int $year): ?string
     {
         $typeLabels = config('coach_teacher_legacy_support.mochi_report_tables', []);
         $parts = [];
@@ -154,8 +154,11 @@ final class MochiTeacherSupportQuery
                 "{$table}.teacher_id IS NOT NULL",
                 "{$table}.support_date IS NOT NULL",
                 self::sqlDateValueIsNotBlank("{$table}.support_date"),
-                ExcelSerialDate::sqlColumnInYear("{$table}.support_date", $year),
             ];
+
+            if ($year !== null) {
+                $conditions[] = ExcelSerialDate::sqlColumnInYear("{$table}.support_date", $year);
+            }
 
             if (Schema::hasColumn($table, 'status')) {
                 $conditions[] = "{$table}.status = '완료'";
