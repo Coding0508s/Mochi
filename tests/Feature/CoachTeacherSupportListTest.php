@@ -919,6 +919,73 @@ class CoachTeacherSupportListTest extends TestCase
             ->assertSee('교사 지원 및 참관');
     }
 
+    public function test_latest_support_view_includes_teacher_with_legacy_new_teacher_only(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = 2024;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createTeacher('SK001', '레거시신규', forLatestView: false);
+
+        \DB::table('S_Support_NewTeacher')->insert([
+            'TR_Name' => 'Coach A',
+            'SK_Code' => 'SK001',
+            'Teacher' => '레거시신규',
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2024-02-17 00:00:00',
+            'Status' => '완료',
+            'ReportType' => 1,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->set('filterYear', $year)
+            ->assertSee('레거시신규')
+            ->assertSee('2024-02-17')
+            ->assertSee('교사 지원(신규교사)');
+    }
+
+    public function test_latest_support_view_orders_legacy_new_teacher_by_support_date(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = 2024;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $olderId = $this->createTeacher('SK001', '먼저신규', forLatestView: false);
+        $newerId = $this->createTeacher('SK001', '나중신규', forLatestView: false);
+
+        \DB::table('S_Support_NewTeacher')->insert([
+            [
+                'TR_Name' => 'Coach A',
+                'SK_Code' => 'SK001',
+                'Teacher' => '먼저신규',
+                'TeacherId' => $olderId,
+                'SupportDate' => '2024-01-10 00:00:00',
+                'Status' => '완료',
+                'ReportType' => 1,
+            ],
+            [
+                'TR_Name' => 'Coach A',
+                'SK_Code' => 'SK001',
+                'Teacher' => '나중신규',
+                'TeacherId' => $newerId,
+                'SupportDate' => '2024-05-21 00:00:00',
+                'Status' => '완료',
+                'ReportType' => 1,
+            ],
+        ]);
+
+        $names = collect(
+            Livewire::actingAs($admin)
+                ->test(CoachTeacherSupportList::class)
+                ->set('filterYear', $year)
+                ->viewData('teachers')
+                ->items()
+        )->pluck('Name')->all();
+
+        $this->assertSame(['나중신규', '먼저신규'], $names);
+    }
+
     public function test_coach_with_no_alias_sees_nothing(): void
     {
         $coach = $this->createCoachUser('Unknown Coach', 'unknown@example.com');

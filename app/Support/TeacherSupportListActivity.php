@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Schema;
 final class TeacherSupportListActivity
 {
     /**
-     * 실제 지원(완료·MOCHI 보고서)이 있는 교사만 남긴다. 계획만 있는 교사는 제외.
+     * 실제 지원(완료·MOCHI·레거시 보고서)이 있는 교사만 남긴다. 계획만 있는 교사는 제외.
      *
      * @param  Builder<Teacher>  $query
      */
@@ -39,32 +39,55 @@ final class TeacherSupportListActivity
                 }
             }
 
-            self::appendMochiReportExistsClause($outer, $year, $first);
+            $first = self::appendTeacherIdUnionExistsClause(
+                $outer,
+                MochiTeacherSupportQuery::teacherIdUnionSql($year),
+                $first,
+            );
+
+            self::appendTeacherIdUnionExistsClause(
+                $outer,
+                LegacyTeacherSupportQuery::teacherIdUnionSql($year),
+                $first,
+            );
         });
     }
 
     /**
-     * 최신 지원일(완료·MOCHI) 내림차순 정렬. 계획일은 정렬에 쓰지 않는다.
+     * 최신 지원일(완료·MOCHI·레거시) 내림차순 정렬. 계획일은 정렬에 쓰지 않는다.
      *
      * @param  Builder<Teacher>  $query
      */
     public static function applyLatestSupportOrdering(Builder $query, ?int $year): void
     {
         $mochiSubquery = MochiTeacherSupportQuery::latestDatePerTeacherSubquerySql($year);
+        $legacySubquery = LegacyTeacherSupportQuery::latestDatePerTeacherSubquerySql($year);
 
-        if ($mochiSubquery !== null) {
+        $mochiJoined = $mochiSubquery !== null;
+        $legacyJoined = $legacySubquery !== null;
+
+        if ($mochiJoined) {
             $query->leftJoin(DB::raw($mochiSubquery.' AS mochi_latest_support'), function ($join): void {
                 $join->on('mochi_latest_support.teacher_id', '=', 'Teachers.ID');
             });
         }
 
-        $query->orderByDesc(DB::raw(self::latestSupportDateSqlExpression($year, $mochiSubquery !== null)))
+        if ($legacyJoined) {
+            $query->leftJoin(DB::raw($legacySubquery.' AS legacy_latest_support'), function ($join): void {
+                $join->on('legacy_latest_support.teacher_id', '=', 'Teachers.ID');
+            });
+        }
+
+        $query->orderByDesc(DB::raw(self::latestSupportDateSqlExpression($year, $mochiJoined, $legacyJoined)))
             ->orderByDesc('Teachers.ID');
     }
 
-    public static function latestSupportDateSqlExpression(?int $year, bool $mochiJoined = false): string
-    {
-        $parts = self::activityDateParts($year, $mochiJoined);
+    public static function latestSupportDateSqlExpression(
+        ?int $year,
+        bool $mochiJoined = false,
+        bool $legacyJoined = false,
+    ): string {
+        $parts = self::activityDateParts($year, $mochiJoined, $legacyJoined);
 
         if ($parts === []) {
             return "'1970-01-01'";
@@ -90,7 +113,7 @@ final class TeacherSupportListActivity
     /**
      * @return list<string>
      */
-    private static function activityDateParts(?int $year, bool $mochiJoined): array
+    private static function activityDateParts(?int $year, bool $mochiJoined, bool $legacyJoined): array
     {
         $parts = [];
 
@@ -111,6 +134,12 @@ final class TeacherSupportListActivity
             $parts[] = 'mochi_latest_support.latest_mochi_date';
         } elseif (($mochiSubquery = MochiTeacherSupportQuery::latestDatePerTeacherSubquerySql($year)) !== null) {
             $parts[] = "(SELECT latest_mochi_date FROM {$mochiSubquery} AS mochi_sort WHERE mochi_sort.teacher_id = Teachers.ID)";
+        }
+
+        if ($legacyJoined) {
+            $parts[] = 'legacy_latest_support.latest_legacy_date';
+        } elseif (($legacySubquery = LegacyTeacherSupportQuery::latestDatePerTeacherSubquerySql($year)) !== null) {
+            $parts[] = "(SELECT latest_legacy_date FROM {$legacySubquery} AS legacy_sort WHERE legacy_sort.teacher_id = Teachers.ID)";
         }
 
         return $parts;
@@ -135,26 +164,28 @@ final class TeacherSupportListActivity
     /**
      * @param  Builder<Teacher>  $outer
      */
-    private static function appendMochiReportExistsClause(Builder $outer, ?int $year, bool $first): void
+    private static function appendTeacherIdUnionExistsClause(Builder $outer, ?string $unionSql, bool $first): bool
     {
-        $unionSql = MochiTeacherSupportQuery::teacherIdUnionSql($year);
-
         if ($unionSql === null) {
-            return;
+            return $first;
         }
 
         $clause = function (Builder $exists) use ($unionSql): void {
             $exists->whereExists(function ($sub) use ($unionSql): void {
                 $sub->select(DB::raw(1))
-                    ->from(DB::raw($unionSql.' AS mochi_teacher_ids'))
-                    ->whereColumn('mochi_teacher_ids.teacher_id', 'Teachers.ID');
+                    ->from(DB::raw($unionSql.' AS support_teacher_ids'))
+                    ->whereColumn('support_teacher_ids.teacher_id', 'Teachers.ID');
             });
         };
 
         if ($first) {
             $outer->where($clause);
-        } else {
-            $outer->orWhere($clause);
+
+            return false;
         }
+
+        $outer->orWhere($clause);
+
+        return false;
     }
 }

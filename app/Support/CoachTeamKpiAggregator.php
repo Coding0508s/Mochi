@@ -226,8 +226,18 @@ final class CoachTeamKpiAggregator
                 if ($mochiTeacherIds !== []) {
                     if ($first) {
                         $outer->whereIn('Teachers.ID', $mochiTeacherIds);
+                        $first = false;
                     } else {
                         $outer->orWhereIn('Teachers.ID', $mochiTeacherIds);
+                    }
+                }
+
+                $legacyTeacherIds = LegacyTeacherSupportQuery::teacherIdsInYear($year);
+                if ($legacyTeacherIds !== []) {
+                    if ($first) {
+                        $outer->whereIn('Teachers.ID', $legacyTeacherIds);
+                    } else {
+                        $outer->orWhereIn('Teachers.ID', $legacyTeacherIds);
                     }
                 }
             }
