@@ -109,6 +109,7 @@ class ContactList extends Component
         'newEmail.email' => '올바른 이메일 형식이 아닙니다.',
         'newEmail.unique' => '이미 등록된 이메일입니다.',
         'newSkCode.required' => '기관을 검색하여 선택해 주세요.',
+        'newDescription.max' => '비고는 5,000자 이내로 입력해 주세요.',
     ];
 
     public function mount(): void
@@ -366,6 +367,7 @@ class ContactList extends Component
             'newClassParticipation' => ['nullable', Rule::in(['', 'in', 'out'])],
             'newGrapeSeedEssentials' => ['nullable', 'date'],
             'newLittleSeedEssentials' => ['nullable', 'date'],
+            'newDescription' => ['nullable', 'string', 'max:5000'],
         ], $this->messages);
 
         Gate::authorize('createContactRecord', $this->newSkCode);
