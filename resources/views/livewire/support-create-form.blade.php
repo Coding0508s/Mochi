@@ -227,10 +227,10 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 border-t border-gray-100 pt-3">
+                    <div wire:key="visit-report-basic-fields" class="grid grid-cols-1 gap-3 sm:grid-cols-2 border-t border-gray-100 pt-3">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">지원 날짜 <span class="text-red-500">*</span></label>
-                            <input type="date" wire:model="visitForm.support_date"
+                            <input type="date" wire:model.blur="visitForm.support_date"
                                    class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                             @error('visitForm.support_date')
                                 <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
@@ -238,13 +238,13 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">장소</label>
-                            <input type="text" wire:model="visitForm.support_location"
+                            <input type="text" wire:model.blur="visitForm.support_location"
                                    placeholder="예: 분당 ○○어학원"
                                    class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">지원 목적 <span class="text-red-500">*</span></label>
-                            <input type="text" wire:model="visitForm.support_purpose"
+                            <input type="text" wire:model.blur="visitForm.support_purpose"
                                    placeholder="예: 신임 교사 온보딩, 정기 수업 참관"
                                    class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                             @error('visitForm.support_purpose')
@@ -290,48 +290,48 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">면담 시간</label>
-                            <input type="time" wire:model="visitForm.interview_time"
+                            <input type="time" wire:model.blur="visitForm.interview_time"
                                    class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                         </div>
                     </div>
 
-                    <div class="border-t border-gray-100 pt-3">
+                    <div wire:key="visit-report-observe-fields" class="border-t border-gray-100 pt-3">
                         <h3 class="text-sm font-semibold text-gray-700 mb-2">참관 수업 정보</h3>
                         <div class="grid grid-cols-4 gap-3">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-                                <input type="number" min="0" max="99" wire:model="visitForm.observe_unit"
+                                <input type="number" min="0" max="99" wire:model.blur="visitForm.observe_unit"
                                        class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Lesson</label>
-                                <input type="number" min="0" max="99" wire:model="visitForm.observe_lesson"
+                                <input type="number" min="0" max="99" wire:model.blur="visitForm.observe_lesson"
                                        class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">반</label>
-                                <input type="text" wire:model="visitForm.observe_class"
+                                <input type="text" wire:model.blur="visitForm.observe_class"
                                        class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">세</label>
-                                <input type="text" wire:model="visitForm.observe_age"
+                                <input type="text" wire:model.blur="visitForm.observe_age"
                                        class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                             </div>
                         </div>
                     </div>
 
-                    <div class="border-t border-gray-100 pt-3">
+                    <div wire:key="visit-report-pre-request" class="border-t border-gray-100 pt-3">
                         <label class="block text-sm font-medium text-gray-700 mb-1">사전 요청 및 주요 이슈</label>
-                        <textarea wire:model="visitForm.pre_request_notes"
+                        <textarea wire:model.blur="visitForm.pre_request_notes"
                                   rows="4"
                                   placeholder="교사의 사전 요청 사항과 이번 지원이 필요했던 배경/이유를 간략히 기록 (예:학생 발화 참여율 저하, 신규 커리큘럼 도입 등)"
                                   class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
                     </div>
 
-                    <div class="border-t border-gray-100 pt-3">
+                    <div wire:key="visit-report-monitoring-feedback" class="border-t border-gray-100 pt-3">
                         <label class="block text-sm font-medium text-gray-700 mb-1">세부 지원 내용(수업 모니터링 및 피드백) <span class="text-red-500">*</span></label>
-                        <textarea wire:model="visitForm.monitoring_feedback"
+                        <textarea wire:model.blur="visitForm.monitoring_feedback"
                                   rows="5"
                                   placeholder="수업 모니터링(커리큘럼 이행, 교수법, 학생 반응) 결과와 잘된 점(Strengths) 및 개선점(Areas for Improvement)을 통합하여 기록.
 수업 후 교사 면담 내용, 현장 건의사항 및 애로사항, 코치의 후속 조치(Action Plan) 계획을 함께 작성."
@@ -341,9 +341,9 @@
                         @enderror
                     </div>
 
-                    <div class="border-t border-gray-100 pt-3">
+                    <div wire:key="visit-report-special-notes" class="border-t border-gray-100 pt-3">
                         <label class="block text-sm font-medium text-gray-700 mb-1">특이사항</label>
-                        <textarea wire:model="visitForm.special_notes"
+                        <textarea wire:model.blur="visitForm.special_notes"
                                   rows="4"
                                   placeholder="상기 내용 외에 공유가 필요한 추가적인 특이점이나 보안 사항 기록"
                                   class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
