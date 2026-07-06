@@ -78,6 +78,47 @@ class ContactListClassParticipationTest extends TestCase
         $this->assertNull($teacher->getAttributes()['ClassInOut']);
     }
 
+    public function test_create_teacher_saves_long_description(): void
+    {
+        $this->seedInstitution('SK-DESC-1');
+
+        $user = User::factory()->admin()->create();
+        $longDescription = str_repeat('가나다라마바사아자차', 40); // 400자
+
+        Livewire::actingAs($user)
+            ->test(ContactList::class)
+            ->set('newName', '긴 비고 교사')
+            ->set('newEmail', 'long-desc@example.com')
+            ->set('newSkCode', 'SK-DESC-1')
+            ->set('newSchoolName', '테스트 기관')
+            ->set('newDescription', $longDescription)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $teacher = Teacher::query()->where('Email', 'long-desc@example.com')->first();
+        $this->assertNotNull($teacher);
+        $this->assertSame($longDescription, $teacher->Description);
+    }
+
+    public function test_create_teacher_rejects_description_over_limit(): void
+    {
+        $this->seedInstitution('SK-DESC-2');
+
+        $user = User::factory()->admin()->create();
+
+        Livewire::actingAs($user)
+            ->test(ContactList::class)
+            ->set('newName', '초과 비고 교사')
+            ->set('newEmail', 'over-desc@example.com')
+            ->set('newSkCode', 'SK-DESC-2')
+            ->set('newSchoolName', '테스트 기관')
+            ->set('newDescription', str_repeat('가', 5001))
+            ->call('save')
+            ->assertHasErrors(['newDescription']);
+
+        $this->assertNull(Teacher::query()->where('Email', 'over-desc@example.com')->first());
+    }
+
     public function test_edit_modal_loads_unspecified_when_class_in_out_is_null(): void
     {
         $this->seedInstitution('SK-UNSET-2');
