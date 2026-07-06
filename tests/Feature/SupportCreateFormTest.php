@@ -715,6 +715,35 @@ class SupportCreateFormTest extends TestCase
         Mail::assertNothingSent();
     }
 
+    public function test_coach_team_visit_form_commits_required_inputs_on_blur(): void
+    {
+        // 지연(deferred) wire:model은 조건부 재렌더 시 입력값이 서버로 전달되지 않을 수 있어
+        // 필수 입력칸은 wire:model.blur로 즉시 커밋해야 한다. (DOM 재사용/미전송 회귀 방지)
+        Institution::query()->create([
+            'SKcode' => 'SK-COACH-BLUR',
+            'AccountName' => 'Coach Blur 기관',
+        ]);
+
+        $teacherId = (int) DB::table('Teachers')->insertGetId([
+            'SK_Code' => 'SK-COACH-BLUR',
+            'Name' => '최교사',
+        ]);
+
+        $user = User::factory()->admin()->create(['team' => 'COACH']);
+
+        $component = Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'coach'])
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-COACH-BLUR')
+            ->set('formTeacherId', $teacherId)
+            ->assertSet('visitTeacherId', $teacherId);
+
+        $component->assertSeeHtml('wire:model.blur="visitForm.support_purpose"');
+        $component->assertSeeHtml('wire:model.blur="visitForm.monitoring_feedback"');
+        $component->assertSeeHtml('wire:key="visit-report-basic-fields"');
+        $component->assertSeeHtml('wire:key="visit-report-monitoring-feedback"');
+    }
+
     public function test_coach_team_complete_visit_save_shows_alert_when_required_fields_missing(): void
     {
         Institution::query()->create([
