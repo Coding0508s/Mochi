@@ -301,6 +301,30 @@ class StoreTeacherVisitSupportReportTest extends TestCase
         ]);
     }
 
+    public function test_empty_integer_fields_are_stored_as_null(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $teacher = $this->createTeacher();
+        $payload = array_merge($this->visitPayload(false, null), [
+            'observe_unit' => '',
+            'observe_lesson' => '',
+            'session_number' => '',
+        ]);
+
+        app(StoreTeacherVisitSupportReport::class)->execute(
+            (int) $teacher->ID,
+            $payload,
+            $admin,
+        );
+
+        $this->assertDatabaseHas('teacher_visit_support_reports', [
+            'teacher_id' => $teacher->ID,
+            'observe_unit' => null,
+            'observe_lesson' => null,
+            'session_number' => null,
+        ]);
+    }
+
     public function test_rejects_duplicate_completed_report_on_same_teacher_and_date(): void
     {
         $admin = User::factory()->admin()->create();

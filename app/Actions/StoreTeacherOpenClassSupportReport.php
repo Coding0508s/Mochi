@@ -8,6 +8,8 @@ use App\Models\TeacherOpenClassSupportReport;
 use App\Models\User;
 use App\Support\CoachTeacherScope;
 use App\Support\CoachTeacherSupportPayload;
+use App\Support\NullableFormInteger;
+use App\Support\TeacherSupportNewTeacherDisplay;
 use App\Support\TeacherSupportSlotSync;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -43,7 +45,10 @@ class StoreTeacherOpenClassSupportReport
                     'Support_Date' => $validated['support_date'],
                     'Meet_Time' => $meetTime,
                     'Target' => $validated['teacher_name'],
-                    'Support_Type' => config('coach_teacher_open_class.support_type_label'),
+                    'Support_Type' => TeacherSupportNewTeacherDisplay::supportTypeForPayload(
+                        $validated,
+                        (string) config('coach_teacher_open_class.support_type_label'),
+                    ),
                     'Issue' => filled($validated['remarks'] ?? null) ? $validated['remarks'] : null,
                     'Status' => '완료',
                     'CreatedDate' => now(),
@@ -112,6 +117,8 @@ class StoreTeacherOpenClassSupportReport
      */
     private function validate(array $data): array
     {
+        $data = NullableFormInteger::normalizePayload($data);
+
         return Validator::make($data, [
             'sk_code' => ['required', 'string', 'max:100'],
             'coach_name' => ['required', 'string', 'max:255'],
@@ -133,6 +140,7 @@ class StoreTeacherOpenClassSupportReport
             'support_content.*' => ['string'],
             'remarks' => ['nullable', 'string', 'max:5000'],
             'mark_completed' => ['nullable', 'boolean'],
+            'is_new_teacher_support' => ['nullable', 'boolean'],
             'support_round' => ['nullable', 'integer', 'between:1,4'],
         ])->validate();
     }

@@ -8,6 +8,7 @@ use App\Models\TeacherDemoLessonSupportReport;
 use App\Models\User;
 use App\Support\CoachTeacherScope;
 use App\Support\CoachTeacherSupportPayload;
+use App\Support\NullableFormInteger;
 use App\Support\TeacherSupportSlotSync;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -108,6 +109,8 @@ class StoreTeacherDemoLessonSupportReport
      */
     private function validate(array $data): array
     {
+        $data = NullableFormInteger::normalizePayload($data);
+
         $evaluationKeys = array_keys(config('coach_teacher_demo_lesson.evaluation_criteria', []));
 
         return Validator::make($data, [
@@ -131,6 +134,7 @@ class StoreTeacherDemoLessonSupportReport
             'evaluations.*' => ['nullable', 'integer', 'in:1,2,3'],
             'overall_comments' => ['nullable', 'string', 'max:5000'],
             'mark_completed' => ['nullable', 'boolean'],
+            'is_new_teacher_support' => ['nullable', 'boolean'],
             'support_round' => ['nullable', 'integer', 'between:1,4'],
         ])->validate();
     }

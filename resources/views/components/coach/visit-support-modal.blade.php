@@ -116,6 +116,13 @@
                                     <input type="text" wire:model="visitForm.observe_age"
                                            class="w-14 shrink-0 px-2 py-1 text-sm border border-gray-300 rounded-lg text-center">
                                 </div>
+                                <p class="mt-1 text-xs text-gray-400">Unit·Lesson 등 참관 수업 정보는 해당 없으면 비워 두셔도 됩니다.</p>
+                                @error('visitForm.observe_unit')
+                                    <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                @enderror
+                                @error('visitForm.observe_lesson')
+                                    <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                @enderror
                             </div>
                         </div>
                     </section>
