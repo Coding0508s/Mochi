@@ -65,8 +65,8 @@
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="space-y-2 relative" id="org-name-wrap">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300" for="org-name">기관명</label>
-                        <input class="block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm focus:border-primary focus:ring-primary dark:text-white sm:text-sm py-2.5" id="org-name" name="org_name" placeholder="기관명을 입력하세요" type="text" required autocomplete="off"/>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300" for="org-name">받는 분 또는 기관명</label>
+                        <input class="block w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm focus:border-primary focus:ring-primary dark:text-white sm:text-sm py-2.5" id="org-name" name="org_name" placeholder="받는 분 또는 기관명을 입력하세요" type="text" required autocomplete="off"/>
                         <ul id="org-name-dropdown" class="hidden absolute z-20 left-0 right-0 mt-1 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-52 overflow-y-auto" role="listbox"></ul>
                     </div>
                     <div class="space-y-2">
