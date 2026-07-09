@@ -35,6 +35,15 @@ final class VisitSupportReportValidationPresenter
             'support_purpose.required' => '지원 목적을 입력해 주세요.',
             'monitoring_feedback.required' => '세부 지원 내용을 입력해 주세요.',
             'interview_and_action_plan.required' => '면담 내용 및 Action Plan을 입력해 주세요.',
+            'observe_unit.integer' => 'Unit은 0~99 사이 숫자로 입력해 주세요.',
+            'observe_unit.min' => 'Unit은 0~99 사이 숫자로 입력해 주세요.',
+            'observe_unit.max' => 'Unit은 0~99 사이 숫자로 입력해 주세요.',
+            'observe_lesson.integer' => 'Lesson은 0~99 사이 숫자로 입력해 주세요.',
+            'observe_lesson.min' => 'Lesson은 0~99 사이 숫자로 입력해 주세요.',
+            'observe_lesson.max' => 'Lesson은 0~99 사이 숫자로 입력해 주세요.',
+            'session_number.integer' => 'Session은 1~9 사이 숫자로 입력해 주세요.',
+            'session_number.min' => 'Session은 1~9 사이 숫자로 입력해 주세요.',
+            'session_number.max' => 'Session은 1~9 사이 숫자로 입력해 주세요.',
         ];
     }
 }

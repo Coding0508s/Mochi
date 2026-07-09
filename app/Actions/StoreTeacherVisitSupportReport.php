@@ -8,6 +8,7 @@ use App\Models\TeacherVisitSupportReport;
 use App\Models\User;
 use App\Support\CoachTeacherScope;
 use App\Support\CoachTeacherSupportPayload;
+use App\Support\NullableFormInteger;
 use App\Support\SupportReportStoredMailNotifier;
 use App\Support\TeacherSupportReportSupportRecordBuilder;
 use App\Support\TeacherSupportSlotSync;
@@ -50,8 +51,9 @@ class StoreTeacherVisitSupportReport
             $supportRecordId = (int) $supportRecord->ID;
 
             if ($markCompleted) {
+                $isNewTeacherSupport = (bool) ($validated['is_new_teacher_support'] ?? false);
                 $round = isset($validated['support_round']) ? (int) $validated['support_round'] : null;
-                if ($round === null) {
+                if ($round === null && ! $isNewTeacherSupport) {
                     $round = TeacherSupportSlotSync::firstEmptyRound($teacher);
                 }
 
@@ -132,6 +134,8 @@ class StoreTeacherVisitSupportReport
      */
     private function validate(array $data): array
     {
+        $data = NullableFormInteger::normalizePayload($data);
+
         $markCompleted = (bool) ($data['mark_completed'] ?? false);
 
         return Validator::make(
@@ -163,6 +167,7 @@ class StoreTeacherVisitSupportReport
                 'interview_and_action_plan' => ['nullable', 'string', 'max:2000'],
                 'special_notes' => ['nullable', 'string', 'max:1000'],
                 'mark_completed' => ['nullable', 'boolean'],
+                'is_new_teacher_support' => ['nullable', 'boolean'],
                 'support_round' => ['nullable', 'integer', 'between:1,4'],
             ],
             VisitSupportReportValidationPresenter::messages(),

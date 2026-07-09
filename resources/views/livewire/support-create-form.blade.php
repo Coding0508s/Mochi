@@ -302,11 +302,17 @@
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Unit</label>
                                 <input type="number" min="0" max="99" wire:model.blur="visitForm.observe_unit"
                                        class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                                @error('visitForm.observe_unit')
+                                    <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                @enderror
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Lesson</label>
                                 <input type="number" min="0" max="99" wire:model.blur="visitForm.observe_lesson"
                                        class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                                @error('visitForm.observe_lesson')
+                                    <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                @enderror
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">반</label>
@@ -319,6 +325,7 @@
                                        class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                             </div>
                         </div>
+                        <p class="mt-1 text-xs text-gray-400">Unit·Lesson 등 참관 수업 정보는 해당 없으면 비워 두셔도 됩니다.</p>
                     </div>
 
                     <div wire:key="visit-report-pre-request" class="border-t border-gray-100 pt-3">
