@@ -40,7 +40,10 @@ class ContactList extends Component
 
     // 검색창에 입력한 텍스트
     public string $employmentFilter = 'all';
-    // 재직 상태 필터: all | active | inactive
+    // 수업 참여 필터: all | active | inactive
+
+    public string $teacherStatusFilter = 'active';
+    // 교사 재직 상태: all | active | retired
 
     // ─── 생성/수정 모달 상태 ────────────────────────────────────────
     public bool $showModal = false;
@@ -133,6 +136,11 @@ class ContactList extends Component
     }
 
     public function updatingEmploymentFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingTeacherStatusFilter(): void
     {
         $this->resetPage();
     }
@@ -749,6 +757,7 @@ class ContactList extends Component
         $this->hydrateTeacherInstitutions($teachers->getCollection());
 
         $statsQuery = Teacher::query();
+        $this->applyTeacherStatusFilter($statsQuery);
         $this->applyContactVisibilityScope($statsQuery);
         $totalCount = (clone $statsQuery)->count();
         $activeCount = (clone $statsQuery)->where('ClassInOut', true)->count();
@@ -831,9 +840,26 @@ class ContactList extends Component
                         ->orWhereNull('ClassInOut');
                 });
             });
+        $this->applyTeacherStatusFilter($teachersQuery);
         $this->applyContactVisibilityScope($teachersQuery);
 
         return $teachersQuery;
+    }
+
+    /**
+     * @param  Builder<Teacher>  $query
+     */
+    private function applyTeacherStatusFilter(Builder $query): void
+    {
+        if ($this->teacherStatusFilter === 'retired') {
+            $query->retired();
+
+            return;
+        }
+
+        if ($this->teacherStatusFilter === 'active') {
+            $query->excludeRetired();
+        }
     }
 
     private function applyContactVisibilityScope(Builder $query): void

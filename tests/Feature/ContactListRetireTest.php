@@ -307,4 +307,133 @@ class ContactListRetireTest extends TestCase
             'Status' => '퇴직',
         ]);
     }
+
+    public function test_active_tab_excludes_retired_teachers_from_list(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '활성교사');
+        $this->createRetiredTeacherWithRecord('SK001', '퇴직교사');
+
+        Livewire::actingAs($admin)
+            ->test(ContactList::class)
+            ->assertSet('teacherStatusFilter', 'active')
+            ->assertSee('활성교사')
+            ->assertDontSee('퇴직교사')
+            ->assertViewHas('teachers', fn ($paginator) => $paginator->total() === 1);
+    }
+
+    public function test_retired_tab_shows_only_retired_teachers(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '활성교사');
+        $this->createRetiredTeacherWithRecord('SK001', '퇴직교사');
+
+        Livewire::actingAs($admin)
+            ->test(ContactList::class)
+            ->set('teacherStatusFilter', 'retired')
+            ->assertSee('퇴직교사')
+            ->assertDontSee('활성교사')
+            ->assertViewHas('teachers', fn ($paginator) => $paginator->total() === 1);
+    }
+
+    public function test_all_tab_shows_active_and_retired_teachers(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '활성교사');
+        $this->createRetiredTeacherWithRecord('SK001', '퇴직교사');
+
+        Livewire::actingAs($admin)
+            ->test(ContactList::class)
+            ->set('teacherStatusFilter', 'all')
+            ->assertSee('활성교사')
+            ->assertSee('퇴직교사')
+            ->assertViewHas('teachers', fn ($paginator) => $paginator->total() === 2);
+    }
+
+    public function test_all_tab_applies_class_participation_filter(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '활성수업O', ['ClassInOut' => true]);
+        $this->createTeacher('SK001', '활성수업X', ['ClassInOut' => false]);
+        $this->createRetiredTeacherWithRecord('SK001', '퇴직수업O');
+        Teacher::query()->where('Name', '퇴직수업O')->update(['ClassInOut' => true]);
+
+        Livewire::actingAs($admin)
+            ->test(ContactList::class)
+            ->set('teacherStatusFilter', 'all')
+            ->set('employmentFilter', 'active')
+            ->assertSee('활성수업O')
+            ->assertSee('퇴직수업O')
+            ->assertDontSee('활성수업X')
+            ->assertViewHas('teachers', fn ($paginator) => $paginator->total() === 2);
+    }
+
+    public function test_retired_tab_applies_class_participation_filter(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createRetiredTeacherWithRecord('SK001', '퇴직수업O');
+        Teacher::query()->where('Name', '퇴직수업O')->update(['ClassInOut' => true]);
+
+        $this->createTeacher('SK001', '퇴직수업X', [
+            'Status' => '퇴직',
+            'ClassInOut' => false,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(ContactList::class)
+            ->set('teacherStatusFilter', 'retired')
+            ->set('employmentFilter', 'active')
+            ->assertSee('퇴직수업O')
+            ->assertDontSee('퇴직수업X')
+            ->assertViewHas('teachers', fn ($paginator) => $paginator->total() === 1);
+    }
+
+    public function test_summary_counts_respect_teacher_status_filter(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '활성참여', ['ClassInOut' => true]);
+        $this->createTeacher('SK001', '활성미참여', ['ClassInOut' => false]);
+        $this->createRetiredTeacherWithRecord('SK001', '퇴직교사');
+
+        Livewire::actingAs($admin)
+            ->test(ContactList::class)
+            ->assertViewHas('totalCount', 2)
+            ->assertViewHas('activeCount', 1)
+            ->assertViewHas('inactiveCount', 1)
+            ->set('teacherStatusFilter', 'retired')
+            ->assertViewHas('totalCount', 1)
+            ->assertViewHas('activeCount', 0)
+            ->assertViewHas('inactiveCount', 1)
+            ->set('teacherStatusFilter', 'all')
+            ->assertViewHas('totalCount', 3)
+            ->assertViewHas('activeCount', 1)
+            ->assertViewHas('inactiveCount', 2);
+    }
+
+    public function test_create_button_visible_on_all_teacher_status_tabs_for_admin(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(ContactList::class)
+            ->assertSee('신규 생성')
+            ->set('teacherStatusFilter', 'all')
+            ->assertSee('신규 생성')
+            ->set('teacherStatusFilter', 'retired')
+            ->assertSee('신규 생성')
+            ->set('teacherStatusFilter', 'active')
+            ->assertSee('신규 생성');
+    }
 }
