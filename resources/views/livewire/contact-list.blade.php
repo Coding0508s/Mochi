@@ -77,26 +77,6 @@
                        class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
             </div>
 
-            <button type="button"
-                    wire:click="exportContactsExcel"
-                    wire:loading.attr="disabled"
-                    wire:target="exportContactsExcel"
-                    class="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60">
-                <span wire:loading.remove wire:target="exportContactsExcel" class="inline-flex items-center gap-2">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                    </svg>
-                    엑셀 다운로드
-                </span>
-                <span wire:loading.inline-flex wire:target="exportContactsExcel" class="hidden items-center gap-2">
-                    <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-                    </svg>
-                    생성 중…
-                </span>
-            </button>
-
             @if($search)
                 <button wire:click="$set('search', '')"
                         class="py-2 px-3 text-sm text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
@@ -104,16 +84,62 @@
                 </button>
             @endif
 
-            @if($canCreateContactRecords ?? false)
+            <div class="ml-auto flex flex-wrap items-center gap-3 max-md:ml-0 max-md:w-full">
+                <div class="flex items-center gap-2 text-sm">
+                    <span class="text-gray-500">상태</span>
+                    <div class="mochi-toggle-group">
+                        <button type="button"
+                                wire:click="$set('teacherStatusFilter', 'all')"
+                                aria-pressed="{{ $teacherStatusFilter === 'all' ? 'true' : 'false' }}"
+                                class="mochi-toggle-btn {{ $teacherStatusFilter === 'all' ? 'mochi-toggle-btn--active' : '' }}">
+                            전체
+                        </button>
+                        <button type="button"
+                                wire:click="$set('teacherStatusFilter', 'active')"
+                                aria-pressed="{{ $teacherStatusFilter === 'active' ? 'true' : 'false' }}"
+                                class="mochi-toggle-btn {{ $teacherStatusFilter === 'active' ? 'mochi-toggle-btn--active' : '' }}">
+                            활성
+                        </button>
+                        <button type="button"
+                                wire:click="$set('teacherStatusFilter', 'retired')"
+                                aria-pressed="{{ $teacherStatusFilter === 'retired' ? 'true' : 'false' }}"
+                                class="mochi-toggle-btn {{ $teacherStatusFilter === 'retired' ? 'mochi-toggle-btn--active' : '' }}">
+                            퇴직
+                        </button>
+                    </div>
+                </div>
+
+                @if($canCreateContactRecords ?? false)
+                    <button type="button"
+                            wire:click="openCreateModal"
+                            class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 cursor-pointer max-md:w-full">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        신규 생성
+                    </button>
+                @endif
+
                 <button type="button"
-                        wire:click="openCreateModal"
-                        class="ml-auto inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 cursor-pointer max-md:w-full max-md:ml-0">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                    </svg>
-                    신규 생성
+                        wire:click="exportContactsExcel"
+                        wire:loading.attr="disabled"
+                        wire:target="exportContactsExcel"
+                        class="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 max-md:w-full">
+                    <span wire:loading.remove wire:target="exportContactsExcel" class="inline-flex items-center gap-2">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        엑셀 다운로드
+                    </span>
+                    <span wire:loading.inline-flex wire:target="exportContactsExcel" class="hidden items-center gap-2">
+                        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                        </svg>
+                        생성 중…
+                    </span>
                 </button>
-            @endif
+            </div>
         </div>
     </div>
 
