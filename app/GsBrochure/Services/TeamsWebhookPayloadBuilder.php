@@ -196,6 +196,76 @@ class TeamsWebhookPayloadBuilder
         ];
     }
 
+    /**
+     * @param  list<array{name: string, value: string}>  $itemFacts
+     */
+    public function buildStoreReturnCompletionPayload(
+        string $webhookUrl,
+        string $format,
+        string $message,
+        string $completedByName,
+        string $returnedAt,
+        string $institutionName,
+        string $institutionSkCode,
+        string $freight,
+        string $csTeam,
+        array $itemFacts,
+        string $returnsUrl,
+    ): array {
+        $summaryFacts = [
+            ['name' => '처리자', 'value' => $completedByName],
+            ['name' => 'Date', 'value' => $returnedAt],
+            ['name' => '기관명', 'value' => $institutionName],
+            ['name' => 'SK 코드', 'value' => $institutionSkCode !== '' ? $institutionSkCode : '-'],
+            ['name' => '운임', 'value' => $freight !== '' ? $freight : '-'],
+            ['name' => '담당 CS 팀', 'value' => $csTeam !== '' ? $csTeam : '-'],
+        ];
+
+        if ($this->usesAdaptiveCard($webhookUrl, $format)) {
+            return $this->buildWorkflowsMessageEnvelope($this->buildAdaptiveCardPayload(
+                title: '반품 처리 완료',
+                factSections: [
+                    [
+                        'facts' => $this->messageCardFactsToAdaptiveFacts($summaryFacts),
+                    ],
+                    [
+                        'heading' => '반품 품목',
+                        'facts' => $this->messageCardFactsToAdaptiveFacts($itemFacts),
+                    ],
+                ],
+                actions: [[
+                    'type' => 'Action.OpenUrl',
+                    'title' => '반품 현황 보기',
+                    'url' => $returnsUrl,
+                ]],
+                introText: $message,
+            ));
+        }
+
+        return [
+            '@type' => 'MessageCard',
+            '@context' => 'http://schema.org/extensions',
+            'themeColor' => '28a745',
+            'summary' => '반품 처리 완료',
+            'sections' => [[
+                'activityTitle' => '**반품 처리 완료**',
+                'text' => $message,
+                'facts' => $summaryFacts,
+            ], [
+                'activityTitle' => '**반품 품목**',
+                'facts' => $itemFacts,
+            ]],
+            'potentialAction' => [[
+                '@type' => 'OpenUri',
+                'name' => '반품 현황 보기',
+                'targets' => [[
+                    'os' => 'default',
+                    'uri' => $returnsUrl,
+                ]],
+            ]],
+        ];
+    }
+
     public function usesAdaptiveCard(string $webhookUrl, string $format = self::FORMAT_AUTO): bool
     {
         $normalizedFormat = strtolower(trim($format));
@@ -243,7 +313,7 @@ class TeamsWebhookPayloadBuilder
      * @param  list<array{type: string, title: string, url: string}>  $actions
      * @return array<string, mixed>
      */
-    private function buildAdaptiveCardPayload(string $title, array $factSections, array $actions = []): array
+    private function buildAdaptiveCardPayload(string $title, array $factSections, array $actions = [], ?string $introText = null): array
     {
         $body = [[
             'type' => 'TextBlock',
@@ -252,6 +322,15 @@ class TeamsWebhookPayloadBuilder
             'size' => 'Medium',
             'wrap' => true,
         ]];
+
+        if (filled($introText)) {
+            $body[] = [
+                'type' => 'TextBlock',
+                'text' => $introText,
+                'wrap' => true,
+                'spacing' => 'Small',
+            ];
+        }
 
         foreach ($factSections as $section) {
             if (($section['heading'] ?? '') !== '') {

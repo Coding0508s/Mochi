@@ -96,6 +96,31 @@ class TeamsWebhookPayloadBuilderTest extends TestCase
         $this->assertSame('반품 등록 보기', $payload['potentialAction'][0]['name'] ?? null);
     }
 
+    public function test_builds_store_return_completion_payload_for_incoming_webhook(): void
+    {
+        $message = '반품 처리 완료. 이카운트 전표 확인 바랍니다.';
+
+        $payload = $this->builder->buildStoreReturnCompletionPayload(
+            webhookUrl: 'https://example.webhook.office.com/webhookb2/abc',
+            format: TeamsWebhookPayloadBuilder::FORMAT_AUTO,
+            message: $message,
+            completedByName: 'CS User',
+            returnedAt: '2026-07-10',
+            institutionName: '포도씨 유치원',
+            institutionSkCode: 'SK1001',
+            freight: '선불',
+            csTeam: 'Ellen Joo',
+            itemFacts: [['name' => 'Unit 4', 'value' => '2개 / 전표 등록 완료']],
+            returnsUrl: 'https://example.test/store/returns?team_menu=logistics',
+        );
+
+        $this->assertSame('MessageCard', $payload['@type'] ?? null);
+        $this->assertSame('반품 처리 완료', $payload['summary'] ?? null);
+        $this->assertSame($message, $payload['sections'][0]['text'] ?? null);
+        $this->assertSame('CS User', $payload['sections'][0]['facts'][0]['value'] ?? null);
+        $this->assertSame('반품 현황 보기', $payload['potentialAction'][0]['name'] ?? null);
+    }
+
     /**
      * @return array<string, array{0: string}>
      */
