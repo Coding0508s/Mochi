@@ -31,7 +31,7 @@ class Department extends Model
         'FGC_Creator',
     ];
 
-    public const PEOPLE_SIDEBAR_CACHE_KEY = 'layout:people-teams:v1';
+    public const PEOPLE_SIDEBAR_CACHE_KEY = 'layout:people-teams:v2';
 
     /**
      * People 사이드바 팀 메뉴 상단 고정 순서 (DEPTNAME 기준, 대소문자 무시).

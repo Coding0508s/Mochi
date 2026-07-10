@@ -7,7 +7,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 
 /**
  * Teams 사이드바(team_menu) 및 CO 전용 기능 접근.
- * 부서 코드(A01/A02/A03/A05)는 Setup 팀 관리·InstitutionList 담당자 드롭다운과 동일.
+ * 부서 코드(A01/A02/A03/A04/A05)는 Setup 팀 관리·InstitutionList 담당자 드롭다운과 동일.
  */
 final class TeamMenuContext
 {
@@ -26,6 +26,8 @@ final class TeamMenuContext
     public const DEPT_CS = 'A03';
 
     public const DEPT_COACH = 'A05';
+
+    public const DEPT_LOGISTICS = 'A04';
 
     /**
      * 로그인 계정 팀 판별: 연결된 employee.WORKDEPT 우선(관리자 제외), 없으면 users.team.

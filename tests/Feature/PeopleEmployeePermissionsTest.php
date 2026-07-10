@@ -311,6 +311,23 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->assertSee('비활성화 직원', false);
     }
 
+    public function test_people_sidebar_lists_logistics_team_department_in_team_list(): void
+    {
+        Department::query()->insert([
+            'DEPTNO' => 'A04',
+            'DEPTNAME' => 'Logistics Team',
+            'ADMRDEPT' => '',
+            'LOCATION' => '',
+        ]);
+
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)
+            ->get(route('people.index'))
+            ->assertOk()
+            ->assertSee('>Logistics Team<', false);
+    }
+
     public function test_people_sidebar_lists_online_team_department_in_team_list(): void
     {
         Department::query()->insert([
