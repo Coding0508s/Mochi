@@ -535,7 +535,7 @@ class StoreReturnRegistrationForm extends Component
             'institution_sk_code' => $institutionSkCode,
             'freight' => $freight,
             'cs_team' => $csTeam,
-            'registrant_name' => Auth::user()?->name ?? '시스템',
+            'registrant_name' => Auth::user()?->nameForCoReports() ?? '시스템',
             'items' => collect($validated['itemRows'])
                 ->map(fn (array $row): array => [
                     'item_name' => app(StoreReturnEcountProductOptions::class)->displayNameForProductCode(trim($row['itemName'])),
