@@ -1,0 +1,27 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+
+class StoreReturnEcountProduct extends Model
+{
+    protected $fillable = [
+        'prod_cd',
+        'product_name',
+        'is_active',
+        'sort_order',
+        'memo',
+    ];
+
+    protected $casts = [
+        'is_active' => 'bool',
+        'sort_order' => 'int',
+    ];
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_active', true);
+    }
+}

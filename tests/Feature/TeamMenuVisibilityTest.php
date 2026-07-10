@@ -62,6 +62,33 @@ class TeamMenuVisibilityTest extends TestCase
             ->assertOk();
     }
 
+    public function test_cs_user_can_access_store_returns_route(): void
+    {
+        $cs = User::factory()->create([
+            'team' => 'CS',
+            'is_admin' => false,
+        ]);
+
+        $this->actingAs($cs)
+            ->get(route('store.returns.index', ['team_menu' => 'cs']))
+            ->assertOk()
+            ->assertSee('반품 등록', false);
+    }
+
+    public function test_cs_team_sidebar_shows_return_registration_menu(): void
+    {
+        $cs = User::factory()->create([
+            'team' => 'CS',
+            'is_admin' => false,
+        ]);
+
+        $response = $this->actingAs($cs)->get(route('profile.edit'));
+
+        $response->assertOk();
+        $response->assertSee('store/returns?team_menu=cs', false);
+        $response->assertSee('sidebar-subitem-label">반품 등록<', false);
+    }
+
     public function test_cs_team_sidebar_shows_brochure_request_menu_only(): void
     {
         $cs = User::factory()->create([
@@ -106,6 +133,60 @@ class TeamMenuVisibilityTest extends TestCase
         $this->actingAs($cs)
             ->get(route('co.gs-brochure.request', ['view' => 'list', 'team_menu' => 'cs']))
             ->assertOk();
+    }
+
+    public function test_logistics_team_sidebar_shows_store_and_brochure_menus(): void
+    {
+        $user = User::factory()->create([
+            'team' => 'CO',
+            'is_admin' => false,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('profile.edit'));
+
+        $response->assertOk();
+        $response->assertSee('>Logistics Team<', false);
+        $response->assertSee('store/inventory?team_menu=logistics', false);
+        $response->assertSee('store/sales?team_menu=logistics', false);
+        $response->assertSee('store/returns?team_menu=logistics', false);
+        $response->assertSee('section=inventory&amp;team_menu=logistics', false);
+        $response->assertSee('section=logistics&amp;team_menu=logistics', false);
+        $response->assertSee('sidebar-subitem-label">Store 재고<', false);
+        $response->assertSee('sidebar-subitem-label">반품 등록<', false);
+        $response->assertSee('sidebar-subitem-label">GS Brochure<', false);
+        $response->assertSee('sidebar-subitem-label">운송장 입력<', false);
+    }
+
+    public function test_co_team_sidebar_still_shows_store_menus(): void
+    {
+        $user = User::factory()->create([
+            'team' => 'CO',
+            'is_admin' => false,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('profile.edit'));
+
+        $response->assertOk();
+        $response->assertSee('store/inventory?team_menu=co', false);
+        $response->assertSee('store/sales?team_menu=co', false);
+    }
+
+    public function test_store_inventory_highlights_logistics_menu_when_team_menu_is_logistics(): void
+    {
+        $user = User::factory()->create([
+            'team' => 'CO',
+            'is_admin' => false,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('store.inventory.index', ['team_menu' => 'logistics']));
+
+        $response->assertOk();
+        $this->assertSame(TeamMenuContext::MENU_LOGISTICS, TeamMenuContext::activeMenu($user));
+
+        $html = $response->getContent();
+        $logisticsSection = (string) str($html)->after('Logistics Team')->before('CO Team');
+        $this->assertStringContainsString('store/inventory?team_menu=logistics', $logisticsSection);
+        $this->assertStringContainsString('sidebar-subitem-active', $logisticsSection);
     }
 
     public function test_admin_sidebar_shows_retired_teachers_under_admin_menu(): void

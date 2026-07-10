@@ -74,6 +74,28 @@ class TeamsWebhookPayloadBuilderTest extends TestCase
         $this->assertSame('1234567890', $this->adaptiveFactValue($payload['attachments'][0]['content'], '운송장 번호'));
     }
 
+    public function test_builds_store_return_registration_payload_for_incoming_webhook(): void
+    {
+        $payload = $this->builder->buildStoreReturnRegistrationPayload(
+            webhookUrl: 'https://example.webhook.office.com/webhookb2/abc',
+            format: TeamsWebhookPayloadBuilder::FORMAT_AUTO,
+            registrantName: 'Logistics User',
+            returnedAt: '2026-07-10',
+            institutionName: '포도씨 유치원',
+            institutionSkCode: 'SK1001',
+            freight: '선불',
+            csTeam: 'Ellen Joo',
+            itemFacts: [['name' => 'Unit 4', 'value' => '2개 / 정상 / 스티커']],
+            returnsUrl: 'https://example.test/store/returns?team_menu=cs',
+        );
+
+        $this->assertSame('MessageCard', $payload['@type'] ?? null);
+        $this->assertSame('물류 반품 등록', $payload['summary'] ?? null);
+        $this->assertSame('포도씨 유치원', $payload['sections'][0]['facts'][2]['value'] ?? null);
+        $this->assertSame('Unit 4', $payload['sections'][1]['facts'][0]['name'] ?? null);
+        $this->assertSame('반품 등록 보기', $payload['potentialAction'][0]['name'] ?? null);
+    }
+
     /**
      * @return array<string, array{0: string}>
      */

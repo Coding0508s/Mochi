@@ -84,7 +84,8 @@
          openTeams: true,
         openCS: {{ $isCoTeamRoute && ! $isAdminSidebarContext && ($activeTeamMenu === 'cs' || ($activeTeamMenu === null && $sidebarUser?->isCsTeam())) ? 'true' : 'false' }},
         openCoach: {{ $isCoTeamRoute && ! $isAdminSidebarContext && ($activeTeamMenu === 'coach' || ($activeTeamMenu === null && $sidebarUser?->isCoachTeam())) ? 'true' : 'false' }},
-        openCO: {{ $isCoTeamRoute && ! $isAdminSidebarContext && ($activeTeamMenu === 'co' || ($activeTeamMenu === null && ! $sidebarUser?->isCsTeam() && ! $sidebarUser?->isCoachTeam())) ? 'true' : 'false' }},
+        openCO: {{ $isCoTeamRoute && ! $isAdminSidebarContext && $activeTeamMenu !== 'logistics' && ($activeTeamMenu === 'co' || ($activeTeamMenu === null && ! $sidebarUser?->isCsTeam() && ! $sidebarUser?->isCoachTeam())) ? 'true' : 'false' }},
+        openLogistics: {{ $isCoTeamRoute && ! $isAdminSidebarContext && $activeTeamMenu === 'logistics' ? 'true' : 'false' }},
         openAdmin: {{ $isAdminSidebarContext ? 'true' : 'false' }},
          openReview: false,
          openGoal: false,
@@ -328,7 +329,7 @@
                 <button type="button"
                         @click="openTeams = !openTeams"
                         class="sidebar-item sidebar-focusable"
-                        :class="(openTeams && (openCS || openCoach || openCO)) ? 'sidebar-item-active' : 'sidebar-item-default'">
+                        :class="(openTeams && (openCS || openCoach || openCO || openLogistics)) ? 'sidebar-item-active' : 'sidebar-item-default'">
                     <span class="sidebar-item-lead">
                         @include('partials.sidebar-menu-icon', ['name' => 'user-group'])
                         <span class="font-medium">Teams</span>
@@ -354,6 +355,10 @@
                                 $active = request()->routeIs($menu['route'].'.*');
                             } else {
                                 $active = false;
+                            }
+
+                            if ($active && ! empty($menu['section'] ?? null)) {
+                                $active = request()->query('section') === $menu['section'];
                             }
 
                             if (! $active || $expectedTeamMenu === null) {
@@ -397,7 +402,7 @@
                             {{-- Admin --}}
                             <div>
                                 <button type="button"
-                                        @click="openAdmin = !openAdmin; if (openAdmin) { openCS = false; openCoach = false; openCO = false }"
+                                        @click="openAdmin = !openAdmin; if (openAdmin) { openCS = false; openCoach = false; openCO = false; openLogistics = false }"
                                         class="sidebar-item sidebar-team-toggle sidebar-focusable"
                                         :class="openAdmin ? 'sidebar-team-toggle-open' : ''"
                                         :aria-expanded="openAdmin ? 'true' : 'false'">
@@ -440,7 +445,7 @@
                     {{-- CO Team (하위 메뉴 포함) --}}
                     <div>
                         <button type="button"
-                                @click="openCO = !openCO; if (openCO) { openSetup = false; openCS = false; openCoach = false }"
+                                @click="openCO = !openCO; if (openCO) { openSetup = false; openCS = false; openCoach = false; openLogistics = false }"
                                 class="sidebar-item sidebar-team-toggle sidebar-focusable"
                                 :class="openCO ? 'sidebar-team-toggle-open' : ''"
                                 :aria-expanded="openCO ? 'true' : 'false'">
@@ -489,6 +494,10 @@
 
                         </div>
                     </div>
+
+                        @include('partials.sidebar-logistics-team-block', [
+                            'isSidebarMenuActive' => $isSidebarMenuActive,
+                        ])
                     @endif
                 </div>
             </div>

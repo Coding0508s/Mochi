@@ -174,6 +174,13 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/store/sales', function () {
         return view('pages.store.sales.index');
     })->name('store.sales.index');
+    Route::get('/store/returns', function () {
+        return view('pages.store.returns.index');
+    })->name('store.returns.index');
+    Route::get('/store/returns/products', function () {
+        return view('pages.store.returns.products.index');
+    })->middleware('can:manageStoreReturnProducts')
+        ->name('store.returns.products.index');
     Route::get('/store/inventory/skus', function () {
         return view('pages.store.inventory.skus.index');
     })->middleware('can:manageStoreInventory')

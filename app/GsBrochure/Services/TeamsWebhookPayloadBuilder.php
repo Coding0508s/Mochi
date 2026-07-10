@@ -129,6 +129,73 @@ class TeamsWebhookPayloadBuilder
         ];
     }
 
+    /**
+     * @param  list<array{name: string, value: string}>  $itemFacts
+     */
+    public function buildStoreReturnRegistrationPayload(
+        string $webhookUrl,
+        string $format,
+        string $registrantName,
+        string $returnedAt,
+        string $institutionName,
+        string $institutionSkCode,
+        string $freight,
+        string $csTeam,
+        array $itemFacts,
+        string $returnsUrl,
+    ): array {
+        $summaryFacts = [
+            ['name' => '등록자', 'value' => $registrantName],
+            ['name' => 'Date', 'value' => $returnedAt],
+            ['name' => '기관명', 'value' => $institutionName],
+            ['name' => 'SK 코드', 'value' => $institutionSkCode !== '' ? $institutionSkCode : '-'],
+            ['name' => '운임', 'value' => $freight !== '' ? $freight : '-'],
+            ['name' => '담당 CS 팀', 'value' => $csTeam !== '' ? $csTeam : '-'],
+        ];
+
+        if ($this->usesAdaptiveCard($webhookUrl, $format)) {
+            return $this->buildWorkflowsMessageEnvelope($this->buildAdaptiveCardPayload(
+                title: '물류 반품 등록',
+                factSections: [
+                    [
+                        'facts' => $this->messageCardFactsToAdaptiveFacts($summaryFacts),
+                    ],
+                    [
+                        'heading' => '반품 품목',
+                        'facts' => $this->messageCardFactsToAdaptiveFacts($itemFacts),
+                    ],
+                ],
+                actions: [[
+                    'type' => 'Action.OpenUrl',
+                    'title' => '반품 등록 보기',
+                    'url' => $returnsUrl,
+                ]],
+            ));
+        }
+
+        return [
+            '@type' => 'MessageCard',
+            '@context' => 'http://schema.org/extensions',
+            'themeColor' => '2b78c5',
+            'summary' => '물류 반품 등록',
+            'sections' => [[
+                'activityTitle' => '**물류 반품 등록**',
+                'facts' => $summaryFacts,
+            ], [
+                'activityTitle' => '**반품 품목**',
+                'facts' => $itemFacts,
+            ]],
+            'potentialAction' => [[
+                '@type' => 'OpenUri',
+                'name' => '반품 등록 보기',
+                'targets' => [[
+                    'os' => 'default',
+                    'uri' => $returnsUrl,
+                ]],
+            ]],
+        ];
+    }
+
     public function usesAdaptiveCard(string $webhookUrl, string $format = self::FORMAT_AUTO): bool
     {
         $normalizedFormat = strtolower(trim($format));

@@ -53,6 +53,8 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::define('manageStoreInventory', fn (?User $user): bool => (bool) ($user?->hasFullAccess() || $user?->can_manage_store_inventory));
 
+        Gate::define('manageStoreReturnProducts', fn (?User $user): bool => (bool) $user?->hasFullAccess());
+
         Gate::define('manageGsBrochureAdmin', fn (?User $user): bool => (bool) ($user?->hasFullAccess() || $user?->is_gs_brochure_admin));
 
         Gate::define('viewAdminMenu', fn (?User $user): bool => TeamMenuContext::showAdminTeamSidebar($user));

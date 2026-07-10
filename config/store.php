@@ -48,6 +48,18 @@ return [
             'max_rows_per_query' => max(1, (int) env('STORE_GNUBOARD_SALES_MAX_ROWS_PER_QUERY', 5000)),
         ],
     ],
+    'return_registration' => [
+        'statuses' => ['정상', '접수', '수거중', '전표 등록 완료', '폐기', '기타'],
+        'in_progress_status' => '진행 중',
+        'completed_status' => '전표 등록 완료',
+        'freight_options' => ['선불', '착불', '무료', '기타'],
+        // 반품 등록 품목 드롭다운 — Store 재고 연동과 별도 PROD_CD 목록
+        'ecount_enabled' => filter_var(env('STORE_RETURN_ECOUNT_ENABLED', 'true'), FILTER_VALIDATE_BOOLEAN),
+        'ecount_product_codes' => env('STORE_RETURN_ECOUNT_PRODUCT_CODES', ''),
+        'ecount_product_max_codes' => max(1, (int) env('STORE_RETURN_ECOUNT_PRODUCT_MAX_CODES', 100)),
+        'ecount_cache_ttl_seconds' => max(0, (int) env('STORE_RETURN_ECOUNT_CACHE_TTL_SECONDS', 120)),
+        'ecount_cache_prefix' => env('STORE_RETURN_ECOUNT_CACHE_PREFIX', 'store_return'),
+    ],
     'ecount' => [
         'base_url' => env('ECOUNT_API_BASE_URL'),
         'zone_lookup_base_url' => env('ECOUNT_ZONE_LOOKUP_BASE_URL', 'https://oapi.ecount.com'),
