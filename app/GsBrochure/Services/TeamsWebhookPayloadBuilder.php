@@ -196,6 +196,59 @@ class TeamsWebhookPayloadBuilder
         ];
     }
 
+    public function buildStoreReturnRegistrationSummaryPayload(
+        string $webhookUrl,
+        string $format,
+        string $message,
+        string $registrantName,
+        string $returnedAt,
+        string $registrationCountSummary,
+        string $returnsUrl,
+    ): array {
+        $summaryFacts = [
+            ['name' => '등록자', 'value' => $registrantName],
+            ['name' => 'Date', 'value' => $returnedAt],
+            ['name' => '등록 건수', 'value' => $registrationCountSummary],
+        ];
+
+        if ($this->usesAdaptiveCard($webhookUrl, $format)) {
+            return $this->buildWorkflowsMessageEnvelope($this->buildAdaptiveCardPayload(
+                title: '물류 반품 등록',
+                factSections: [
+                    [
+                        'facts' => $this->messageCardFactsToAdaptiveFacts($summaryFacts),
+                    ],
+                ],
+                actions: [[
+                    'type' => 'Action.OpenUrl',
+                    'title' => '반품 현황 보기',
+                    'url' => $returnsUrl,
+                ]],
+                introText: $message,
+            ));
+        }
+
+        return [
+            '@type' => 'MessageCard',
+            '@context' => 'http://schema.org/extensions',
+            'themeColor' => '2b78c5',
+            'summary' => $message,
+            'sections' => [[
+                'activityTitle' => '**물류 반품 등록**',
+                'text' => $message,
+                'facts' => $summaryFacts,
+            ]],
+            'potentialAction' => [[
+                '@type' => 'OpenUri',
+                'name' => '반품 현황 보기',
+                'targets' => [[
+                    'os' => 'default',
+                    'uri' => $returnsUrl,
+                ]],
+            ]],
+        ];
+    }
+
     /**
      * @param  list<array{name: string, value: string}>  $itemFacts
      */

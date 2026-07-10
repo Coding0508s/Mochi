@@ -623,7 +623,6 @@ class StoreReturnRegistrationForm extends Component
             $freight = filled($block['freight'] ?? null) ? $block['freight'] : null;
             $csTeam = $this->resolveCsTeam($institutionSkCode, (string) ($block['csTeam'] ?? ''));
             $registrationGroupKey = (string) Str::uuid();
-            $blockItems = [];
 
             foreach ($block['itemRows'] as $row) {
                 StoreReturnRegistration::query()->create([
@@ -640,25 +639,15 @@ class StoreReturnRegistrationForm extends Component
                     'registration_group_key' => $registrationGroupKey,
                 ]);
                 $savedCount++;
-
-                $blockItems[] = [
-                    'item_name' => $productOptions->displayNameForProductCode(trim((string) $row['itemName'])),
-                    'quantity' => (int) $row['quantity'],
-                    'status' => $row['status'],
-                    'notes' => filled($row['notes'] ?? null) ? trim((string) $row['notes']) : null,
-                ];
             }
-
-            app(StoreReturnTeamsNotifier::class)->notifyRegistered([
-                'returned_at' => $validated['returnDate'],
-                'institution_name' => $institutionName,
-                'institution_sk_code' => $institutionSkCode,
-                'freight' => $freight,
-                'cs_team' => $csTeam,
-                'registrant_name' => Auth::user()?->nameForCoReports() ?? '시스템',
-                'items' => $blockItems,
-            ]);
         }
+
+        app(StoreReturnTeamsNotifier::class)->notifyRegistrationSaved(
+            registrantName: Auth::user()?->nameForCoReports() ?? '시스템',
+            returnedAt: $validated['returnDate'],
+            savedCount: $savedCount,
+            institutionCount: $institutionCount,
+        );
 
         $this->resetFormFields();
         $this->showCreateModal = false;

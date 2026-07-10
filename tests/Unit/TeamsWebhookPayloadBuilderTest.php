@@ -96,6 +96,29 @@ class TeamsWebhookPayloadBuilderTest extends TestCase
         $this->assertSame('반품 등록 보기', $payload['potentialAction'][0]['name'] ?? null);
     }
 
+    public function test_builds_store_return_registration_summary_payload_for_incoming_webhook(): void
+    {
+        $message = '반품이 등록되었습니다.';
+
+        $payload = $this->builder->buildStoreReturnRegistrationSummaryPayload(
+            webhookUrl: 'https://example.webhook.office.com/webhookb2/abc',
+            format: TeamsWebhookPayloadBuilder::FORMAT_AUTO,
+            message: $message,
+            registrantName: '물류 담당자',
+            returnedAt: '2026-07-10',
+            registrationCountSummary: '3건 / 2개 기관',
+            returnsUrl: 'https://example.test/store/returns?team_menu=cs',
+        );
+
+        $this->assertSame('MessageCard', $payload['@type'] ?? null);
+        $this->assertSame($message, $payload['summary'] ?? null);
+        $this->assertSame($message, $payload['sections'][0]['text'] ?? null);
+        $this->assertSame('물류 담당자', $payload['sections'][0]['facts'][0]['value'] ?? null);
+        $this->assertSame('2026-07-10', $payload['sections'][0]['facts'][1]['value'] ?? null);
+        $this->assertSame('3건 / 2개 기관', $payload['sections'][0]['facts'][2]['value'] ?? null);
+        $this->assertSame('반품 현황 보기', $payload['potentialAction'][0]['name'] ?? null);
+    }
+
     public function test_builds_store_return_completion_payload_for_incoming_webhook(): void
     {
         $message = '반품 처리 완료. 이카운트 전표 확인 바랍니다.';
