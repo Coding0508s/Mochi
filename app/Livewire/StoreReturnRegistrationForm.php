@@ -24,20 +24,16 @@ class StoreReturnRegistrationForm extends Component
 
     public string $returnDate = '';
 
-    public string $institutionKeyword = '';
-
-    public string $institutionSkCode = '';
-
-    public string $institutionName = '';
-
-    public string $freight = '';
-
-    public string $csTeam = '';
-
     /**
-     * @var array<int, array{itemName: string, quantity: string, status: string, notes: string}>
+     * @var array<int, array{
+     *     institutionKeyword: string,
+     *     institutionSkCode: string,
+     *     freight: string,
+     *     csTeam: string,
+     *     itemRows: array<int, array{itemName: string, quantity: string, status: string, notes: string}>
+     * }>
      */
-    public array $itemRows = [];
+    public array $institutionBlocks = [];
 
     public string $search = '';
 
@@ -75,15 +71,17 @@ class StoreReturnRegistrationForm extends Component
 
     public ?string $teamMenu = null;
 
-    private ?string $lockedInstitutionKeyword = null;
-
     private ?string $lockedDetailInstitutionKeyword = null;
+
+    /**
+     * @var array<int, string|null>
+     */
+    private array $lockedInstitutionKeywords = [];
 
     public function mount(): void
     {
         $this->returnDate = Carbon::now()->format('Y-m-d');
-        $this->freight = '';
-        $this->itemRows = [$this->defaultItemRow()];
+        $this->institutionBlocks = [$this->defaultInstitutionBlock()];
         $this->teamMenu = $this->resolveTeamMenu();
     }
 
@@ -105,13 +103,18 @@ class StoreReturnRegistrationForm extends Component
     /**
      * @return Collection<int, Institution>
      */
-    public function getInstitutionSuggestionsProperty(): Collection
+    public function institutionSuggestionsFor(int $blockIndex): Collection
     {
-        if (filled($this->institutionSkCode)) {
+        $block = $this->institutionBlocks[$blockIndex] ?? null;
+        if (! is_array($block)) {
             return collect();
         }
 
-        $keyword = trim($this->institutionKeyword);
+        if (filled($block['institutionSkCode'] ?? '')) {
+            return collect();
+        }
+
+        $keyword = trim((string) ($block['institutionKeyword'] ?? ''));
         if ($keyword === '' || ! Schema::hasTable('S_AccountName')) {
             return collect();
         }
@@ -170,22 +173,23 @@ class StoreReturnRegistrationForm extends Component
             ->get();
     }
 
-    public function selectInstitution(string $skCode): void
+    public function selectInstitution(int $blockIndex, string $skCode): void
     {
         $institution = Institution::query()
             ->with('accountInfo')
             ->where('SKcode', $skCode)
             ->first();
 
-        if ($institution === null) {
+        if ($institution === null || ! isset($this->institutionBlocks[$blockIndex])) {
             return;
         }
 
-        $this->institutionSkCode = trim((string) $institution->SKcode);
-        $this->institutionName = $institution->resolvedAccountName();
-        $this->csTeam = trim((string) ($institution->accountInfo?->CS ?? ''));
-        $this->lockedInstitutionKeyword = $this->institutionName;
-        $this->institutionKeyword = $this->institutionName;
+        $institutionName = $institution->resolvedAccountName();
+
+        $this->institutionBlocks[$blockIndex]['institutionSkCode'] = trim((string) $institution->SKcode);
+        $this->institutionBlocks[$blockIndex]['csTeam'] = trim((string) ($institution->accountInfo?->CS ?? ''));
+        $this->institutionBlocks[$blockIndex]['institutionKeyword'] = $institutionName;
+        $this->lockedInstitutionKeywords[$blockIndex] = $institutionName;
     }
 
     public function selectDetailInstitution(string $skCode): void
@@ -225,35 +229,35 @@ class StoreReturnRegistrationForm extends Component
         $this->detailInstitutionSkCode = '';
     }
 
-    public function updatedInstitutionKeyword(): void
+    public function updatedInstitutionBlocks(mixed $value, string $name): void
     {
-        $keyword = trim($this->institutionKeyword);
-        $this->institutionName = $keyword;
+        if (! preg_match('/^(\d+)\.institutionKeyword$/', $name, $matches)) {
+            return;
+        }
+
+        $blockIndex = (int) $matches[1];
+        if (! isset($this->institutionBlocks[$blockIndex])) {
+            return;
+        }
+
+        $keyword = trim((string) ($this->institutionBlocks[$blockIndex]['institutionKeyword'] ?? ''));
 
         if (blank($keyword)) {
-            $this->institutionSkCode = '';
-            $this->csTeam = '';
-            $this->lockedInstitutionKeyword = null;
+            $this->institutionBlocks[$blockIndex]['institutionSkCode'] = '';
+            $this->institutionBlocks[$blockIndex]['csTeam'] = '';
+            $this->lockedInstitutionKeywords[$blockIndex] = null;
 
             return;
         }
 
-        if ($this->lockedInstitutionKeyword !== null && $keyword === $this->lockedInstitutionKeyword) {
+        $lockedKeyword = $this->lockedInstitutionKeywords[$blockIndex] ?? null;
+        if ($lockedKeyword !== null && $keyword === $lockedKeyword) {
             return;
         }
 
-        $this->lockedInstitutionKeyword = null;
-        $this->institutionSkCode = '';
-        $this->csTeam = '';
-    }
-
-    public function clearInstitutionSelection(): void
-    {
-        $this->institutionSkCode = '';
-        $this->institutionName = '';
-        $this->institutionKeyword = '';
-        $this->csTeam = '';
-        $this->lockedInstitutionKeyword = null;
+        $this->lockedInstitutionKeywords[$blockIndex] = null;
+        $this->institutionBlocks[$blockIndex]['institutionSkCode'] = '';
+        $this->institutionBlocks[$blockIndex]['csTeam'] = '';
     }
 
     public function openCreateModal(): void
@@ -515,104 +519,159 @@ class StoreReturnRegistrationForm extends Component
         session()->flash('success', '반품 내역이 수정되었습니다.');
     }
 
-    public function addItemRow(): void
+    public function addItemRow(?int $blockIndex = null): void
     {
-        $this->itemRows[] = $this->defaultItemRow();
-    }
+        $blockIndex ??= count($this->institutionBlocks) - 1;
 
-    public function removeItemRow(int $index): void
-    {
-        if (count($this->itemRows) <= 1) {
+        if (! isset($this->institutionBlocks[$blockIndex])) {
             return;
         }
 
-        unset($this->itemRows[$index]);
-        $this->itemRows = array_values($this->itemRows);
+        $this->institutionBlocks[$blockIndex]['itemRows'][] = $this->defaultItemRow();
+    }
+
+    public function addInstitutionBlock(): void
+    {
+        $this->institutionBlocks[] = $this->defaultInstitutionBlock();
+    }
+
+    public function removeItemRow(int $blockIndex, int $itemIndex): void
+    {
+        if (! isset($this->institutionBlocks[$blockIndex]['itemRows'][$itemIndex])) {
+            return;
+        }
+
+        if (count($this->institutionBlocks[$blockIndex]['itemRows']) <= 1) {
+            return;
+        }
+
+        unset($this->institutionBlocks[$blockIndex]['itemRows'][$itemIndex]);
+        $this->institutionBlocks[$blockIndex]['itemRows'] = array_values($this->institutionBlocks[$blockIndex]['itemRows']);
+    }
+
+    public function removeInstitutionBlock(int $blockIndex): void
+    {
+        if (count($this->institutionBlocks) <= 1) {
+            return;
+        }
+
+        unset($this->institutionBlocks[$blockIndex]);
+        $this->reindexInstitutionBlocks();
+    }
+
+    private function reindexInstitutionBlocks(): void
+    {
+        $lockedKeywords = [];
+
+        foreach (array_values($this->institutionBlocks) as $index => $block) {
+            if (filled($block['institutionSkCode'] ?? '') && filled($block['institutionKeyword'] ?? '')) {
+                $lockedKeywords[$index] = (string) $block['institutionKeyword'];
+            }
+        }
+
+        $this->institutionBlocks = array_values($this->institutionBlocks);
+        $this->lockedInstitutionKeywords = $lockedKeywords;
     }
 
     public function save(): void
     {
         $statuses = config('store.return_registration.statuses', []);
         $freightOptions = config('store.return_registration.freight_options', []);
-        $itemNameRules = $this->itemNameValidationRules();
+        $legacyItemNames = collect($this->institutionBlocks)
+            ->flatMap(fn (array $block): Collection => collect($block['itemRows'])->pluck('itemName'))
+            ->all();
+        $itemNameRules = $this->itemNameValidationRules($legacyItemNames);
 
         $validated = $this->validate([
             'returnDate' => ['required', 'date'],
-            'institutionKeyword' => ['required', 'string', 'max:255'],
-            'institutionSkCode' => ['nullable', 'string', 'max:50'],
-            'freight' => ['nullable', 'string', Rule::in($freightOptions)],
-            'itemRows' => ['required', 'array', 'min:1'],
-            'itemRows.*.itemName' => $itemNameRules,
-            'itemRows.*.quantity' => ['required', 'integer', 'min:1', 'max:999999'],
-            'itemRows.*.status' => ['required', 'string', Rule::in($statuses)],
-            'itemRows.*.notes' => ['nullable', 'string', 'max:2000'],
+            'institutionBlocks' => ['required', 'array', 'min:1'],
+            'institutionBlocks.*.institutionKeyword' => ['required', 'string', 'max:255'],
+            'institutionBlocks.*.institutionSkCode' => ['nullable', 'string', 'max:50'],
+            'institutionBlocks.*.freight' => ['nullable', 'string', Rule::in($freightOptions)],
+            'institutionBlocks.*.itemRows' => ['required', 'array', 'min:1'],
+            'institutionBlocks.*.itemRows.*.itemName' => $itemNameRules,
+            'institutionBlocks.*.itemRows.*.quantity' => ['required', 'integer', 'min:1', 'max:999999'],
+            'institutionBlocks.*.itemRows.*.status' => ['required', 'string', Rule::in($statuses)],
+            'institutionBlocks.*.itemRows.*.notes' => ['nullable', 'string', 'max:2000'],
         ], [
             'returnDate.required' => '날짜를 입력해 주세요.',
             'returnDate.date' => '날짜 형식이 올바르지 않습니다.',
-            'institutionKeyword.required' => '기관명을 입력해 주세요.',
-            'itemRows.required' => '품목을 1개 이상 입력해 주세요.',
-            'itemRows.min' => '품목을 1개 이상 입력해 주세요.',
-            'itemRows.*.itemName.required' => '품목명을 선택해 주세요.',
-            'itemRows.*.itemName.in' => '품목명을 목록에서 선택해 주세요.',
-            'itemRows.*.quantity.required' => '수량을 입력해 주세요.',
-            'itemRows.*.quantity.integer' => '수량은 숫자만 입력해 주세요.',
-            'itemRows.*.quantity.min' => '수량은 1 이상이어야 합니다.',
-            'itemRows.*.status.required' => '상태를 선택해 주세요.',
-            'itemRows.*.status.in' => '상태 값이 올바르지 않습니다.',
-            'freight.in' => '운임 값이 올바르지 않습니다.',
-            'itemRows.*.notes.max' => '특이 사항은 2000자 이내로 입력해 주세요.',
+            'institutionBlocks.required' => '기관을 1개 이상 입력해 주세요.',
+            'institutionBlocks.min' => '기관을 1개 이상 입력해 주세요.',
+            'institutionBlocks.*.institutionKeyword.required' => '기관명을 입력해 주세요.',
+            'institutionBlocks.*.itemRows.required' => '품목을 1개 이상 입력해 주세요.',
+            'institutionBlocks.*.itemRows.min' => '품목을 1개 이상 입력해 주세요.',
+            'institutionBlocks.*.itemRows.*.itemName.required' => '품목명을 선택해 주세요.',
+            'institutionBlocks.*.itemRows.*.itemName.in' => '품목명을 목록에서 선택해 주세요.',
+            'institutionBlocks.*.itemRows.*.quantity.required' => '수량을 입력해 주세요.',
+            'institutionBlocks.*.itemRows.*.quantity.integer' => '수량은 숫자만 입력해 주세요.',
+            'institutionBlocks.*.itemRows.*.quantity.min' => '수량은 1 이상이어야 합니다.',
+            'institutionBlocks.*.itemRows.*.status.required' => '상태를 선택해 주세요.',
+            'institutionBlocks.*.itemRows.*.status.in' => '상태 값이 올바르지 않습니다.',
+            'institutionBlocks.*.freight.in' => '운임 값이 올바르지 않습니다.',
+            'institutionBlocks.*.itemRows.*.notes.max' => '특이 사항은 2000자 이내로 입력해 주세요.',
         ]);
 
-        $institutionSkCode = filled($validated['institutionSkCode']) ? trim($validated['institutionSkCode']) : null;
-        $institutionName = trim($validated['institutionKeyword']);
-        $freight = filled($validated['freight'] ?? null) ? $validated['freight'] : null;
-        $csTeam = $this->resolveCsTeam($institutionSkCode);
         $userId = Auth::id();
         $savedCount = 0;
-        $registrationGroupKey = (string) Str::uuid();
+        $institutionCount = count($validated['institutionBlocks']);
+        $productOptions = app(StoreReturnEcountProductOptions::class);
 
-        foreach ($validated['itemRows'] as $row) {
-            StoreReturnRegistration::query()->create([
-                'returned_at' => $validated['returnDate'],
-                'institution_sk_code' => $institutionSkCode,
-                'institution_name' => $institutionName,
-                'item_name' => app(StoreReturnEcountProductOptions::class)->displayNameForProductCode(trim($row['itemName'])),
-                'quantity' => (int) $row['quantity'],
-                'status' => $row['status'],
-                'freight' => $freight,
-                'notes' => filled($row['notes'] ?? null) ? trim((string) $row['notes']) : null,
-                'cs_team' => $csTeam,
-                'registered_by' => $userId,
-                'registration_group_key' => $registrationGroupKey,
-            ]);
-            $savedCount++;
-        }
+        foreach ($validated['institutionBlocks'] as $block) {
+            $institutionSkCode = filled($block['institutionSkCode'] ?? null) ? trim((string) $block['institutionSkCode']) : null;
+            $institutionName = trim((string) $block['institutionKeyword']);
+            $freight = filled($block['freight'] ?? null) ? $block['freight'] : null;
+            $csTeam = $this->resolveCsTeam($institutionSkCode, (string) ($block['csTeam'] ?? ''));
+            $registrationGroupKey = (string) Str::uuid();
+            $blockItems = [];
 
-        app(StoreReturnTeamsNotifier::class)->notifyRegistered([
-            'returned_at' => $validated['returnDate'],
-            'institution_name' => $institutionName,
-            'institution_sk_code' => $institutionSkCode,
-            'freight' => $freight,
-            'cs_team' => $csTeam,
-            'registrant_name' => Auth::user()?->nameForCoReports() ?? '시스템',
-            'items' => collect($validated['itemRows'])
-                ->map(fn (array $row): array => [
-                    'item_name' => app(StoreReturnEcountProductOptions::class)->displayNameForProductCode(trim($row['itemName'])),
+            foreach ($block['itemRows'] as $row) {
+                StoreReturnRegistration::query()->create([
+                    'returned_at' => $validated['returnDate'],
+                    'institution_sk_code' => $institutionSkCode,
+                    'institution_name' => $institutionName,
+                    'item_name' => $productOptions->displayNameForProductCode(trim((string) $row['itemName'])),
+                    'quantity' => (int) $row['quantity'],
+                    'status' => $row['status'],
+                    'freight' => $freight,
+                    'notes' => filled($row['notes'] ?? null) ? trim((string) $row['notes']) : null,
+                    'cs_team' => $csTeam,
+                    'registered_by' => $userId,
+                    'registration_group_key' => $registrationGroupKey,
+                ]);
+                $savedCount++;
+
+                $blockItems[] = [
+                    'item_name' => $productOptions->displayNameForProductCode(trim((string) $row['itemName'])),
                     'quantity' => (int) $row['quantity'],
                     'status' => $row['status'],
                     'notes' => filled($row['notes'] ?? null) ? trim((string) $row['notes']) : null,
-                ])
-                ->values()
-                ->all(),
-        ]);
+                ];
+            }
+
+            app(StoreReturnTeamsNotifier::class)->notifyRegistered([
+                'returned_at' => $validated['returnDate'],
+                'institution_name' => $institutionName,
+                'institution_sk_code' => $institutionSkCode,
+                'freight' => $freight,
+                'cs_team' => $csTeam,
+                'registrant_name' => Auth::user()?->nameForCoReports() ?? '시스템',
+                'items' => $blockItems,
+            ]);
+        }
 
         $this->resetFormFields();
         $this->showCreateModal = false;
         $this->resetPage();
-        session()->flash(
-            'success',
-            $savedCount > 1 ? "반품 {$savedCount}건이 등록되었습니다." : '반품이 등록되었습니다.',
-        );
+
+        $successMessage = match (true) {
+            $institutionCount > 1 && $savedCount > 1 => "반품 {$savedCount}건({$institutionCount}개 기관)이 등록되었습니다.",
+            $savedCount > 1 => "반품 {$savedCount}건이 등록되었습니다.",
+            $institutionCount > 1 => "반품 {$institutionCount}개 기관이 등록되었습니다.",
+            default => '반품이 등록되었습니다.',
+        };
+
+        session()->flash('success', $successMessage);
     }
 
     public function render()
@@ -889,7 +948,7 @@ class StoreReturnRegistrationForm extends Component
         ]);
     }
 
-    private function resolveCsTeam(?string $institutionSkCode): ?string
+    private function resolveCsTeam(?string $institutionSkCode, string $fallbackCsTeam = ''): ?string
     {
         if (filled($institutionSkCode)) {
             $institution = Institution::query()
@@ -902,9 +961,29 @@ class StoreReturnRegistrationForm extends Component
             return $resolved !== '' ? $resolved : null;
         }
 
-        $csTeam = trim($this->csTeam);
+        $csTeam = trim($fallbackCsTeam);
 
         return $csTeam !== '' ? $csTeam : null;
+    }
+
+    /**
+     * @return array{
+     *     institutionKeyword: string,
+     *     institutionSkCode: string,
+     *     freight: string,
+     *     csTeam: string,
+     *     itemRows: array<int, array{itemName: string, quantity: string, status: string, notes: string}>
+     * }
+     */
+    private function defaultInstitutionBlock(): array
+    {
+        return [
+            'institutionKeyword' => '',
+            'institutionSkCode' => '',
+            'freight' => '',
+            'csTeam' => '',
+            'itemRows' => [$this->defaultItemRow()],
+        ];
     }
 
     /**
@@ -937,13 +1016,8 @@ class StoreReturnRegistrationForm extends Component
     private function resetFormFields(): void
     {
         $this->returnDate = Carbon::now()->format('Y-m-d');
-        $this->institutionKeyword = '';
-        $this->institutionSkCode = '';
-        $this->institutionName = '';
-        $this->lockedInstitutionKeyword = null;
-        $this->freight = '';
-        $this->csTeam = '';
-        $this->itemRows = [$this->defaultItemRow()];
+        $this->institutionBlocks = [$this->defaultInstitutionBlock()];
+        $this->lockedInstitutionKeywords = [];
         $this->resetErrorBag();
         $this->resetValidation();
     }

@@ -453,152 +453,183 @@
                 <x-admin.modal-header title="반품 등록" close-action="closeCreateModal" />
 
                 <form wire:submit.prevent="save" class="mochi-modal-body-scroll px-6 py-5">
-                    @php
-                        $formGridClass = count($itemRows) > 1
-                            ? 'md:grid-cols-[11rem_minmax(0,1fr)_5.5rem_7rem_minmax(0,1fr)_2.25rem]'
-                            : 'md:grid-cols-[11rem_minmax(0,1fr)_5.5rem_7rem_minmax(0,1fr)]';
-                    @endphp
+                    <div class="mb-4 max-w-xs">
+                        <label for="return-date" class="text-xs font-medium text-gray-600">Date</label>
+                        <input id="return-date"
+                               type="date"
+                               wire:model="returnDate"
+                               class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                        @error('returnDate') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    </div>
 
-                    <div class="grid grid-cols-1 gap-x-4 gap-y-2 {{ $formGridClass }}">
-                        <div class="flex flex-col gap-1 md:col-start-1 md:row-start-1">
-                            <label for="return-date" class="text-xs font-medium text-gray-600">Date</label>
-                            <input id="return-date"
-                                   type="date"
-                                   wire:model="returnDate"
-                                   class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
-                            @error('returnDate') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
-                        </div>
+                    <div class="space-y-4">
+                        @foreach($institutionBlocks as $blockIndex => $block)
+                            @php
+                                $blockItemCount = count($block['itemRows']);
+                                $formGridClass = $blockItemCount > 1
+                                    ? 'md:grid-cols-[minmax(0,1fr)_5.5rem_7rem_minmax(0,1fr)_2.25rem]'
+                                    : 'md:grid-cols-[minmax(0,1fr)_5.5rem_7rem_minmax(0,1fr)]';
+                            @endphp
 
-                        <div class="flex flex-col gap-1 md:col-span-3 md:row-start-1">
-                            <label for="institution-keyword" class="text-xs font-medium text-gray-600">기관명</label>
-                            <input id="institution-keyword"
-                                   type="text"
-                                   wire:model.live.debounce.200ms="institutionKeyword"
-                                   placeholder="기관명 직접 입력 또는 SK 코드 검색"
-                                   class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
-
-                            @if(filled($institutionKeyword) && blank($institutionSkCode) && $this->institutionSuggestions->isNotEmpty())
-                                <div class="max-h-44 overflow-auto rounded-lg border border-gray-200 bg-white shadow-sm">
-                                    @foreach($this->institutionSuggestions as $institution)
+                            <div wire:key="return-institution-block-{{ $blockIndex }}"
+                                 @class([
+                                     'rounded-lg border border-gray-200 p-4' => count($institutionBlocks) > 1,
+                                 ])>
+                                @if(count($institutionBlocks) > 1)
+                                    <div class="mb-3 flex items-center justify-between gap-2">
+                                        <h3 class="text-sm font-semibold text-gray-700">기관 {{ $blockIndex + 1 }}</h3>
                                         <button type="button"
-                                                wire:click="selectInstitution('{{ $institution->SKcode }}')"
-                                                class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-blue-50">
-                                            <span class="font-medium text-gray-900">{{ $institution->resolvedAccountName() }}</span>
-                                            <span class="ml-2 text-xs text-gray-500">({{ $institution->SKcode }})</span>
-                                        </button>
-                                    @endforeach
-                                </div>
-                            @elseif(filled(trim($institutionKeyword)) && blank($institutionSkCode) && $this->institutionSuggestions->isEmpty())
-                                <p class="text-xs text-gray-500">검색 결과가 없습니다. 입력한 기관명으로 등록할 수 있습니다.</p>
-                            @endif
-
-                            @error('institutionKeyword') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
-                        </div>
-
-                        <div class="flex flex-col gap-1 md:col-start-5 md:row-start-1">
-                            <label for="freight" class="text-xs font-medium text-gray-600">운임</label>
-                            <select id="freight"
-                                    wire:model="freight"
-                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
-                                <option value="">선택 안 함</option>
-                                @foreach($freightOptions as $option)
-                                    <option value="{{ $option }}">{{ $option }}</option>
-                                @endforeach
-                            </select>
-                            @error('freight') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
-                        </div>
-
-                        <div class="col-span-full hidden gap-x-4 gap-y-2 text-xs font-medium text-gray-600 md:grid {{ $formGridClass }}">
-                            <span class="md:col-span-2">품목명</span>
-                            <span>수량</span>
-                            <span>상태</span>
-                            <span>특이 사항</span>
-                            @if(count($itemRows) > 1)
-                                <span class="sr-only">삭제</span>
-                            @endif
-                        </div>
-
-                        @foreach($itemRows as $index => $row)
-                            <div class="col-span-full grid grid-cols-1 gap-x-4 gap-y-2 {{ $formGridClass }} md:items-start"
-                                 wire:key="return-item-row-{{ $index }}">
-                                <div class="flex flex-col gap-1 md:col-span-2">
-                                    @if($loop->first)
-                                        <label class="text-xs font-medium text-gray-600 md:sr-only" for="item-name-{{ $index }}">품목명</label>
-                                    @endif
-                                    @include('partials.store.return-item-name-field', [
-                                        'wireModel' => 'itemRows.'.$index.'.itemName',
-                                        'id' => 'item-name-'.$index,
-                                        'errorKey' => 'itemRows.'.$index.'.itemName',
-                                        'ecountProductOptions' => $ecountProductOptions,
-                                        'currentValue' => $row['itemName'],
-                                    ])
-                                </div>
-
-                                <div class="flex flex-col gap-1">
-                                    @if($loop->first)
-                                        <label class="text-xs font-medium text-gray-600 md:sr-only" for="quantity-{{ $index }}">수량</label>
-                                    @endif
-                                    <input id="quantity-{{ $index }}"
-                                           type="number"
-                                           min="1"
-                                           wire:model="itemRows.{{ $index }}.quantity"
-                                           placeholder="수량"
-                                           class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
-                                    @error('itemRows.'.$index.'.quantity') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
-                                </div>
-
-                                <div class="flex flex-col gap-1">
-                                    @if($loop->first)
-                                        <label class="text-xs font-medium text-gray-600 md:sr-only" for="status-{{ $index }}">상태</label>
-                                    @endif
-                                    <select id="status-{{ $index }}"
-                                            wire:model="itemRows.{{ $index }}.status"
-                                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
-                                        @foreach($statusOptions as $option)
-                                            <option value="{{ $option }}">{{ $option }}</option>
-                                        @endforeach
-                                    </select>
-                                    @error('itemRows.'.$index.'.status') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
-                                </div>
-
-                                <div class="flex flex-col gap-1">
-                                    @if($loop->first)
-                                        <label class="text-xs font-medium text-gray-600 md:sr-only" for="notes-{{ $index }}">특이 사항</label>
-                                    @endif
-                                    <input id="notes-{{ $index }}"
-                                           type="text"
-                                           wire:model="itemRows.{{ $index }}.notes"
-                                           placeholder="특이 사항"
-                                           class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
-                                    @error('itemRows.'.$index.'.notes') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
-                                </div>
-
-                                @if(count($itemRows) > 1)
-                                    <div class="flex items-start justify-end md:justify-center md:pt-1">
-                                        <button type="button"
-                                                wire:click="removeItemRow({{ $index }})"
-                                                class="rounded-lg border border-gray-300 p-2 text-gray-500 hover:bg-gray-50 hover:text-red-600"
-                                                title="행 삭제"
-                                                aria-label="행 삭제">
-                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                            </svg>
+                                                wire:click="removeInstitutionBlock({{ $blockIndex }})"
+                                                class="rounded-lg border border-gray-300 px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-50 hover:text-red-600">
+                                            기관 삭제
                                         </button>
                                     </div>
                                 @endif
+
+                                <div class="grid grid-cols-1 gap-x-4 gap-y-2 md:grid-cols-[minmax(0,1fr)_5.5rem]">
+                                    <div class="flex flex-col gap-1">
+                                        <label for="institution-keyword-{{ $blockIndex }}" class="text-xs font-medium text-gray-600">기관명</label>
+                                        <input id="institution-keyword-{{ $blockIndex }}"
+                                               type="text"
+                                               wire:model.live.debounce.200ms="institutionBlocks.{{ $blockIndex }}.institutionKeyword"
+                                               placeholder="기관명 직접 입력 또는 SK 코드 검색"
+                                               class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
+
+                                        @if(filled($block['institutionKeyword']) && blank($block['institutionSkCode']) && $this->institutionSuggestionsFor($blockIndex)->isNotEmpty())
+                                            <div class="max-h-44 overflow-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+                                                @foreach($this->institutionSuggestionsFor($blockIndex) as $institution)
+                                                    <button type="button"
+                                                            wire:click="selectInstitution({{ $blockIndex }}, '{{ $institution->SKcode }}')"
+                                                            class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-blue-50">
+                                                        <span class="font-medium text-gray-900">{{ $institution->resolvedAccountName() }}</span>
+                                                        <span class="ml-2 text-xs text-gray-500">({{ $institution->SKcode }})</span>
+                                                    </button>
+                                                @endforeach
+                                            </div>
+                                        @elseif(filled(trim($block['institutionKeyword'])) && blank($block['institutionSkCode']) && $this->institutionSuggestionsFor($blockIndex)->isEmpty())
+                                            <p class="text-xs text-gray-500">검색 결과가 없습니다. 입력한 기관명으로 등록할 수 있습니다.</p>
+                                        @endif
+
+                                        @error('institutionBlocks.'.$blockIndex.'.institutionKeyword') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+                                    </div>
+
+                                    <div class="flex flex-col gap-1">
+                                        <label for="freight-{{ $blockIndex }}" class="text-xs font-medium text-gray-600">운임</label>
+                                        <select id="freight-{{ $blockIndex }}"
+                                                wire:model="institutionBlocks.{{ $blockIndex }}.freight"
+                                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                                            <option value="">선택 안 함</option>
+                                            @foreach($freightOptions as $option)
+                                                <option value="{{ $option }}">{{ $option }}</option>
+                                            @endforeach
+                                        </select>
+                                        @error('institutionBlocks.'.$blockIndex.'.freight') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+                                    </div>
+                                </div>
+
+                                <div class="mt-3 hidden gap-x-4 gap-y-2 text-xs font-medium text-gray-600 md:grid {{ $formGridClass }}">
+                                    <span>품목명</span>
+                                    <span>수량</span>
+                                    <span>상태</span>
+                                    <span>특이 사항</span>
+                                    @if($blockItemCount > 1)
+                                        <span class="sr-only">삭제</span>
+                                    @endif
+                                </div>
+
+                                @foreach($block['itemRows'] as $index => $row)
+                                    <div class="mt-2 grid grid-cols-1 gap-x-4 gap-y-2 {{ $formGridClass }} md:items-start"
+                                         wire:key="return-item-row-{{ $blockIndex }}-{{ $index }}">
+                                        <div class="flex flex-col gap-1">
+                                            @if($loop->first)
+                                                <label class="text-xs font-medium text-gray-600 md:sr-only" for="item-name-{{ $blockIndex }}-{{ $index }}">품목명</label>
+                                            @endif
+                                            @include('partials.store.return-item-name-field', [
+                                                'wireModel' => 'institutionBlocks.'.$blockIndex.'.itemRows.'.$index.'.itemName',
+                                                'id' => 'item-name-'.$blockIndex.'-'.$index,
+                                                'errorKey' => 'institutionBlocks.'.$blockIndex.'.itemRows.'.$index.'.itemName',
+                                                'ecountProductOptions' => $ecountProductOptions,
+                                                'currentValue' => $row['itemName'],
+                                            ])
+                                        </div>
+
+                                        <div class="flex flex-col gap-1">
+                                            @if($loop->first)
+                                                <label class="text-xs font-medium text-gray-600 md:sr-only" for="quantity-{{ $blockIndex }}-{{ $index }}">수량</label>
+                                            @endif
+                                            <input id="quantity-{{ $blockIndex }}-{{ $index }}"
+                                                   type="number"
+                                                   min="1"
+                                                   wire:model="institutionBlocks.{{ $blockIndex }}.itemRows.{{ $index }}.quantity"
+                                                   placeholder="수량"
+                                                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                                            @error('institutionBlocks.'.$blockIndex.'.itemRows.'.$index.'.quantity') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+                                        </div>
+
+                                        <div class="flex flex-col gap-1">
+                                            @if($loop->first)
+                                                <label class="text-xs font-medium text-gray-600 md:sr-only" for="status-{{ $blockIndex }}-{{ $index }}">상태</label>
+                                            @endif
+                                            <select id="status-{{ $blockIndex }}-{{ $index }}"
+                                                    wire:model="institutionBlocks.{{ $blockIndex }}.itemRows.{{ $index }}.status"
+                                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                                                @foreach($statusOptions as $option)
+                                                    <option value="{{ $option }}">{{ $option }}</option>
+                                                @endforeach
+                                            </select>
+                                            @error('institutionBlocks.'.$blockIndex.'.itemRows.'.$index.'.status') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+                                        </div>
+
+                                        <div class="flex flex-col gap-1">
+                                            @if($loop->first)
+                                                <label class="text-xs font-medium text-gray-600 md:sr-only" for="notes-{{ $blockIndex }}-{{ $index }}">특이 사항</label>
+                                            @endif
+                                            <input id="notes-{{ $blockIndex }}-{{ $index }}"
+                                                   type="text"
+                                                   wire:model="institutionBlocks.{{ $blockIndex }}.itemRows.{{ $index }}.notes"
+                                                   placeholder="특이 사항"
+                                                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                                            @error('institutionBlocks.'.$blockIndex.'.itemRows.'.$index.'.notes') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+                                        </div>
+
+                                        @if($blockItemCount > 1)
+                                            <div class="flex items-start justify-end md:justify-center md:pt-1">
+                                                <button type="button"
+                                                        wire:click="removeItemRow({{ $blockIndex }}, {{ $index }})"
+                                                        class="rounded-lg border border-gray-300 p-2 text-gray-500 hover:bg-gray-50 hover:text-red-600"
+                                                        title="행 삭제"
+                                                        aria-label="행 삭제">
+                                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endforeach
+
+                                @error('institutionBlocks.'.$blockIndex.'.itemRows') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                             </div>
                         @endforeach
+                    </div>
 
-                        <div class="col-span-full flex justify-center">
-                            <button type="button"
-                                    wire:click="addItemRow"
-                                    class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700">
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                                </svg>
-                                행 추가하기
-                            </button>
-                        </div>
+                    <div class="mt-4 flex flex-wrap justify-center gap-2">
+                        <button type="button"
+                                wire:click="addItemRow"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            행 추가하기
+                        </button>
+                        <button type="button"
+                                wire:click="addInstitutionBlock"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            기관 추가하기
+                        </button>
                     </div>
 
                     <div class="mt-6 flex justify-end gap-2 border-t border-gray-100 pt-4">
