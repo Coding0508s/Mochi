@@ -86,6 +86,22 @@ final class StoreReturnEcountProductOptions
         return trim($productCode);
     }
 
+    public function displayNameForStoredItemName(string $storedItemName): string
+    {
+        $stored = trim($storedItemName);
+        if ($stored === '') {
+            return '';
+        }
+
+        foreach ($this->options() as $option) {
+            if ($option['label'] === $stored) {
+                return $stored;
+            }
+        }
+
+        return $this->displayNameForProductCode($stored);
+    }
+
     public function selectionValueForStoredItemName(string $storedItemName): string
     {
         $stored = trim($storedItemName);

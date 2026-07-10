@@ -103,4 +103,25 @@ class StoreReturnEcountProductOptionsTest extends TestCase
         $this->assertSame('00P050', $options[0]['value']);
         $this->assertSame('LittleSEED Student Book 1', $options[0]['label']);
     }
+
+    public function test_display_name_for_stored_item_name_resolves_product_code_or_returns_label(): void
+    {
+        StoreReturnEcountProduct::query()->create([
+            'prod_cd' => 'U01C-CM-400',
+            'product_name' => 'GrapeSEED Unit 1 Class Material',
+            'is_active' => true,
+            'sort_order' => 0,
+        ]);
+
+        $options = app(StoreReturnEcountProductOptions::class);
+
+        $this->assertSame(
+            'GrapeSEED Unit 1 Class Material',
+            $options->displayNameForStoredItemName('U01C-CM-400'),
+        );
+        $this->assertSame(
+            'GrapeSEED Unit 1 Class Material',
+            $options->displayNameForStoredItemName('GrapeSEED Unit 1 Class Material'),
+        );
+    }
 }
