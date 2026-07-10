@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 class StoreReturnRegistrationFormTest extends TestCase
@@ -303,6 +304,51 @@ class StoreReturnRegistrationFormTest extends TestCase
             'item_name' => 'GrapeSEED Unit 4',
             'quantity' => 2,
         ]);
+    }
+
+    public function test_list_and_detail_show_display_name_when_stored_item_name_is_product_code(): void
+    {
+        StoreReturnEcountProduct::query()->create([
+            'prod_cd' => 'U01C-CM-400',
+            'product_name' => 'GrapeSEED Unit 1 Class Material',
+            'is_active' => true,
+            'sort_order' => 0,
+        ]);
+
+        StoreReturnEcountProduct::query()->create([
+            'prod_cd' => 'U12S-SB-400',
+            'product_name' => 'GrapeSEED Unit 12 Student Book',
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+
+        $user = User::factory()->create();
+        $groupKey = (string) Str::uuid();
+
+        $registrations = collect([
+            ['U01C-CM-400', 3],
+            ['U12S-SB-400', 13],
+        ])->map(
+            fn (array $row) => StoreReturnRegistration::factory()
+                ->for($user, 'registrant')
+                ->forRegistrationGroup($groupKey)
+                ->create([
+                    'returned_at' => '2026-07-10',
+                    'institution_name' => '부산 광서 이든',
+                    'institution_sk_code' => 'SK2792',
+                    'item_name' => $row[0],
+                    'quantity' => $row[1],
+                ]),
+        );
+
+        Livewire::actingAs($user)
+            ->test(StoreReturnRegistrationForm::class)
+            ->assertSee('GrapeSEED Unit 1 Class Material 외 1건', false)
+            ->assertDontSee('U01C-CM-400', false)
+            ->assertDontSee('U12S-SB-400', false)
+            ->call('openDetailModal', $registrations->first()->id)
+            ->assertSee('GrapeSEED Unit 1 Class Material', false)
+            ->assertSee('GrapeSEED Unit 12 Student Book', false);
     }
 
     public function test_user_can_register_multiple_item_rows_at_once(): void
@@ -932,5 +978,60 @@ class StoreReturnRegistrationFormTest extends TestCase
             ->set('statusFilter', 'completed')
             ->assertSee('완료 유치원', false)
             ->assertDontSee('진행 중 유치원', false);
+    }
+
+    public function test_admin_can_see_delete_button_and_remove_return_group(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $groupKey = (string) Str::uuid();
+
+        $registrations = collect(['Unit 4', 'Unit 2', 'Unit 1'])->map(
+            fn (string $itemName) => StoreReturnRegistration::factory()
+                ->for($admin, 'registrant')
+                ->forRegistrationGroup($groupKey)
+                ->create([
+                    'returned_at' => '2026-07-10',
+                    'institution_name' => '삭제 대상 유치원',
+                    'institution_sk_code' => 'SK9001',
+                    'item_name' => $itemName,
+                ]),
+        );
+
+        $anchorId = $registrations->first()->id;
+
+        Livewire::actingAs($admin)
+            ->test(StoreReturnRegistrationForm::class)
+            ->assertSeeHtml('wire:click="deleteReturnGroup('.$anchorId.')"')
+            ->call('deleteReturnGroup', $anchorId);
+
+        $this->assertDatabaseCount('store_return_registrations', 0);
+    }
+
+    public function test_non_admin_cannot_see_delete_button_or_delete_return_group(): void
+    {
+        $user = User::factory()->create(['is_admin' => false]);
+        $groupKey = (string) Str::uuid();
+
+        $registration = StoreReturnRegistration::factory()
+            ->for($user, 'registrant')
+            ->forRegistrationGroup($groupKey)
+            ->create([
+                'returned_at' => '2026-07-10',
+                'institution_name' => '보호 대상 유치원',
+                'item_name' => 'Unit 1',
+            ]);
+
+        Livewire::actingAs($user)
+            ->test(StoreReturnRegistrationForm::class)
+            ->assertDontSeeHtml('wire:click="deleteReturnGroup(')
+            ->assertSet('canDeleteReturnGroups', false);
+
+        $this->withoutExceptionHandling();
+
+        $this->expectException(HttpException::class);
+
+        Livewire::actingAs($user)
+            ->test(StoreReturnRegistrationForm::class)
+            ->call('deleteReturnGroup', $registration->id);
     }
 }

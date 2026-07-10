@@ -98,6 +98,9 @@
                     @if($this->isCsTeamMenu)
                         <col class="w-[5.5rem]">
                     @endif
+                    @if($this->canDeleteReturnGroups)
+                        <col class="w-[4.5rem]">
+                    @endif
                 </colgroup>
                 <thead class="mochi-table-head">
                     <tr class="text-gray-700">
@@ -111,6 +114,9 @@
                         <th class="px-3 py-2 text-center text-xs font-semibold">담당 CS 팀</th>
                         @if($this->isCsTeamMenu)
                             <th class="px-3 py-2 text-center text-xs font-semibold">작업</th>
+                        @endif
+                        @if($this->canDeleteReturnGroups)
+                            <th class="px-3 py-2 text-center text-xs font-semibold">삭제</th>
                         @endif
                     </tr>
                 </thead>
@@ -155,10 +161,22 @@
                                     @endif
                                 </td>
                             @endif
+                            @if($this->canDeleteReturnGroups)
+                                <td class="px-3 py-2 text-center">
+                                    <button type="button"
+                                            wire:click="deleteReturnGroup({{ $group['anchor_id'] }})"
+                                            wire:confirm="이 반품 등록 건을 삭제할까요? 되돌릴 수 없습니다."
+                                            wire:loading.attr="disabled"
+                                            wire:target="deleteReturnGroup({{ $group['anchor_id'] }})"
+                                            class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60">
+                                        삭제
+                                    </button>
+                                </td>
+                            @endif
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $this->isCsTeamMenu ? 9 : 8 }}" class="px-3 py-8 text-center text-sm text-gray-500">
+                            <td colspan="{{ $this->listTableColumnCount }}" class="px-3 py-8 text-center text-sm text-gray-500">
                                 등록된 반품 내역이 없습니다.
                             </td>
                         </tr>
@@ -388,7 +406,7 @@
                             <tbody class="divide-y divide-gray-100">
                                 @foreach($detailItemRows as $row)
                                     <tr wire:key="return-detail-view-item-{{ $row['id'] ?? $loop->index }}">
-                                        <td class="px-3 py-2 text-center text-gray-800">{{ $row['itemName'] }}</td>
+                                        <td class="px-3 py-2 text-center text-gray-800">{{ $row['itemDisplayName'] ?? $row['itemName'] }}</td>
                                         <td class="px-3 py-2 text-center text-gray-700">{{ number_format((int) $row['quantity']) }}</td>
                                         <td class="px-3 py-2 text-center text-gray-700">{{ $row['status'] }}</td>
                                         <td class="px-3 py-2 text-left text-gray-600">{{ filled($row['notes']) ? $row['notes'] : '-' }}</td>

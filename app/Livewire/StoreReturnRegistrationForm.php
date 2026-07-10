@@ -319,9 +319,49 @@ class StoreReturnRegistrationForm extends Component
         session()->flash('success', '반품 처리가 완료되었습니다.');
     }
 
+    public function deleteReturnGroup(int $anchorRegistrationId): void
+    {
+        if (! Auth::user()?->hasFullAccess()) {
+            abort(403);
+        }
+
+        $anchor = StoreReturnRegistration::query()->findOrFail($anchorRegistrationId);
+        $items = $this->queryGroupItems($anchor);
+
+        StoreReturnRegistration::query()
+            ->whereIn('id', $items->pluck('id'))
+            ->delete();
+
+        if ($this->showDetailModal && $this->detailAnchorId === $anchor->id) {
+            $this->closeDetailModal();
+        }
+
+        session()->flash('success', '반품 내역이 삭제되었습니다.');
+    }
+
     public function getIsCsTeamMenuProperty(): bool
     {
         return $this->teamMenu === TeamMenuContext::MENU_CS;
+    }
+
+    public function getCanDeleteReturnGroupsProperty(): bool
+    {
+        return (bool) Auth::user()?->hasFullAccess();
+    }
+
+    public function getListTableColumnCountProperty(): int
+    {
+        $count = 8;
+
+        if ($this->isCsTeamMenu) {
+            $count++;
+        }
+
+        if ($this->canDeleteReturnGroups) {
+            $count++;
+        }
+
+        return $count;
     }
 
     public function getIsDetailGroupCompletedProperty(): bool
@@ -683,7 +723,7 @@ class StoreReturnRegistrationForm extends Component
             'notes_summary' => filled($first->notes) ? $first->notes : null,
             'items' => $orderedItems->map(fn (StoreReturnRegistration $item): array => [
                 'id' => $item->id,
-                'item_name' => $item->item_name,
+                'item_name' => app(StoreReturnEcountProductOptions::class)->displayNameForStoredItemName($item->item_name),
                 'quantity' => $item->quantity ?? 1,
                 'status' => $item->status,
                 'notes' => $item->notes,
@@ -696,14 +736,17 @@ class StoreReturnRegistrationForm extends Component
      */
     private function summarizeItemNames(Collection $items): string
     {
+        $productOptions = app(StoreReturnEcountProductOptions::class);
+
         /** @var StoreReturnRegistration $first */
         $first = $items->first();
+        $firstDisplayName = $productOptions->displayNameForStoredItemName($first->item_name);
 
         if ($items->count() === 1) {
-            return $first->item_name;
+            return $firstDisplayName;
         }
 
-        return $first->item_name.' 외 '.($items->count() - 1).'건';
+        return $firstDisplayName.' 외 '.($items->count() - 1).'건';
     }
 
     /**
@@ -920,9 +963,12 @@ class StoreReturnRegistrationForm extends Component
             ? $first->institution_name
             : null;
         $this->detailOriginalRegistrationIds = $items->pluck('id')->all();
+        $productOptions = app(StoreReturnEcountProductOptions::class);
+
         $this->detailItemRows = $items->map(fn (StoreReturnRegistration $item): array => [
             'id' => $item->id,
-            'itemName' => app(StoreReturnEcountProductOptions::class)->selectionValueForStoredItemName($item->item_name),
+            'itemName' => $productOptions->selectionValueForStoredItemName($item->item_name),
+            'itemDisplayName' => $productOptions->displayNameForStoredItemName($item->item_name),
             'quantity' => (string) ($item->quantity ?? 1),
             'status' => $item->status,
             'notes' => $item->notes ?? '',
