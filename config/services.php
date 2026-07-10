@@ -43,6 +43,13 @@ return [
         'logistics_url' => env('GS_BROCHURE_TEAMS_LOGISTICS_URL'),
     ],
 
+    'store_return_teams' => [
+        'webhook_url' => env('STORE_RETURN_TEAMS_WEBHOOK_URL'),
+        'webhook_format' => env('STORE_RETURN_TEAMS_WEBHOOK_FORMAT', 'auto'),
+        // 비우면 CS 팀 반품 등록 화면으로 연결
+        'returns_url' => env('STORE_RETURN_TEAMS_RETURNS_URL'),
+    ],
+
     /*
     | 외부 플랫폼 → 기관 마스터(S_AccountName) upsert API (Bearer)
     */

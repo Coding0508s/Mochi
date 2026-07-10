@@ -69,6 +69,9 @@ class TeamMenuContextTest extends TestCase
         $this->assertFalse(
             TeamMenuContext::isCrossTeamReadOnlyContext($coach, TeamMenuContext::MENU_COACH)
         );
+        $this->assertFalse(
+            TeamMenuContext::isCrossTeamReadOnlyContext($coach, TeamMenuContext::MENU_LOGISTICS)
+        );
     }
 
     public function test_coach_user_sees_exclusive_coach_sidebar_only(): void

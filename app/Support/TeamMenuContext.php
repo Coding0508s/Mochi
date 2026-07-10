@@ -17,6 +17,8 @@ final class TeamMenuContext
 
     public const MENU_CO = 'co';
 
+    public const MENU_LOGISTICS = 'logistics';
+
     public const DEPT_ADMINISTRATION = 'A01';
 
     public const DEPT_CO = 'A02';
@@ -141,7 +143,7 @@ final class TeamMenuContext
     public static function activeMenu(?User $user = null): ?string
     {
         $fromQuery = request()->query('team_menu');
-        if (in_array($fromQuery, [self::MENU_CS, self::MENU_COACH, self::MENU_CO], true)) {
+        if (in_array($fromQuery, [self::MENU_CS, self::MENU_COACH, self::MENU_CO, self::MENU_LOGISTICS], true)) {
             return $fromQuery;
         }
 
@@ -179,7 +181,7 @@ final class TeamMenuContext
         }
 
         $activeMenu = self::normalizeTeamMenu($teamMenuOverride) ?? self::activeMenu($user);
-        if ($activeMenu === null) {
+        if ($activeMenu === null || $activeMenu === self::MENU_LOGISTICS) {
             return false;
         }
 
@@ -421,7 +423,7 @@ final class TeamMenuContext
      */
     private static function normalizeTeamMenu(?string $teamMenu): ?string
     {
-        return in_array($teamMenu, [self::MENU_CS, self::MENU_COACH, self::MENU_CO], true)
+        return in_array($teamMenu, [self::MENU_CS, self::MENU_COACH, self::MENU_CO, self::MENU_LOGISTICS], true)
             ? $teamMenu
             : null;
     }
