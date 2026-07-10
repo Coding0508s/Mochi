@@ -249,6 +249,7 @@
                                         <option value="신규(24년)"></option>
                                         <option value="신규(25년)"></option>
                                         <option value="신규(26년)"></option>
+                                        <option value="신규(27년)"></option>
                                         <option value="해지방문"></option>
                                     </datalist>
                                     @error('newConsultingType') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
@@ -294,6 +295,8 @@
                                         <option value="">선택</option>
                                         <option value="신규(24년)">신규(24년)</option>
                                         <option value="신규(25년)">신규(25년)</option>
+                                        <option value="신규(26년)">신규(26년)</option>
+                                        <option value="신규(27년)">신규(27년)</option>
                                         <option value="해지">해지</option>
                                     </select>
                                     @error('newType') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
