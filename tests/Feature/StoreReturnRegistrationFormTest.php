@@ -12,6 +12,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -142,6 +143,59 @@ class StoreReturnRegistrationFormTest extends TestCase
             return ($data['summary'] ?? '') === '물류 반품 등록'
                 && ($data['sections'][0]['facts'][0]['value'] ?? '') === '물류 담당자'
                 && ($data['sections'][0]['facts'][2]['value'] ?? '') === '분당 미금 꿈터유치원';
+        });
+    }
+
+    public function test_teams_notification_uses_english_registrant_name_when_available(): void
+    {
+        Http::fake();
+
+        config([
+            'services.store_return_teams.webhook_url' => 'https://example.test/teams-webhook',
+        ]);
+
+        if (! Schema::hasTable('employee')) {
+            Schema::create('employee', function (Blueprint $table): void {
+                $table->string('EMPNO')->primary();
+                $table->string('WORKDEPT')->nullable();
+                $table->string('KOREANAME')->nullable();
+                $table->string('ENGLISHNAME')->nullable();
+                $table->integer('STATUS')->nullable();
+            });
+        }
+
+        DB::table('employee')->insert([
+            'EMPNO' => 'E-LOG-001',
+            'KOREANAME' => '허보석',
+            'ENGLISHNAME' => 'Boseok Hur',
+            'STATUS' => 1,
+        ]);
+
+        $user = User::factory()->create([
+            'name' => '허보석',
+            'employee_empno' => 'E-LOG-001',
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(StoreReturnRegistrationForm::class)
+            ->call('openCreateModal')
+            ->set('returnDate', '2026-07-10')
+            ->set('institutionKeyword', '분당 미금 꿈터유치원')
+            ->set('freight', '선불')
+            ->set('itemRows.0.itemName', 'Unit 1')
+            ->set('itemRows.0.quantity', '1')
+            ->set('itemRows.0.status', '정상')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        Http::assertSent(function (Request $request): bool {
+            if ($request->url() !== 'https://example.test/teams-webhook') {
+                return false;
+            }
+
+            $data = $request->data();
+
+            return ($data['sections'][0]['facts'][0]['value'] ?? '') === 'Boseok Hur';
         });
     }
 
