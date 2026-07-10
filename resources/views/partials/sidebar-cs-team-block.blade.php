@@ -27,7 +27,7 @@
         @php
             $csStoreMenus = [
                 [
-                    'label' => '반품 등록',
+                    'label' => '반품 현황',
                     'path' => route('store.returns.index'),
                     'route' => '',
                     'routeIs' => 'store.returns.index',
