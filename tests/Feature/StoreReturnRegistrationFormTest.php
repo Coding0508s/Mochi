@@ -141,9 +141,11 @@ class StoreReturnRegistrationFormTest extends TestCase
 
             $data = $request->data();
 
-            return ($data['summary'] ?? '') === '물류 반품 등록'
+            return ($data['summary'] ?? '') === '반품이 등록되었습니다.'
+                && ($data['sections'][0]['text'] ?? '') === '반품이 등록되었습니다.'
                 && ($data['sections'][0]['facts'][0]['value'] ?? '') === '물류 담당자'
-                && ($data['sections'][0]['facts'][2]['value'] ?? '') === '분당 미금 꿈터유치원';
+                && ($data['sections'][0]['facts'][1]['value'] ?? '') === '2026-07-10'
+                && ($data['sections'][0]['facts'][2]['value'] ?? '') === '1건';
         });
     }
 
@@ -499,7 +501,18 @@ class StoreReturnRegistrationFormTest extends TestCase
         $groupKeys = StoreReturnRegistration::query()->pluck('registration_group_key')->unique()->values();
         $this->assertCount(2, $groupKeys);
 
-        Http::assertSentCount(2);
+        Http::assertSentCount(1);
+
+        Http::assertSent(function (Request $request): bool {
+            if ($request->url() !== 'https://example.test/teams-webhook') {
+                return false;
+            }
+
+            $data = $request->data();
+
+            return ($data['sections'][0]['text'] ?? '') === '반품이 등록되었습니다.'
+                && ($data['sections'][0]['facts'][2]['value'] ?? '') === '2건 / 2개 기관';
+        });
     }
 
     public function test_return_registration_requires_required_fields(): void

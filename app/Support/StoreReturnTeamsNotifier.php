@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Http;
 
 final class StoreReturnTeamsNotifier
 {
+    public const REGISTRATION_MESSAGE = '반품이 등록되었습니다.';
+
     public const COMPLETION_MESSAGE = '반품 처리 완료. 이카운트 전표 확인 바랍니다.';
 
     public function __construct(
@@ -62,6 +64,34 @@ final class StoreReturnTeamsNotifier
                 freight: (string) ($registration['freight'] ?? ''),
                 csTeam: (string) ($registration['cs_team'] ?? ''),
                 itemFacts: $itemFacts,
+                returnsUrl: $this->resolveReturnsUrl(),
+            );
+
+            Http::timeout(5)->post($webhookUrl, $payload);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+    }
+
+    public function notifyRegistrationSaved(
+        string $registrantName,
+        string $returnedAt,
+        int $savedCount,
+        int $institutionCount,
+    ): void {
+        $webhookUrl = config('services.store_return_teams.webhook_url');
+        if (! is_string($webhookUrl) || $webhookUrl === '') {
+            return;
+        }
+
+        try {
+            $payload = $this->payloadBuilder->buildStoreReturnRegistrationSummaryPayload(
+                webhookUrl: $webhookUrl,
+                format: (string) config('services.store_return_teams.webhook_format', TeamsWebhookPayloadBuilder::FORMAT_AUTO),
+                message: self::REGISTRATION_MESSAGE,
+                registrantName: $registrantName,
+                returnedAt: $returnedAt,
+                registrationCountSummary: $this->formatRegistrationCountSummary($savedCount, $institutionCount),
                 returnsUrl: $this->resolveReturnsUrl(),
             );
 
@@ -148,5 +178,14 @@ final class StoreReturnTeamsNotifier
         }
 
         return route('store.returns.index', ['team_menu' => TeamMenuContext::MENU_LOGISTICS]);
+    }
+
+    private function formatRegistrationCountSummary(int $savedCount, int $institutionCount): string
+    {
+        if ($institutionCount > 1) {
+            return "{$savedCount}건 / {$institutionCount}개 기관";
+        }
+
+        return $savedCount > 1 ? "{$savedCount}건" : '1건';
     }
 }
