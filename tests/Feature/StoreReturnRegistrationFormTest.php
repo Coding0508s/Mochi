@@ -81,12 +81,12 @@ class StoreReturnRegistrationFormTest extends TestCase
             ->test(StoreReturnRegistrationForm::class)
             ->call('openCreateModal')
             ->set('returnDate', '2026-07-09')
-            ->set('institutionKeyword', '테스트 유치원')
-            ->set('freight', '선불')
-            ->set('itemRows.0.itemName', 'GrapeSEED 교재')
-            ->set('itemRows.0.quantity', '3')
-            ->set('itemRows.0.status', '정상')
-            ->set('itemRows.0.notes', '박스 훼손')
+            ->set('institutionBlocks.0.institutionKeyword', '테스트 유치원')
+            ->set('institutionBlocks.0.freight', '선불')
+            ->set('institutionBlocks.0.itemRows.0.itemName', 'GrapeSEED 교재')
+            ->set('institutionBlocks.0.itemRows.0.quantity', '3')
+            ->set('institutionBlocks.0.itemRows.0.status', '정상')
+            ->set('institutionBlocks.0.itemRows.0.notes', '박스 훼손')
             ->call('save')
             ->assertHasNoErrors()
             ->assertSet('showCreateModal', false)
@@ -125,12 +125,12 @@ class StoreReturnRegistrationFormTest extends TestCase
             ->test(StoreReturnRegistrationForm::class)
             ->call('openCreateModal')
             ->set('returnDate', '2026-07-10')
-            ->set('institutionKeyword', '분당 미금 꿈터유치원')
-            ->set('freight', '선불')
-            ->set('itemRows.0.itemName', 'Unit 1')
-            ->set('itemRows.0.quantity', '12')
-            ->set('itemRows.0.status', '정상')
-            ->set('itemRows.0.notes', '스티커')
+            ->set('institutionBlocks.0.institutionKeyword', '분당 미금 꿈터유치원')
+            ->set('institutionBlocks.0.freight', '선불')
+            ->set('institutionBlocks.0.itemRows.0.itemName', 'Unit 1')
+            ->set('institutionBlocks.0.itemRows.0.quantity', '12')
+            ->set('institutionBlocks.0.itemRows.0.status', '정상')
+            ->set('institutionBlocks.0.itemRows.0.notes', '스티커')
             ->call('save')
             ->assertHasNoErrors();
 
@@ -181,11 +181,11 @@ class StoreReturnRegistrationFormTest extends TestCase
             ->test(StoreReturnRegistrationForm::class)
             ->call('openCreateModal')
             ->set('returnDate', '2026-07-10')
-            ->set('institutionKeyword', '분당 미금 꿈터유치원')
-            ->set('freight', '선불')
-            ->set('itemRows.0.itemName', 'Unit 1')
-            ->set('itemRows.0.quantity', '1')
-            ->set('itemRows.0.status', '정상')
+            ->set('institutionBlocks.0.institutionKeyword', '분당 미금 꿈터유치원')
+            ->set('institutionBlocks.0.freight', '선불')
+            ->set('institutionBlocks.0.itemRows.0.itemName', 'Unit 1')
+            ->set('institutionBlocks.0.itemRows.0.quantity', '1')
+            ->set('institutionBlocks.0.itemRows.0.status', '정상')
             ->call('save')
             ->assertHasNoErrors();
 
@@ -214,11 +214,11 @@ class StoreReturnRegistrationFormTest extends TestCase
             ->test(StoreReturnRegistrationForm::class)
             ->call('openCreateModal')
             ->set('returnDate', '2026-07-10')
-            ->set('institutionKeyword', '테스트 유치원')
-            ->set('freight', '선불')
-            ->set('itemRows.0.itemName', 'Unit 1')
-            ->set('itemRows.0.quantity', '1')
-            ->set('itemRows.0.status', '정상')
+            ->set('institutionBlocks.0.institutionKeyword', '테스트 유치원')
+            ->set('institutionBlocks.0.freight', '선불')
+            ->set('institutionBlocks.0.itemRows.0.itemName', 'Unit 1')
+            ->set('institutionBlocks.0.itemRows.0.quantity', '1')
+            ->set('institutionBlocks.0.itemRows.0.status', '정상')
             ->call('save')
             ->assertHasNoErrors();
 
@@ -355,11 +355,11 @@ class StoreReturnRegistrationFormTest extends TestCase
             ->test(StoreReturnRegistrationForm::class)
             ->call('openCreateModal')
             ->set('returnDate', '2026-07-10')
-            ->set('institutionKeyword', '테스트 유치원')
-            ->set('freight', '선불')
-            ->set('itemRows.0.itemName', '00P228')
-            ->set('itemRows.0.quantity', '2')
-            ->set('itemRows.0.status', '정상')
+            ->set('institutionBlocks.0.institutionKeyword', '테스트 유치원')
+            ->set('institutionBlocks.0.freight', '선불')
+            ->set('institutionBlocks.0.itemRows.0.itemName', '00P228')
+            ->set('institutionBlocks.0.itemRows.0.quantity', '2')
+            ->set('institutionBlocks.0.itemRows.0.status', '정상')
             ->call('save')
             ->assertHasNoErrors();
 
@@ -423,15 +423,15 @@ class StoreReturnRegistrationFormTest extends TestCase
             ->test(StoreReturnRegistrationForm::class)
             ->call('openCreateModal')
             ->set('returnDate', '2026-07-09')
-            ->set('institutionKeyword', '테스트 유치원')
-            ->set('freight', '착불')
-            ->set('itemRows.0.itemName', '교재 A')
-            ->set('itemRows.0.quantity', '1')
-            ->set('itemRows.0.status', '정상')
+            ->set('institutionBlocks.0.institutionKeyword', '테스트 유치원')
+            ->set('institutionBlocks.0.freight', '착불')
+            ->set('institutionBlocks.0.itemRows.0.itemName', '교재 A')
+            ->set('institutionBlocks.0.itemRows.0.quantity', '1')
+            ->set('institutionBlocks.0.itemRows.0.status', '정상')
             ->call('addItemRow')
-            ->set('itemRows.1.itemName', '교재 B')
-            ->set('itemRows.1.quantity', '2')
-            ->set('itemRows.1.status', '정상')
+            ->set('institutionBlocks.0.itemRows.1.itemName', '교재 B')
+            ->set('institutionBlocks.0.itemRows.1.quantity', '2')
+            ->set('institutionBlocks.0.itemRows.1.status', '정상')
             ->call('save')
             ->assertHasNoErrors()
             ->assertSee('반품 2건이 등록되었습니다.', false)
@@ -455,6 +455,53 @@ class StoreReturnRegistrationFormTest extends TestCase
         $this->assertNotNull($groupKeys->first());
     }
 
+    public function test_user_can_register_multiple_institutions_at_once(): void
+    {
+        Http::fake();
+
+        config([
+            'services.store_return_teams.webhook_url' => 'https://example.test/teams-webhook',
+        ]);
+
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(StoreReturnRegistrationForm::class)
+            ->call('openCreateModal')
+            ->assertSee('기관 추가하기', false)
+            ->set('returnDate', '2026-07-10')
+            ->set('institutionBlocks.0.institutionKeyword', '유치원 A')
+            ->set('institutionBlocks.0.itemRows.0.itemName', 'Unit 1')
+            ->set('institutionBlocks.0.itemRows.0.quantity', '1')
+            ->set('institutionBlocks.0.itemRows.0.status', '정상')
+            ->call('addInstitutionBlock')
+            ->set('institutionBlocks.1.institutionKeyword', '유치원 B')
+            ->set('institutionBlocks.1.itemRows.0.itemName', 'Unit 2')
+            ->set('institutionBlocks.1.itemRows.0.quantity', '3')
+            ->set('institutionBlocks.1.itemRows.0.status', '정상')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertSee('2건(2개 기관)이 등록되었습니다.', false)
+            ->assertSee('유치원 A', false)
+            ->assertSee('유치원 B', false);
+
+        $this->assertDatabaseCount('store_return_registrations', 2);
+        $this->assertDatabaseHas('store_return_registrations', [
+            'institution_name' => '유치원 A',
+            'item_name' => 'Unit 1',
+        ]);
+        $this->assertDatabaseHas('store_return_registrations', [
+            'institution_name' => '유치원 B',
+            'item_name' => 'Unit 2',
+            'quantity' => 3,
+        ]);
+
+        $groupKeys = StoreReturnRegistration::query()->pluck('registration_group_key')->unique()->values();
+        $this->assertCount(2, $groupKeys);
+
+        Http::assertSentCount(2);
+    }
+
     public function test_return_registration_requires_required_fields(): void
     {
         $user = User::factory()->create();
@@ -463,15 +510,15 @@ class StoreReturnRegistrationFormTest extends TestCase
             ->test(StoreReturnRegistrationForm::class)
             ->call('openCreateModal')
             ->set('returnDate', '')
-            ->set('institutionKeyword', '')
-            ->set('itemRows.0.itemName', '')
-            ->set('itemRows.0.quantity', '')
+            ->set('institutionBlocks.0.institutionKeyword', '')
+            ->set('institutionBlocks.0.itemRows.0.itemName', '')
+            ->set('institutionBlocks.0.itemRows.0.quantity', '')
             ->call('save')
             ->assertHasErrors([
                 'returnDate' => 'required',
-                'institutionKeyword' => 'required',
-                'itemRows.0.itemName' => 'required',
-                'itemRows.0.quantity' => 'required',
+                'institutionBlocks.0.institutionKeyword' => 'required',
+                'institutionBlocks.0.itemRows.0.itemName' => 'required',
+                'institutionBlocks.0.itemRows.0.quantity' => 'required',
             ]);
     }
 
@@ -483,10 +530,10 @@ class StoreReturnRegistrationFormTest extends TestCase
             ->test(StoreReturnRegistrationForm::class)
             ->call('openCreateModal')
             ->set('returnDate', '2026-07-10')
-            ->set('institutionKeyword', '직접 입력 기관')
-            ->set('itemRows.0.itemName', '교재 A')
-            ->set('itemRows.0.quantity', '1')
-            ->set('itemRows.0.status', '정상')
+            ->set('institutionBlocks.0.institutionKeyword', '직접 입력 기관')
+            ->set('institutionBlocks.0.itemRows.0.itemName', '교재 A')
+            ->set('institutionBlocks.0.itemRows.0.quantity', '1')
+            ->set('institutionBlocks.0.itemRows.0.status', '정상')
             ->call('save')
             ->assertHasNoErrors();
 
@@ -544,11 +591,11 @@ class StoreReturnRegistrationFormTest extends TestCase
             ->test(StoreReturnRegistrationForm::class)
             ->call('openCreateModal')
             ->set('returnDate', '2026-07-10')
-            ->set('institutionKeyword', '포도씨 유치원')
-            ->set('freight', '선불')
-            ->set('itemRows.0.itemName', 'Unit 1')
-            ->set('itemRows.0.quantity', '1')
-            ->set('itemRows.0.status', '정상')
+            ->set('institutionBlocks.0.institutionKeyword', '포도씨 유치원')
+            ->set('institutionBlocks.0.freight', '선불')
+            ->set('institutionBlocks.0.itemRows.0.itemName', 'Unit 1')
+            ->set('institutionBlocks.0.itemRows.0.quantity', '1')
+            ->set('institutionBlocks.0.itemRows.0.status', '정상')
             ->call('save')
             ->assertHasNoErrors();
 
@@ -704,12 +751,12 @@ class StoreReturnRegistrationFormTest extends TestCase
         Livewire::actingAs($user)
             ->test(StoreReturnRegistrationForm::class)
             ->call('openCreateModal')
-            ->call('selectInstitution', 'SK-RETURN-1')
-            ->assertSet('csTeam', 'Bella Joo')
+            ->call('selectInstitution', 0, 'SK-RETURN-1')
+            ->assertSet('institutionBlocks.0.csTeam', 'Bella Joo')
             ->set('returnDate', '2026-07-10')
-            ->set('itemRows.0.itemName', '교재 A')
-            ->set('itemRows.0.quantity', '1')
-            ->set('itemRows.0.status', '정상')
+            ->set('institutionBlocks.0.itemRows.0.itemName', '교재 A')
+            ->set('institutionBlocks.0.itemRows.0.quantity', '1')
+            ->set('institutionBlocks.0.itemRows.0.status', '정상')
             ->call('save')
             ->assertHasNoErrors()
             ->assertSee('Bella Joo', false);
