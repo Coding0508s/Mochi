@@ -10,7 +10,7 @@
     <div class="mochi-summary-card">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-                <h2 class="text-base font-semibold text-mochi-header">반품 등록</h2>
+                <h2 class="text-base font-semibold text-mochi-header">반품 현황</h2>
                 <p class="mt-1 text-xs text-gray-600">
                     @if($this->isCsTeamMenu)
                         반품 내역을 조회하고 처리 완료합니다.

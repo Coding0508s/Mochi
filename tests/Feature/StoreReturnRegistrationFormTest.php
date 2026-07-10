@@ -46,7 +46,7 @@ class StoreReturnRegistrationFormTest extends TestCase
         $this->actingAs($user)
             ->get(route('store.returns.index', ['team_menu' => 'logistics']))
             ->assertOk()
-            ->assertSee('반품 등록', false)
+            ->assertSee('반품 현황', false)
             ->assertSee('Date', false)
             ->assertSee('기관명', false)
             ->assertSee('품목명', false)
@@ -764,7 +764,8 @@ class StoreReturnRegistrationFormTest extends TestCase
             ->test(StoreReturnRegistrationForm::class)
             ->assertSet('isCsTeamMenu', false)
             ->assertDontSee('>완료<', false)
-            ->assertSee('>반품 등록<', false);
+            ->assertSee('반품 현황', false)
+            ->assertSeeHtml('wire:click="openCreateModal"');
     }
 
     public function test_cs_team_can_complete_return_group_from_list(): void

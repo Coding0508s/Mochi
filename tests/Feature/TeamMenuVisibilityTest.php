@@ -72,7 +72,7 @@ class TeamMenuVisibilityTest extends TestCase
         $this->actingAs($cs)
             ->get(route('store.returns.index', ['team_menu' => 'cs']))
             ->assertOk()
-            ->assertSee('반품 등록', false);
+            ->assertSee('반품 현황', false);
     }
 
     public function test_cs_team_sidebar_shows_return_registration_menu(): void
@@ -86,7 +86,7 @@ class TeamMenuVisibilityTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('store/returns?team_menu=cs', false);
-        $response->assertSee('sidebar-subitem-label">반품 등록<', false);
+        $response->assertSee('sidebar-subitem-label">반품 현황<', false);
     }
 
     public function test_cs_team_sidebar_shows_brochure_request_menu_only(): void
@@ -152,7 +152,7 @@ class TeamMenuVisibilityTest extends TestCase
         $response->assertSee('section=inventory&amp;team_menu=logistics', false);
         $response->assertSee('section=logistics&amp;team_menu=logistics', false);
         $response->assertSee('sidebar-subitem-label">Store 재고<', false);
-        $response->assertSee('sidebar-subitem-label">반품 등록<', false);
+        $response->assertSee('sidebar-subitem-label">반품 현황<', false);
         $response->assertSee('sidebar-subitem-label">GS Brochure<', false);
         $response->assertSee('sidebar-subitem-label">운송장 입력<', false);
     }
