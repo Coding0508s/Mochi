@@ -225,6 +225,70 @@ class StoreReturnRegistrationFormTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_teams_notification_is_sent_when_cs_completes_return_group(): void
+    {
+        Http::fake();
+
+        config([
+            'services.store_return_teams.webhook_url' => 'https://example.test/teams-webhook',
+        ]);
+
+        $user = User::factory()->create([
+            'team' => 'CS',
+            'name' => 'CS 담당자',
+        ]);
+
+        $registration = StoreReturnRegistration::factory()->for($user, 'registrant')->create([
+            'returned_at' => '2026-07-10',
+            'institution_name' => '분당 미금 꿈터유치원',
+            'institution_sk_code' => 'SK1001',
+            'freight' => '선불',
+            'item_name' => 'Unit 4',
+            'status' => '접수',
+        ]);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'cs'])
+            ->test(StoreReturnRegistrationForm::class)
+            ->call('completeReturnGroup', $registration->id)
+            ->assertHasNoErrors();
+
+        Http::assertSent(function (Request $request): bool {
+            if ($request->url() !== 'https://example.test/teams-webhook') {
+                return false;
+            }
+
+            $data = $request->data();
+
+            return ($data['summary'] ?? '') === '반품 처리 완료'
+                && ($data['sections'][0]['text'] ?? '') === '반품 처리 완료. 이카운트 전표 확인 바랍니다.'
+                && ($data['sections'][0]['facts'][0]['value'] ?? '') === 'CS 담당자'
+                && ($data['sections'][0]['facts'][2]['value'] ?? '') === '분당 미금 꿈터유치원';
+        });
+    }
+
+    public function test_teams_completion_notification_is_skipped_when_webhook_url_is_missing(): void
+    {
+        Http::fake();
+
+        config([
+            'services.store_return_teams.webhook_url' => null,
+        ]);
+
+        $user = User::factory()->create(['team' => 'CS']);
+
+        $registration = StoreReturnRegistration::factory()->for($user, 'registrant')->create([
+            'status' => '접수',
+        ]);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'cs'])
+            ->test(StoreReturnRegistrationForm::class)
+            ->call('completeReturnGroup', $registration->id);
+
+        Http::assertNothingSent();
+    }
+
     public function test_create_modal_shows_ecount_product_dropdown_when_return_product_codes_are_configured(): void
     {
         Config::set('store.ecount.base_url', 'https://oapi.ecount.com');

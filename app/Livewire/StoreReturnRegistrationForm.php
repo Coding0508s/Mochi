@@ -311,6 +311,25 @@ class StoreReturnRegistrationForm extends Component
             ->whereIn('id', $items->pluck('id'))
             ->update(['status' => $completedStatus]);
 
+        /** @var StoreReturnRegistration $first */
+        $first = $items->first();
+        $productOptions = app(StoreReturnEcountProductOptions::class);
+
+        app(StoreReturnTeamsNotifier::class)->notifyCompleted([
+            'returned_at' => $first->returned_at->format('Y-m-d'),
+            'institution_name' => $first->institution_name,
+            'institution_sk_code' => $first->institution_sk_code,
+            'freight' => $first->freight,
+            'cs_team' => $first->cs_team,
+            'completed_by_name' => Auth::user()?->nameForCoReports() ?? '시스템',
+            'items' => $items->map(fn (StoreReturnRegistration $item): array => [
+                'item_name' => $productOptions->displayNameForStoredItemName($item->item_name),
+                'quantity' => $item->quantity ?? 1,
+                'status' => $completedStatus,
+                'notes' => $item->notes,
+            ])->all(),
+        ]);
+
         if ($this->showDetailModal && $this->detailAnchorId === $anchor->id) {
             $this->loadDetailFieldsFromAnchor($anchor->id);
             $this->detailEditMode = false;
