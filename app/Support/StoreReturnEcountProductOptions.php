@@ -207,6 +207,26 @@ final class StoreReturnEcountProductOptions
             ? $this->ecountApiClient->fetchProductDisplayNamesByCodes($missingCodes)
             : [];
 
+        $toBackfill = [];
+        foreach ($apiNames as $code => $name) {
+            $normalizedCode = strtoupper(trim((string) $code));
+            $trimmedName = trim((string) $name);
+            if ($normalizedCode === '' || $trimmedName === '') {
+                continue;
+            }
+
+            if (trim((string) ($dbNames[$normalizedCode] ?? '')) !== '') {
+                continue;
+            }
+
+            $toBackfill[$normalizedCode] = $trimmedName;
+        }
+
+        if ($toBackfill !== []) {
+            $this->productRepository->backfillMissingProductNames($toBackfill);
+            $this->forgetCachedOptions();
+        }
+
         $map = [];
         foreach ($codes as $code) {
             $normalizedCode = strtoupper(trim($code));
@@ -214,7 +234,7 @@ final class StoreReturnEcountProductOptions
                 continue;
             }
 
-            $name = trim((string) ($dbNames[$normalizedCode] ?? $apiNames[$normalizedCode] ?? ''));
+            $name = trim((string) ($dbNames[$normalizedCode] ?? $toBackfill[$normalizedCode] ?? $apiNames[$normalizedCode] ?? ''));
             if ($name !== '') {
                 $map[$normalizedCode] = $name;
             }

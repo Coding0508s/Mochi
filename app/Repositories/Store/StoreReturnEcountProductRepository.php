@@ -67,6 +67,37 @@ class StoreReturnEcountProductRepository
             ->paginate($perPage);
     }
 
+    /**
+     * 이카운트에서 조회한 품목명을 DB에 저장합니다.
+     * product_name 이 비어 있는 행만 갱신해, 이미 저장된 이름은 덮어쓰지 않습니다.
+     *
+     * @param  array<string, string>  $productNamesByCode  normalized_prod_cd => product_name
+     */
+    public function backfillMissingProductNames(array $productNamesByCode): int
+    {
+        $updated = 0;
+
+        foreach ($productNamesByCode as $code => $name) {
+            $normalizedCode = strtoupper(trim((string) $code));
+            $trimmedName = trim((string) $name);
+            if ($normalizedCode === '' || $trimmedName === '') {
+                continue;
+            }
+
+            $affected = StoreReturnEcountProduct::query()
+                ->where('prod_cd', $normalizedCode)
+                ->where(function ($query): void {
+                    $query->whereNull('product_name')
+                        ->orWhere('product_name', '');
+                })
+                ->update(['product_name' => mb_substr($trimmedName, 0, 255)]);
+
+            $updated += (int) $affected;
+        }
+
+        return $updated;
+    }
+
     public function create(
         string $prodCd,
         bool $isActive = true,

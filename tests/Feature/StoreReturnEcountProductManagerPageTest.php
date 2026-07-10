@@ -152,4 +152,62 @@ class StoreReturnEcountProductManagerPageTest extends TestCase
 
         $this->assertSame([], $options);
     }
+
+    public function test_list_render_backfills_missing_product_name_from_ecount(): void
+    {
+        Http::fake([
+            'https://oapi.ecount.com/OAPI/V2/InventoryBasic/GetBasicProductsList*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        [
+                            'PROD_CD' => 'U35S-SB-400',
+                            'PROD_DES' => 'Unit 35 Student Book',
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        StoreReturnEcountProduct::query()->create([
+            'prod_cd' => 'U35S-SB-400',
+            'product_name' => null,
+            'is_active' => true,
+            'sort_order' => 0,
+        ]);
+
+        $admin = User::factory()->create(['is_admin' => true]);
+        $this->actingAs($admin);
+
+        Livewire::test(StoreReturnEcountProductManager::class)
+            ->assertSee('Unit 35 Student Book', false);
+
+        $this->assertDatabaseHas('store_return_ecount_products', [
+            'prod_cd' => 'U35S-SB-400',
+            'product_name' => 'Unit 35 Student Book',
+        ]);
+    }
+
+    public function test_backfilled_product_name_remains_when_ecount_api_fails(): void
+    {
+        StoreReturnEcountProduct::query()->create([
+            'prod_cd' => 'U35S-SB-400',
+            'product_name' => 'Unit 35 Student Book',
+            'is_active' => true,
+            'sort_order' => 0,
+        ]);
+
+        Http::fake([
+            'https://oapi.ecount.com/OAPI/V2/InventoryBasic/GetBasicProductsList*' => Http::response([
+                'Status' => '500',
+                'Error' => 'unavailable',
+            ], 500),
+        ]);
+
+        $admin = User::factory()->create(['is_admin' => true]);
+        $this->actingAs($admin);
+
+        Livewire::test(StoreReturnEcountProductManager::class)
+            ->assertSee('Unit 35 Student Book', false);
+    }
 }
