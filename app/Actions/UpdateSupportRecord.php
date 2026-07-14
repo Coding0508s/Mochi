@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Models\Institution;
 use App\Models\SupportRecord;
 use App\Support\ManagerNameNormalizer;
+use App\Support\SupportRecordTeacherCompletionSync;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Schema;
@@ -57,6 +58,7 @@ class UpdateSupportRecord
         $supportDate = Carbon::parse($payload['support_date']);
         $meetTime = trim((string) $payload['support_time']);
         $completed = (bool) ($payload['completed'] ?? false);
+        $wasCompleted = $record->isCompleted();
 
         $record->update(SupportRecord::filterAttributesForTable([
             'Year' => (int) $supportDate->format('Y'),
@@ -70,6 +72,11 @@ class UpdateSupportRecord
             'Others' => filled($payload['others'] ?? null) ? trim((string) $payload['others']) : null,
         ] + SupportRecord::completionAttributes($completed, $record->CompletedDate)));
 
-        return $record->fresh() ?? $record;
+        $fresh = $record->fresh() ?? $record;
+        if ($wasCompleted !== $fresh->isCompleted()) {
+            app(SupportRecordTeacherCompletionSync::class)->sync($fresh, $fresh->isCompleted());
+        }
+
+        return $fresh;
     }
 }

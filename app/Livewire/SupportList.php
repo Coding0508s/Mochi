@@ -6,6 +6,7 @@ use App\Models\ContractDocument;
 use App\Models\Institution;
 use App\Models\SupportRecord;
 use App\Support\SupportRecordCascadeDeleter;
+use App\Support\SupportRecordTeacherCompletionSync;
 use App\Support\SupportReportStoredMailNotifier;
 use App\Support\TeamMenuContext;
 use Illuminate\Support\Collection;
@@ -585,8 +586,13 @@ class SupportList extends Component
             SupportRecord::where('ID', $this->editingId)->update($data);
         });
 
+        $updated = SupportRecord::query()->findOrFail($this->editingId);
+        if ($wasCompleted !== $updated->isCompleted()) {
+            app(SupportRecordTeacherCompletionSync::class)->sync($updated, $updated->isCompleted());
+        }
+
         SupportReportStoredMailNotifier::notifyWhenMarkedComplete(
-            SupportRecord::query()->findOrFail($this->editingId),
+            $updated,
             auth()->user(),
             $wasCompleted,
         );
@@ -605,6 +611,11 @@ class SupportList extends Component
         Gate::authorize('updateSupportRecord', $record);
         $wasCompleted = $record->isCompleted();
         $record->toggleComplete(! $wasCompleted);
+
+        app(SupportRecordTeacherCompletionSync::class)->sync(
+            $record->fresh() ?? $record,
+            ! $wasCompleted,
+        );
 
         SupportReportStoredMailNotifier::notifyWhenMarkedComplete(
             $record->fresh() ?? $record,
