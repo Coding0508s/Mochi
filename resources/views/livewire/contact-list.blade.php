@@ -552,18 +552,25 @@
     @if($showDetailModal && $selectedContact)
         <div class="mochi-modal-overlay"
              wire:click.self="closeDetailModal">
-            <div class="mochi-modal-shell max-w-2xl"
+            <div class="mochi-modal-shell max-w-2xl max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex flex-col"
                  wire:click.stop>
                 <x-admin.modal-header title="연락처 상세 정보" close-action="closeDetailModal" />
 
-                <div class="px-6 py-5">
+                {{-- 본문만 스크롤: 긴 비고가 있어도 모달이 화면을 넘기지 않도록 --}}
+                <div class="mochi-modal-body-scroll px-6 py-5">
                     <div class="border border-gray-200 rounded-lg overflow-hidden">
-                        <table class="w-full text-sm">
+                        <table class="w-full text-sm table-fixed">
+                            <colgroup>
+                                <col class="w-28">
+                                <col>
+                                <col class="w-28">
+                                <col>
+                            </colgroup>
                             <tbody class="divide-y divide-gray-100">
                                 <tr>
-                                    <th class="w-28 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">이름</th>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">이름</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['name'] ?? '-' }}</td>
-                                    <th class="w-28 px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">직급</th>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">직급</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['position'] ?? '-' }}</td>
                                 </tr>
                                 <tr>
@@ -576,13 +583,13 @@
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">연락처</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['phone'] ?? '-' }}</td>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">이메일</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['email'] ?? '-' }}</td>
+                                    <td class="px-3 py-2 font-medium text-gray-900 break-words">{{ $selectedContact['email'] ?? '-' }}</td>
                                 </tr>
                                 <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">기관코드</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['sk_code'] ?? '-' }}</td>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">기관명</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['school_name'] ?? '-' }}</td>
+                                    <td class="px-3 py-2 font-medium text-gray-900 break-words">{{ $selectedContact['school_name'] ?? '-' }}</td>
                                 </tr>
                                 <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">담당 Coach</th>
@@ -605,19 +612,20 @@
                                     <td colspan="3" class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['created_date'] ?? '-' }}</td>
                                 </tr>
                                 <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">기관 주소</th>
-                                    <td colspan="3" class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['institution_address'] ?? '-' }}</td>
+                                    <th class="align-top px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">기관 주소</th>
+                                    <td colspan="3" class="px-3 py-2 font-medium text-gray-900 break-words">{{ $selectedContact['institution_address'] ?? '-' }}</td>
                                 </tr>
                                 <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">비고</th>
-                                    <td colspan="3" class="mochi-multiline-readout px-3 py-2 font-medium text-gray-900">{{ $selectedContact['description'] ?? '-' }}</td>
+                                    {{-- td에 display:block(mochi-multiline-readout)을 쓰면 colspan이 깨져 비고가 좁게 줄바꿈됨 --}}
+                                    <th class="align-top px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">비고</th>
+                                    <td colspan="3" class="px-3 py-2 font-medium text-gray-900 text-left whitespace-pre-wrap break-words">{{ $selectedContact['description'] ?? '-' }}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-2">
+                <div class="shrink-0 px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-2">
                     <button type="button"
                             wire:click="closeDetailModal"
                             class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">

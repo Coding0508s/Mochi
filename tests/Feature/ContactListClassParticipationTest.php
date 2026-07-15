@@ -249,6 +249,38 @@ class ContactListClassParticipationTest extends TestCase
             ->assertDontSee('>퇴직<', false);
     }
 
+    public function test_detail_modal_keeps_long_description_in_full_width_table_cell(): void
+    {
+        $this->seedInstitution('SK-DETAIL-LONG');
+
+        $longDescription = 'This teacher took a while finishing the GS Essentials. '
+            .'She taught at FSS for a year (2025) however, not GS nor LS. '
+            .'As a young, fluent native speaker, Kate교수부장님 would like to continue '
+            .'to raise her up as one of the teachers.';
+
+        $teacherId = Teacher::query()->create([
+            'SK_Code' => 'SK-DETAIL-LONG',
+            'Name' => '허 Jina',
+            'Email' => 'long-detail@example.com',
+            'School_Name' => '용인 구갈 성민어학원',
+            'Description' => $longDescription,
+            'Status' => '활성화',
+            'ClassInOut' => true,
+        ])->ID;
+
+        $user = User::factory()->admin()->create();
+
+        Livewire::actingAs($user)
+            ->test(ContactList::class)
+            ->call('openDetailModal', $teacherId)
+            ->assertSet('showDetailModal', true)
+            ->assertSee($longDescription)
+            // display:block인 mochi-multiline-readout을 td에 쓰면 colspan이 깨짐
+            ->assertDontSeeHtml('mochi-multiline-readout')
+            ->assertSeeHtml('colspan="3" class="px-3 py-2 font-medium text-gray-900 text-left whitespace-pre-wrap break-words"')
+            ->assertSeeHtml('mochi-modal-body-scroll');
+    }
+
     public function test_contact_list_shows_active_status_when_class_participation_is_out(): void
     {
         $this->seedInstitution('SK-STATUS-2');
