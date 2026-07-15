@@ -20,6 +20,9 @@ class TeacherSupportCompletionDisplayTest extends TestCase
 
         Schema::dropIfExists('teacher_visit_support_reports');
         Schema::dropIfExists('S_Support_NewTeacher');
+        Schema::dropIfExists('S_Support_OnSite');
+        Schema::dropIfExists('S_SolutionConsulting');
+        Schema::dropIfExists('S_Support_LVA');
         Schema::dropIfExists('Teachers');
 
         Schema::create('Teachers', function ($table): void {
@@ -44,6 +47,29 @@ class TeacherSupportCompletionDisplayTest extends TestCase
             $table->unsignedInteger('TeacherId')->nullable();
             $table->dateTime('SupportDate')->nullable();
             $table->string('Status', 50)->nullable();
+        });
+
+        Schema::create('S_Support_OnSite', function ($table): void {
+            $table->increments('ID');
+            $table->unsignedInteger('TeacherId')->nullable();
+            $table->dateTime('SupportDate')->nullable();
+            $table->string('Status', 50)->nullable();
+        });
+
+        Schema::create('S_SolutionConsulting', function ($table): void {
+            $table->increments('ID');
+            $table->unsignedInteger('TeacherId')->nullable();
+            $table->dateTime('SupportDate')->nullable();
+            $table->string('Status', 50)->nullable();
+        });
+
+        Schema::create('S_Support_LVA', function ($table): void {
+            $table->increments('ID');
+            $table->unsignedInteger('TeacherId')->nullable();
+            $table->dateTime('SupportDate')->nullable();
+            $table->string('Status', 50)->nullable();
+            $table->unsignedTinyInteger('ReportType')->nullable();
+            $table->string('LVA_TYPE', 10)->nullable();
         });
     }
 
@@ -208,6 +234,250 @@ class TeacherSupportCompletionDisplayTest extends TestCase
 
         $this->assertSame('2024-02-17', $first['date']);
         $this->assertSame('교사 지원(신규교사)', $first['type']);
+        $this->assertSame('', $second['date']);
+    }
+
+    public function test_parts_falls_back_to_legacy_onsite_when_teacher_slot_empty(): void
+    {
+        $teacherId = DB::table('Teachers')->insertGetId([
+            'Name' => '온사이트교사',
+        ]);
+
+        DB::table('S_Support_OnSite')->insert([
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2024-06-27 00:00:00',
+            'Status' => '완료',
+        ]);
+
+        $teacher = Teacher::query()->findOrFail($teacherId);
+
+        $parts = TeacherSupportCompletionDisplay::parts($teacher, 1, 2024);
+
+        $this->assertSame('2024-06-27', $parts['date']);
+        $this->assertSame('교사 지원 On-Site', $parts['type']);
+    }
+
+    public function test_parts_falls_back_to_legacy_pro_con_when_teacher_slot_empty(): void
+    {
+        $teacherId = DB::table('Teachers')->insertGetId([
+            'Name' => '프로콘교사',
+        ]);
+
+        DB::table('S_SolutionConsulting')->insert([
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2024-11-22 00:00:00',
+            'Status' => '완료',
+        ]);
+
+        $teacher = Teacher::query()->findOrFail($teacherId);
+
+        $parts = TeacherSupportCompletionDisplay::parts($teacher, 1, 2024);
+
+        $this->assertSame('2024-11-22', $parts['date']);
+        $this->assertSame('Pro Con', $parts['type']);
+    }
+
+    public function test_parts_falls_back_to_legacy_lva_with_resolved_type(): void
+    {
+        $teacherId = DB::table('Teachers')->insertGetId([
+            'Name' => 'LVA교사',
+        ]);
+
+        DB::table('S_Support_LVA')->insert([
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2024-03-10 00:00:00',
+            'Status' => '완료',
+            'ReportType' => 3,
+            'LVA_TYPE' => 'FB',
+        ]);
+
+        $teacher = Teacher::query()->findOrFail($teacherId);
+
+        $parts = TeacherSupportCompletionDisplay::parts($teacher, 1, 2024);
+
+        $this->assertSame('2024-03-10', $parts['date']);
+        $this->assertSame('교사 지원 LVA FB', $parts['type']);
+    }
+
+    public function test_legacy_onsite_does_not_duplicate_into_second_round_when_slot_matches(): void
+    {
+        $teacherId = DB::table('Teachers')->insertGetId([
+            'Name' => '온사이트중복방지',
+            '_1st_Support_Date' => '2024-06-27',
+            '_1st_Support_Type' => '교사 지원 On-Site',
+        ]);
+
+        DB::table('S_Support_OnSite')->insert([
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2024-06-27 00:00:00',
+            'Status' => '완료',
+        ]);
+
+        $teacher = Teacher::query()->findOrFail($teacherId);
+
+        $first = TeacherSupportCompletionDisplay::parts($teacher, 1, 2024);
+        $second = TeacherSupportCompletionDisplay::parts($teacher, 2, 2024);
+
+        $this->assertSame('2024-06-27', $first['date']);
+        $this->assertSame('교사 지원 On-Site', $first['type']);
+        $this->assertSame('', $second['date']);
+    }
+
+    public function test_multiple_legacy_types_fill_sequential_empty_rounds(): void
+    {
+        $teacherId = DB::table('Teachers')->insertGetId([
+            'Name' => '다건교사',
+        ]);
+
+        DB::table('S_Support_OnSite')->insert([
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2024-06-27 00:00:00',
+            'Status' => '완료',
+        ]);
+
+        DB::table('S_SolutionConsulting')->insert([
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2024-11-22 00:00:00',
+            'Status' => '완료',
+        ]);
+
+        $teacher = Teacher::query()->findOrFail($teacherId);
+
+        $first = TeacherSupportCompletionDisplay::parts($teacher, 1, 2024);
+        $second = TeacherSupportCompletionDisplay::parts($teacher, 2, 2024);
+
+        $this->assertSame('2024-06-27', $first['date']);
+        $this->assertSame('교사 지원 On-Site', $first['type']);
+        $this->assertSame(0, $first['extra']);
+        $this->assertSame('2024-11-22', $second['date']);
+        $this->assertSame('Pro Con', $second['type']);
+        $this->assertSame(0, $second['extra']);
+    }
+
+    public function test_duplicate_same_date_type_shows_extra_count_on_round(): void
+    {
+        $teacherId = DB::table('Teachers')->insertGetId([
+            'Name' => '중복프로콘교사',
+        ]);
+
+        DB::table('S_SolutionConsulting')->insert([
+            [
+                'TeacherId' => $teacherId,
+                'SupportDate' => '2024-11-22 00:00:00',
+                'Status' => '완료',
+            ],
+            [
+                'TeacherId' => $teacherId,
+                'SupportDate' => '2024-11-22 00:00:00',
+                'Status' => '완료',
+            ],
+        ]);
+
+        $teacher = Teacher::query()->findOrFail($teacherId);
+
+        $parts = TeacherSupportCompletionDisplay::parts($teacher, 1, 2024);
+        $display = TeacherSupportCompletionDisplay::displayWithType($teacher, 1, 2024);
+
+        $this->assertSame('2024-11-22', $parts['date']);
+        $this->assertSame('Pro Con', $parts['type']);
+        $this->assertSame(1, $parts['extra']);
+        $this->assertSame('2024-11-22 (Pro Con) 외 1건', $display);
+
+        $second = TeacherSupportCompletionDisplay::parts($teacher, 2, 2024);
+        $this->assertSame('', $second['date']);
+        $this->assertSame(0, $second['extra']);
+    }
+
+    public function test_teacher_slot_with_matching_duplicate_reports_shows_extra(): void
+    {
+        $teacherId = DB::table('Teachers')->insertGetId([
+            'Name' => '슬롯중복교사',
+            '_1st_Support_Date' => '2024-11-22',
+            '_1st_Support_Type' => 'Pro Con',
+        ]);
+
+        DB::table('S_SolutionConsulting')->insert([
+            [
+                'TeacherId' => $teacherId,
+                'SupportDate' => '2024-11-22 00:00:00',
+                'Status' => '완료',
+            ],
+            [
+                'TeacherId' => $teacherId,
+                'SupportDate' => '2024-11-22 00:00:00',
+                'Status' => '완료',
+            ],
+        ]);
+
+        $teacher = Teacher::query()->findOrFail($teacherId);
+
+        $first = TeacherSupportCompletionDisplay::parts($teacher, 1, 2024);
+        $second = TeacherSupportCompletionDisplay::parts($teacher, 2, 2024);
+
+        $this->assertSame('2024-11-22', $first['date']);
+        $this->assertSame('Pro Con', $first['type']);
+        $this->assertSame(1, $first['extra']);
+        $this->assertSame('', $second['date']);
+    }
+
+    public function test_same_date_different_types_collapse_into_one_round_with_extra(): void
+    {
+        $teacherId = DB::table('Teachers')->insertGetId([
+            'Name' => '같은날다타입',
+        ]);
+
+        DB::table('S_Support_OnSite')->insert([
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2024-06-27 00:00:00',
+            'Status' => '완료',
+        ]);
+
+        DB::table('S_SolutionConsulting')->insert([
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2024-06-27 00:00:00',
+            'Status' => '완료',
+        ]);
+
+        $teacher = Teacher::query()->findOrFail($teacherId);
+
+        $first = TeacherSupportCompletionDisplay::parts($teacher, 1, 2024);
+        $second = TeacherSupportCompletionDisplay::parts($teacher, 2, 2024);
+        $display = TeacherSupportCompletionDisplay::displayWithType($teacher, 1, 2024);
+
+        $this->assertSame('2024-06-27', $first['date']);
+        $this->assertSame(1, $first['extra']);
+        $this->assertStringContainsString('외 1건', $display);
+        $this->assertSame('', $second['date']);
+    }
+
+    public function test_teacher_slot_counts_same_date_other_types_as_extra(): void
+    {
+        $teacherId = DB::table('Teachers')->insertGetId([
+            'Name' => '슬롯다른타입',
+            '_1st_Support_Date' => '2024-06-27',
+            '_1st_Support_Type' => '교사 지원 On-Site',
+        ]);
+
+        DB::table('S_Support_OnSite')->insert([
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2024-06-27 00:00:00',
+            'Status' => '완료',
+        ]);
+
+        DB::table('S_SolutionConsulting')->insert([
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2024-06-27 00:00:00',
+            'Status' => '완료',
+        ]);
+
+        $teacher = Teacher::query()->findOrFail($teacherId);
+
+        $first = TeacherSupportCompletionDisplay::parts($teacher, 1, 2024);
+        $second = TeacherSupportCompletionDisplay::parts($teacher, 2, 2024);
+
+        $this->assertSame('2024-06-27', $first['date']);
+        $this->assertSame('교사 지원 On-Site', $first['type']);
+        $this->assertSame(1, $first['extra']);
         $this->assertSame('', $second['date']);
     }
 }

@@ -829,6 +829,12 @@
         line-height: 1.2;
     }
 
+    .coach-teacher-support-table .coach-support-completed-extra {
+        color: #9ca3af;
+        font-size: 0.625rem;
+        line-height: 1.2;
+    }
+
     /* 1~4차 지원 계획일/타입: 목록 UI만 숨김 (마크업·편집 모달·데이터 로직 유지) */
     .coach-teacher-support-table .coach-support-col-plan-12-hidden,
     .coach-teacher-support-table .coach-support-col-plan-34-hidden,
