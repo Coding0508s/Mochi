@@ -1,60 +1,56 @@
 <?php
 
+/*
+|--------------------------------------------------------------------------
+| 레거시 TR 교사지원 보고서 테이블 (TeacherId 기준)
+|--------------------------------------------------------------------------
+|
+| legacy_sources: 교사 상세 「지원 내역」 집계
+| legacy_completion_sources: 교사 지원 현황 N차 완료 칸 orphan fallback
+|
+| 두 목록을 같게 유지해 상세 이력과 현황 표가 어긋나지 않게 한다.
+*/
+
+$legacySources = [
+    [
+        'table' => 'S_Support_NewTeacher',
+        'type' => '교사 지원(신규교사)',
+    ],
+    [
+        'table' => 'S_Support_LVA',
+        'type_resolver' => 'lva',
+    ],
+    [
+        'table' => 'S_Support_OnSite',
+        'type' => '교사 지원 On-Site',
+    ],
+    [
+        'table' => 'S_Support_OpenClass',
+        'type' => 'Open-Class',
+    ],
+    [
+        'table' => 'S_SupportLittleSEED_ONLVA',
+        'type' => 'LS On-Site & LVA',
+    ],
+    [
+        'table' => 'S_Support_U21',
+        'type' => 'Unit 21+',
+    ],
+    [
+        'table' => 'S_Support_U31',
+        'type' => 'Unit 31+',
+    ],
+    [
+        'table' => 'S_SolutionConsulting',
+        'type' => 'Pro Con',
+    ],
+];
+
 return [
 
-    /*
-    |--------------------------------------------------------------------------
-    | 레거시 TR 교사지원 보고서 테이블 (TeacherId 기준)
-    |--------------------------------------------------------------------------
-    */
+    'legacy_completion_sources' => $legacySources,
 
-    /*
-    |--------------------------------------------------------------------------
-    | 교사 지원 현황 N차 완료 칸 fallback (Teachers 슬롯 비어 있을 때)
-    |--------------------------------------------------------------------------
-    */
-
-    'legacy_completion_sources' => [
-        [
-            'table' => 'S_Support_NewTeacher',
-            'type' => '교사 지원(신규교사)',
-        ],
-    ],
-
-    'legacy_sources' => [
-        [
-            'table' => 'S_Support_NewTeacher',
-            'type' => '교사 지원(신규교사)',
-        ],
-        [
-            'table' => 'S_Support_LVA',
-            'type_resolver' => 'lva',
-        ],
-        [
-            'table' => 'S_Support_OnSite',
-            'type' => '교사 지원 On-Site',
-        ],
-        [
-            'table' => 'S_Support_OpenClass',
-            'type' => 'Open-Class',
-        ],
-        [
-            'table' => 'S_SupportLittleSEED_ONLVA',
-            'type' => 'LS On-Site & LVA',
-        ],
-        [
-            'table' => 'S_Support_U21',
-            'type' => 'Unit 21+',
-        ],
-        [
-            'table' => 'S_Support_U31',
-            'type' => 'Unit 31+',
-        ],
-        [
-            'table' => 'S_SolutionConsulting',
-            'type' => 'Pro Con',
-        ],
-    ],
+    'legacy_sources' => $legacySources,
 
     /*
     |--------------------------------------------------------------------------

@@ -117,7 +117,16 @@ final class TeacherSupportNewTeacherDisplay
         }
 
         foreach (LegacyTeacherSupportQuery::completedReportsForTeacherIds($teacherIds, $year) as $teacherId => $teacherReports) {
-            $reports[$teacherId] = array_merge($reports[$teacherId] ?? [], $teacherReports);
+            $newTeacherReports = array_values(array_filter(
+                $teacherReports,
+                fn (array $report): bool => self::isNewTeacherSupportType($report['type'] ?? null),
+            ));
+
+            if ($newTeacherReports === []) {
+                continue;
+            }
+
+            $reports[$teacherId] = array_merge($reports[$teacherId] ?? [], $newTeacherReports);
         }
 
         $result = [];

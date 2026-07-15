@@ -80,9 +80,8 @@ final class LegacyTeacherSupportQuery
 
         $reportsByTeacher = [];
 
-        foreach (config('coach_teacher_legacy_support.legacy_completion_sources', []) as $source) {
+        foreach (self::completionSources() as $source) {
             $table = $source['table'] ?? null;
-            $typeLabel = $source['type'] ?? '';
 
             if (! is_string($table) || $table === '' || ! Schema::hasTable($table)) {
                 continue;
@@ -107,10 +106,17 @@ final class LegacyTeacherSupportQuery
                 $query->where('Status', '완료');
             }
 
+            $select = [$teacherIdColumn, 'SupportDate'];
+            foreach (['LVA_TYPE', 'ReportType'] as $optionalColumn) {
+                if (Schema::hasColumn($table, $optionalColumn)) {
+                    $select[] = $optionalColumn;
+                }
+            }
+
             $rows = $query
                 ->orderBy($teacherIdColumn)
                 ->orderBy('SupportDate')
-                ->get([$teacherIdColumn, 'SupportDate']);
+                ->get($select);
 
             foreach ($rows as $row) {
                 $date = ExcelSerialDate::toStorageString($row->SupportDate);
@@ -122,7 +128,7 @@ final class LegacyTeacherSupportQuery
                 $teacherId = (int) $row->{$teacherIdColumn};
                 $reportsByTeacher[$teacherId][] = [
                     'date' => $date,
-                    'type' => (string) $typeLabel,
+                    'type' => self::resolveTypeLabel($source, $row),
                     'sort' => Carbon::parse($date)->getTimestamp(),
                 ];
             }
@@ -142,6 +148,23 @@ final class LegacyTeacherSupportQuery
         }
 
         return $result;
+    }
+
+    /**
+     * @param  array<string, mixed>  $source
+     */
+    private static function resolveTypeLabel(array $source, object $row): string
+    {
+        if (($source['type_resolver'] ?? null) === 'lva') {
+            $lvaType = $row->LVA_TYPE ?? null;
+            if (! filled($lvaType) && isset($row->ReportType)) {
+                $lvaType = config('coach_teacher_legacy_support.lva_report_types')[(int) $row->ReportType] ?? null;
+            }
+
+            return filled($lvaType) ? '교사 지원 LVA '.$lvaType : '교사 지원 LVA';
+        }
+
+        return (string) ($source['type'] ?? '교사 지원');
     }
 
     /**
