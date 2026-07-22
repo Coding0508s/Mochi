@@ -566,7 +566,10 @@ class SupportCreateForm extends Component
 
             return;
         }
-        $this->formAccountName = (string) ($inst?->AccountName ?? $potential?->AccountName ?? '');
+        // 운영기관은 표시명(S_Account_Information) 우선 — 마스터 AccountName(예: FLS서적)을 그대로 쓰지 않는다.
+        $this->formAccountName = $inst !== null
+            ? $inst->resolvedAccountName()
+            : (string) ($potential?->AccountName ?? '');
         $this->formPotentialTargetId = $potential?->ID ? (int) $potential->ID : null;
         $this->formIsPotential = $potential !== null;
         $this->formPossibility = $potential ? (string) ($potential->Possibility ?? '') : '';
@@ -694,8 +697,9 @@ class SupportCreateForm extends Component
         $this->formSkCode = $inst
             ? (string) $inst->SKcode
             : trim((string) ($potential?->AccountCode ?? $trimmedSkCode));
+        // 드롭다운 제안과 동일하게 표시명 우선 (마스터 AccountName이 FLS서적 등이어도 화면에는 한글명).
         $this->formAccountName = $inst
-            ? (string) $inst->AccountName
+            ? $inst->resolvedAccountName()
             : (string) ($potential?->AccountName ?? '');
         $this->formInstitutionKeyword = $this->formAccountName;
         $this->formPotentialTargetId = ($isPotential || $potential !== null) && $potential?->ID
