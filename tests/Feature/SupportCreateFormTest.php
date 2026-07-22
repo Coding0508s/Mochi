@@ -1333,6 +1333,28 @@ class SupportCreateFormTest extends TestCase
             ->assertSet('formAccountName', '의왕 FSS Exact');
     }
 
+    public function test_select_institution_prefers_account_information_display_name(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK2190',
+            'AccountName' => 'FLS서적',
+        ]);
+
+        AccountInformation::query()->create([
+            'SK_Code' => 'SK2190',
+            'Account_Name' => '의왕 청계 FSS어학원 초등부',
+        ]);
+
+        Livewire::actingAs(User::factory()->create())
+            ->withQueryParams(['team_menu' => 'coach'])
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK2190')
+            ->assertSet('formSkCode', 'SK2190')
+            ->assertSet('formAccountName', '의왕 청계 FSS어학원 초등부')
+            ->assertSet('formInstitutionKeyword', '의왕 청계 FSS어학원 초등부')
+            ->assertDontSee('FLS서적');
+    }
+
     public function test_mount_prefills_institution_sk_code_from_query(): void
     {
         Institution::query()->create([
