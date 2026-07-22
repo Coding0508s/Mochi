@@ -613,8 +613,13 @@ class SupportCreateForm extends Component
 
         $inst = Institution::query()
             ->with('accountInfo')
-            ->where('AccountName', $keyword)
-            ->orWhere('SKcode', $keyword)
+            ->where(function ($query) use ($keyword): void {
+                $query->where('AccountName', $keyword)
+                    ->orWhere('SKcode', $keyword)
+                    ->orWhereHas('accountInfo', function ($info) use ($keyword): void {
+                        $info->where('Account_Name', $keyword);
+                    });
+            })
             ->first();
 
         if ($inst) {
@@ -631,7 +636,7 @@ class SupportCreateForm extends Component
             }
 
             $this->formSkCode = (string) $inst->SKcode;
-            $this->formAccountName = (string) $inst->AccountName;
+            $this->formAccountName = $inst->resolvedAccountName();
             $this->formPotentialTargetId = null;
             $this->formIsPotential = false;
             $this->formPossibility = '';
@@ -1288,16 +1293,16 @@ class SupportCreateForm extends Component
         if ($normalizedKeyword !== '') {
             // Eloquent\Collection::merge()는 항목을 모델로 간주해 getKey()를 호출한다.
             // 배열로 합치려면 일반 Support\Collection으로 바꾼 뒤 merge 한다.
+            // SupportList와 동일하게 Institution::search() 사용.
+            // 표시명(resolvedAccountName)은 S_Account_Information.Account_Name 우선이므로
+            // 마스터 AccountName만 검색하면 한글 지역명(예: 의왕) 검색이 누락된다.
             $institutionSuggestions = collect(
                 Institution::query()
                     ->with('accountInfo')
                     ->whereDoesntHave('accountInfo', function ($query): void {
                         $query->where('Customer_Type', 'like', '%해지%');
                     })
-                    ->where(function ($query) use ($normalizedKeyword): void {
-                        $query->whereRaw("REPLACE(AccountName, ' ', '') like ?", ["%{$normalizedKeyword}%"])
-                            ->orWhereRaw("REPLACE(SKcode, ' ', '') like ?", ["%{$normalizedKeyword}%"]);
-                    })
+                    ->search($keyword)
                     ->orderBy('AccountName')
                     ->limit(8)
                     ->get()

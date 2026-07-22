@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Livewire\SupportCreateForm;
 use App\Mail\SupportReportStoredMail;
 use App\Mail\UrgentSupportNotificationMail;
+use App\Models\AccountInformation;
 use App\Models\CoNewTarget;
 use App\Models\Institution;
 use App\Models\User;
@@ -42,6 +43,8 @@ class SupportCreateFormTest extends TestCase
             $table->increments('ID');
             $table->string('SKcode', 100)->unique();
             $table->string('AccountName', 255);
+            $table->string('Director', 255)->nullable();
+            $table->string('Address', 255)->nullable();
         });
 
         Schema::create('S_Account_Information', function (Blueprint $table): void {
@@ -52,6 +55,8 @@ class SupportCreateFormTest extends TestCase
             $table->string('TR', 255)->nullable();
             $table->string('CS', 255)->nullable();
             $table->string('Customer_Type', 255)->nullable();
+            $table->string('Affiliate', 255)->nullable();
+            $table->string('Address', 255)->nullable();
         });
 
         Schema::create('S_SupportInfo_Account', function (Blueprint $table): void {
@@ -1284,6 +1289,48 @@ class SupportCreateFormTest extends TestCase
             ->first();
 
         $this->assertNotNull($sfFile);
+    }
+
+    public function test_institution_suggestions_match_account_information_display_name(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-FSS-UIWANG',
+            'AccountName' => 'FSS Uiwang Campus',
+        ]);
+
+        AccountInformation::query()->create([
+            'SK_Code' => 'SK-FSS-UIWANG',
+            'Account_Name' => '의왕 FSS 캠퍼스',
+        ]);
+
+        Livewire::actingAs(User::factory()->create())
+            ->withQueryParams(['team_menu' => 'coach'])
+            ->test(SupportCreateForm::class)
+            ->set('formInstitutionKeyword', '의왕')
+            ->assertSee('의왕 FSS 캠퍼스')
+            ->assertSee('SK-FSS-UIWANG')
+            ->set('formInstitutionKeyword', 'FSS')
+            ->assertSee('의왕 FSS 캠퍼스');
+    }
+
+    public function test_exact_account_information_name_auto_selects_institution(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-FSS-EXACT',
+            'AccountName' => 'FSS Exact Campus',
+        ]);
+
+        AccountInformation::query()->create([
+            'SK_Code' => 'SK-FSS-EXACT',
+            'Account_Name' => '의왕 FSS Exact',
+        ]);
+
+        Livewire::actingAs(User::factory()->create())
+            ->withQueryParams(['team_menu' => 'coach'])
+            ->test(SupportCreateForm::class)
+            ->set('formInstitutionKeyword', '의왕 FSS Exact')
+            ->assertSet('formSkCode', 'SK-FSS-EXACT')
+            ->assertSet('formAccountName', '의왕 FSS Exact');
     }
 
     public function test_mount_prefills_institution_sk_code_from_query(): void
