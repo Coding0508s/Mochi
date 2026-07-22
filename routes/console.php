@@ -30,6 +30,14 @@ Schedule::job(new ProcessAssignmentChangeRequestsJob)
     ->when(fn (): bool => (bool) config('services.assignment_sync.enabled', false))
     ->withoutOverlapping();
 
+// 운영 DB 주간 백업 (일요일 03:00, Asia/Seoul). 로컬/스테이징은 DB_BACKUP_ENABLED=false 유지.
+Schedule::command('db:backup')
+    ->weeklyOn(0, '03:00')
+    ->timezone((string) config('app.timezone', 'Asia/Seoul'))
+    ->environments(['production'])
+    ->when(fn (): bool => (bool) config('database_backup.enabled', false))
+    ->withoutOverlapping();
+
 Artisan::command(
     'ecount:session {--refresh : 캐시를 비우고 OAPILogin으로 세션을 다시 받습니다}',
     function () {
