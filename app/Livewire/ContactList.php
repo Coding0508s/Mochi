@@ -22,7 +22,9 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -722,7 +724,30 @@ class ContactList extends Component
                     (string) ($teacher->institution?->Address ?? ''),
                     (string) ($teacher->Description ?? ''),
                 ], null, 'A'.$row);
+
+                // 숫자처럼 보이는 값도 텍스트로 유지 (앞자리 0·과학적 표기 방지)
+                $sheet->setCellValueExplicit(
+                    'A'.$row,
+                    (string) ($teacher->SK_Code ?? ''),
+                    DataType::TYPE_STRING
+                );
+                $sheet->setCellValueExplicit(
+                    'F'.$row,
+                    (string) ($teacher->Phone ?? ''),
+                    DataType::TYPE_STRING
+                );
+
                 $row++;
+            }
+
+            $lastDataRow = $row - 1;
+            if ($lastDataRow >= 2) {
+                $sheet->getStyle('A2:A'.$lastDataRow)
+                    ->getNumberFormat()
+                    ->setFormatCode(NumberFormat::FORMAT_TEXT);
+                $sheet->getStyle('F2:F'.$lastDataRow)
+                    ->getNumberFormat()
+                    ->setFormatCode(NumberFormat::FORMAT_TEXT);
             }
 
             foreach (range('A', 'N') as $column) {
