@@ -12,6 +12,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use Tests\TestCase;
 
 class ContactListInstitutionNameTest extends TestCase
@@ -92,10 +95,10 @@ class ContactListInstitutionNameTest extends TestCase
     public function test_exports_contacts_to_excel_with_current_filters(): void
     {
         Teacher::query()->create([
-            'SK_Code' => 'SK-EXPORT-CONTACT',
+            'SK_Code' => '0123456789',
             'Name' => '엑셀 테스트 교사',
             'Email' => 'export-contact@example.com',
-            'Phone' => '010-9999-8888',
+            'Phone' => '01099998888',
             'School_Name' => '엑셀 테스트 기관',
             'ClassInOut' => true,
         ]);
@@ -103,11 +106,35 @@ class ContactListInstitutionNameTest extends TestCase
         $now = now();
         Carbon::setTestNow($now);
 
-        Livewire::actingAs(User::factory()->create(['is_admin' => true]))
+        $component = Livewire::actingAs(User::factory()->create(['is_admin' => true]))
             ->test(ContactList::class)
             ->set('searchType', 'name')
             ->set('search', '엑셀 테스트')
             ->call('exportContactsExcel')
             ->assertFileDownloaded('교직원_연락처_'.$now->format('Ymd_His').'.xlsx');
+
+        $xlsxBinary = base64_decode((string) data_get($component->effects, 'download.content'), true);
+        $this->assertNotFalse($xlsxBinary);
+        $this->assertNotSame('', $xlsxBinary);
+
+        $tempPath = tempnam(sys_get_temp_dir(), 'contact-export-').'.xlsx';
+        file_put_contents($tempPath, $xlsxBinary);
+
+        try {
+            $sheet = IOFactory::load($tempPath)->getActiveSheet();
+
+            $skCodeCell = $sheet->getCell('A2');
+            $phoneCell = $sheet->getCell('F2');
+
+            $this->assertSame(DataType::TYPE_STRING, $skCodeCell->getDataType());
+            $this->assertSame('0123456789', $skCodeCell->getValue());
+            $this->assertSame(NumberFormat::FORMAT_TEXT, $skCodeCell->getStyle()->getNumberFormat()->getFormatCode());
+
+            $this->assertSame(DataType::TYPE_STRING, $phoneCell->getDataType());
+            $this->assertSame('01099998888', $phoneCell->getValue());
+            $this->assertSame(NumberFormat::FORMAT_TEXT, $phoneCell->getStyle()->getNumberFormat()->getFormatCode());
+        } finally {
+            @unlink($tempPath);
+        }
     }
 }
