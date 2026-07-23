@@ -1196,7 +1196,121 @@ class InstitutionListTest extends TestCase
             ->test(InstitutionList::class)
             ->call('openDetailModal', $account->ID)
             ->assertSet('showDetailModal', true)
+            ->assertSet('selectedInstitution.id', $account->ID)
+            ->assertSet('selectedInstitution.master_id', null)
             ->assertSee('마스터 없는 기관');
+    }
+
+    public function test_admin_can_save_managers_for_account_without_master_record(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $account = AccountInformation::query()->create([
+            'SK_Code' => 'SK-ORPHAN-MGR',
+            'Account_Name' => '마스터 없는 담당자 변경',
+            'CO' => 'Old CO',
+            'TR' => 'Keep TR',
+            'CS' => 'Keep CS',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $account->ID)
+            ->call('openManagerModal', $account->ID)
+            ->set('editCo', 'Addy Kim')
+            ->call('saveManagers')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_Account_Information', [
+            'ID' => $account->ID,
+            'SK_Code' => 'SK-ORPHAN-MGR',
+            'CO' => 'Addy Kim',
+            'TR' => 'Keep TR',
+            'CS' => 'Keep CS',
+        ]);
+    }
+
+    public function test_admin_detail_save_creates_master_for_account_without_master_record(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $account = AccountInformation::query()->create([
+            'SK_Code' => 'SK-ORPHAN-DETAIL',
+            'Account_Name' => '마스터 없는 상세 저장',
+            'CO' => 'Old CO',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $account->ID)
+            ->call('startDetailEdit')
+            ->set('editDetailCo', 'Addy Kim')
+            ->call('saveDetailFields')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_AccountName', [
+            'SKcode' => 'SK-ORPHAN-DETAIL',
+            'AccountName' => '마스터 없는 상세 저장',
+        ]);
+        $this->assertDatabaseHas('S_Account_Information', [
+            'ID' => $account->ID,
+            'CO' => 'Addy Kim',
+        ]);
+    }
+
+    public function test_orphan_detail_validation_failure_does_not_create_master(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $account = AccountInformation::query()->create([
+            'SK_Code' => 'SK-ORPHAN-VALIDATE',
+            'Account_Name' => '검증 실패 시 마스터 미생성',
+            'CO' => 'Old CO',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $account->ID)
+            ->call('startDetailEdit')
+            ->set('editDetailInstitutionName', '')
+            ->call('saveDetailFields')
+            ->assertHasErrors(['editDetailInstitutionName']);
+
+        $this->assertDatabaseMissing('S_AccountName', [
+            'SKcode' => 'SK-ORPHAN-VALIDATE',
+        ]);
+    }
+
+    public function test_orphan_detail_save_uses_sk_fallback_when_master_id_is_stale(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $account = AccountInformation::query()->create([
+            'SK_Code' => 'SK-ORPHAN-STALE',
+            'Account_Name' => 'stale master_id 폴백',
+            'CO' => 'Old CO',
+        ]);
+
+        $existingMaster = Institution::query()->create([
+            'SKcode' => 'SK-ORPHAN-STALE',
+            'AccountName' => 'stale master_id 폴백',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(InstitutionList::class)
+            ->call('openDetailModal', $account->ID)
+            ->assertSet('selectedInstitution.master_id', $existingMaster->ID)
+            ->set('selectedInstitution.master_id', 999999)
+            ->call('startDetailEdit')
+            ->set('editDetailCo', 'Addy Kim')
+            ->call('saveDetailFields')
+            ->assertHasNoErrors();
+
+        $this->assertSame(1, Institution::query()->where('SKcode', 'SK-ORPHAN-STALE')->count());
+        $this->assertDatabaseHas('S_Account_Information', [
+            'ID' => $account->ID,
+            'CO' => 'Addy Kim',
+        ]);
     }
 
     public function test_open_detail_modal_for_master_only_catalog_row(): void

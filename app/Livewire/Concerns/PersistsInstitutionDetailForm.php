@@ -23,12 +23,15 @@ trait PersistsInstitutionDetailForm
             return null;
         }
 
-        $institutionId = (int) ($this->selectedInstitution['id'] ?? 0);
         $originalSk = trim((string) ($this->selectedInstitution['skcode'] ?? ''));
 
-        if ($institutionId <= 0 || $originalSk === '') {
+        if ($originalSk === '') {
+            $this->addError('detailEdit', '기관 코드가 없어 저장할 수 없습니다.');
+
             return null;
         }
+
+        $institution = $this->resolveInstitutionMasterForDetailSave($originalSk);
 
         $this->applyInstitutionDetailEditFieldLocks();
 
@@ -38,7 +41,11 @@ trait PersistsInstitutionDetailForm
         // 충돌해 "이미 사용 중인 SK 코드입니다."로 저장이 막히는 문제가 있었다.
         $skCodeRules = ['required', 'string', 'max:100'];
         if (trim($this->editDetailSkCode) !== $originalSk) {
-            $skCodeRules[] = Rule::unique('S_AccountName', 'SKcode')->ignore($institutionId, 'ID');
+            $uniqueRule = Rule::unique('S_AccountName', 'SKcode');
+            if ($institution !== null) {
+                $uniqueRule = $uniqueRule->ignore((int) $institution->ID, 'ID');
+            }
+            $skCodeRules[] = $uniqueRule;
         }
 
         $this->validate([
@@ -64,7 +71,16 @@ trait PersistsInstitutionDetailForm
             'editDetailInstitutionName.required' => '기관명을 입력해 주세요.',
         ]);
 
-        $institution = Institution::query()->findOrFail($institutionId);
+        // info만 있고 마스터가 없는 레거시 기관: 검증 통과 후에야 마스터를 만든다.
+        if ($institution === null) {
+            $accountName = trim($this->editDetailInstitutionName);
+            $institution = Institution::query()->firstOrCreate(
+                ['SKcode' => $originalSk],
+                ['AccountName' => $accountName !== '' ? $accountName : $originalSk],
+            );
+        }
+
+        $institutionId = (int) $institution->ID;
 
         $updateInstitutionDetail->execute($institution, [
             'sk_code' => trim($this->editDetailSkCode),
@@ -92,8 +108,10 @@ trait PersistsInstitutionDetailForm
 
         $this->dispatch('institution-form-detail-edit-state', isEditing: false);
 
+        $catalogId = (int) ($this->selectedInstitution['id'] ?? 0);
+
         return [
-            'institution_id' => $institutionId,
+            'institution_id' => $catalogId > 0 ? $catalogId : $institutionId,
             'sk_code' => $newSk,
         ];
     }
@@ -127,5 +145,19 @@ trait PersistsInstitutionDetailForm
         $this->editDetailCo = (string) ($this->selectedInstitution['co'] ?? '');
         $this->editDetailTr = (string) ($this->selectedInstitution['tr'] ?? '');
         $this->editDetailCs = (string) ($this->selectedInstitution['cs'] ?? '');
+    }
+
+    private function resolveInstitutionMasterForDetailSave(string $originalSk): ?Institution
+    {
+        $masterId = (int) ($this->selectedInstitution['master_id'] ?? 0);
+
+        if ($masterId > 0) {
+            $institution = Institution::query()->find($masterId);
+            if ($institution !== null) {
+                return $institution;
+            }
+        }
+
+        return Institution::query()->where('SKcode', $originalSk)->first();
     }
 }
