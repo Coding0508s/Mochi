@@ -23,12 +23,29 @@ trait PersistsInstitutionDetailForm
             return null;
         }
 
-        $institutionId = (int) ($this->selectedInstitution['id'] ?? 0);
         $originalSk = trim((string) ($this->selectedInstitution['skcode'] ?? ''));
 
-        if ($institutionId <= 0 || $originalSk === '') {
+        if ($originalSk === '') {
+            $this->addError('detailEdit', '기관 코드가 없어 저장할 수 없습니다.');
+
             return null;
         }
+
+        $masterId = (int) ($this->selectedInstitution['master_id'] ?? 0);
+        $institution = $masterId > 0
+            ? Institution::query()->find($masterId)
+            : Institution::query()->where('SKcode', $originalSk)->first();
+
+        // info만 있고 마스터가 없는 레거시 기관: 저장 시 마스터를 만들어 UI 저장이 가능하도록 한다.
+        if ($institution === null) {
+            $fallbackName = trim((string) ($this->selectedInstitution['name'] ?? ''));
+            $institution = Institution::query()->create([
+                'SKcode' => $originalSk,
+                'AccountName' => $fallbackName !== '' ? $fallbackName : $originalSk,
+            ]);
+        }
+
+        $institutionId = (int) $institution->ID;
 
         $this->applyInstitutionDetailEditFieldLocks();
 
@@ -64,8 +81,6 @@ trait PersistsInstitutionDetailForm
             'editDetailInstitutionName.required' => '기관명을 입력해 주세요.',
         ]);
 
-        $institution = Institution::query()->findOrFail($institutionId);
-
         $updateInstitutionDetail->execute($institution, [
             'sk_code' => trim($this->editDetailSkCode),
             'institution_name' => trim($this->editDetailInstitutionName),
@@ -92,8 +107,10 @@ trait PersistsInstitutionDetailForm
 
         $this->dispatch('institution-form-detail-edit-state', isEditing: false);
 
+        $catalogId = (int) ($this->selectedInstitution['id'] ?? 0);
+
         return [
-            'institution_id' => $institutionId,
+            'institution_id' => $catalogId > 0 ? $catalogId : $institutionId,
             'sk_code' => $newSk,
         ];
     }
