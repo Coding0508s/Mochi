@@ -22,6 +22,7 @@
                 ['label' => '기관리스트', 'path' => '/institutions', 'route' => 'institutions', 'icon' => 'building'],
                 ['label' => '교직원 연락처보기', 'path' => '/contacts', 'route' => 'contacts', 'icon' => 'phone'],
                 ['label' => '기관지원보고서', 'path' => '/supports', 'route' => 'supports', 'icon' => 'document'],
+                ['label' => '기관 이슈', 'path' => '/institution-issues', 'routeIs' => 'institution-issues.index', 'icon' => 'document'],
             ],
         ])
         @php

@@ -521,7 +521,7 @@ class SupportRecord extends Model
         }
 
         $searchableColumns = array_values(array_filter(
-            ['Account_Name', 'Issue', 'TO_Account', 'SK_Code'],
+            ['Account_Name', 'Issue', 'TO_Account', 'SK_Code', 'Target'],
             static::tableHasColumn(...)
         ));
 

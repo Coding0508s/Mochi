@@ -708,6 +708,7 @@ class SupportCreateForm extends Component
         $this->formIsPotential = $this->formPotentialTargetId !== null;
         $this->formPossibility = $this->formIsPotential ? (string) ($potential?->Possibility ?? '') : '';
         $this->formTeacherId = null;
+        $this->formTarget = '';
         $this->syncInlineVisitFormState();
         $this->syncFormTeacherIdFromTargetName();
         $this->applyDefaultCommunicationTemplatesIfEmpty();
@@ -1133,6 +1134,7 @@ class SupportCreateForm extends Component
                     'Support_Date' => $this->formSupportDate,
                     'Meet_Time' => $this->formSupportTime.':00',
                     'Support_Type' => '기관이슈',
+                    'Target' => filled($this->formTarget) ? (string) $this->formTarget : null,
                     'Issue' => $this->formIssue,
                     'TO_Account' => null,
                     'is_urgent' => $this->isUrgent,
