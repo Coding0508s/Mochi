@@ -14,6 +14,7 @@
     $isCoTeamRoute = request()->is('institutions*')
         || request()->is('contacts*')
         || request()->is('supports*')
+        || request()->is('institution-issues*')
         || request()->is('potential-institutions*')
         || request()->is('salesforce-files*')
         || request()->is('store/*')

@@ -8,6 +8,7 @@ use App\Mail\UrgentSupportNotificationMail;
 use App\Models\AccountInformation;
 use App\Models\CoNewTarget;
 use App\Models\Institution;
+use App\Models\Teacher;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -363,6 +364,86 @@ class SupportCreateFormTest extends TestCase
             'sender_user_id' => $sender->id,
             'sk_code' => 'SK-ISSUE-3',
         ]);
+    }
+
+    public function test_cs_issue_mode_saves_without_teacher_leaving_target_empty(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-ISSUE-T0',
+            'AccountName' => '교사없음기관',
+        ]);
+
+        $cs = User::factory()->create(['team' => 'CS']);
+
+        Livewire::actingAs($cs)
+            ->withQueryParams(['team_menu' => 'cs', 'report_mode' => 'issue'])
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-ISSUE-T0')
+            ->set('formIssue', '기관 공통 이슈')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_SupportInfo_Account', [
+            'SK_Code' => 'SK-ISSUE-T0',
+            'Issue' => '기관 공통 이슈',
+            'Target' => null,
+            'record_kind' => 'issue',
+        ]);
+    }
+
+    public function test_cs_issue_mode_saves_selected_teacher_name_to_target(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-ISSUE-T1',
+            'AccountName' => '교사선택기관',
+        ]);
+
+        $teacherId = Teacher::query()->create([
+            'SK_Code' => 'SK-ISSUE-T1',
+            'Name' => '김교사',
+        ])->ID;
+
+        $cs = User::factory()->create(['team' => 'CS']);
+
+        Livewire::actingAs($cs)
+            ->withQueryParams(['team_menu' => 'cs', 'report_mode' => 'issue'])
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-ISSUE-T1')
+            ->set('formTeacherId', $teacherId)
+            ->assertSet('formTarget', '김교사')
+            ->set('formIssue', '교사 관련 이슈')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_SupportInfo_Account', [
+            'SK_Code' => 'SK-ISSUE-T1',
+            'Issue' => '교사 관련 이슈',
+            'Target' => '김교사',
+            'record_kind' => 'issue',
+        ]);
+    }
+
+    public function test_cs_issue_mode_resets_teacher_when_institution_changes(): void
+    {
+        Institution::query()->create(['SKcode' => 'SK-A', 'AccountName' => '기관A']);
+        Institution::query()->create(['SKcode' => 'SK-B', 'AccountName' => '기관B']);
+
+        $teacherId = Teacher::query()->create([
+            'SK_Code' => 'SK-A',
+            'Name' => '박교사',
+        ])->ID;
+
+        $cs = User::factory()->create(['team' => 'CS']);
+
+        Livewire::actingAs($cs)
+            ->withQueryParams(['team_menu' => 'cs', 'report_mode' => 'issue'])
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-A')
+            ->set('formTeacherId', $teacherId)
+            ->assertSet('formTarget', '박교사')
+            ->call('selectInstitution', 'SK-B')
+            ->assertSet('formTeacherId', null)
+            ->assertSet('formTarget', '');
     }
 
     public function test_create_form_shows_coach_team_heading_when_team_menu_is_coach(): void

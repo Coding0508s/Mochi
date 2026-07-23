@@ -356,8 +356,8 @@
                                   class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
                     </div>
                 @elseif($reportMode === 'issue')
-                {{-- ── 기관 이슈(경량) 입력 ── --}}
-                <div wire:key="support-create-issue-report" class="grid grid-cols-2 gap-3">
+                {{-- ── 기관 이슈(경량) 입력: 발생일 → 시간 → 교사 ── --}}
+                <div wire:key="support-create-issue-report" class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             발생일 <span class="text-red-500">*</span>
@@ -386,6 +386,25 @@
                         @error('formSupportTime')
                             <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                         @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            관련 교사 <span class="text-xs font-normal text-gray-400">(선택)</span>
+                        </label>
+                        <select wire:model.live="formTeacherId"
+                                wire:key="issue-teacher-{{ $formSkCode }}"
+                                @disabled(!$institutionSelected)
+                                class="w-full py-1.5 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
+                                       {{ $institutionSelected ? 'border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}">
+                            <option value="">선택 안 함 (기관 공통)</option>
+                            @foreach($institutionTeachers as $teacher)
+                                <option value="{{ $teacher->ID }}">{{ $teacher->Name }}</option>
+                            @endforeach
+                        </select>
+                        @if($institutionSelected && $institutionTeachers->isEmpty())
+                            <p class="mt-1 text-xs text-amber-600">등록된 교사가 없어도 기관 공통으로 저장할 수 있습니다.</p>
+                        @endif
                     </div>
                 </div>
 

@@ -647,7 +647,10 @@ class SupportList extends Component
     public function render()
     {
         $records = SupportRecord::query()
-            ->excludeIssues()
+            ->when(
+                ! $this->filterUrgentOnly,
+                fn ($query) => $query->excludeIssues()
+            )
             ->ofYear($this->filterYear ? (int) $this->filterYear : null)
             ->ofTr($this->filterTr)
             ->keyword($this->search)
