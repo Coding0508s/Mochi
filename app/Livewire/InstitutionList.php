@@ -331,8 +331,12 @@ class InstitutionList extends Component
         );
         $managerChangeMeta = $this->resolveLatestManagerChangeMetaByRole((string) ($institution->SKcode ?? ''));
 
+        // 목록에서 넘어온 catalog ID(보통 S_Account_Information.ID)를 유지한다.
+        // 마스터(S_AccountName.ID)만 넣으면 담당자 변경 시 info ID와 숫자 충돌하거나,
+        // 마스터가 없는 기관은 id=0이 되어 저장이 조용히 실패한다.
         $this->selectedInstitution = [
-            'id' => $institution->ID,
+            'id' => $id,
+            'master_id' => $institution->exists ? (int) $institution->ID : null,
             'skcode' => $institution->SKcode,
             'name' => $institution->resolvedAccountName(),
             'english_name' => $institution->EnglishName,
@@ -775,7 +779,8 @@ class InstitutionList extends Component
         $institution = $this->resolveInstitutionForDetailModal($id);
         $institution->loadMissing('accountInfo');
 
-        $this->editingInstitutionId = $institution->ID;
+        // 새로고침/이벤트용 ID는 catalog ID를 쓴다(마스터 없는 기관·ID 충돌 방지).
+        $this->editingInstitutionId = $id;
         $this->editSkCode = (string) ($institution->SKcode ?? '');
         $this->editInstitutionName = $institution->resolvedAccountName();
         $this->editCo = $this->alignManagerLabelToMasterOption(
@@ -797,7 +802,7 @@ class InstitutionList extends Component
 
         $this->dispatch(
             'institution-form-open-manager',
-            institutionId: $institution->ID,
+            institutionId: $id,
             skCode: (string) ($institution->SKcode ?? ''),
             institutionName: $institution->resolvedAccountName(),
             co: $this->editCo,
