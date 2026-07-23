@@ -228,8 +228,16 @@
                         <span class="col-span-2 text-gray-900">{{ $selectedRetirement['retirement_date'] ?? '-' }}</span>
                     </div>
                     <div class="grid grid-cols-3 gap-2">
-                        <span class="text-gray-500">TR</span>
-                        <span class="col-span-2 text-gray-900">{{ $selectedRetirement['tr_name'] ?? '-' }}</span>
+                        <span class="text-gray-500">담당 TR(퇴직 시)</span>
+                        <span class="col-span-2 text-gray-900">{{ $selectedRetirement['tr_name'] ?: '-' }}</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <span class="text-gray-500">현재 TR</span>
+                        <span class="col-span-2 text-gray-900">{{ ($selectedRetirement['current_tr_name'] ?? '') !== '' ? $selectedRetirement['current_tr_name'] : '-' }}</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <span class="text-gray-500">처리자</span>
+                        <span class="col-span-2 text-gray-900">{{ ($selectedRetirement['processor_name'] ?? '') !== '' ? $selectedRetirement['processor_name'] : '-' }}</span>
                     </div>
                     <div class="grid grid-cols-3 gap-2">
                         <span class="text-gray-500">상태</span>

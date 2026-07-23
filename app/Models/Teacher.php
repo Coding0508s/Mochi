@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\LegacyDateTimeCast;
 use App\Casts\NormalizedMultilineText;
+use App\Support\LegacyAuditUserNames;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -220,6 +221,19 @@ class Teacher extends Model
 
     public function listTrName(): string
     {
+        $retired = $this->listRetiredTrName();
+        if ($retired !== '') {
+            return $retired;
+        }
+
+        return $this->listCurrentTrName();
+    }
+
+    /**
+     * 퇴직 당시 담당 TR 스냅샷 (마스터 → 퇴직 이력).
+     */
+    public function listRetiredTrName(): string
+    {
         $fromMaster = trim((string) ($this->masterRecord?->getAttribute(
             config('coach_retired_teachers.teacher_master.columns.tr_name', 'TR_Name')
         ) ?? ''));
@@ -227,7 +241,34 @@ class Teacher extends Model
             return $fromMaster;
         }
 
+        return trim((string) ($this->retirementList?->TR_Name ?? ''));
+    }
+
+    /**
+     * 현재 소속 기관의 담당 TR.
+     */
+    public function listCurrentTrName(): string
+    {
         return trim((string) ($this->institution?->accountInfo?->TR ?? ''));
+    }
+
+    /**
+     * 퇴직/복직 처리자 이메일 (Creator 우선).
+     */
+    public function listProcessorEmail(): string
+    {
+        $fromList = LegacyAuditUserNames::preferredEmail(
+            $this->retirementList?->FGC_Creator,
+            $this->retirementList?->FGC_LastModifier,
+        );
+        if ($fromList !== '') {
+            return $fromList;
+        }
+
+        return LegacyAuditUserNames::preferredEmail(
+            $this->masterRecord?->getAttribute('FGC_Creator'),
+            $this->masterRecord?->getAttribute('FGC_LastModifier'),
+        );
     }
 
     public function listRetirementDate(): ?Carbon

@@ -270,6 +270,109 @@ class CoachRetiredTeacherListTest extends TestCase
             ->assertDontSee('010-9999-8888');
     }
 
+    public function test_list_does_not_show_current_tr_or_processor_columns(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', '현재TR이름');
+        $this->createMasterRecord([
+            'Name' => 'TR표시교사',
+            'SK_Code' => 'SK001',
+            'TR_Name' => '퇴직시TR이름',
+            'RetirementDate' => "{$year}-03-01 00:00:00",
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachRetiredTeacherList::class)
+            ->assertSee('TR')
+            ->assertDontSee('담당 TR(퇴직 시)')
+            ->assertDontSee('현재 TR')
+            ->assertDontSeeHtml('>처리자</th>');
+    }
+
+    public function test_detail_modal_shows_retired_tr_current_tr_and_processor_name(): void
+    {
+        $admin = $this->createAdminUser();
+        $admin->forceFill([
+            'name' => '상세처리자',
+            'email' => 'detail-processor@example.com',
+            'employee_empno' => 'E9001',
+        ])->save();
+
+        \DB::table('employee')->insert([
+            'EMPNO' => 'E9001',
+            'KOREANAME' => '상세처리자',
+            'ENGLISHNAME' => 'Detail Processor',
+            'EMAIL' => 'detail-processor@example.com',
+        ]);
+
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', '상세현재TR');
+        $teacherId = $this->createTeacher('SK001', '상세TR교사', [
+            'Status' => '퇴직',
+            'School_Name' => '기관A',
+        ]);
+        $this->createMasterRecord([
+            'TearcherID' => $teacherId,
+            'Name' => '상세TR교사',
+            'SK_Code' => 'SK001',
+            'TR_Name' => '상세퇴직TR',
+            'RetirementDate' => "{$year}-03-01 00:00:00",
+        ]);
+        $this->createRetirementRecord([
+            'TearcherID' => $teacherId,
+            'Name' => '상세TR교사',
+            'SK_Code' => 'SK001',
+            'TR_Name' => '상세퇴직TR',
+            'RetirementDate' => "{$year}-03-01 00:00:00",
+            'FGC_Creator' => 'detail-processor@example.com',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachRetiredTeacherList::class)
+            ->call('openDetailModal', $teacherId)
+            ->assertSet('showDetailModal', true)
+            ->assertSet('selectedRetirement.tr_name', '상세퇴직TR')
+            ->assertSet('selectedRetirement.current_tr_name', '상세현재TR')
+            ->assertSet('selectedRetirement.processor_name', 'Detail Processor')
+            ->assertSee('담당 TR(퇴직 시)')
+            ->assertSee('현재 TR')
+            ->assertSee('처리자')
+            ->assertSee('Detail Processor')
+            ->assertDontSee('상세처리자');
+    }
+
+    public function test_excel_export_headers_remain_without_current_tr_or_processor(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+        $now = now();
+        Carbon::setTestNow($now);
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createMasterRecord([
+            'Name' => '엑셀헤더확인',
+            'SK_Code' => 'SK001',
+            'TR_Name' => 'Coach A',
+            'RetirementDate' => "{$year}-03-01 00:00:00",
+        ]);
+
+        $component = Livewire::actingAs($admin)
+            ->test(CoachRetiredTeacherList::class);
+
+        $reflection = new \ReflectionClass(CoachRetiredTeacherList::class);
+        $method = $reflection->getMethod('exportRowValues');
+        $method->setAccessible(true);
+
+        $row = $component->viewData('retirements')->first();
+        $values = $method->invoke($component->instance(), $row);
+
+        $this->assertCount(9, $values);
+        $this->assertSame('Coach A', $values[6]);
+    }
+
     public function test_exports_retired_teacher_list_to_excel(): void
     {
         $admin = $this->createAdminUser();

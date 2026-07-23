@@ -10,6 +10,7 @@ use App\Models\TeacherMasterDb;
 use App\Models\User;
 use App\Support\CoachRetirementListScope;
 use App\Support\CoachTeacherScope;
+use App\Support\LegacyAuditUserNames;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -184,7 +185,7 @@ class CoachRetiredTeacherList extends Component
             }
 
             $record = $this->buildBaseQuery()
-                ->with(['teacher', 'institution.accountInfo', 'retirementList'])
+                ->with(['teacher.institution.accountInfo', 'institution.accountInfo', 'retirementList'])
                 ->where(config('coach_retired_teachers.teacher_master.columns.id', 'ID'), $retirementId)
                 ->first();
 
@@ -198,7 +199,6 @@ class CoachRetiredTeacherList extends Component
             $nameColumn = config('coach_retired_teachers.teacher_master.columns.name', 'Name');
             $skCodeColumn = config('coach_retired_teachers.teacher_master.columns.sk_code', 'SK_Code');
             $statusColumn = config('coach_retired_teachers.teacher_master.columns.status', 'Status');
-            $trNameColumn = config('coach_retired_teachers.teacher_master.columns.tr_name', 'TR_Name');
             $descriptionColumn = config('coach_retired_teachers.teacher_master.columns.description', 'Description');
 
             $this->selectedRetirement = [
@@ -208,7 +208,9 @@ class CoachRetiredTeacherList extends Component
                 'sk_code' => (string) ($record->getAttribute($skCodeColumn) ?? ''),
                 'account_name' => $record->displayAccountName(),
                 'position' => $record->displayPosition(),
-                'tr_name' => (string) (($record->getAttribute($trNameColumn) ?? '') ?: ($record->institution?->accountInfo?->TR ?? '')),
+                'tr_name' => $record->listRetiredTrName(),
+                'current_tr_name' => $record->listCurrentTrName(),
+                'processor_name' => $this->processorNameForEmail($record->listProcessorEmail()),
                 'retirement_date' => $record->getAttribute($retiredAtColumn)?->format('Y-m-d') ?? null,
                 'recommend_yn' => (bool) $recommend['recommend_yn'],
                 'recommend_description' => $recommend['recommend_description'],
@@ -222,7 +224,7 @@ class CoachRetiredTeacherList extends Component
         }
 
         $record = $this->buildBaseQuery()
-            ->with(['teacher', 'institution.accountInfo'])
+            ->with(['teacher.institution.accountInfo', 'institution.accountInfo'])
             ->where('ID', $retirementId)
             ->first();
 
@@ -239,7 +241,9 @@ class CoachRetiredTeacherList extends Component
             'sk_code' => $record->SK_Code,
             'account_name' => $record->displayAccountName(),
             'position' => $record->displayPosition(),
-            'tr_name' => $record->TR_Name,
+            'tr_name' => $record->listRetiredTrName(),
+            'current_tr_name' => $record->listCurrentTrName(),
+            'processor_name' => $this->processorNameForEmail($record->listProcessorEmail()),
             'retirement_date' => $record->RetirementDate?->format('Y-m-d'),
             'recommend_yn' => (bool) $record->RecommendYN,
             'recommend_description' => $record->RecommendDescription,
@@ -375,6 +379,17 @@ class CoachRetiredTeacherList extends Component
         ]);
     }
 
+    private function processorNameForEmail(string $email): string
+    {
+        if ($email === '') {
+            return '';
+        }
+
+        $names = LegacyAuditUserNames::mapByEmail([$email]);
+
+        return LegacyAuditUserNames::displayName($email, $names);
+    }
+
     /**
      * @return Builder<Model>
      */
@@ -382,7 +397,7 @@ class CoachRetiredTeacherList extends Component
     {
         $eagerLoad = $this->listsFromTeachersStatus()
             ? ['institution.accountInfo', 'masterRecord', 'retirementList']
-            : ['teacher', 'institution.accountInfo', 'retirementList'];
+            : ['teacher.institution.accountInfo', 'institution.accountInfo', 'retirementList'];
 
         return $this->buildBaseQuery()
             ->with($eagerLoad)
@@ -822,7 +837,9 @@ class CoachRetiredTeacherList extends Component
             'sk_code' => (string) ($teacher->SK_Code ?? ''),
             'account_name' => $teacher->displayAccountName(),
             'position' => $teacher->displayPosition(),
-            'tr_name' => $teacher->listTrName(),
+            'tr_name' => $teacher->listRetiredTrName(),
+            'current_tr_name' => $teacher->listCurrentTrName(),
+            'processor_name' => $this->processorNameForEmail($teacher->listProcessorEmail()),
             'retirement_date' => $teacher->listRetirementDate()?->format('Y-m-d'),
             'recommend_yn' => (bool) $recommend['recommend_yn'],
             'recommend_description' => $recommend['recommend_description'],

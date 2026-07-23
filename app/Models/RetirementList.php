@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Casts\LegacyDateTimeCast;
+use App\Support\LegacyAuditUserNames;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -100,6 +101,29 @@ class RetirementList extends Model
         }
 
         return null;
+    }
+
+    public function listRetiredTrName(): string
+    {
+        return trim((string) ($this->TR_Name ?? ''));
+    }
+
+    public function listCurrentTrName(): string
+    {
+        $fromTeacher = trim((string) ($this->teacher?->institution?->accountInfo?->TR ?? ''));
+        if ($fromTeacher !== '') {
+            return $fromTeacher;
+        }
+
+        return trim((string) ($this->institution?->accountInfo?->TR ?? ''));
+    }
+
+    public function listProcessorEmail(): string
+    {
+        return LegacyAuditUserNames::preferredEmail(
+            $this->FGC_Creator,
+            $this->FGC_LastModifier,
+        );
     }
 
     /**
