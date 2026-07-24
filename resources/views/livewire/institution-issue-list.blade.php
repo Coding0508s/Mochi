@@ -217,39 +217,60 @@
                             @endphp
                             <div wire:key="issue-detail-{{ $issue['id'] }}"
                                  class="rounded-xl border {{ $issue['is_urgent'] ? 'border-red-200 bg-red-50/40' : 'border-gray-200 bg-white' }} overflow-hidden">
-                                <button type="button"
-                                        wire:click="toggleExpandedIssue({{ (int) $issue['id'] }})"
-                                        class="w-full px-3.5 py-2.5 text-left hover:bg-gray-50/80 transition-colors">
-                                    <div class="flex items-start gap-2">
-                                        <svg class="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform {{ $isExpanded ? 'rotate-90' : '' }}"
-                                             fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
-                                        </svg>
-                                        <div class="min-w-0 flex-1 space-y-1">
-                                            <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500 leading-5">
-                                                <span class="font-medium text-gray-800">
-                                                    {{ $issue['support_date'] !== '' ? $issue['support_date'] : '-' }}
-                                                    @if($issue['meet_time'] !== '')
-                                                        {{ $issue['meet_time'] }}
+                                <div class="flex items-start gap-2 px-3.5 py-2.5">
+                                    <button type="button"
+                                            wire:click="toggleExpandedIssue({{ (int) $issue['id'] }})"
+                                            class="min-w-0 flex-1 text-left hover:bg-gray-50/80 rounded-lg -mx-1 px-1 py-0.5 transition-colors">
+                                        <div class="flex items-start gap-2">
+                                            <svg class="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform {{ $isExpanded ? 'rotate-90' : '' }}"
+                                                 fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+                                            </svg>
+                                            <div class="min-w-0 flex-1 space-y-1">
+                                                <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500 leading-5">
+                                                    <span class="font-medium text-gray-800">
+                                                        {{ $issue['support_date'] !== '' ? $issue['support_date'] : '-' }}
+                                                        @if($issue['meet_time'] !== '')
+                                                            {{ $issue['meet_time'] }}
+                                                        @endif
+                                                    </span>
+                                                    <span>·</span>
+                                                    <span>작성자 {{ $issue['tr_name'] !== '' ? $issue['tr_name'] : '-' }}</span>
+                                                    @if($issue['is_urgent'])
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700">긴급</span>
                                                     @endif
-                                                </span>
-                                                <span>·</span>
-                                                <span>작성자 {{ $issue['tr_name'] !== '' ? $issue['tr_name'] : '-' }}</span>
-                                                @if($issue['is_urgent'])
-                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700">긴급</span>
-                                                @endif
-                                                @if($issue['is_completed'])
-                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">완료</span>
-                                                @else
-                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">진행중</span>
+                                                </div>
+                                                @if(! $isExpanded)
+                                                    <p class="text-sm text-gray-600 truncate">{{ $preview !== '' ? $preview : '-' }}</p>
                                                 @endif
                                             </div>
-                                            @if(! $isExpanded)
-                                                <p class="text-sm text-gray-600 truncate">{{ $preview !== '' ? $preview : '-' }}</p>
-                                            @endif
                                         </div>
+                                    </button>
+
+                                    <div class="shrink-0 pt-0.5">
+                                        @if($this->canUpdateIssue((int) $issue['id']))
+                                            <label class="flex items-center gap-2 cursor-pointer">
+                                                <button type="button"
+                                                        wire:click.stop="toggleIssueComplete({{ (int) $issue['id'] }})"
+                                                        title="완료처리"
+                                                        class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent
+                                                               transition-colors duration-200 focus:outline-none
+                                                               {{ $issue['is_completed'] ? 'bg-green-500' : 'bg-gray-300' }}">
+                                                    <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200
+                                                                 {{ $issue['is_completed'] ? 'translate-x-4' : 'translate-x-0' }}">
+                                                    </span>
+                                                </button>
+                                                <span class="text-xs whitespace-nowrap {{ $issue['is_completed'] ? 'text-green-600 font-medium' : 'text-gray-400' }}">
+                                                    {{ $issue['is_completed'] ? '완료' : '진행중' }}
+                                                </span>
+                                            </label>
+                                        @elseif($issue['is_completed'])
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">완료</span>
+                                        @else
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">진행중</span>
+                                        @endif
                                     </div>
-                                </button>
+                                </div>
 
                                 @if($isExpanded)
                                     @php
@@ -299,9 +320,20 @@
                                                     <input type="checkbox" wire:model="editIsUrgent" class="rounded border-gray-300 text-red-600 focus:ring-red-500"/>
                                                     <span class="text-sm text-gray-700">긴급</span>
                                                 </label>
-                                                <label class="inline-flex items-center gap-2 cursor-pointer">
-                                                    <input type="checkbox" wire:model="editCompleted" class="rounded border-gray-300 text-green-600 focus:ring-green-500"/>
-                                                    <span class="text-sm text-gray-700">완료</span>
+                                                <label class="flex items-center gap-3 cursor-pointer">
+                                                    <span class="text-sm font-medium text-gray-700">완료처리</span>
+                                                    <button type="button"
+                                                            wire:click="toggleIssueComplete({{ (int) $issue['id'] }})"
+                                                            class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent
+                                                                   transition-colors duration-200 focus:outline-none
+                                                                   {{ $editCompleted ? 'bg-green-500' : 'bg-gray-300' }}">
+                                                        <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200
+                                                                     {{ $editCompleted ? 'translate-x-5' : 'translate-x-0' }}">
+                                                        </span>
+                                                    </button>
+                                                    <span class="text-xs {{ $editCompleted ? 'text-green-600 font-medium' : 'text-gray-400' }}">
+                                                        {{ $editCompleted ? '완료됨' : '진행중' }}
+                                                    </span>
                                                 </label>
                                             </div>
 
@@ -337,14 +369,14 @@
                                                         수정
                                                     </button>
                                                 @endif
-                                                @can('deleteSupportRecords')
+                                                @if($this->canDeleteIssue((int) $issue['id']))
                                                     <button type="button"
                                                             wire:click="deleteIssue({{ (int) $issue['id'] }})"
                                                             wire:confirm="이 기관 이슈를 삭제할까요?"
                                                             class="px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors">
                                                         삭제
                                                     </button>
-                                                @endcan
+                                                @endif
                                             </div>
                                         @endif
                                     </div>

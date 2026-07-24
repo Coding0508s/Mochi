@@ -433,11 +433,11 @@ class InstitutionIssueTest extends TestCase
         $this->assertSame('타인 수정 금지', $record->fresh()->Issue);
     }
 
-    public function test_non_admin_cannot_delete_issue(): void
+    public function test_author_can_delete_own_issue(): void
     {
         Institution::query()->create([
             'SKcode' => 'SK-DEL-ISSUE-1',
-            'AccountName' => '삭제거부기관',
+            'AccountName' => '작성자삭제기관',
         ]);
 
         $author = User::factory()->create([
@@ -449,13 +449,13 @@ class InstitutionIssueTest extends TestCase
         $record = SupportRecord::query()->create([
             'Year' => (int) now()->format('Y'),
             'SK_Code' => 'SK-DEL-ISSUE-1',
-            'Account_Name' => '삭제거부기관',
+            'Account_Name' => '작성자삭제기관',
             'TR_Name' => $author->nameForCoReports(),
             'Support_Date' => now()->format('Y-m-d'),
             'Meet_Time' => '12:00:00',
             'Support_Type' => '기관이슈',
             'Target' => '삭제교사',
-            'Issue' => '삭제되면안됨',
+            'Issue' => '작성자삭제대상',
             'record_kind' => SupportRecord::KIND_ISSUE,
             'CreatedDate' => now(),
         ]);
@@ -463,6 +463,52 @@ class InstitutionIssueTest extends TestCase
         Livewire::actingAs($author)
             ->test(InstitutionIssueList::class)
             ->call('openGroupDetail', 'sk:SK-DEL-ISSUE-1|t:삭제교사')
+            ->assertSee('삭제')
+            ->call('deleteIssue', (int) $record->ID)
+            ->assertHasNoErrors()
+            ->assertSet('showDetailModal', false);
+
+        $this->assertDatabaseMissing('S_SupportInfo_Account', [
+            'ID' => $record->ID,
+        ]);
+    }
+
+    public function test_non_author_cannot_delete_issue(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-DEL-ISSUE-3',
+            'AccountName' => '삭제거부기관',
+        ]);
+
+        $author = User::factory()->create([
+            'team' => 'CS',
+            'name' => '원작성자',
+            'is_admin' => false,
+        ]);
+        $other = User::factory()->create([
+            'team' => 'CS',
+            'name' => '타인CS',
+            'is_admin' => false,
+        ]);
+
+        $record = SupportRecord::query()->create([
+            'Year' => (int) now()->format('Y'),
+            'SK_Code' => 'SK-DEL-ISSUE-3',
+            'Account_Name' => '삭제거부기관',
+            'TR_Name' => $author->nameForCoReports(),
+            'Support_Date' => now()->format('Y-m-d'),
+            'Meet_Time' => '12:30:00',
+            'Support_Type' => '기관이슈',
+            'Target' => '타인도사',
+            'Issue' => '삭제되면안됨',
+            'record_kind' => SupportRecord::KIND_ISSUE,
+            'CreatedDate' => now(),
+        ]);
+
+        Livewire::actingAs($other)
+            ->test(InstitutionIssueList::class)
+            ->call('openGroupDetail', 'sk:SK-DEL-ISSUE-3|t:타인도사')
+            ->assertDontSeeHtml('wire:click="deleteIssue')
             ->call('deleteIssue', (int) $record->ID)
             ->assertForbidden();
 
@@ -509,7 +555,7 @@ class InstitutionIssueTest extends TestCase
         ]);
     }
 
-    public function test_author_sees_edit_button_but_not_delete(): void
+    public function test_author_sees_edit_and_delete_buttons_for_own_issue(): void
     {
         Institution::query()->create([
             'SKcode' => 'SK-UI-1',
@@ -540,6 +586,98 @@ class InstitutionIssueTest extends TestCase
             ->test(InstitutionIssueList::class)
             ->call('openGroupDetail', 'sk:SK-UI-1|t:UI교사')
             ->assertSee('수정')
-            ->assertDontSeeHtml('wire:click="deleteIssue');
+            ->assertSeeHtml('wire:click="deleteIssue');
+    }
+
+    public function test_author_can_toggle_issue_complete_without_edit_mode(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-TOGGLE-1',
+            'AccountName' => '토글기관',
+        ]);
+
+        $author = User::factory()->create([
+            'team' => 'CS',
+            'name' => '토글작성자',
+            'is_admin' => false,
+        ]);
+
+        $record = SupportRecord::query()->create([
+            'Year' => (int) now()->format('Y'),
+            'SK_Code' => 'SK-TOGGLE-1',
+            'Account_Name' => '토글기관',
+            'TR_Name' => $author->nameForCoReports(),
+            'Support_Date' => now()->format('Y-m-d'),
+            'Meet_Time' => '10:00:00',
+            'Support_Type' => '기관이슈',
+            'Target' => '토글교사',
+            'Issue' => '토글 이슈',
+            'record_kind' => SupportRecord::KIND_ISSUE,
+            'Status' => '진행중',
+            'CreatedDate' => now(),
+        ]);
+
+        Livewire::actingAs($author)
+            ->test(InstitutionIssueList::class)
+            ->call('openGroupDetail', 'sk:SK-TOGGLE-1|t:토글교사')
+            ->assertSet('issueModalViewOnly', true)
+            ->call('toggleExpandedIssue', (int) $record->ID) // 접기
+            ->assertSet('expandedIssueId', null)
+            ->call('toggleIssueComplete', (int) $record->ID)
+            ->assertHasNoErrors()
+            ->assertSet('expandedIssueId', null)
+            ->assertSet('selectedGroup.issues.0.is_completed', true);
+
+        $this->assertTrue($record->fresh()->isCompleted());
+
+        Livewire::actingAs($author)
+            ->test(InstitutionIssueList::class)
+            ->call('openGroupDetail', 'sk:SK-TOGGLE-1|t:토글교사')
+            ->call('toggleIssueComplete', (int) $record->ID)
+            ->assertSet('selectedGroup.issues.0.is_completed', false);
+
+        $this->assertFalse($record->fresh()->isCompleted());
+    }
+
+    public function test_non_author_cannot_toggle_issue_complete(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-TOGGLE-2',
+            'AccountName' => '토글거부기관',
+        ]);
+
+        $author = User::factory()->create([
+            'team' => 'CS',
+            'name' => '원작성자',
+            'is_admin' => false,
+        ]);
+        $other = User::factory()->create([
+            'team' => 'CS',
+            'name' => '다른사람',
+            'is_admin' => false,
+        ]);
+
+        $record = SupportRecord::query()->create([
+            'Year' => (int) now()->format('Y'),
+            'SK_Code' => 'SK-TOGGLE-2',
+            'Account_Name' => '토글거부기관',
+            'TR_Name' => $author->nameForCoReports(),
+            'Support_Date' => now()->format('Y-m-d'),
+            'Meet_Time' => '11:00:00',
+            'Support_Type' => '기관이슈',
+            'Target' => '거부교사',
+            'Issue' => '토글 거부',
+            'record_kind' => SupportRecord::KIND_ISSUE,
+            'Status' => '진행중',
+            'CreatedDate' => now(),
+        ]);
+
+        Livewire::actingAs($other)
+            ->test(InstitutionIssueList::class)
+            ->call('openGroupDetail', 'sk:SK-TOGGLE-2|t:거부교사')
+            ->call('toggleIssueComplete', (int) $record->ID)
+            ->assertForbidden();
+
+        $this->assertFalse($record->fresh()->isCompleted());
     }
 }

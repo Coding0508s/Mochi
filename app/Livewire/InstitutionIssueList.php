@@ -172,9 +172,11 @@ class InstitutionIssueList extends Component
 
     public function deleteIssue(int $id): void
     {
-        Gate::authorize('deleteSupportRecords');
-
         $record = $this->findIssueOrFail($id);
+
+        // 기관 이슈만: 관리자 또는 작성자 본인. 전역 deleteSupportRecords(관리자 전용)는 바꾸지 않는다.
+        abort_unless($this->userCanDeleteIssue($record), 403);
+
         app(SupportRecordCascadeDeleter::class)->delete($record);
 
         $this->resetIssueEditState();
@@ -201,6 +203,38 @@ class InstitutionIssueList extends Component
 
         return $record instanceof SupportRecord
             && Gate::allows('updateSupportRecord', $record);
+    }
+
+    public function canDeleteIssue(int $id): bool
+    {
+        $record = SupportRecord::query()->onlyIssues()->find($id);
+
+        return $record instanceof SupportRecord
+            && $this->userCanDeleteIssue($record);
+    }
+
+    private function userCanDeleteIssue(SupportRecord $record): bool
+    {
+        return Gate::allows('deleteSupportRecords')
+            || Gate::allows('updateSupportRecord', $record);
+    }
+
+    /**
+     * 읽기/수정 모드 공통: 완료처리를 즉시 토글한다.
+     */
+    public function toggleIssueComplete(int $id): void
+    {
+        $record = $this->findIssueOrFail($id);
+        Gate::authorize('updateSupportRecord', $record);
+
+        $wasCompleted = $record->isCompleted();
+        $record->toggleComplete(! $wasCompleted);
+
+        if ($this->editingIssueId === $id) {
+            $this->editCompleted = ! $wasCompleted;
+        }
+
+        $this->refreshSelectedGroup();
     }
 
     public function render(): View
@@ -323,6 +357,9 @@ class InstitutionIssueList extends Component
         $issueIds = collect($this->selectedGroup['issues'] ?? [])->pluck('id')->all();
         if ($previousExpanded !== null && in_array($previousExpanded, $issueIds, true)) {
             $this->expandedIssueId = $previousExpanded;
+        } else {
+            // 접혀 있던 상태(null)를 유지한다. applySelectedGroup 기본값(첫 이슈 펼침)을 덮어쓴다.
+            $this->expandedIssueId = null;
         }
     }
 
