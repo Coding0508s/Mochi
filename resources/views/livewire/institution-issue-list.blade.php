@@ -252,12 +252,99 @@
                                 </button>
 
                                 @if($isExpanded)
-                                    <div class="border-t border-gray-100 px-3.5 py-2.5 space-y-2 bg-white/70">
-                                        <div class="text-sm text-gray-800 whitespace-pre-wrap leading-6">{{ $issue['issue'] !== '' ? $issue['issue'] : '-' }}</div>
-                                        @if($issue['to_account'] !== '')
-                                            <div class="border-t border-gray-100 pt-1.5">
-                                                <p class="text-xs font-medium text-gray-500 mb-0.5">처리 내역</p>
-                                                <p class="text-sm text-gray-700 whitespace-pre-wrap leading-6">{{ $issue['to_account'] }}</p>
+                                    @php
+                                        $isEditingThis = ((int) $editingIssueId) === ((int) $issue['id']) && ! $issueModalViewOnly;
+                                    @endphp
+                                    <div class="border-t border-gray-100 px-3.5 py-2.5 space-y-3 bg-white/70">
+                                        @if($isEditingThis)
+                                            <div class="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label class="block text-xs font-medium text-gray-500 mb-1" for="edit-support-date-{{ $issue['id'] }}">발생일</label>
+                                                    <input id="edit-support-date-{{ $issue['id'] }}"
+                                                           type="date"
+                                                           wire:model="editSupportDate"
+                                                           class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header"/>
+                                                    @error('editSupportDate') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                                                </div>
+                                                <div>
+                                                    <label class="block text-xs font-medium text-gray-500 mb-1" for="edit-support-time-{{ $issue['id'] }}">시간</label>
+                                                    <input id="edit-support-time-{{ $issue['id'] }}"
+                                                           type="time"
+                                                           wire:model="editSupportTime"
+                                                           class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header"/>
+                                                    @error('editSupportTime') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-500 mb-1" for="edit-issue-{{ $issue['id'] }}">이슈 내용</label>
+                                                <textarea id="edit-issue-{{ $issue['id'] }}"
+                                                          wire:model="editIssue"
+                                                          rows="4"
+                                                          class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header resize-y"></textarea>
+                                                @error('editIssue') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-500 mb-1" for="edit-to-account-{{ $issue['id'] }}">처리 내역</label>
+                                                <textarea id="edit-to-account-{{ $issue['id'] }}"
+                                                          wire:model="editToAccount"
+                                                          rows="3"
+                                                          class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header resize-y"></textarea>
+                                                @error('editToAccount') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                                            </div>
+
+                                            <div class="flex flex-wrap items-center gap-4">
+                                                <label class="inline-flex items-center gap-2 cursor-pointer">
+                                                    <input type="checkbox" wire:model="editIsUrgent" class="rounded border-gray-300 text-red-600 focus:ring-red-500"/>
+                                                    <span class="text-sm text-gray-700">긴급</span>
+                                                </label>
+                                                <label class="inline-flex items-center gap-2 cursor-pointer">
+                                                    <input type="checkbox" wire:model="editCompleted" class="rounded border-gray-300 text-green-600 focus:ring-green-500"/>
+                                                    <span class="text-sm text-gray-700">완료</span>
+                                                </label>
+                                            </div>
+
+                                            <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+                                                <button type="button"
+                                                        wire:click="cancelIssueEdit"
+                                                        class="px-3 py-1.5 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                                                    취소
+                                                </button>
+                                                <button type="button"
+                                                        wire:click="saveIssue"
+                                                        wire:loading.attr="disabled"
+                                                        wire:loading.class="opacity-70 cursor-not-allowed"
+                                                        class="px-3 py-1.5 text-sm font-medium text-white bg-mochi-header hover:bg-mochi-header/90 rounded-lg transition-colors">
+                                                    <span wire:loading.remove wire:target="saveIssue">저장</span>
+                                                    <span wire:loading wire:target="saveIssue">저장 중...</span>
+                                                </button>
+                                            </div>
+                                        @else
+                                            <div class="text-sm text-gray-800 whitespace-pre-wrap leading-6">{{ $issue['issue'] !== '' ? $issue['issue'] : '-' }}</div>
+                                            @if($issue['to_account'] !== '')
+                                                <div class="border-t border-gray-100 pt-1.5">
+                                                    <p class="text-xs font-medium text-gray-500 mb-0.5">처리 내역</p>
+                                                    <p class="text-sm text-gray-700 whitespace-pre-wrap leading-6">{{ $issue['to_account'] }}</p>
+                                                </div>
+                                            @endif
+
+                                            <div class="flex flex-wrap items-center justify-end gap-2 pt-1 border-t border-gray-100">
+                                                @if($this->canUpdateIssue((int) $issue['id']))
+                                                    <button type="button"
+                                                            wire:click="startIssueEdit({{ (int) $issue['id'] }})"
+                                                            class="px-3 py-1.5 text-sm font-medium text-white bg-mochi-header hover:bg-mochi-header/90 rounded-lg transition-colors">
+                                                        수정
+                                                    </button>
+                                                @endif
+                                                @can('deleteSupportRecords')
+                                                    <button type="button"
+                                                            wire:click="deleteIssue({{ (int) $issue['id'] }})"
+                                                            wire:confirm="이 기관 이슈를 삭제할까요?"
+                                                            class="px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors">
+                                                        삭제
+                                                    </button>
+                                                @endcan
                                             </div>
                                         @endif
                                     </div>
