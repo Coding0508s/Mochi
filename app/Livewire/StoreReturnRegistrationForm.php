@@ -4,7 +4,9 @@ namespace App\Livewire;
 
 use App\Models\Institution;
 use App\Models\StoreReturnRegistration;
+use App\Services\Store\EcountApiClient;
 use App\Support\StoreReturnEcountProductOptions;
+use App\Support\StoreReturnSaleOrderPayloadBuilder;
 use App\Support\StoreReturnTeamsNotifier;
 use App\Support\TeamMenuContext;
 use Carbon\Carbon;
@@ -15,8 +17,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 use Livewire\Component;
 use Livewire\WithPagination;
+use RuntimeException;
 
 class StoreReturnRegistrationForm extends Component
 {
@@ -60,6 +64,8 @@ class StoreReturnRegistrationForm extends Component
     public string $detailCsTeam = '';
 
     public string $detailShippingAddress = '';
+
+    public ?string $detailEcountSlipNo = null;
 
     /**
      * @var array<int, int>
@@ -342,6 +348,61 @@ class StoreReturnRegistrationForm extends Component
         }
 
         session()->flash('success', '반품 처리가 완료되었습니다.');
+    }
+
+    public function createEcountSaleOrder(int $anchorRegistrationId): void
+    {
+        if (! $this->isCsTeamMenu) {
+            abort(403);
+        }
+
+        if (! config('store.return_registration.sale_order_enabled')) {
+            session()->flash('error', 'Ecount 주문서 생성 기능이 비활성화되어 있습니다.');
+
+            return;
+        }
+
+        $anchor = StoreReturnRegistration::query()->findOrFail($anchorRegistrationId);
+        $items = $this->queryGroupItems($anchor);
+
+        if ($items->contains(fn (StoreReturnRegistration $item): bool => filled($item->ecount_slip_no))) {
+            session()->flash('error', '이미 생성된 주문서가 있습니다.');
+
+            return;
+        }
+
+        try {
+            $payload = app(StoreReturnSaleOrderPayloadBuilder::class)->build($items);
+            $result = app(EcountApiClient::class)->saveSaleOrder($payload);
+        } catch (InvalidArgumentException $exception) {
+            session()->flash('error', $exception->getMessage());
+
+            return;
+        } catch (RuntimeException $exception) {
+            session()->flash('error', $exception->getMessage());
+
+            return;
+        }
+
+        $slipNos = $result['slip_nos'];
+        $slipNo = count($slipNos) === 1 ? $slipNos[0] : implode(',', $slipNos);
+
+        StoreReturnRegistration::query()
+            ->whereIn('id', $items->pluck('id'))
+            ->update([
+                'ecount_slip_no' => $slipNo,
+                'ecount_order_synced_at' => now(),
+            ]);
+
+        if (
+            $this->showDetailModal
+            && $this->detailAnchorId !== null
+            && $items->pluck('id')->contains($this->detailAnchorId)
+        ) {
+            $this->loadDetailFieldsFromAnchor($this->detailAnchorId);
+        }
+
+        session()->flash('success', 'Ecount 주문서가 생성되었습니다.');
     }
 
     public function deleteReturnGroup(int $anchorRegistrationId): void
@@ -1038,6 +1099,7 @@ class StoreReturnRegistrationForm extends Component
         $this->detailFreight = '';
         $this->detailCsTeam = '';
         $this->detailShippingAddress = '';
+        $this->detailEcountSlipNo = null;
         $this->detailOriginalRegistrationIds = [];
         $this->detailItemRows = [];
         $this->lockedDetailInstitutionKeyword = null;
@@ -1060,6 +1122,7 @@ class StoreReturnRegistrationForm extends Component
         $this->detailFreight = $first->freight ?? '';
         $this->detailCsTeam = $first->cs_team ?? '';
         $this->detailShippingAddress = $first->shipping_address ?? '';
+        $this->detailEcountSlipNo = $first->ecount_slip_no;
         $this->lockedDetailInstitutionKeyword = filled($first->institution_sk_code)
             ? $first->institution_name
             : null;
