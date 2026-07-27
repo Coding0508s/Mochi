@@ -21,11 +21,6 @@ class StoreReturnRegistration extends Model
         'status',
         'freight',
         'notes',
-        'class_name',
-        'ecount_remarks',
-        'shipping_address',
-        'ecount_slip_no',
-        'ecount_order_synced_at',
         'cs_team',
         'registered_by',
         'registration_group_key',
@@ -36,7 +31,6 @@ class StoreReturnRegistration extends Model
         return [
             'returned_at' => 'date',
             'quantity' => 'integer',
-            'ecount_order_synced_at' => 'datetime',
         ];
     }
 

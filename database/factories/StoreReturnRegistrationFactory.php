@@ -34,11 +34,6 @@ class StoreReturnRegistrationFactory extends Factory
             'status' => '정상',
             'freight' => '선불',
             'notes' => fake()->optional()->sentence(),
-            'class_name' => null,
-            'ecount_remarks' => null,
-            'shipping_address' => null,
-            'ecount_slip_no' => null,
-            'ecount_order_synced_at' => null,
             'cs_team' => fake()->optional()->name(),
             'registered_by' => User::factory(),
         ];

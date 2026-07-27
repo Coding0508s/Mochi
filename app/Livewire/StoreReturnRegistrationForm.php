@@ -4,9 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Institution;
 use App\Models\StoreReturnRegistration;
-use App\Services\Store\EcountApiClient;
 use App\Support\StoreReturnEcountProductOptions;
-use App\Support\StoreReturnSaleOrderPayloadBuilder;
 use App\Support\StoreReturnTeamsNotifier;
 use App\Support\TeamMenuContext;
 use Carbon\Carbon;
@@ -17,10 +15,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use InvalidArgumentException;
 use Livewire\Component;
 use Livewire\WithPagination;
-use RuntimeException;
 
 class StoreReturnRegistrationForm extends Component
 {
@@ -63,17 +59,13 @@ class StoreReturnRegistrationForm extends Component
 
     public string $detailCsTeam = '';
 
-    public string $detailShippingAddress = '';
-
-    public ?string $detailEcountSlipNo = null;
-
     /**
      * @var array<int, int>
      */
     public array $detailOriginalRegistrationIds = [];
 
     /**
-     * @var array<int, array{id: int|null, itemName: string, quantity: string, status: string, notes: string, className: string, ecountRemarks: string}>
+     * @var array<int, array{id: int|null, itemName: string, quantity: string, status: string, notes: string}>
      */
     public array $detailItemRows = [];
 
@@ -350,61 +342,6 @@ class StoreReturnRegistrationForm extends Component
         session()->flash('success', '반품 처리가 완료되었습니다.');
     }
 
-    public function createEcountSaleOrder(int $anchorRegistrationId): void
-    {
-        if (! $this->isCsTeamMenu) {
-            abort(403);
-        }
-
-        if (! config('store.return_registration.sale_order_enabled')) {
-            session()->flash('error', 'Ecount 주문서 생성 기능이 비활성화되어 있습니다.');
-
-            return;
-        }
-
-        $anchor = StoreReturnRegistration::query()->findOrFail($anchorRegistrationId);
-        $items = $this->queryGroupItems($anchor);
-
-        if ($items->contains(fn (StoreReturnRegistration $item): bool => filled($item->ecount_slip_no))) {
-            session()->flash('error', '이미 생성된 주문서가 있습니다.');
-
-            return;
-        }
-
-        try {
-            $payload = app(StoreReturnSaleOrderPayloadBuilder::class)->build($items);
-            $result = app(EcountApiClient::class)->saveSaleOrder($payload);
-        } catch (InvalidArgumentException $exception) {
-            session()->flash('error', $exception->getMessage());
-
-            return;
-        } catch (RuntimeException $exception) {
-            session()->flash('error', $exception->getMessage());
-
-            return;
-        }
-
-        $slipNos = $result['slip_nos'];
-        $slipNo = count($slipNos) === 1 ? $slipNos[0] : implode(',', $slipNos);
-
-        StoreReturnRegistration::query()
-            ->whereIn('id', $items->pluck('id'))
-            ->update([
-                'ecount_slip_no' => $slipNo,
-                'ecount_order_synced_at' => now(),
-            ]);
-
-        if (
-            $this->showDetailModal
-            && $this->detailAnchorId !== null
-            && $items->pluck('id')->contains($this->detailAnchorId)
-        ) {
-            $this->loadDetailFieldsFromAnchor($this->detailAnchorId);
-        }
-
-        session()->flash('success', 'Ecount 주문서가 생성되었습니다.');
-    }
-
     public function deleteReturnGroup(int $anchorRegistrationId): void
     {
         if (! Auth::user()?->hasFullAccess()) {
@@ -504,15 +441,12 @@ class StoreReturnRegistrationForm extends Component
             'detailInstitutionSkCode' => ['nullable', 'string', 'max:50'],
             'detailFreight' => ['nullable', 'string', Rule::in($freightOptions)],
             'detailCsTeam' => ['nullable', 'string', 'max:100'],
-            'detailShippingAddress' => ['nullable', 'string', 'max:500'],
             'detailItemRows' => ['required', 'array', 'min:1'],
             'detailItemRows.*.id' => ['nullable', 'integer', Rule::exists('store_return_registrations', 'id')],
             'detailItemRows.*.itemName' => $detailItemNameRules,
             'detailItemRows.*.quantity' => ['required', 'integer', 'min:1', 'max:999999'],
             'detailItemRows.*.status' => ['required', 'string', Rule::in($statuses)],
             'detailItemRows.*.notes' => ['nullable', 'string', 'max:2000'],
-            'detailItemRows.*.className' => ['nullable', 'string', 'max:100'],
-            'detailItemRows.*.ecountRemarks' => ['nullable', 'string', 'max:255'],
         ], [
             'detailReturnDate.required' => '날짜를 입력해 주세요.',
             'detailReturnDate.date' => '날짜 형식이 올바르지 않습니다.',
@@ -528,9 +462,6 @@ class StoreReturnRegistrationForm extends Component
             'detailItemRows.*.status.in' => '상태 값이 올바르지 않습니다.',
             'detailFreight.in' => '운임 값이 올바르지 않습니다.',
             'detailItemRows.*.notes.max' => '특이 사항은 2000자 이내로 입력해 주세요.',
-            'detailShippingAddress.max' => '배송지는 500자 이내로 입력해 주세요.',
-            'detailItemRows.*.className.max' => 'Class Name은 100자 이내로 입력해 주세요.',
-            'detailItemRows.*.ecountRemarks.max' => 'Ecount 적요는 255자 이내로 입력해 주세요.',
         ]);
 
         $submittedIds = collect($validated['detailItemRows'])
@@ -548,9 +479,6 @@ class StoreReturnRegistrationForm extends Component
         $institutionName = trim($validated['detailInstitutionKeyword']);
         $freight = filled($validated['detailFreight'] ?? null) ? $validated['detailFreight'] : null;
         $csTeam = filled($validated['detailCsTeam'] ?? null) ? trim($validated['detailCsTeam']) : null;
-        $shippingAddress = filled($validated['detailShippingAddress'] ?? null)
-            ? trim($validated['detailShippingAddress'])
-            : null;
 
         $groupPayload = [
             'returned_at' => $validated['detailReturnDate'],
@@ -558,7 +486,6 @@ class StoreReturnRegistrationForm extends Component
             'institution_name' => $institutionName,
             'freight' => $freight,
             'cs_team' => $csTeam,
-            'shipping_address' => $shippingAddress,
         ];
 
         foreach ($validated['detailItemRows'] as $row) {
@@ -568,8 +495,6 @@ class StoreReturnRegistrationForm extends Component
                 'quantity' => (int) $row['quantity'],
                 'status' => $row['status'],
                 'notes' => filled($row['notes'] ?? null) ? trim((string) $row['notes']) : null,
-                'class_name' => filled($row['className'] ?? null) ? trim((string) $row['className']) : null,
-                'ecount_remarks' => filled($row['ecountRemarks'] ?? null) ? trim((string) $row['ecountRemarks']) : null,
             ];
 
             if (filled($row['id'] ?? null)) {
@@ -858,7 +783,6 @@ class StoreReturnRegistrationForm extends Component
             'institution_sk_code' => $first->institution_sk_code,
             'freight' => $first->freight,
             'cs_team' => $first->cs_team,
-            'ecount_slip_no' => $first->ecount_slip_no,
             'item_summary' => $this->summarizeItemNames($orderedItems),
             'total_quantity' => (int) $orderedItems->sum(fn (StoreReturnRegistration $item): int => $item->quantity ?? 1),
             'status_summary' => $this->displayGroupStatus($orderedItems),
@@ -1065,7 +989,7 @@ class StoreReturnRegistrationForm extends Component
     }
 
     /**
-     * @return array{id: null, itemName: string, quantity: string, status: string, notes: string, className: string, ecountRemarks: string}
+     * @return array{id: null, itemName: string, quantity: string, status: string, notes: string}
      */
     private function defaultDetailItemRow(): array
     {
@@ -1075,8 +999,6 @@ class StoreReturnRegistrationForm extends Component
             'quantity' => '',
             'status' => (string) (config('store.return_registration.statuses')[0] ?? '정상'),
             'notes' => '',
-            'className' => '',
-            'ecountRemarks' => '',
         ];
     }
 
@@ -1098,8 +1020,6 @@ class StoreReturnRegistrationForm extends Component
         $this->detailInstitutionSkCode = '';
         $this->detailFreight = '';
         $this->detailCsTeam = '';
-        $this->detailShippingAddress = '';
-        $this->detailEcountSlipNo = null;
         $this->detailOriginalRegistrationIds = [];
         $this->detailItemRows = [];
         $this->lockedDetailInstitutionKeyword = null;
@@ -1121,8 +1041,6 @@ class StoreReturnRegistrationForm extends Component
         $this->detailInstitutionSkCode = $first->institution_sk_code ?? '';
         $this->detailFreight = $first->freight ?? '';
         $this->detailCsTeam = $first->cs_team ?? '';
-        $this->detailShippingAddress = $first->shipping_address ?? '';
-        $this->detailEcountSlipNo = $first->ecount_slip_no;
         $this->lockedDetailInstitutionKeyword = filled($first->institution_sk_code)
             ? $first->institution_name
             : null;
@@ -1136,8 +1054,6 @@ class StoreReturnRegistrationForm extends Component
             'quantity' => (string) ($item->quantity ?? 1),
             'status' => $item->status,
             'notes' => $item->notes ?? '',
-            'className' => $item->class_name ?? '',
-            'ecountRemarks' => $item->ecount_remarks ?? '',
         ])->all();
     }
 }
