@@ -47,6 +47,7 @@ class ContactListMyAssignedFilterTest extends TestCase
         Livewire::actingAs($coachUser)
             ->test(ContactList::class)
             ->assertSet('myAssignedOnly', false)
+            ->assertSee('내 담당만')
             ->assertSee('내 담당 교사')
             ->assertSee('다른 담당 교사');
     }
