@@ -59,6 +59,12 @@ return [
         'ecount_product_max_codes' => max(1, (int) env('STORE_RETURN_ECOUNT_PRODUCT_MAX_CODES', 100)),
         'ecount_cache_ttl_seconds' => max(0, (int) env('STORE_RETURN_ECOUNT_CACHE_TTL_SECONDS', 120)),
         'ecount_cache_prefix' => env('STORE_RETURN_ECOUNT_CACHE_PREFIX', 'store_return'),
+        'sale_order_enabled' => filter_var(env('STORE_RETURN_ECOUNT_SALE_ORDER_ENABLED', 'false'), FILTER_VALIDATE_BOOLEAN),
+        'sale_order_endpoint' => env('STORE_RETURN_ECOUNT_SALE_ORDER_ENDPOINT', '/OAPI/V2/SaleOrder/SaveSaleOrder'),
+        'sale_order_warehouse_code' => env('STORE_RETURN_ECOUNT_SALE_ORDER_WAREHOUSE', 'GV01'),
+        'sale_order_ref_des' => env('STORE_RETURN_ECOUNT_SALE_ORDER_REF_DES', '반품'),
+        'sale_order_class_name_field' => env('STORE_RETURN_ECOUNT_CLASS_NAME_FIELD', 'U_MEMO1'),
+        'sale_order_shipping_address_field' => env('STORE_RETURN_ECOUNT_SHIPPING_ADDRESS_FIELD', 'ADD_LTXT_01_T'),
     ],
     'ecount' => [
         'base_url' => env('ECOUNT_API_BASE_URL'),
