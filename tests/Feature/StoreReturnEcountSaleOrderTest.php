@@ -149,6 +149,36 @@ class StoreReturnEcountSaleOrderTest extends TestCase
         ]);
     }
 
+    public function test_sale_order_disabled_hides_button_and_blocks_action(): void
+    {
+        Http::fake();
+
+        Config::set('store.return_registration.sale_order_enabled', false);
+
+        $user = User::factory()->create([
+            'team' => 'CS',
+            'is_admin' => false,
+        ]);
+
+        $registration = StoreReturnRegistration::factory()
+            ->for($user, 'registrant')
+            ->create([
+                'item_name' => 'J11S-SSET-400',
+                'class_name' => '1학년',
+                'ecount_remarks' => '적요',
+            ]);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'cs'])
+            ->test(StoreReturnRegistrationForm::class)
+            ->call('openDetailModal', $registration->id)
+            ->assertDontSee('Ecount 주문서 생성', false)
+            ->call('createEcountSaleOrder', $registration->id)
+            ->assertSee('Ecount 주문서 생성 기능이 비활성화되어 있습니다.', false);
+
+        Http::assertNothingSent();
+    }
+
     public function test_create_button_not_for_logistics_menu(): void
     {
         $user = User::factory()->create([

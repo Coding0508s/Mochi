@@ -63,6 +63,7 @@ return [
         'sale_order_endpoint' => env('STORE_RETURN_ECOUNT_SALE_ORDER_ENDPOINT', '/OAPI/V2/SaleOrder/SaveSaleOrder'),
         'sale_order_warehouse_code' => env('STORE_RETURN_ECOUNT_SALE_ORDER_WAREHOUSE', 'GV01'),
         'sale_order_ref_des' => env('STORE_RETURN_ECOUNT_SALE_ORDER_REF_DES', '반품'),
+        // U_MEMO1 / ADD_LTXT_01_T — Ecount Test Zone SaveSaleOrder 스파이크로 확정 후 운영 enable
         'sale_order_class_name_field' => env('STORE_RETURN_ECOUNT_CLASS_NAME_FIELD', 'U_MEMO1'),
         'sale_order_shipping_address_field' => env('STORE_RETURN_ECOUNT_SHIPPING_ADDRESS_FIELD', 'ADD_LTXT_01_T'),
     ],
