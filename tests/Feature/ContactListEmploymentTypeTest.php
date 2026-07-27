@@ -134,7 +134,7 @@ class ContactListEmploymentTypeTest extends TestCase
             ->test(ContactList::class)
             ->assertSee('파트타임 교사')
             ->assertSee('Part Time')
-            ->assertSee('고용 형태')
+            ->assertSee('근무 형태')
             ->assertDontSee('>비활성화<', false)
             ->assertDontSeeHtml('>활성화</span>');
     }
@@ -158,7 +158,7 @@ class ContactListEmploymentTypeTest extends TestCase
             ->test(ContactList::class)
             ->call('openDetailModal', $teacherId)
             ->assertSet('selectedContact.employment_type', 'Full Time')
-            ->assertSee('고용 형태')
+            ->assertSee('근무 형태')
             ->assertSee('Full Time')
             ->assertDontSeeHtml('>Status</th>')
             ->assertDontSee('비활성화');

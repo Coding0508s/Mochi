@@ -95,7 +95,7 @@ class ContactList extends Component
 
     public string $newPosition = '';  // 직급
 
-    public string $newEmploymentType = 'unspecified'; // 고용 형태: full_time|part_time|unspecified
+    public string $newEmploymentType = 'unspecified'; // 근무 형태: full_time|part_time|unspecified
 
     public string $newClassParticipation = 'out'; // 수업참여: in|out (기본 수업(X))
 
@@ -687,7 +687,7 @@ class ContactList extends Component
                 '기관명',
                 '이름',
                 '직급',
-                '고용 형태',
+                '근무 형태',
                 '이메일',
                 '전화번호',
                 'GrapeSEED Essentials',

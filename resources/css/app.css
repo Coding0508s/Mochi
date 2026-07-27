@@ -770,13 +770,15 @@
         --coach-support-sk-width: 4rem;
         --coach-support-inst-width: 7.5rem;
         --coach-support-position-width: 3.25rem;
+        --coach-support-employment-width: 5rem;
         --coach-support-name-width: 4.5rem;
-        --coach-support-essentials-gs-width: 4.25rem;
-        --coach-support-essentials-ls-width: 4.25rem;
+        --coach-support-essentials-gs-width: 5.5rem;
+        --coach-support-essentials-ls-width: 5.5rem;
         --coach-support-plan1-date-width: 8.5rem;
         --coach-support-sticky-width: calc(
             var(--coach-support-sk-width) + var(--coach-support-inst-width) +
-                var(--coach-support-position-width) + var(--coach-support-name-width) +
+                var(--coach-support-position-width) + var(--coach-support-employment-width) +
+                var(--coach-support-name-width) +
                 var(--coach-support-essentials-gs-width) + var(--coach-support-essentials-ls-width)
         );
         --coach-support-row-border: #e8ecf1;
@@ -821,6 +823,7 @@
 
     .coach-teacher-support-table .coach-support-completed-date {
         font-variant-numeric: tabular-nums;
+        white-space: nowrap;
     }
 
     .coach-teacher-support-table .coach-support-completed-type {
@@ -874,6 +877,11 @@
     .coach-teacher-support-table .coach-support-col-position {
         width: var(--coach-support-position-width);
         min-width: var(--coach-support-position-width);
+    }
+
+    .coach-teacher-support-table .coach-support-col-employment {
+        width: var(--coach-support-employment-width);
+        min-width: var(--coach-support-employment-width);
     }
 
     .coach-teacher-support-table .coach-support-col-name {
@@ -989,11 +997,34 @@
         border-right: 1px solid #d5dcd6;
     }
 
-    .coach-teacher-support-table .coach-support-sticky-essentials-gs {
+    .coach-teacher-support-table .coach-support-sticky-employment {
         position: sticky;
         left: calc(
             var(--coach-support-sk-width) + var(--coach-support-inst-width) +
                 var(--coach-support-name-width) + var(--coach-support-position-width)
+        );
+        z-index: 23;
+        width: var(--coach-support-employment-width);
+        min-width: var(--coach-support-employment-width);
+        max-width: var(--coach-support-employment-width);
+        background-color: #ffffff;
+        background-clip: padding-box;
+        border-right: 1px solid var(--coach-support-row-border);
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-employment--head {
+        top: 0;
+        z-index: 43;
+        background-color: #e8e6d9;
+        border-right: 1px solid #d5dcd6;
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-essentials-gs {
+        position: sticky;
+        left: calc(
+            var(--coach-support-sk-width) + var(--coach-support-inst-width) +
+                var(--coach-support-name-width) + var(--coach-support-position-width) +
+                var(--coach-support-employment-width)
         );
         z-index: 23;
         width: var(--coach-support-essentials-gs-width);
@@ -1002,6 +1033,8 @@
         background-color: #ffffff;
         background-clip: padding-box;
         border-right: 1px solid var(--coach-support-row-border);
+        white-space: nowrap;
+        word-break: normal;
     }
 
     .coach-teacher-support-table .coach-support-sticky-essentials-gs--head {
@@ -1016,6 +1049,7 @@
         left: calc(
             var(--coach-support-sk-width) + var(--coach-support-inst-width) +
                 var(--coach-support-name-width) + var(--coach-support-position-width) +
+                var(--coach-support-employment-width) +
                 var(--coach-support-essentials-gs-width)
         );
         z-index: 24;
@@ -1026,6 +1060,8 @@
         background-clip: padding-box;
         border-right: none;
         box-shadow: none;
+        white-space: nowrap;
+        word-break: normal;
     }
 
     .coach-teacher-support-table .coach-support-sticky-essentials-ls--head {
@@ -1082,6 +1118,7 @@
     }
 
     .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-position,
+    .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-employment,
     .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-name,
     .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-essentials-gs,
     .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-essentials-ls {

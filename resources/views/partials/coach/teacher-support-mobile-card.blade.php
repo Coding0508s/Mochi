@@ -12,6 +12,9 @@
                         {{ $teacher->Position }}
                     </span>
                 @endif
+                <span class="inline-flex shrink-0 items-center rounded px-2 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-700">
+                    {{ \App\Enums\TeacherEmploymentType::fromMixed($teacher->EmploymentType)->label() }}
+                </span>
             </div>
             <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
                 <span>{{ ltrim((string) $teacher->SK_Code, '*') }}</span>
