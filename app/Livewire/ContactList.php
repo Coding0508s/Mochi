@@ -48,6 +48,9 @@ class ContactList extends Component
     public string $teacherStatusFilter = 'active';
     // 교사 재직 상태: all | active | retired
 
+    public bool $myAssignedOnly = false;
+    // 내 담당만: false=전체, true=팀 담당 컬럼 매칭 기관만
+
     // ─── 생성/수정 모달 상태 ────────────────────────────────────────
     public bool $showModal = false;
 
@@ -144,6 +147,11 @@ class ContactList extends Component
     }
 
     public function updatingTeacherStatusFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingMyAssignedOnly(): void
     {
         $this->resetPage();
     }
@@ -775,6 +783,7 @@ class ContactList extends Component
         $statsQuery = Teacher::query();
         $this->applyTeacherStatusFilter($statsQuery);
         $this->applyContactVisibilityScope($statsQuery);
+        $this->applyMyAssignedFilter($statsQuery);
         $totalCount = (clone $statsQuery)->count();
         $activeCount = (clone $statsQuery)->where('ClassInOut', true)->count();
         $inactiveCount = (clone $statsQuery)
@@ -858,6 +867,7 @@ class ContactList extends Component
             });
         $this->applyTeacherStatusFilter($teachersQuery);
         $this->applyContactVisibilityScope($teachersQuery);
+        $this->applyMyAssignedFilter($teachersQuery);
 
         return $teachersQuery;
     }
@@ -886,6 +896,21 @@ class ContactList extends Component
         if (! $user instanceof User) {
             $query->whereRaw('1 = 0');
         }
+    }
+
+    /**
+     * @param  Builder<Teacher>  $query
+     */
+    private function applyMyAssignedFilter(Builder $query): void
+    {
+        if (! $this->myAssignedOnly) {
+            return;
+        }
+
+        $query->whereHas('institution', function (Builder $institutionQuery): void {
+            app(InstitutionAccountListQuery::class)
+                ->applyCurrentUserManagerScope($institutionQuery);
+        });
     }
 
     /**

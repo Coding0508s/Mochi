@@ -86,6 +86,24 @@
 
             <div class="ml-auto flex flex-wrap items-center gap-3 max-md:ml-0 max-md:w-full">
                 <div class="flex items-center gap-2 text-sm">
+                    <span class="text-gray-500">담당</span>
+                    <div class="mochi-toggle-group">
+                        <button type="button"
+                                wire:click="$set('myAssignedOnly', false)"
+                                aria-pressed="{{ $myAssignedOnly ? 'false' : 'true' }}"
+                                class="mochi-toggle-btn {{ ! $myAssignedOnly ? 'mochi-toggle-btn--active' : '' }}">
+                            전체
+                        </button>
+                        <button type="button"
+                                wire:click="$set('myAssignedOnly', true)"
+                                aria-pressed="{{ $myAssignedOnly ? 'true' : 'false' }}"
+                                class="mochi-toggle-btn {{ $myAssignedOnly ? 'mochi-toggle-btn--active' : '' }}">
+                            내 담당만
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 text-sm">
                     <span class="text-gray-500">상태</span>
                     <div class="mochi-toggle-group">
                         <button type="button"
