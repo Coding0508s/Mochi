@@ -921,6 +921,47 @@ final class EcountApiClient
     }
 
     /**
+     * @param  array{SaleOrderList: list<array{BulkDatas: array<string, string>}>}  $body
+     * @return array{slip_nos: list<string>, raw: array<string, mixed>}
+     */
+    public function saveSaleOrder(array $body): array
+    {
+        $sessionId = $this->resolveSessionId();
+        if ($sessionId === '') {
+            throw new InvalidArgumentException('ECOUNT_SESSION_ID 값이 비어 있습니다.');
+        }
+
+        $endpoint = trim((string) config('store.return_registration.sale_order_endpoint', ''));
+        if ($endpoint === '') {
+            throw new InvalidArgumentException('sale_order_endpoint 설정이 비어 있습니다.');
+        }
+
+        $payload = $this->postEcountJsonNoCache($endpoint, $sessionId, $body);
+        $slipNos = $this->extractSaveSaleOrderSlipNos($payload);
+
+        $data = is_array($payload['Data'] ?? null) ? $payload['Data'] : [];
+        $successCnt = (int) ($data['SuccessCnt'] ?? 0);
+        $failCnt = (int) ($data['FailCnt'] ?? 0);
+
+        if ($failCnt > 0 || $successCnt < 1 || $slipNos === []) {
+            $detail = trim(
+                ($failCnt > 0 ? "실패 {$failCnt}건" : '')
+                .($successCnt < 1 ? ($failCnt > 0 ? ', ' : '').'성공 0건' : '')
+                .($slipNos === [] ? (($failCnt > 0 || $successCnt < 1) ? ', ' : '').'주문번호 없음' : '')
+            );
+
+            throw new RuntimeException(
+                'Ecount 주문서 생성에 실패했습니다.'.($detail !== '' ? " ({$detail})" : '')
+            );
+        }
+
+        return [
+            'slip_nos' => $slipNos,
+            'raw' => $payload,
+        ];
+    }
+
+    /**
      * 이카운트 다건 품목코드 구분자(오픈 API에서 PROD_CD 연결에 사용, U+222C).
      */
     private function ecountProdCdJoiner(): string
@@ -974,6 +1015,47 @@ final class EcountApiClient
             'ok' => false,
             'message' => $message !== '' ? $message : 'Ecount API 응답이 실패 상태입니다.',
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return list<string>
+     */
+    private function extractSaveSaleOrderSlipNos(array $payload): array
+    {
+        $data = $payload['Data'] ?? $payload['data'] ?? null;
+        if (! is_array($data)) {
+            return [];
+        }
+
+        $raw = $data['SlipNos'] ?? $data['slip_nos'] ?? $data['SLIP_NOS'] ?? null;
+        if ($raw === null || $raw === '') {
+            return [];
+        }
+
+        if (is_string($raw)) {
+            $trimmed = trim($raw);
+
+            return $trimmed !== '' ? [$trimmed] : [];
+        }
+
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        $slipNos = [];
+        foreach ($raw as $item) {
+            if (! is_string($item) && ! is_int($item) && ! is_float($item)) {
+                continue;
+            }
+
+            $value = trim((string) $item);
+            if ($value !== '') {
+                $slipNos[] = $value;
+            }
+        }
+
+        return $slipNos;
     }
 
     /**
@@ -1123,6 +1205,56 @@ final class EcountApiClient
     private function postEcountJson(string $endpoint, string $sessionId, array $body): array
     {
         return $this->postEcountJsonInternal($endpoint, $sessionId, $body, true);
+    }
+
+    /**
+     * 읽기 전용 API와 달리 주문서 생성 등 쓰기 호출은 응답 캐시를 사용하지 않습니다.
+     *
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    private function postEcountJsonNoCache(string $endpoint, string $sessionId, array $body, bool $allowSessionRefresh = true): array
+    {
+        $baseUrl = $this->resolveBaseUrl();
+        $timeout = (int) config('store.timeout', 10);
+        if ($baseUrl === '') {
+            throw new InvalidArgumentException('ECOUNT_API_BASE_URL 값이 비어 있습니다.');
+        }
+
+        try {
+            $response = Http::baseUrl($baseUrl)
+                ->timeout($timeout)
+                ->acceptJson()
+                ->contentType('application/json')
+                ->post($endpoint.'?SESSION_ID='.rawurlencode($sessionId), $body);
+
+            $payload = $response->throw()->json();
+            if (! is_array($payload)) {
+                throw new RuntimeException('Ecount API 응답 형식이 올바르지 않습니다.');
+            }
+
+            $parsed = $this->parseEcountApiStatus($payload);
+            if (! $parsed['ok']) {
+                $message = $parsed['message'];
+
+                if ($allowSessionRefresh && $this->shouldRefreshSession($message)) {
+                    $newSessionId = $this->refreshSessionId();
+                    if ($newSessionId !== '' && $newSessionId !== $sessionId) {
+                        return $this->postEcountJsonNoCache($endpoint, $newSessionId, $body, false);
+                    }
+                }
+
+                throw new RuntimeException(
+                    $message === 'Ecount API 응답이 실패 상태입니다.'
+                        ? $message
+                        : 'Ecount API 오류: '.$message
+                );
+            }
+
+            return $payload;
+        } catch (RequestException $exception) {
+            throw new RuntimeException('Ecount API 호출에 실패했습니다.', previous: $exception);
+        }
     }
 
     /**
