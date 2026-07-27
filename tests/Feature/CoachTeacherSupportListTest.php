@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Actions\UpdateTeacherSupport;
+use App\Enums\TeacherEmploymentType;
 use App\Livewire\CoachTeacherSupportList;
 use App\Models\Teacher;
 use App\Models\User;
@@ -1353,6 +1354,32 @@ class CoachTeacherSupportListTest extends TestCase
             ->set('showAllTeachers', true);
 
         $this->assertStringContainsString('bg-red-100 text-red-800', $component->html());
+    }
+
+    public function test_list_shows_employment_type_after_position(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK100', '고용형태기관', 'Coach A');
+        $this->createTeacher('SK100', '정규교사', [
+            'Position' => '교사',
+            'EmploymentType' => TeacherEmploymentType::FullTime->value,
+            '_1st_Support_Date' => "{$year}-03-10",
+        ]);
+        $this->createTeacher('SK100', '미지정교사', [
+            'Position' => '교사',
+            'EmploymentType' => TeacherEmploymentType::Unspecified->value,
+            '_1st_Support_Date' => "{$year}-03-11",
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->assertSee('근무형태')
+            ->assertSee('정규교사')
+            ->assertSee('Full Time')
+            ->assertSee('미지정교사')
+            ->assertSee('미지정');
     }
 
     public function test_kpis_follow_teacher_list_visibility_filter(): void

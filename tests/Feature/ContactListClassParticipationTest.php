@@ -274,7 +274,7 @@ class ContactListClassParticipationTest extends TestCase
             ->assertSet('selectedContact.class_participation', '수업 미참여')
             ->assertSet('selectedContact.employment_type', '미지정')
             ->assertSee('수업참여')
-            ->assertSee('고용 형태')
+            ->assertSee('근무 형태')
             ->assertSee('수업 미참여')
             ->assertSee('미지정')
             ->assertDontSeeHtml('>Status</th>')
@@ -368,7 +368,7 @@ class ContactListClassParticipationTest extends TestCase
             ->call('openCreateModal')
             ->assertSee('수업(O)')
             ->assertSee('수업(X)')
-            ->assertSee('고용 형태')
+            ->assertSee('근무 형태')
             ->assertDontSee('>미참여</span>', false);
     }
 

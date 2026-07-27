@@ -172,7 +172,7 @@
                     <th class="contact-sticky-institution contact-sticky-institution--head px-3 py-2 text-left text-xs font-semibold">기관명</th>
                     <th class="contact-sticky-name contact-sticky-name--head px-3 py-2 text-left text-xs font-semibold">이름</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">직급</th>
-                    <th class="px-3 py-2 text-center text-xs font-semibold">고용 형태</th>
+                    <th class="px-3 py-2 text-center text-xs font-semibold">근무 형태</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">이메일</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">전화번호</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">GrapeSEED Essentials</th>
@@ -365,7 +365,7 @@
 
                         <div class="border-t border-b border-gray-100 py-4 space-y-4">
                             <div class="grid grid-cols-[110px_1fr] items-center gap-3">
-                                <label class="text-sm font-medium text-gray-700">고용 형태</label>
+                                <label class="text-sm font-medium text-gray-700">근무 형태</label>
                                 <div class="flex items-center gap-6 text-sm">
                                     <label class="inline-flex items-center gap-2 cursor-pointer">
                                         <input type="radio"
@@ -585,7 +585,7 @@
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['position'] ?? '-' }}</td>
                                 </tr>
                                 <tr>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">고용 형태</th>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">근무 형태</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['employment_type'] ?? '-' }}</td>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">수업참여</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['class_participation'] ?? '-' }}</td>

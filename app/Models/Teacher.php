@@ -40,7 +40,7 @@ use Illuminate\Support\Carbon;
  * @property string $Phone 연락처
  * @property string $Position 직급
  * @property string $Status 상태 (재직/퇴직 등)
- * @property TeacherEmploymentType|string|null $EmploymentType 고용 형태
+ * @property TeacherEmploymentType|string|null $EmploymentType 근무 형태
  * @property string $CO_Name 담당 CO 이름
  */
 class Teacher extends Model

@@ -277,6 +277,7 @@
                     <col class="coach-support-col-institution">
                     <col class="coach-support-col-name">
                     <col class="coach-support-col-position">
+                    <col class="coach-support-col-employment">
                     <col class="coach-support-col-essentials-gs">
                     <col class="coach-support-col-essentials-ls">
                     <col span="4" class="coach-support-col-completed">
@@ -287,6 +288,7 @@
                     <th class="coach-support-sticky-inst coach-support-sticky-inst--head px-2 py-1.5 text-center">기관명</th>
                     <th class="coach-support-sticky-name coach-support-sticky-name--head px-2 py-1.5 text-left">이름</th>
                     <th class="coach-support-sticky-position coach-support-sticky-position--head px-2 py-1.5 text-left">직급</th>
+                    <th class="coach-support-sticky-employment coach-support-sticky-employment--head px-2 py-1.5 text-left">근무형태</th>
                     <th class="coach-support-sticky-essentials-gs coach-support-sticky-essentials-gs--head px-2 py-1.5 text-left" title="GS Essentials">GS Ess.</th>
                     <th class="coach-support-sticky-essentials-ls coach-support-sticky-essentials-ls--head px-2 py-1.5 text-left" title="LS Essentials">LS Ess.</th>
                     <th class="coach-support-col-plan-12-hidden px-3 py-2 text-left coach-support-col-plan1-date">1차 지원 계획일자</th>
@@ -347,6 +349,11 @@
                                     {{ $teacher->Position }}
                                 </span>
                             @endif
+                        </td>
+                        <td class="coach-support-sticky-employment px-3 py-2 align-middle">
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-gray-700">
+                                {{ \App\Enums\TeacherEmploymentType::fromMixed($teacher->EmploymentType)->label() }}
+                            </span>
                         </td>
                         <td class="coach-support-sticky-essentials-gs px-3 py-2 align-middle coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
@@ -1026,7 +1033,7 @@
 
                             <div class="border-t border-b border-gray-100 py-4 space-y-4">
                                 <div class="grid grid-cols-[110px_1fr] items-center gap-3">
-                                    <label class="text-sm font-medium text-gray-700">고용 형태</label>
+                                    <label class="text-sm font-medium text-gray-700">근무 형태</label>
                                     <div class="flex items-center gap-6 text-sm">
                                         <label class="inline-flex items-center gap-2 cursor-pointer">
                                             <input type="radio"
@@ -1118,7 +1125,7 @@
                                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">수업(X)</span>
                                             @endif
                                         </td>
-                                        <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">고용 형태</th>
+                                        <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">근무 형태</th>
                                         <td class="px-3 py-2 text-gray-900">{{ $teacherDetailInfo['employment_type_label'] ?? '미지정' }}</td>
                                     </tr>
                                     <tr>
