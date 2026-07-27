@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\LegacyDateTimeCast;
 use App\Casts\NormalizedMultilineText;
+use App\Enums\TeacherEmploymentType;
 use App\Support\LegacyAuditUserNames;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -39,6 +40,7 @@ use Illuminate\Support\Carbon;
  * @property string $Phone 연락처
  * @property string $Position 직급
  * @property string $Status 상태 (재직/퇴직 등)
+ * @property TeacherEmploymentType|string|null $EmploymentType 고용 형태
  * @property string $CO_Name 담당 CO 이름
  */
 class Teacher extends Model
@@ -63,6 +65,7 @@ class Teacher extends Model
         'Position',
         'Description',
         'Status',
+        'EmploymentType',
         'ClassInOut',
         'NewSenior',
         'CS',
@@ -101,6 +104,7 @@ class Teacher extends Model
     protected function casts(): array
     {
         return [
+            'EmploymentType' => TeacherEmploymentType::class,
             'GrapeSEEDEssentials' => LegacyDateTimeCast::class,
             'LittleSEEDEssentials' => LegacyDateTimeCast::class,
             'Plan_1st_Support_Date' => LegacyDateTimeCast::class,
