@@ -82,6 +82,7 @@ class CoachTeacherSupportListTest extends TestCase
             $table->string('Phone', 100)->nullable();
             $table->text('Description')->nullable();
             $table->string('Status', 50)->nullable();
+            $table->string('EmploymentType', 32)->default('unspecified');
             $table->boolean('ClassInOut')->default(true);
             $table->dateTime('Created_Date')->nullable();
             $table->date('Plan_1st_Support_Date')->nullable();
@@ -2405,14 +2406,22 @@ class CoachTeacherSupportListTest extends TestCase
             ->test(CoachTeacherSupportList::class)
             ->call('openTeacherModal', $id)
             ->call('startTeacherEdit')
+            ->assertSee('교사정보 수정하기')
+            ->assertSee('저장하기')
+            ->assertSee('취소')
+            ->assertDontSee('>수정하기<', false)
             ->set('teacherProfileForm.name', '김수정')
             ->set('teacherProfileForm.email', 'new@test.com')
+            ->set('teacherProfileForm.employment_type', 'full_time')
+            ->set('teacherProfileForm.class_participation', 'out')
             ->call('saveTeacherProfile')
             ->assertHasNoErrors();
 
         $teacher = Teacher::find($id);
         $this->assertSame('김수정', $teacher->Name);
         $this->assertSame('new@test.com', $teacher->Email);
+        $this->assertSame('full_time', $teacher->EmploymentType?->value ?? $teacher->getAttributes()['EmploymentType']);
+        $this->assertFalse((bool) $teacher->getAttributes()['ClassInOut']);
     }
 
     public function test_retire_teacher_sets_class_in_out_false(): void
