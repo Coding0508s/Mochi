@@ -59,13 +59,15 @@ class StoreReturnRegistrationForm extends Component
 
     public string $detailCsTeam = '';
 
+    public string $detailShippingAddress = '';
+
     /**
      * @var array<int, int>
      */
     public array $detailOriginalRegistrationIds = [];
 
     /**
-     * @var array<int, array{id: int|null, itemName: string, quantity: string, status: string, notes: string}>
+     * @var array<int, array{id: int|null, itemName: string, quantity: string, status: string, notes: string, className: string, ecountRemarks: string}>
      */
     public array $detailItemRows = [];
 
@@ -441,12 +443,15 @@ class StoreReturnRegistrationForm extends Component
             'detailInstitutionSkCode' => ['nullable', 'string', 'max:50'],
             'detailFreight' => ['nullable', 'string', Rule::in($freightOptions)],
             'detailCsTeam' => ['nullable', 'string', 'max:100'],
+            'detailShippingAddress' => ['nullable', 'string', 'max:500'],
             'detailItemRows' => ['required', 'array', 'min:1'],
             'detailItemRows.*.id' => ['nullable', 'integer', Rule::exists('store_return_registrations', 'id')],
             'detailItemRows.*.itemName' => $detailItemNameRules,
             'detailItemRows.*.quantity' => ['required', 'integer', 'min:1', 'max:999999'],
             'detailItemRows.*.status' => ['required', 'string', Rule::in($statuses)],
             'detailItemRows.*.notes' => ['nullable', 'string', 'max:2000'],
+            'detailItemRows.*.className' => ['nullable', 'string', 'max:100'],
+            'detailItemRows.*.ecountRemarks' => ['nullable', 'string', 'max:255'],
         ], [
             'detailReturnDate.required' => '날짜를 입력해 주세요.',
             'detailReturnDate.date' => '날짜 형식이 올바르지 않습니다.',
@@ -462,6 +467,9 @@ class StoreReturnRegistrationForm extends Component
             'detailItemRows.*.status.in' => '상태 값이 올바르지 않습니다.',
             'detailFreight.in' => '운임 값이 올바르지 않습니다.',
             'detailItemRows.*.notes.max' => '특이 사항은 2000자 이내로 입력해 주세요.',
+            'detailShippingAddress.max' => '배송지는 500자 이내로 입력해 주세요.',
+            'detailItemRows.*.className.max' => 'Class Name은 100자 이내로 입력해 주세요.',
+            'detailItemRows.*.ecountRemarks.max' => 'Ecount 적요는 255자 이내로 입력해 주세요.',
         ]);
 
         $submittedIds = collect($validated['detailItemRows'])
@@ -479,6 +487,9 @@ class StoreReturnRegistrationForm extends Component
         $institutionName = trim($validated['detailInstitutionKeyword']);
         $freight = filled($validated['detailFreight'] ?? null) ? $validated['detailFreight'] : null;
         $csTeam = filled($validated['detailCsTeam'] ?? null) ? trim($validated['detailCsTeam']) : null;
+        $shippingAddress = filled($validated['detailShippingAddress'] ?? null)
+            ? trim($validated['detailShippingAddress'])
+            : null;
 
         $groupPayload = [
             'returned_at' => $validated['detailReturnDate'],
@@ -486,6 +497,7 @@ class StoreReturnRegistrationForm extends Component
             'institution_name' => $institutionName,
             'freight' => $freight,
             'cs_team' => $csTeam,
+            'shipping_address' => $shippingAddress,
         ];
 
         foreach ($validated['detailItemRows'] as $row) {
@@ -495,6 +507,8 @@ class StoreReturnRegistrationForm extends Component
                 'quantity' => (int) $row['quantity'],
                 'status' => $row['status'],
                 'notes' => filled($row['notes'] ?? null) ? trim((string) $row['notes']) : null,
+                'class_name' => filled($row['className'] ?? null) ? trim((string) $row['className']) : null,
+                'ecount_remarks' => filled($row['ecountRemarks'] ?? null) ? trim((string) $row['ecountRemarks']) : null,
             ];
 
             if (filled($row['id'] ?? null)) {
@@ -783,6 +797,7 @@ class StoreReturnRegistrationForm extends Component
             'institution_sk_code' => $first->institution_sk_code,
             'freight' => $first->freight,
             'cs_team' => $first->cs_team,
+            'ecount_slip_no' => $first->ecount_slip_no,
             'item_summary' => $this->summarizeItemNames($orderedItems),
             'total_quantity' => (int) $orderedItems->sum(fn (StoreReturnRegistration $item): int => $item->quantity ?? 1),
             'status_summary' => $this->displayGroupStatus($orderedItems),
@@ -989,7 +1004,7 @@ class StoreReturnRegistrationForm extends Component
     }
 
     /**
-     * @return array{id: null, itemName: string, quantity: string, status: string, notes: string}
+     * @return array{id: null, itemName: string, quantity: string, status: string, notes: string, className: string, ecountRemarks: string}
      */
     private function defaultDetailItemRow(): array
     {
@@ -999,6 +1014,8 @@ class StoreReturnRegistrationForm extends Component
             'quantity' => '',
             'status' => (string) (config('store.return_registration.statuses')[0] ?? '정상'),
             'notes' => '',
+            'className' => '',
+            'ecountRemarks' => '',
         ];
     }
 
@@ -1020,6 +1037,7 @@ class StoreReturnRegistrationForm extends Component
         $this->detailInstitutionSkCode = '';
         $this->detailFreight = '';
         $this->detailCsTeam = '';
+        $this->detailShippingAddress = '';
         $this->detailOriginalRegistrationIds = [];
         $this->detailItemRows = [];
         $this->lockedDetailInstitutionKeyword = null;
@@ -1041,6 +1059,7 @@ class StoreReturnRegistrationForm extends Component
         $this->detailInstitutionSkCode = $first->institution_sk_code ?? '';
         $this->detailFreight = $first->freight ?? '';
         $this->detailCsTeam = $first->cs_team ?? '';
+        $this->detailShippingAddress = $first->shipping_address ?? '';
         $this->lockedDetailInstitutionKeyword = filled($first->institution_sk_code)
             ? $first->institution_name
             : null;
@@ -1054,6 +1073,8 @@ class StoreReturnRegistrationForm extends Component
             'quantity' => (string) ($item->quantity ?? 1),
             'status' => $item->status,
             'notes' => $item->notes ?? '',
+            'className' => $item->class_name ?? '',
+            'ecountRemarks' => $item->ecount_remarks ?? '',
         ])->all();
     }
 }

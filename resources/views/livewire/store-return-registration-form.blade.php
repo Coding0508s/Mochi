@@ -134,6 +134,9 @@
                                     @if(filled($group['institution_sk_code']))
                                         <div class="mt-0.5 break-all text-center text-xs text-gray-500">{{ $group['institution_sk_code'] }}</div>
                                     @endif
+                                    @if(filled($group['ecount_slip_no'] ?? null))
+                                        <div class="mt-0.5 break-all text-center text-xs text-gray-500">전표 {{ $group['ecount_slip_no'] }}</div>
+                                    @endif
                                 </button>
                             </td>
                             <td class="px-3 py-2 text-center text-gray-800">{{ $group['item_summary'] }}</td>
@@ -261,18 +264,29 @@
                                 @error('detailCsTeam') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
+                        <div class="mt-4 flex flex-col gap-1">
+                            <label for="detail-shipping-address" class="text-xs font-medium text-gray-600">배송지</label>
+                            <input id="detail-shipping-address"
+                                   type="text"
+                                   wire:model="detailShippingAddress"
+                                   placeholder="Ecount 주문서 배송지"
+                                   class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                            @error('detailShippingAddress') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+                        </div>
                     </div>
 
                     @error('detailItemRows') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
 
                     <div class="overflow-x-auto rounded-lg border border-gray-200">
-                        <table class="w-full min-w-[720px] text-sm">
+                        <table class="w-full min-w-[960px] text-sm">
                             <thead class="bg-gray-50 text-gray-700">
                                 <tr>
                                     <th class="px-3 py-2 text-center text-xs font-semibold">품목명</th>
                                     <th class="px-3 py-2 text-center text-xs font-semibold">수량</th>
                                     <th class="px-3 py-2 text-center text-xs font-semibold">상태</th>
                                     <th class="px-3 py-2 text-left text-xs font-semibold">특이 사항</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold">Class Name</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold">Ecount 적요</th>
                                     @if(count($detailItemRows) > 1)
                                         <th class="w-12 px-2 py-2 text-center text-xs font-semibold"><span class="sr-only">삭제</span></th>
                                     @endif
@@ -313,6 +327,20 @@
                                                    placeholder="특이 사항"
                                                    class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                             @error('detailItemRows.'.$index.'.notes') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                                        </td>
+                                        <td class="px-3 py-2">
+                                            <input type="text"
+                                                   wire:model="detailItemRows.{{ $index }}.className"
+                                                   placeholder="Class Name"
+                                                   class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                                            @error('detailItemRows.'.$index.'.className') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                                        </td>
+                                        <td class="px-3 py-2">
+                                            <input type="text"
+                                                   wire:model="detailItemRows.{{ $index }}.ecountRemarks"
+                                                   placeholder="Ecount 적요"
+                                                   class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                                            @error('detailItemRows.'.$index.'.ecountRemarks') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                                         </td>
                                         @if(count($detailItemRows) > 1)
                                             <td class="px-2 py-2 text-center">
@@ -391,16 +419,24 @@
                                 <dd class="mt-1 truncate font-medium text-gray-900" title="{{ $detailCsTeam }}">{{ $detailCsTeam ?: '-' }}</dd>
                             </div>
                         </dl>
+                        <dl class="mt-4 grid min-w-[720px] grid-cols-1 gap-4 text-sm">
+                            <div class="min-w-0">
+                                <dt class="text-xs text-gray-500">배송지</dt>
+                                <dd class="mt-1 font-medium text-gray-900">{{ filled($detailShippingAddress) ? $detailShippingAddress : '-' }}</dd>
+                            </div>
+                        </dl>
                     </div>
 
                     <div class="overflow-x-auto rounded-lg border border-gray-200">
-                        <table class="w-full min-w-[640px] text-sm">
+                        <table class="w-full min-w-[800px] text-sm">
                             <thead class="bg-gray-50 text-gray-700">
                                 <tr>
                                     <th class="px-3 py-2 text-center text-xs font-semibold">품목명</th>
                                     <th class="px-3 py-2 text-center text-xs font-semibold">수량</th>
                                     <th class="px-3 py-2 text-center text-xs font-semibold">상태</th>
                                     <th class="px-3 py-2 text-left text-xs font-semibold">특이 사항</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold">Class Name</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold">Ecount 적요</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
@@ -410,6 +446,8 @@
                                         <td class="px-3 py-2 text-center text-gray-700">{{ number_format((int) $row['quantity']) }}</td>
                                         <td class="px-3 py-2 text-center text-gray-700">{{ $row['status'] }}</td>
                                         <td class="px-3 py-2 text-left text-gray-600">{{ filled($row['notes']) ? $row['notes'] : '-' }}</td>
+                                        <td class="px-3 py-2 text-left text-gray-600">{{ filled($row['className']) ? $row['className'] : '-' }}</td>
+                                        <td class="px-3 py-2 text-left text-gray-600">{{ filled($row['ecountRemarks']) ? $row['ecountRemarks'] : '-' }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
