@@ -59,6 +59,7 @@ class ContactListInstitutionNameTest extends TestCase
             $table->string('Phone', 190)->nullable();
             $table->string('School_Name', 255)->nullable();
             $table->string('Status', 50)->nullable();
+            $table->string('EmploymentType', 32)->default('unspecified');
             $table->boolean('ClassInOut')->default(true);
             $table->dateTime('Created_Date')->nullable();
         });
@@ -124,7 +125,7 @@ class ContactListInstitutionNameTest extends TestCase
             $sheet = IOFactory::load($tempPath)->getActiveSheet();
 
             $skCodeCell = $sheet->getCell('A2');
-            $phoneCell = $sheet->getCell('F2');
+            $phoneCell = $sheet->getCell('G2');
 
             $this->assertSame(DataType::TYPE_STRING, $skCodeCell->getDataType());
             $this->assertSame('0123456789', $skCodeCell->getValue());

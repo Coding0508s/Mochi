@@ -913,7 +913,7 @@
     @if($showTeacherModal && $teacherDetailInfo)
         <div class="mochi-modal-overlay" wire:click.self="closeTeacherModal">
             <div class="mochi-modal-shell max-w-4xl max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex flex-col" @click.stop>
-                <x-admin.modal-header title="TR 교사정보">
+                <x-admin.modal-header :title="$teacherModalEditMode ? '교사정보 수정하기' : 'TR 교사정보'">
                     <x-slot:actions>
                         @if(! $teacherModalEditMode && ! ($teacherDetailInfo['is_retired'] ?? false))
                             <button type="button"
@@ -962,51 +962,121 @@
                         </div>
                     @endif
 
-                    {{-- 수정 모드 --}}
+                    {{-- 수정 모드 (연락처「교사정보 수정하기」와 동일 필드 구성) --}}
                     @if($teacherModalEditMode)
-                        <div>
-                            <h4 class="text-base font-semibold text-gray-800 mb-3">교사 정보 수정</h4>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-xs text-gray-500 mb-1">이름</label>
-                                    <input type="text" wire:model="teacherProfileForm.name"
-                                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
-                                </div>
-                                <div>
-                                    <label class="block text-xs text-gray-500 mb-1">이메일</label>
-                                    <input type="email" wire:model="teacherProfileForm.email"
-                                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
-                                </div>
-                                <div>
-                                    <label class="block text-xs text-gray-500 mb-1">전화</label>
-                                    <input type="text" wire:model="teacherProfileForm.phone"
-                                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
-                                </div>
-                                <div>
-                                    <label class="block text-xs text-gray-500 mb-1">직급</label>
-                                    <input type="text" wire:model="teacherProfileForm.position"
-                                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
-                                </div>
-                                <div class="col-span-2">
-                                    <label class="block text-xs text-gray-500 mb-1">비고</label>
-                                    <textarea wire:model="teacherProfileForm.description" rows="2"
-                                              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header"></textarea>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <label class="text-xs text-gray-500">수업참여</label>
-                                    <input type="checkbox" wire:model="teacherProfileForm.class_in_out"
-                                           class="rounded border-gray-300 text-mochi-header focus:ring-mochi-header">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">기관명</label>
+                                <div class="rounded-lg border border-blue-200 bg-blue-50/60 px-3 py-2.5 text-sm font-medium text-gray-900">
+                                    <span class="text-blue-700">[{{ $teacherDetailInfo['sk_code'] ?? '-' }}]</span>
+                                    {{ $teacherDetailInfo['school_name'] ?? '-' }}
                                 </div>
                             </div>
-                            <div class="flex justify-end gap-2 mt-4">
-                                <button wire:click="$set('teacherModalEditMode', false)"
-                                        class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
-                                    취소
-                                </button>
-                                <button wire:click="saveTeacherProfile"
-                                        class="cursor-pointer rounded-lg bg-mochi-header px-4 py-2 text-sm text-white hover:bg-mochi-header/90">
-                                    저장
-                                </button>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        Name <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="text" wire:model="teacherProfileForm.name"
+                                           class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">직급</label>
+                                    <select wire:model="teacherProfileForm.position"
+                                            class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                                        <option value="">선택</option>
+                                        <option value="원장">원장</option>
+                                        <option value="교장">교장</option>
+                                        <option value="부원장">부원장</option>
+                                        <option value="교사">교사</option>
+                                        <option value="행정">행정</option>
+                                        <option value="교수 부장">교수 부장</option>
+                                        <option value="교감">교감</option>
+                                        <option value="기타">기타</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">eMail</label>
+                                    <input type="email" wire:model="teacherProfileForm.email"
+                                           class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                                    <input type="text" wire:model="teacherProfileForm.phone"
+                                           class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">GrapeSEED Essentials</label>
+                                    <input type="date" wire:model="teacherProfileForm.gs_essentials"
+                                           class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">LittleSEED Essentials</label>
+                                    <input type="date" wire:model="teacherProfileForm.ls_essentials"
+                                           class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                                </div>
+                            </div>
+
+                            <div class="border-t border-b border-gray-100 py-4 space-y-4">
+                                <div class="grid grid-cols-[110px_1fr] items-center gap-3">
+                                    <label class="text-sm font-medium text-gray-700">고용 형태</label>
+                                    <div class="flex items-center gap-6 text-sm">
+                                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                                            <input type="radio"
+                                                   wire:model="teacherProfileForm.employment_type"
+                                                   value="full_time"
+                                                   class="w-4 h-4 text-mochi-header border-gray-300 focus:ring-mochi-header">
+                                            <span class="text-gray-700">Full Time</span>
+                                        </label>
+                                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                                            <input type="radio"
+                                                   wire:model="teacherProfileForm.employment_type"
+                                                   value="part_time"
+                                                   class="w-4 h-4 text-mochi-header border-gray-300 focus:ring-mochi-header">
+                                            <span class="text-gray-700">Part Time</span>
+                                        </label>
+                                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                                            <input type="radio"
+                                                   wire:model="teacherProfileForm.employment_type"
+                                                   value="unspecified"
+                                                   class="w-4 h-4 text-gray-500 border-gray-300 focus:ring-gray-400">
+                                            <span class="text-gray-500">미지정</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-[110px_1fr] items-center gap-3">
+                                    <label class="text-sm font-medium text-gray-700">수업참여</label>
+                                    <div class="flex items-center gap-6 text-sm">
+                                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                                            <input type="radio"
+                                                   wire:model="teacherProfileForm.class_participation"
+                                                   value="in"
+                                                   class="w-4 h-4 text-mochi-header border-gray-300 focus:ring-mochi-header">
+                                            <span class="text-gray-700">수업(O)</span>
+                                        </label>
+                                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                                            <input type="radio"
+                                                   wire:model="teacherProfileForm.class_participation"
+                                                   value="out"
+                                                   class="w-4 h-4 text-mochi-header border-gray-300 focus:ring-mochi-header">
+                                            <span class="text-gray-700">수업(X)</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                <textarea wire:model="teacherProfileForm.description" rows="4"
+                                          class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header resize-none"></textarea>
                             </div>
                         </div>
                     @else
@@ -1048,16 +1118,16 @@
                                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">수업(X)</span>
                                             @endif
                                         </td>
-                                        <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">CO</th>
-                                        <td class="px-3 py-2 text-gray-900">{{ $teacherDetailInfo['co'] ?? '-' }}</td>
+                                        <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">고용 형태</th>
+                                        <td class="px-3 py-2 text-gray-900">{{ $teacherDetailInfo['employment_type_label'] ?? '미지정' }}</td>
                                     </tr>
                                     <tr>
+                                        <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">CO</th>
+                                        <td class="px-3 py-2 text-gray-900">{{ $teacherDetailInfo['co'] ?? '-' }}</td>
                                         <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">기관</th>
                                         <td class="px-3 py-2 {{ ! empty($teacherDetailInfo['is_terminated']) ? 'text-red-700 font-medium' : 'text-gray-900' }}">
                                             {{ $teacherDetailInfo['school_name'] ?? '-' }} ({{ $teacherDetailInfo['sk_code'] }})
                                         </td>
-                                        <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium"></th>
-                                        <td></td>
                                     </tr>
                                     @if($teacherDetailInfo['description'])
                                         <tr>
@@ -1200,11 +1270,25 @@
                     @endif
 
                 </div>
-                <div class="px-6 py-4 bg-gray-50 border-t flex justify-end">
-                    <button wire:click="closeTeacherModal"
-                            class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer">
-                        닫기
-                    </button>
+                <div class="px-6 py-4 bg-gray-50 border-t flex justify-end gap-2">
+                    @if($teacherModalEditMode)
+                        <button type="button"
+                                wire:click="$set('teacherModalEditMode', false)"
+                                class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer">
+                            취소
+                        </button>
+                        <button type="button"
+                                wire:click="saveTeacherProfile"
+                                class="cursor-pointer rounded-lg bg-mochi-header px-4 py-2 text-sm text-white hover:bg-mochi-header/90">
+                            저장하기
+                        </button>
+                    @else
+                        <button type="button"
+                                wire:click="closeTeacherModal"
+                                class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer">
+                            닫기
+                        </button>
+                    @endif
                 </div>
             </div>
         </div>
