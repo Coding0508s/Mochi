@@ -18,6 +18,7 @@ use App\Actions\UpdateLegacyTeacherSupportReport;
 use App\Actions\UpdateTeacherProfile;
 use App\Actions\UpdateTeacherSupport;
 use App\Actions\UpdateTeacherSupportReport;
+use App\Enums\TeacherEmploymentType;
 use App\Livewire\Concerns\GuardsCrossTeamReadOnlyContext;
 use App\Livewire\Concerns\HandlesVisitSupportReportValidationFailures;
 use App\Livewire\Concerns\ManagesSupportReportRoundSelection;
@@ -409,7 +410,12 @@ class CoachTeacherSupportList extends Component
             'email' => $teacher->Email,
             'phone' => $teacher->Phone,
             'position' => $teacher->Position,
-            'class_in_out' => (bool) $teacher->ClassInOut,
+            'class_in_out' => array_key_exists('ClassInOut', $teacher->getAttributes())
+                && $teacher->getAttributes()['ClassInOut'] !== null
+                && filter_var($teacher->getAttributes()['ClassInOut'], FILTER_VALIDATE_BOOLEAN),
+            'class_participation' => $this->classParticipationValueFromTeacher($teacher),
+            'employment_type' => TeacherEmploymentType::fromMixed($teacher->EmploymentType)->value,
+            'employment_type_label' => TeacherEmploymentType::fromMixed($teacher->EmploymentType)->label(),
             'is_retired' => $teacher->isRetired(),
             'description' => $teacher->Description,
             'sk_code' => SkCodeNormalizer::normalize($teacher->SK_Code) ?? '',
@@ -820,6 +826,21 @@ class CoachTeacherSupportList extends Component
         return $scopedQuery->exists();
     }
 
+    private function classParticipationValueFromTeacher(Teacher $teacher): string
+    {
+        if (! array_key_exists('ClassInOut', $teacher->getAttributes())) {
+            return 'out';
+        }
+
+        $raw = $teacher->getAttributes()['ClassInOut'];
+
+        if ($raw === null) {
+            return 'out';
+        }
+
+        return filter_var($raw, FILTER_VALIDATE_BOOLEAN) ? 'in' : 'out';
+    }
+
     private function canViewInstitutionSk(string $skCode): bool
     {
         $user = auth()->user();
@@ -923,7 +944,11 @@ class CoachTeacherSupportList extends Component
             'phone' => $this->teacherDetailInfo['phone'] ?? '',
             'position' => $this->teacherDetailInfo['position'] ?? '',
             'description' => $this->teacherDetailInfo['description'] ?? '',
-            'class_in_out' => $this->teacherDetailInfo['class_in_out'] ?? true,
+            'class_participation' => $this->teacherDetailInfo['class_participation'] ?? 'out',
+            'employment_type' => $this->teacherDetailInfo['employment_type']
+                ?? TeacherEmploymentType::Unspecified->value,
+            'gs_essentials' => $this->teacherDetailInfo['gs_essentials'] ?? '',
+            'ls_essentials' => $this->teacherDetailInfo['ls_essentials'] ?? '',
         ];
         $this->teacherModalEditMode = true;
     }
@@ -942,8 +967,26 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
+        $classParticipation = (string) ($this->teacherProfileForm['class_participation'] ?? 'out');
+        $gsEssentials = trim((string) ($this->teacherProfileForm['gs_essentials'] ?? ''));
+        $lsEssentials = trim((string) ($this->teacherProfileForm['ls_essentials'] ?? ''));
+
+        $payload = [
+            'name' => $this->teacherProfileForm['name'] ?? '',
+            'email' => $this->teacherProfileForm['email'] ?? '',
+            'phone' => $this->teacherProfileForm['phone'] ?? '',
+            'position' => $this->teacherProfileForm['position'] ?? '',
+            'description' => $this->teacherProfileForm['description'] ?? '',
+            'class_in_out' => $classParticipation === 'in',
+            'employment_type' => TeacherEmploymentType::fromMixed(
+                $this->teacherProfileForm['employment_type'] ?? null
+            )->value,
+            'gs_essentials' => $gsEssentials === '' ? null : $gsEssentials,
+            'ls_essentials' => $lsEssentials === '' ? null : $lsEssentials,
+        ];
+
         $action = new UpdateTeacherProfile;
-        $action->execute($this->teacherDetailInfo['id'], $this->teacherProfileForm, $user);
+        $action->execute($this->teacherDetailInfo['id'], $payload, $user);
 
         session()->flash('success', '교사 정보가 저장되었습니다.');
         $this->teacherModalEditMode = false;
