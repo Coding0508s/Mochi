@@ -7,7 +7,6 @@ use App\Livewire\CoachTeacherSupportList;
 use App\Models\Teacher;
 use App\Models\User;
 use App\Support\ExcelSerialDate;
-use App\Support\SkCodeNormalizer;
 use App\Support\TeacherSupportKpiCalculator;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -787,31 +786,37 @@ class CoachTeacherSupportListTest extends TestCase
             ->assertSee('이교사');
     }
 
-    public function test_teachers_ordered_by_institution_name_in_all_institutions_view(): void
+    public function test_all_institutions_view_orders_by_latest_support_date_with_unsupported_last(): void
     {
         $admin = $this->createAdminUser();
         $year = now()->year;
 
         $this->createInstitution('SK001', '한국기관', 'Coach A');
         $this->createInstitution('SK002', '가나기관', 'Coach A');
-        $this->createTeacher('SK001', '김교사', [
-            '_1st_Support_Date' => "{$year}-03-10",
-            'Plan_2nd_Support_Date' => "{$year}-06-01",
-        ]);
-        $this->createTeacher('SK002', '이교사', ['Plan_1st_Support_Date' => "{$year}-04-01"]);
 
-        $skCodes = collect(
+        // 더 오래된 지원 — 기관명으로는 '가나'가 앞이지만, 최신 지원순이면 뒤
+        $this->createTeacher('SK002', '이교사', [
+            '_1st_Support_Date' => "{$year}-03-10",
+        ]);
+        // 더 최근 지원
+        $this->createTeacher('SK001', '김교사', [
+            '_1st_Support_Date' => "{$year}-05-21",
+        ]);
+        // 계획만 있고 완료 없음 — 연도 스코프에는 포함되고 정렬은 맨 뒤
+        $this->createTeacher('SK001', '미지원교사', [
+            'Plan_1st_Support_Date' => "{$year}-04-01",
+        ], forLatestView: false);
+
+        $names = collect(
             Livewire::actingAs($admin)
                 ->test(CoachTeacherSupportList::class)
                 ->set('showAllInstitutionsView', true)
                 ->set('filterYear', $year)
                 ->viewData('teachers')
                 ->items()
-        )->pluck('SK_Code')
-            ->map(fn (mixed $skCode): ?string => SkCodeNormalizer::normalize((string) $skCode))
-            ->all();
+        )->pluck('Name')->all();
 
-        $this->assertSame(['SK002', 'SK001'], $skCodes);
+        $this->assertSame(['김교사', '이교사', '미지원교사'], $names);
     }
 
     public function test_all_institutions_view_does_not_duplicate_teachers_when_account_name_rows_duplicated(): void

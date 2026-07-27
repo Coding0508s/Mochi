@@ -2975,22 +2975,7 @@ class CoachTeacherSupportList extends Component
      */
     private function applyTeacherListOrdering(Builder $query): void
     {
-        if (! $this->showAllInstitutionsView) {
-            TeacherSupportListActivity::applyLatestSupportOrdering($query, $this->resolvedFilterYear());
-
-            return;
-        }
-
-        // S_AccountName에 같은 SKcode가 중복 존재할 수 있어 join 대신
-        // 스칼라 서브쿼리로 정렬한다(행 복제 방지).
-        $normalizedSkCode = $this->sqlNormalizedTeacherSkCodeExpression();
-
-        $query->orderByRaw(
-            'COALESCE((SELECT MIN(san.AccountName) FROM S_AccountName AS san'
-            ." WHERE san.SKcode = {$normalizedSkCode}), Teachers.School_Name) ASC"
-        )
-            ->orderBy('Teachers.SK_Code')
-            ->orderBy('Teachers.Name');
+        TeacherSupportListActivity::applyLatestSupportOrdering($query, $this->resolvedFilterYear());
     }
 
     private function sqlNormalizedTeacherSkCodeExpression(): string
