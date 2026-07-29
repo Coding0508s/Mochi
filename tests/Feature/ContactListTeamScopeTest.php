@@ -164,6 +164,7 @@ class ContactListTeamScopeTest extends TestCase
             $table->string('School_Name', 255)->nullable();
             $table->text('Description')->nullable();
             $table->string('Status', 50)->nullable();
+            $table->string('EmploymentType', 32)->default('unspecified');
             $table->boolean('ClassInOut')->nullable();
             $table->date('GrapeSEEDEssentials')->nullable();
             $table->date('LittleSEEDEssentials')->nullable();

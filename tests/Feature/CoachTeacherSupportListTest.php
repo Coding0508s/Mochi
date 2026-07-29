@@ -3,11 +3,11 @@
 namespace Tests\Feature;
 
 use App\Actions\UpdateTeacherSupport;
+use App\Enums\TeacherEmploymentType;
 use App\Livewire\CoachTeacherSupportList;
 use App\Models\Teacher;
 use App\Models\User;
 use App\Support\ExcelSerialDate;
-use App\Support\SkCodeNormalizer;
 use App\Support\TeacherSupportKpiCalculator;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -82,6 +82,7 @@ class CoachTeacherSupportListTest extends TestCase
             $table->string('Phone', 100)->nullable();
             $table->text('Description')->nullable();
             $table->string('Status', 50)->nullable();
+            $table->string('EmploymentType', 32)->default('unspecified');
             $table->boolean('ClassInOut')->default(true);
             $table->dateTime('Created_Date')->nullable();
             $table->date('Plan_1st_Support_Date')->nullable();
@@ -786,31 +787,37 @@ class CoachTeacherSupportListTest extends TestCase
             ->assertSee('이교사');
     }
 
-    public function test_teachers_ordered_by_institution_name_in_all_institutions_view(): void
+    public function test_all_institutions_view_orders_by_latest_support_date_with_unsupported_last(): void
     {
         $admin = $this->createAdminUser();
         $year = now()->year;
 
         $this->createInstitution('SK001', '한국기관', 'Coach A');
         $this->createInstitution('SK002', '가나기관', 'Coach A');
-        $this->createTeacher('SK001', '김교사', [
-            '_1st_Support_Date' => "{$year}-03-10",
-            'Plan_2nd_Support_Date' => "{$year}-06-01",
-        ]);
-        $this->createTeacher('SK002', '이교사', ['Plan_1st_Support_Date' => "{$year}-04-01"]);
 
-        $skCodes = collect(
+        // 더 오래된 지원 — 기관명으로는 '가나'가 앞이지만, 최신 지원순이면 뒤
+        $this->createTeacher('SK002', '이교사', [
+            '_1st_Support_Date' => "{$year}-03-10",
+        ]);
+        // 더 최근 지원
+        $this->createTeacher('SK001', '김교사', [
+            '_1st_Support_Date' => "{$year}-05-21",
+        ]);
+        // 계획만 있고 완료 없음 — 연도 스코프에는 포함되고 정렬은 맨 뒤
+        $this->createTeacher('SK001', '미지원교사', [
+            'Plan_1st_Support_Date' => "{$year}-04-01",
+        ], forLatestView: false);
+
+        $names = collect(
             Livewire::actingAs($admin)
                 ->test(CoachTeacherSupportList::class)
                 ->set('showAllInstitutionsView', true)
                 ->set('filterYear', $year)
                 ->viewData('teachers')
                 ->items()
-        )->pluck('SK_Code')
-            ->map(fn (mixed $skCode): ?string => SkCodeNormalizer::normalize((string) $skCode))
-            ->all();
+        )->pluck('Name')->all();
 
-        $this->assertSame(['SK002', 'SK001'], $skCodes);
+        $this->assertSame(['김교사', '이교사', '미지원교사'], $names);
     }
 
     public function test_all_institutions_view_does_not_duplicate_teachers_when_account_name_rows_duplicated(): void
@@ -1347,6 +1354,32 @@ class CoachTeacherSupportListTest extends TestCase
             ->set('showAllTeachers', true);
 
         $this->assertStringContainsString('bg-red-100 text-red-800', $component->html());
+    }
+
+    public function test_list_shows_employment_type_after_position(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK100', '고용형태기관', 'Coach A');
+        $this->createTeacher('SK100', '정규교사', [
+            'Position' => '교사',
+            'EmploymentType' => TeacherEmploymentType::FullTime->value,
+            '_1st_Support_Date' => "{$year}-03-10",
+        ]);
+        $this->createTeacher('SK100', '미지정교사', [
+            'Position' => '교사',
+            'EmploymentType' => TeacherEmploymentType::Unspecified->value,
+            '_1st_Support_Date' => "{$year}-03-11",
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->assertSee('근무형태')
+            ->assertSee('정규교사')
+            ->assertSee('Full Time')
+            ->assertSee('미지정교사')
+            ->assertSee('미지정');
     }
 
     public function test_kpis_follow_teacher_list_visibility_filter(): void
@@ -2405,14 +2438,22 @@ class CoachTeacherSupportListTest extends TestCase
             ->test(CoachTeacherSupportList::class)
             ->call('openTeacherModal', $id)
             ->call('startTeacherEdit')
+            ->assertSee('교사정보 수정하기')
+            ->assertSee('저장하기')
+            ->assertSee('취소')
+            ->assertDontSee('>수정하기<', false)
             ->set('teacherProfileForm.name', '김수정')
             ->set('teacherProfileForm.email', 'new@test.com')
+            ->set('teacherProfileForm.employment_type', 'full_time')
+            ->set('teacherProfileForm.class_participation', 'out')
             ->call('saveTeacherProfile')
             ->assertHasNoErrors();
 
         $teacher = Teacher::find($id);
         $this->assertSame('김수정', $teacher->Name);
         $this->assertSame('new@test.com', $teacher->Email);
+        $this->assertSame('full_time', $teacher->EmploymentType?->value ?? $teacher->getAttributes()['EmploymentType']);
+        $this->assertFalse((bool) $teacher->getAttributes()['ClassInOut']);
     }
 
     public function test_retire_teacher_sets_class_in_out_false(): void

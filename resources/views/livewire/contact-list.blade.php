@@ -86,6 +86,24 @@
 
             <div class="ml-auto flex flex-wrap items-center gap-3 max-md:ml-0 max-md:w-full">
                 <div class="flex items-center gap-2 text-sm">
+                    <span class="text-gray-500">담당</span>
+                    <div class="mochi-toggle-group">
+                        <button type="button"
+                                wire:click="$set('myAssignedOnly', false)"
+                                aria-pressed="{{ $myAssignedOnly ? 'false' : 'true' }}"
+                                class="mochi-toggle-btn {{ ! $myAssignedOnly ? 'mochi-toggle-btn--active' : '' }}">
+                            전체
+                        </button>
+                        <button type="button"
+                                wire:click="$set('myAssignedOnly', true)"
+                                aria-pressed="{{ $myAssignedOnly ? 'true' : 'false' }}"
+                                class="mochi-toggle-btn {{ $myAssignedOnly ? 'mochi-toggle-btn--active' : '' }}">
+                            내 담당만
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 text-sm">
                     <span class="text-gray-500">상태</span>
                     <div class="mochi-toggle-group">
                         <button type="button"
@@ -154,9 +172,9 @@
                     <th class="contact-sticky-institution contact-sticky-institution--head px-3 py-2 text-left text-xs font-semibold">기관명</th>
                     <th class="contact-sticky-name contact-sticky-name--head px-3 py-2 text-left text-xs font-semibold">이름</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">직급</th>
+                    <th class="px-3 py-2 text-center text-xs font-semibold">근무 형태</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">이메일</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">전화번호</th>
-                    <th class="px-3 py-2 text-center text-xs font-semibold">상태</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">GrapeSEED Essentials</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">LittleSEED Essentials</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">담당 Coach</th>
@@ -190,18 +208,11 @@
                                 <span class="text-gray-400">-</span>
                             @endif
                         </td>
+                        <td class="px-3 py-2.5 text-center">
+                            <span class="text-xs text-gray-700">{{ $this->employmentTypeLabel($teacher) }}</span>
+                        </td>
                         <td class="px-3 py-2.5 text-gray-600 text-xs">{{ $teacher->Email ?? '-' }}</td>
                         <td class="px-3 py-2.5 text-gray-600">{{ $teacher->Phone ?? '-' }}</td>
-                        <td class="px-3 py-2.5 text-center">
-                            @php($statusLabel = $this->contactStatusLabel($teacher))
-                            @if($statusLabel === '퇴직')
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">퇴직</span>
-                            @elseif($statusLabel === '비활성화')
-                                <span class="text-xs text-gray-600">비활성화</span>
-                            @else
-                                <span class="text-xs text-green-700">활성화</span>
-                            @endif
-                        </td>
                         <td class="px-3 py-2.5 text-gray-600 text-xs">
                             {{ optional($teacher->GrapeSEEDEssentials)->format('Y-m-d') ?? '-' }}
                         </td>
@@ -354,21 +365,28 @@
 
                         <div class="border-t border-b border-gray-100 py-4 space-y-4">
                             <div class="grid grid-cols-[110px_1fr] items-center gap-3">
-                                <label class="text-sm font-medium text-gray-700">Status</label>
+                                <label class="text-sm font-medium text-gray-700">근무 형태</label>
                                 <div class="flex items-center gap-6 text-sm">
                                     <label class="inline-flex items-center gap-2 cursor-pointer">
                                         <input type="radio"
-                                               wire:model="newEmploymentStatus"
-                                               value="active"
+                                               wire:model="newEmploymentType"
+                                               value="full_time"
                                                class="w-4 h-4 text-mochi-header border-gray-300 focus:ring-mochi-header">
-                                        <span class="text-gray-700">활성화</span>
+                                        <span class="text-gray-700">Full Time</span>
                                     </label>
                                     <label class="inline-flex items-center gap-2 cursor-pointer">
                                         <input type="radio"
-                                               wire:model="newEmploymentStatus"
-                                               value="inactive"
+                                               wire:model="newEmploymentType"
+                                               value="part_time"
                                                class="w-4 h-4 text-mochi-header border-gray-300 focus:ring-mochi-header">
-                                        <span class="text-gray-700">비활성화</span>
+                                        <span class="text-gray-700">Part Time</span>
+                                    </label>
+                                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                                        <input type="radio"
+                                               wire:model="newEmploymentType"
+                                               value="unspecified"
+                                               class="w-4 h-4 text-gray-500 border-gray-300 focus:ring-gray-400">
+                                        <span class="text-gray-500">미지정</span>
                                     </label>
                                 </div>
                             </div>
@@ -389,13 +407,6 @@
                                                value="out"
                                                class="w-4 h-4 text-mochi-header border-gray-300 focus:ring-mochi-header">
                                         <span class="text-gray-700">수업(X)</span>
-                                    </label>
-                                    <label class="inline-flex items-center gap-2 cursor-pointer">
-                                        <input type="radio"
-                                               wire:model="newClassParticipation"
-                                               value=""
-                                               class="w-4 h-4 text-gray-500 border-gray-300 focus:ring-gray-400">
-                                        <span class="text-gray-500">미참여</span>
                                     </label>
                                 </div>
                             </div>
@@ -574,10 +585,10 @@
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['position'] ?? '-' }}</td>
                                 </tr>
                                 <tr>
+                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">근무 형태</th>
+                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['employment_type'] ?? '-' }}</td>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">수업참여</th>
                                     <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['class_participation'] ?? '-' }}</td>
-                                    <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">Status</th>
-                                    <td class="px-3 py-2 font-medium text-gray-900">{{ $selectedContact['account_status'] ?? '-' }}</td>
                                 </tr>
                                 <tr>
                                     <th class="px-3 py-2 bg-gray-50 text-left text-xs text-gray-500 font-medium">연락처</th>

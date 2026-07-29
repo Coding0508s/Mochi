@@ -18,8 +18,20 @@ class NewPasswordController extends Controller
     /**
      * Display the password reset view.
      */
-    public function create(Request $request): View
+    public function create(Request $request): View|RedirectResponse
     {
+        $token = (string) $request->route('token');
+        $email = (string) $request->query('email', '');
+
+        $broker = Password::broker();
+        $user = $email !== '' ? $broker->getUser(['email' => $email]) : null;
+
+        if ($user === null || ! $broker->tokenExists($user, $token)) {
+            return redirect()
+                ->route('password.request')
+                ->with('status', '링크가 만료되었습니다. 다시 요청해 주세요.');
+        }
+
         return view('auth.reset-password', ['request' => $request]);
     }
 

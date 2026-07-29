@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Actions\ReinstateTeacher;
 use App\Actions\RetireTeacher;
+use App\Enums\TeacherEmploymentType;
 use App\Livewire\Concerns\ManagesReinstateInstitutionSelection;
 use App\Models\Institution;
 use App\Models\Teacher;
@@ -46,6 +47,9 @@ class ContactList extends Component
 
     public string $teacherStatusFilter = 'active';
     // 교사 재직 상태: all | active | retired
+
+    public bool $myAssignedOnly = false;
+    // 내 담당만: false=전체, true=팀 담당 컬럼 매칭 기관만
 
     // ─── 생성/수정 모달 상태 ────────────────────────────────────────
     public bool $showModal = false;
@@ -91,9 +95,9 @@ class ContactList extends Component
 
     public string $newPosition = '';  // 직급
 
-    public string $newEmploymentStatus = 'active'; // 계정상태: active|inactive
+    public string $newEmploymentType = 'unspecified'; // 근무 형태: full_time|part_time|unspecified
 
-    public string $newClassParticipation = '';   // 수업참여: ''(미지정)|in|out
+    public string $newClassParticipation = 'out'; // 수업참여: in|out (기본 수업(X))
 
     public string $newSkCode = '';  // 선택한 기관의 SKcode
 
@@ -147,6 +151,11 @@ class ContactList extends Component
         $this->resetPage();
     }
 
+    public function updatingMyAssignedOnly(): void
+    {
+        $this->resetPage();
+    }
+
     // ─── 모달 열기 / 닫기 ─────────────────────────────────────────
     public function openCreateModal(): void
     {
@@ -170,7 +179,7 @@ class ContactList extends Component
         $this->newEmail = (string) ($teacher->Email ?? '');
         $this->originalEmail = (string) ($teacher->Email ?? '');
         $this->newPosition = (string) ($teacher->Position ?? '');
-        $this->newEmploymentStatus = $this->normalizeStatusForForm($teacher->Status);
+        $this->newEmploymentType = TeacherEmploymentType::fromMixed($teacher->EmploymentType)->value;
         $this->newClassParticipation = $this->classParticipationFromTeacher($teacher);
         $this->newSkCode = (string) ($teacher->SK_Code ?? '');
         $this->newSchoolName = $teacher->institution?->resolvedAccountName()
@@ -223,7 +232,7 @@ class ContactList extends Component
                     ? $teacher->getAttributes()['ClassInOut']
                     : null
             ),
-            'account_status' => $this->accountStatusLabelForDetail($teacher->Status),
+            'employment_type' => $this->employmentTypeLabel($teacher),
             'description' => $teacher->Description,
             'sk_code' => $teacher->SK_Code,
             'school_name' => $teacher->School_Name,
@@ -264,8 +273,8 @@ class ContactList extends Component
         $this->newEmail = '';
         $this->originalEmail = '';
         $this->newPosition = '';
-        $this->newEmploymentStatus = 'active';
-        $this->newClassParticipation = '';
+        $this->newEmploymentType = TeacherEmploymentType::Unspecified->value;
+        $this->newClassParticipation = 'out';
         $this->newSkCode = '';
         $this->newSchoolName = '';
         $this->newInstitutionKeyword = '';
@@ -373,8 +382,8 @@ class ContactList extends Component
             'newEmail' => $emailRules,
             'newPhone' => 'nullable|string|max:190',
             'newSkCode' => 'required',
-            'newEmploymentStatus' => 'required|in:active,inactive',
-            'newClassParticipation' => ['nullable', Rule::in(['', 'in', 'out'])],
+            'newEmploymentType' => ['required', Rule::enum(TeacherEmploymentType::class)],
+            'newClassParticipation' => ['required', Rule::in(['in', 'out'])],
             'newGrapeSeedEssentials' => ['nullable', 'date'],
             'newLittleSeedEssentials' => ['nullable', 'date'],
             'newDescription' => ['nullable', 'string', 'max:5000'],
@@ -382,20 +391,9 @@ class ContactList extends Component
 
         Gate::authorize('createContactRecord', $this->newSkCode);
 
-        $isActive = $this->newEmploymentStatus === 'active';
         $grapeDate = trim($this->newGrapeSeedEssentials);
         $littleDate = trim($this->newLittleSeedEssentials);
-
-        if ($existingTeacher?->isRetired() && $isActive) {
-            session()->flash('warning', '퇴직 교사는 「복직 처리」를 사용해 주세요. 연락처 수정만으로 재직 상태가 바뀌지 않습니다.');
-
-            return;
-        }
-
-        $status = $isActive ? '활성화' : '비활성화';
-        if ($existingTeacher?->isRetired()) {
-            $status = '퇴직';
-        }
+        $employmentType = TeacherEmploymentType::fromMixed($this->newEmploymentType);
 
         $data = [
             'Name' => $this->newName,
@@ -405,7 +403,8 @@ class ContactList extends Component
             'SK_Code' => $this->newSkCode,
             'School_Name' => $this->newSchoolName,
             'Description' => $this->newDescription,
-            'Status' => $status,
+            'Status' => $this->resolveStatusForSave($existingTeacher),
+            'EmploymentType' => $employmentType->value,
             'ClassInOut' => $this->classInOutFromParticipation($this->newClassParticipation),
             'GrapeSEEDEssentials' => $grapeDate === '' ? null : $grapeDate,
             'LittleSEEDEssentials' => $littleDate === '' ? null : $littleDate,
@@ -688,9 +687,9 @@ class ContactList extends Component
                 '기관명',
                 '이름',
                 '직급',
+                '근무 형태',
                 '이메일',
                 '전화번호',
-                '상태',
                 'GrapeSEED Essentials',
                 'LittleSEED Essentials',
                 '담당 Coach',
@@ -713,9 +712,9 @@ class ContactList extends Component
                     (string) ($teacher->School_Name ?? ''),
                     (string) ($teacher->Name ?? ''),
                     (string) ($teacher->Position ?? ''),
+                    $this->employmentTypeLabel($teacher),
                     (string) ($teacher->Email ?? ''),
                     (string) ($teacher->Phone ?? ''),
-                    $this->contactStatusLabel($teacher),
                     optional($teacher->GrapeSEEDEssentials)->format('Y-m-d') ?? '',
                     optional($teacher->LittleSEEDEssentials)->format('Y-m-d') ?? '',
                     (string) ($teacher->institution?->accountInfo?->TR ?? ''),
@@ -732,7 +731,7 @@ class ContactList extends Component
                     DataType::TYPE_STRING
                 );
                 $sheet->setCellValueExplicit(
-                    'F'.$row,
+                    'G'.$row,
                     (string) ($teacher->Phone ?? ''),
                     DataType::TYPE_STRING
                 );
@@ -745,7 +744,7 @@ class ContactList extends Component
                 $sheet->getStyle('A2:A'.$lastDataRow)
                     ->getNumberFormat()
                     ->setFormatCode(NumberFormat::FORMAT_TEXT);
-                $sheet->getStyle('F2:F'.$lastDataRow)
+                $sheet->getStyle('G2:G'.$lastDataRow)
                     ->getNumberFormat()
                     ->setFormatCode(NumberFormat::FORMAT_TEXT);
             }
@@ -784,6 +783,7 @@ class ContactList extends Component
         $statsQuery = Teacher::query();
         $this->applyTeacherStatusFilter($statsQuery);
         $this->applyContactVisibilityScope($statsQuery);
+        $this->applyMyAssignedFilter($statsQuery);
         $totalCount = (clone $statsQuery)->count();
         $activeCount = (clone $statsQuery)->where('ClassInOut', true)->count();
         $inactiveCount = (clone $statsQuery)
@@ -867,6 +867,7 @@ class ContactList extends Component
             });
         $this->applyTeacherStatusFilter($teachersQuery);
         $this->applyContactVisibilityScope($teachersQuery);
+        $this->applyMyAssignedFilter($teachersQuery);
 
         return $teachersQuery;
     }
@@ -895,6 +896,21 @@ class ContactList extends Component
         if (! $user instanceof User) {
             $query->whereRaw('1 = 0');
         }
+    }
+
+    /**
+     * @param  Builder<Teacher>  $query
+     */
+    private function applyMyAssignedFilter(Builder $query): void
+    {
+        if (! $this->myAssignedOnly) {
+            return;
+        }
+
+        $query->whereHas('institution', function (Builder $institutionQuery): void {
+            app(InstitutionAccountListQuery::class)
+                ->applyCurrentUserManagerScope($institutionQuery);
+        });
     }
 
     /**
@@ -936,66 +952,50 @@ class ContactList extends Component
         });
     }
 
-    public function contactStatusLabel(Teacher $teacher): string
+    public function employmentTypeLabel(Teacher $teacher): string
     {
-        return $this->accountStatusLabelForDetail($teacher->Status);
+        return TeacherEmploymentType::fromMixed($teacher->EmploymentType)->label();
+    }
+
+    /**
+     * 연락처 저장 시 Status는 UI로 받지 않는다.
+     * 비퇴직이면 항상 활성화, 이미 퇴직이면 퇴직을 유지한다.
+     */
+    private function resolveStatusForSave(?Teacher $existingTeacher): string
+    {
+        if ($existingTeacher?->isRetired()) {
+            return '퇴직';
+        }
+
+        return '활성화';
     }
 
     private function classParticipationLabelForDetail(mixed $classInOut): string
     {
         if ($classInOut === null) {
-            return '미참여';
+            return '수업 미참여';
         }
 
         return filter_var($classInOut, FILTER_VALIDATE_BOOLEAN) ? '수업 참여' : '수업 미참여';
     }
 
-    private function accountStatusLabelForDetail(?string $status): string
-    {
-        $normalized = trim((string) ($status ?? ''));
-
-        if ($normalized === '퇴직') {
-            return '퇴직';
-        }
-
-        if (in_array($normalized, ['inactive', '비활성', '비활성화'], true)) {
-            return '비활성화';
-        }
-
-        // null·빈 값은 수정 폼(normalizeStatusForForm)과 동일하게 활성화로 취급합니다.
-        return '활성화';
-    }
-
-    private function normalizeStatusForForm(?string $status): string
-    {
-        $normalized = trim((string) $status);
-
-        return in_array($normalized, ['inactive', '비활성', '비활성화', '퇴직'], true)
-            ? 'inactive'
-            : 'active';
-    }
-
     private function classParticipationFromTeacher(Teacher $teacher): string
     {
         if (! array_key_exists('ClassInOut', $teacher->getAttributes())) {
-            return '';
+            return 'out';
         }
 
         $raw = $teacher->getAttributes()['ClassInOut'];
 
         if ($raw === null) {
-            return '';
+            return 'out';
         }
 
         return filter_var($raw, FILTER_VALIDATE_BOOLEAN) ? 'in' : 'out';
     }
 
-    private function classInOutFromParticipation(string $participation): ?bool
+    private function classInOutFromParticipation(string $participation): bool
     {
-        return match ($participation) {
-            'in' => true,
-            'out' => false,
-            default => null,
-        };
+        return $participation === 'in';
     }
 }

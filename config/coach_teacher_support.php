@@ -163,6 +163,7 @@ return [
         'position' => 'Position',
         'description' => 'Description',
         'class_in_out' => 'ClassInOut',
+        'employment_type' => 'EmploymentType',
         'gs_essentials' => 'GrapeSEEDEssentials',
         'ls_essentials' => 'LittleSEEDEssentials',
         'unit_21' => 'Unit_21_',

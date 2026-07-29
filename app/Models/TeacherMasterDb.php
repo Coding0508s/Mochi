@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Casts\LegacyDateTimeCast;
+use App\Support\LegacyAuditUserNames;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -132,6 +133,43 @@ class TeacherMasterDb extends Model
         $fromTeacher = trim((string) ($this->teacher?->Phone ?? ''));
 
         return $fromTeacher !== '' ? $fromTeacher : null;
+    }
+
+    public function listRetiredTrName(): string
+    {
+        $trNameColumn = config('coach_retired_teachers.teacher_master.columns.tr_name', 'TR_Name');
+        $fromMaster = trim((string) ($this->getAttribute($trNameColumn) ?? ''));
+        if ($fromMaster !== '') {
+            return $fromMaster;
+        }
+
+        return trim((string) ($this->retirementList?->TR_Name ?? ''));
+    }
+
+    public function listCurrentTrName(): string
+    {
+        $fromTeacher = trim((string) ($this->teacher?->institution?->accountInfo?->TR ?? ''));
+        if ($fromTeacher !== '') {
+            return $fromTeacher;
+        }
+
+        return trim((string) ($this->institution?->accountInfo?->TR ?? ''));
+    }
+
+    public function listProcessorEmail(): string
+    {
+        $fromList = LegacyAuditUserNames::preferredEmail(
+            $this->retirementList?->FGC_Creator,
+            $this->retirementList?->FGC_LastModifier,
+        );
+        if ($fromList !== '') {
+            return $fromList;
+        }
+
+        return LegacyAuditUserNames::preferredEmail(
+            $this->getAttribute('FGC_Creator'),
+            $this->getAttribute('FGC_LastModifier'),
+        );
     }
 
     public function resolveTeacherId(): ?int

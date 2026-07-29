@@ -275,7 +275,7 @@
     @if($showModal)
         <div class="mochi-modal-overlay"
              wire:click.self="closeModal">
-            <div class="mochi-modal-shell max-w-2xl flex flex-col max-h-[90vh]"
+            <div class="mochi-modal-shell max-w-3xl flex flex-col max-h-[90vh]"
                  wire:click.stop>
 
                 {{-- 모달 헤더 --}}
@@ -294,115 +294,116 @@
                     @endphp
                     <div class="px-6 py-5 space-y-5">
 
-                        {{-- 섹션 1: 기본 정보 --}}
-                        <div class="grid grid-cols-2 gap-4">
+                        {{-- 섹션 1: 기본 정보 — 1행: 기관명·담당자·지원 날짜 / 2행: 지원 방법·지원 시간·참석자 --}}
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                {{-- 기관명 --}}
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        기관명 <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="text"
+                                           wire:model.live.debounce.200ms="formInstitutionKeyword"
+                                           placeholder="기관명을 입력하세요 (예: 분당)"
+                                           @disabled($fieldsDisabled)
+                                           class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header
+                                                  {{ $errors->has('formSkCode') ? 'border-red-400' : 'border-gray-300' }}
+                                                  {{ $fieldsDisabled ? 'bg-gray-50 text-gray-700 cursor-not-allowed' : '' }}" />
 
-                            {{-- 기관명 --}}
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">
-                                    기관명 <span class="text-red-500">*</span>
-                                </label>
-                                <input type="text"
-                                       wire:model.live.debounce.200ms="formInstitutionKeyword"
-                                       placeholder="기관명을 입력하세요 (예: 분당)"
-                                       @disabled($fieldsDisabled)
-                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header
-                                              {{ $errors->has('formSkCode') ? 'border-red-400' : 'border-gray-300' }}
-                                              {{ $fieldsDisabled ? 'bg-gray-50 text-gray-700 cursor-not-allowed' : '' }}" />
+                                    @if(! $modalViewOnly && filled($formInstitutionKeyword) && blank($formSkCode) && $institutionSuggestions->isNotEmpty())
+                                        <div class="mt-2 max-h-44 overflow-auto border border-gray-200 rounded-lg bg-white shadow-sm">
+                                            @foreach($institutionSuggestions as $inst)
+                                                <button type="button"
+                                                        wire:click="selectInstitution('{{ $inst->SKcode }}')"
+                                                        class="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
+                                                    <span class="font-medium text-gray-900">{{ $inst->AccountName }}</span>
+                                                    <span class="ml-2 text-xs text-gray-500">({{ $inst->SKcode }})</span>
+                                                </button>
+                                            @endforeach
+                                        </div>
+                                    @endif
 
-                                @if(! $modalViewOnly && filled($formInstitutionKeyword) && blank($formSkCode) && $institutionSuggestions->isNotEmpty())
-                                    <div class="mt-2 max-h-44 overflow-auto border border-gray-200 rounded-lg bg-white shadow-sm">
-                                        @foreach($institutionSuggestions as $inst)
-                                            <button type="button"
-                                                    wire:click="selectInstitution('{{ $inst->SKcode }}')"
-                                                    class="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
-                                                <span class="font-medium text-gray-900">{{ $inst->AccountName }}</span>
-                                                <span class="ml-2 text-xs text-gray-500">({{ $inst->SKcode }})</span>
-                                            </button>
-                                        @endforeach
-                                    </div>
-                                @endif
+                                    @if(filled($formSkCode))
+                                        <p class="mt-1 text-xs text-blue-600">
+                                            선택된 기관: {{ $formAccountName }} ({{ $formSkCode }})
+                                        </p>
+                                    @endif
 
-                                @if(filled($formSkCode))
-                                    <p class="mt-1 text-xs text-blue-600">
-                                        선택된 기관: {{ $formAccountName }} ({{ $formSkCode }})
-                                    </p>
-                                @endif
+                                    @error('formSkCode')
+                                        <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                    @enderror
+                                    @unless($institutionSelected)
+                                        <p class="mt-1 text-xs text-gray-500">기관을 먼저 선택하면 아래 입력 항목이 활성화됩니다.</p>
+                                    @endunless
+                                </div>
 
-                                @error('formSkCode')
-                                    <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
-                                @enderror
-                                @unless($institutionSelected)
-                                    <p class="mt-1 text-xs text-gray-500">기관을 먼저 선택하면 아래 입력 항목이 활성화됩니다.</p>
-                                @endunless
+                                {{-- 담당자 --}}
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">담당자</label>
+                                    <input type="text"
+                                           wire:model="formCoName"
+                                           @disabled($fieldsDisabled)
+                                           class="w-full py-2 px-3 text-sm border rounded-lg
+                                                  {{ $fieldsDisabled ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed' : 'border-gray-300 bg-white text-gray-700' }}"/>
+                                </div>
+
+                                {{-- 지원날짜 --}}
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        지원 날짜 <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="date"
+                                           wire:model="formSupportDate"
+                                           @disabled($fieldsDisabled)
+                                           class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header
+                                                  {{ $errors->has('formSupportDate') ? 'border-red-400' : '' }}
+                                                  {{ $fieldsDisabled ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed' : 'border-gray-300' }}"/>
+                                    @error('formSupportDate')
+                                        <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                    @enderror
+                                </div>
                             </div>
 
-                            {{-- CO명 --}}
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">담당자</label>
-                                <input type="text"
-                                       wire:model="formCoName"
-                                       @disabled($fieldsDisabled)
-                                       class="w-full py-2 px-3 text-sm border rounded-lg
-                                              {{ $fieldsDisabled ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed' : 'border-gray-300 bg-white text-gray-700' }}"/>
-                                {{-- CO명은 자동 입력되므로 수정 불가 처리 --}}
-                            </div>
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                {{-- 지원방법 --}}
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">지원 방법</label>
+                                    <select wire:model="formSupportType"
+                                            @disabled($fieldsDisabled)
+                                            class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header
+                                                   {{ $fieldsDisabled ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed' : 'border-gray-300' }}">
+                                        <option>전화</option>
+                                        <option>대면</option>
+                                        <option>화상</option>
+                                        <option>이메일</option>
+                                        <option>문자</option>
+                                        <option>기타</option>
+                                    </select>
+                                </div>
 
-                            {{-- 지원날짜 --}}
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">
-                                    지원 날짜 <span class="text-red-500">*</span>
-                                </label>
-                                <input type="date"
-                                       wire:model="formSupportDate"
-                                       @disabled($fieldsDisabled)
-                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header
-                                              {{ $errors->has('formSupportDate') ? 'border-red-400' : '' }}
-                                              {{ $fieldsDisabled ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed' : 'border-gray-300' }}"/>
-                                @error('formSupportDate')
-                                    <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
-                                @enderror
-                            </div>
+                                {{-- 지원시간 --}}
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        지원 시간 <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="time"
+                                           wire:model="formSupportTime"
+                                           @disabled($fieldsDisabled)
+                                           class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header
+                                                  {{ $fieldsDisabled ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed' : 'border-gray-300' }}"/>
+                                </div>
 
-                            {{-- 지원방법 --}}
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">지원 방법</label>
-                                <select wire:model="formSupportType"
-                                        @disabled($fieldsDisabled)
-                                        class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header
-                                               {{ $fieldsDisabled ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed' : 'border-gray-300' }}">
-                                    <option>전화</option>
-                                    <option>대면</option>
-                                    <option>화상</option>
-                                    <option>이메일</option>
-                                    <option>문자</option>
-                                    <option>기타</option>
-                                </select>
+                                {{-- 참석자 --}}
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">참석자</label>
+                                    <input type="text"
+                                           wire:model="formTarget"
+                                           @disabled($fieldsDisabled)
+                                           placeholder="예: 원장, 교사 2명"
+                                           class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header
+                                                  {{ $fieldsDisabled ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed' : 'border-gray-300' }}"/>
+                                </div>
                             </div>
-
-                            {{-- 지원시간 --}}
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">
-                                    지원 시간 <span class="text-red-500">*</span>
-                                </label>
-                                <input type="time"
-                                       wire:model="formSupportTime"
-                                       @disabled($fieldsDisabled)
-                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header
-                                              {{ $fieldsDisabled ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed' : 'border-gray-300' }}"/>
-                            </div>
-
-                            {{-- 참석자 --}}
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">참석자</label>
-                                <input type="text"
-                                       wire:model="formTarget"
-                                       @disabled($fieldsDisabled)
-                                       placeholder="예: 원장, 교사 2명"
-                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header
-                                              {{ $fieldsDisabled ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed' : 'border-gray-300' }}"/>
-                            </div>
-
                         </div>
 
                         {{-- 구분선 --}}
@@ -414,10 +415,10 @@
                                 <label class="block text-sm font-medium text-gray-700 mb-1">기관과의 소통내용</label>
                                 <textarea wire:model="formToAccount"
                                           @disabled($fieldsDisabled)
-                                          rows="5"
+                                          rows="12"
                                           placeholder="기관과 나눈 주요 대화 내용을 기록해 주세요 (Enter 시 새 줄에 ▶ 추가)"
                                           @unless($modalViewOnly) x-on:keydown.enter="mochiSupportEnterTriangle($event)" @endunless
-                                          class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header resize-none
+                                          class="w-full min-h-[18rem] py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header resize-y
                                                  {{ $fieldsDisabled ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed' : 'border-gray-300' }}">
                                 </textarea>
                             </div>

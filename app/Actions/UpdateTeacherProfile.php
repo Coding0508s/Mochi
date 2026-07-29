@@ -2,11 +2,13 @@
 
 namespace App\Actions;
 
+use App\Enums\TeacherEmploymentType;
 use App\Models\Teacher;
 use App\Models\User;
 use App\Support\CoachTeacherScope;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class UpdateTeacherProfile
 {
@@ -30,7 +32,9 @@ class UpdateTeacherProfile
                 continue;
             }
 
-            $attributes[$column] = $value;
+            $attributes[$column] = $value instanceof TeacherEmploymentType
+                ? $value->value
+                : $value;
         }
 
         $teacher->update($attributes);
@@ -64,6 +68,7 @@ class UpdateTeacherProfile
             'position' => ['sometimes', 'nullable', 'string', 'max:100'],
             'description' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'class_in_out' => ['sometimes', 'boolean'],
+            'employment_type' => ['sometimes', 'nullable', Rule::enum(TeacherEmploymentType::class)],
             'gs_essentials' => ['sometimes', 'nullable', 'date'],
             'ls_essentials' => ['sometimes', 'nullable', 'date'],
             'unit_21' => ['sometimes', 'nullable', 'date'],
