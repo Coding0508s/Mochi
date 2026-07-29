@@ -113,7 +113,8 @@ final class StoreReturnTeamsNotifier
      *         item_name: string,
      *         quantity: int,
      *         status: string,
-     *         notes: ?string
+     *         notes: ?string,
+     *         cs_memo: ?string
      *     }>
      * }  $registration
      */
@@ -130,6 +131,9 @@ final class StoreReturnTeamsNotifier
                     $value = number_format($item['quantity']).'개 / '.$item['status'];
                     if (filled($item['notes'] ?? null)) {
                         $value .= ' / '.$item['notes'];
+                    }
+                    if (filled($item['cs_memo'] ?? null)) {
+                        $value .= ' / 메모: '.$item['cs_memo'];
                     }
 
                     return [

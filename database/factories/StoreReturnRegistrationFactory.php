@@ -34,6 +34,7 @@ class StoreReturnRegistrationFactory extends Factory
             'status' => '정상',
             'freight' => '선불',
             'notes' => fake()->optional()->sentence(),
+            'cs_memo' => null,
             'cs_team' => fake()->optional()->name(),
             'registered_by' => User::factory(),
         ];
