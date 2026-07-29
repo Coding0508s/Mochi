@@ -98,13 +98,13 @@
 
     <div class="mochi-table-card">
         <div class="overflow-x-auto isolate">
-            <table class="w-full min-w-[1120px] table-fixed text-sm">
+            <table class="w-full min-w-[1160px] table-fixed text-sm">
                 <colgroup>
                     <col class="w-[7.5rem]">
                     <col class="w-[12rem]">
                     <col class="w-[8.5rem]">
                     <col class="w-[4rem]">
-                    <col class="w-[5.5rem]">
+                    <col class="w-[8.5rem]">
                     <col class="w-[4.5rem]">
                     <col class="w-[8rem]">
                     <col class="w-[8rem]">
@@ -153,7 +153,7 @@
                             </td>
                             <td class="px-3 py-2 text-center text-gray-800">{{ $group['item_summary'] }}</td>
                             <td class="px-3 py-2 text-center text-gray-700">{{ number_format($group['total_quantity']) }}</td>
-                            <td class="px-3 py-2 text-center text-gray-700">{{ $group['status_summary'] }}</td>
+                            <td class="px-3 py-2 text-center whitespace-nowrap text-gray-700">{{ $group['status_summary'] }}</td>
                             <td class="px-3 py-2 text-center text-gray-700">{{ $group['freight'] ?: '-' }}</td>
                             <td class="px-3 py-2 text-left text-gray-600">
                                 <span class="line-clamp-2 break-words text-xs leading-snug" title="{{ $group['notes_summary'] }}">{{ $group['notes_summary'] ?: '-' }}</span>
@@ -431,7 +431,7 @@
                                     <tr wire:key="return-detail-view-item-{{ $row['id'] ?? $loop->index }}">
                                         <td class="px-3 py-2 text-center text-gray-800">{{ $row['itemDisplayName'] ?? $row['itemName'] }}</td>
                                         <td class="px-3 py-2 text-center text-gray-700">{{ number_format((int) $row['quantity']) }}</td>
-                                        <td class="px-3 py-2 text-center text-gray-700">{{ $row['status'] }}</td>
+                                        <td class="px-3 py-2 text-center whitespace-nowrap text-gray-700">{{ $row['status'] }}</td>
                                         <td class="px-3 py-2 text-left text-gray-600">{{ filled($row['notes']) ? $row['notes'] : '-' }}</td>
                                         <td class="px-3 py-2 text-left text-gray-600">
                                             @if($this->isCsTeamMenu)
