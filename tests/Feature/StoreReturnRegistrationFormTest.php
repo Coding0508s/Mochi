@@ -50,6 +50,8 @@ class StoreReturnRegistrationFormTest extends TestCase
             ->assertSee('Date', false)
             ->assertSee('기관명', false)
             ->assertSee('품목명', false)
+            ->assertSee('특이 사항', false)
+            ->assertSee('메모', false)
             ->assertSee('담당 CS 팀', false);
     }
 
@@ -847,6 +849,57 @@ class StoreReturnRegistrationFormTest extends TestCase
             ->assertDontSee('Chris Kim', false);
     }
 
+    public function test_cs_team_menu_shows_cs_team_filter_and_filters_by_assignee(): void
+    {
+        $user = User::factory()->create([
+            'team' => 'CS',
+            'is_admin' => false,
+        ]);
+
+        StoreReturnRegistration::factory()->for($user, 'registrant')->create([
+            'institution_name' => '알파 유치원',
+            'item_name' => '교재 A',
+            'cs_team' => 'Bella Joo',
+        ]);
+
+        StoreReturnRegistration::factory()->for($user, 'registrant')->create([
+            'institution_name' => '베타 학원',
+            'item_name' => '교재 B',
+            'cs_team' => 'Chris Kim',
+        ]);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'cs'])
+            ->test(StoreReturnRegistrationForm::class)
+            ->assertSee('담당 CS', false)
+            ->assertSee('전체 담당', false)
+            ->assertSee('알파 유치원', false)
+            ->assertSee('베타 학원', false)
+            ->set('csTeamFilter', 'Bella Joo')
+            ->assertSee('알파 유치원', false)
+            ->assertDontSee('베타 학원', false);
+    }
+
+    public function test_logistics_menu_does_not_show_cs_team_filter(): void
+    {
+        $user = User::factory()->create([
+            'team' => 'CO',
+            'is_admin' => false,
+        ]);
+
+        StoreReturnRegistration::factory()->for($user, 'registrant')->create([
+            'institution_name' => '알파 유치원',
+            'item_name' => '교재 A',
+            'cs_team' => 'Bella Joo',
+        ]);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'logistics'])
+            ->test(StoreReturnRegistrationForm::class)
+            ->assertDontSee('전체 담당', false)
+            ->assertDontSee('id="return-cs-team-filter"', false);
+    }
+
     public function test_cs_team_menu_shows_complete_button_and_hides_register_button(): void
     {
         $user = User::factory()->create([
@@ -1045,6 +1098,125 @@ class StoreReturnRegistrationFormTest extends TestCase
             'id' => $registration->id,
             'status' => '전표 등록 완료',
         ]);
+    }
+
+    public function test_cs_team_saves_item_memo_when_completing_from_detail_modal(): void
+    {
+        $user = User::factory()->create([
+            'team' => 'CS',
+            'is_admin' => false,
+        ]);
+
+        $registration = StoreReturnRegistration::factory()->for($user, 'registrant')->create([
+            'institution_name' => '포도씨 유치원',
+            'item_name' => 'Unit 4',
+            'status' => '접수',
+            'notes' => '박스 훼손',
+            'cs_memo' => null,
+            'cs_team' => 'Sunny Choi',
+        ]);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'cs'])
+            ->test(StoreReturnRegistrationForm::class)
+            ->call('openDetailModal', $registration->id)
+            ->assertSee('메모', false)
+            ->assertSeeHtml('placeholder="메모 입력"')
+            ->set('detailItemRows.0.csMemo', '고객 확인 완료')
+            ->call('completeReturnGroup', $registration->id)
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('store_return_registrations', [
+            'id' => $registration->id,
+            'status' => '전표 등록 완료',
+            'notes' => '박스 훼손',
+            'cs_memo' => '고객 확인 완료',
+        ]);
+    }
+
+    public function test_cs_team_can_update_memo_after_completion(): void
+    {
+        $user = User::factory()->create([
+            'team' => 'CS',
+            'is_admin' => false,
+        ]);
+
+        $registration = StoreReturnRegistration::factory()->for($user, 'registrant')->create([
+            'institution_name' => '누리봄유치원',
+            'item_name' => '00P065',
+            'status' => '전표 등록 완료',
+            'cs_memo' => '오배송으로 인한 반품',
+            'cs_team' => 'Sunny Choi',
+        ]);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'cs'])
+            ->test(StoreReturnRegistrationForm::class)
+            ->call('openDetailModal', $registration->id)
+            ->assertSet('isDetailGroupCompleted', true)
+            ->assertSee('메모 저장', false)
+            ->assertSeeHtml('placeholder="메모 입력"')
+            ->set('detailItemRows.0.csMemo', '오배송 확인 후 재발송 요청')
+            ->call('saveCsMemos')
+            ->assertHasNoErrors()
+            ->assertSee('메모가 저장되었습니다.', false);
+
+        $this->assertDatabaseHas('store_return_registrations', [
+            'id' => $registration->id,
+            'status' => '전표 등록 완료',
+            'cs_memo' => '오배송 확인 후 재발송 요청',
+        ]);
+    }
+
+    public function test_logistics_detail_shows_cs_memo_as_read_only(): void
+    {
+        $user = User::factory()->create([
+            'team' => 'CO',
+            'is_admin' => false,
+        ]);
+
+        $registration = StoreReturnRegistration::factory()->for($user, 'registrant')->create([
+            'institution_name' => '알파 유치원',
+            'item_name' => '교재 A',
+            'status' => '접수',
+            'cs_memo' => 'CS 확인 메모',
+        ]);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'logistics'])
+            ->test(StoreReturnRegistrationForm::class)
+            ->call('openDetailModal', $registration->id)
+            ->assertSee('메모', false)
+            ->assertSee('CS 확인 메모', false)
+            ->assertDontSeeHtml('placeholder="메모 입력"')
+            ->call('startDetailEdit')
+            ->assertSee('CS 확인 메모', false)
+            ->assertDontSeeHtml('wire:model="detailItemRows.0.csMemo"');
+    }
+
+    public function test_list_shows_cs_memo_between_notes_and_cs_team(): void
+    {
+        $user = User::factory()->create([
+            'team' => 'CO',
+            'is_admin' => false,
+        ]);
+
+        StoreReturnRegistration::factory()->for($user, 'registrant')->create([
+            'institution_name' => '누리봄유치원',
+            'item_name' => '00P065',
+            'status' => '전표 등록 완료',
+            'notes' => '테스트',
+            'cs_memo' => '고객 확인 완료',
+            'cs_team' => 'Sunny Choi',
+        ]);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'logistics'])
+            ->test(StoreReturnRegistrationForm::class)
+            ->assertSeeInOrder(['특이 사항', '메모', '담당 CS 팀'], false)
+            ->assertSee('테스트', false)
+            ->assertSee('고객 확인 완료', false)
+            ->assertSee('Sunny Choi', false);
     }
 
     public function test_status_filter_can_show_only_in_progress_groups(): void

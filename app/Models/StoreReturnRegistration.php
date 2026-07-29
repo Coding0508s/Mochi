@@ -21,6 +21,7 @@ class StoreReturnRegistration extends Model
         'status',
         'freight',
         'notes',
+        'cs_memo',
         'cs_team',
         'registered_by',
         'registration_group_key',

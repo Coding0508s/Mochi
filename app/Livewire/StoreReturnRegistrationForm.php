@@ -39,6 +39,8 @@ class StoreReturnRegistrationForm extends Component
 
     public string $statusFilter = 'all';
 
+    public string $csTeamFilter = '';
+
     public int $perPage = 20;
 
     public bool $showCreateModal = false;
@@ -65,7 +67,7 @@ class StoreReturnRegistrationForm extends Component
     public array $detailOriginalRegistrationIds = [];
 
     /**
-     * @var array<int, array{id: int|null, itemName: string, quantity: string, status: string, notes: string}>
+     * @var array<int, array{id: int|null, itemName: string, quantity: string, status: string, notes: string, csMemo: string}>
      */
     public array $detailItemRows = [];
 
@@ -91,6 +93,11 @@ class StoreReturnRegistrationForm extends Component
     }
 
     public function updatingStatusFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingCsTeamFilter(): void
     {
         $this->resetPage();
     }
@@ -309,11 +316,21 @@ class StoreReturnRegistrationForm extends Component
             return;
         }
 
+        if (
+            $this->showDetailModal
+            && $this->detailAnchorId === $anchor->id
+            && ! $this->persistCsMemosFromDetail($items)
+        ) {
+            return;
+        }
+
         $completedStatus = $this->completedStatus();
 
         StoreReturnRegistration::query()
             ->whereIn('id', $items->pluck('id'))
             ->update(['status' => $completedStatus]);
+
+        $items = $this->queryGroupItems($anchor);
 
         /** @var StoreReturnRegistration $first */
         $first = $items->first();
@@ -331,6 +348,7 @@ class StoreReturnRegistrationForm extends Component
                 'quantity' => $item->quantity ?? 1,
                 'status' => $completedStatus,
                 'notes' => $item->notes,
+                'cs_memo' => $item->cs_memo,
             ])->all(),
         ]);
 
@@ -340,6 +358,63 @@ class StoreReturnRegistrationForm extends Component
         }
 
         session()->flash('success', '반품 처리가 완료되었습니다.');
+    }
+
+    public function saveCsMemos(): void
+    {
+        if (! $this->isCsTeamMenu || $this->detailAnchorId === null) {
+            return;
+        }
+
+        $anchor = StoreReturnRegistration::query()->findOrFail($this->detailAnchorId);
+        $items = $this->queryGroupItems($anchor);
+
+        if (! $this->persistCsMemosFromDetail($items)) {
+            return;
+        }
+
+        $this->loadDetailFieldsFromAnchor($anchor->id);
+        $this->detailEditMode = false;
+        session()->flash('success', '메모가 저장되었습니다.');
+    }
+
+    /**
+     * @param  Collection<int, StoreReturnRegistration>  $items
+     */
+    private function persistCsMemosFromDetail(Collection $items): bool
+    {
+        $validated = $this->validate([
+            'detailItemRows' => ['required', 'array', 'min:1'],
+            'detailItemRows.*.id' => ['required', 'integer', Rule::exists('store_return_registrations', 'id')],
+            'detailItemRows.*.csMemo' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'detailItemRows.required' => '품목을 1개 이상 입력해 주세요.',
+            'detailItemRows.min' => '품목을 1개 이상 입력해 주세요.',
+            'detailItemRows.*.id.required' => '품목 정보가 올바르지 않습니다.',
+            'detailItemRows.*.id.exists' => '품목 정보가 올바르지 않습니다.',
+            'detailItemRows.*.csMemo.max' => '메모는 2000자 이내로 입력해 주세요.',
+        ]);
+
+        $originalIds = $items->pluck('id');
+        $submittedIds = collect($validated['detailItemRows'])
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id);
+
+        if ($submittedIds->count() !== $originalIds->count() || $submittedIds->diff($originalIds)->isNotEmpty()) {
+            $this->addError('detailItemRows', '수정할 수 없는 품목이 포함되어 있습니다.');
+
+            return false;
+        }
+
+        foreach ($validated['detailItemRows'] as $row) {
+            StoreReturnRegistration::query()
+                ->whereKey((int) $row['id'])
+                ->update([
+                    'cs_memo' => filled($row['csMemo'] ?? null) ? trim((string) $row['csMemo']) : null,
+                ]);
+        }
+
+        return true;
     }
 
     public function deleteReturnGroup(int $anchorRegistrationId): void
@@ -374,7 +449,7 @@ class StoreReturnRegistrationForm extends Component
 
     public function getListTableColumnCountProperty(): int
     {
-        $count = 8;
+        $count = 9;
 
         if ($this->isCsTeamMenu) {
             $count++;
@@ -667,6 +742,8 @@ class StoreReturnRegistrationForm extends Component
     {
         $keyword = trim($this->search);
 
+        $csTeamFilter = trim($this->csTeamFilter);
+
         $registrations = StoreReturnRegistration::query()
             ->when($keyword !== '', function (Builder $query) use ($keyword): void {
                 $query->where(function (Builder $inner) use ($keyword): void {
@@ -677,6 +754,10 @@ class StoreReturnRegistrationForm extends Component
                         ->orWhere('cs_team', 'like', "%{$keyword}%");
                 });
             })
+            ->when(
+                $this->isCsTeamMenu && $csTeamFilter !== '',
+                fn (Builder $query) => $query->where('cs_team', $csTeamFilter),
+            )
             ->orderByDesc('returned_at')
             ->orderByDesc('id')
             ->get();
@@ -700,7 +781,26 @@ class StoreReturnRegistrationForm extends Component
             'statusOptions' => config('store.return_registration.statuses', []),
             'freightOptions' => config('store.return_registration.freight_options', []),
             'ecountProductOptions' => $ecountProductOptions,
+            'csTeamOptions' => $this->csTeamFilterOptions(),
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function csTeamFilterOptions(): array
+    {
+        return StoreReturnRegistration::query()
+            ->whereNotNull('cs_team')
+            ->where('cs_team', '!=', '')
+            ->distinct()
+            ->orderBy('cs_team')
+            ->pluck('cs_team')
+            ->map(fn (mixed $value): string => trim((string) $value))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**
@@ -788,12 +888,19 @@ class StoreReturnRegistrationForm extends Component
             'status_summary' => $this->displayGroupStatus($orderedItems),
             'is_completed' => $this->isGroupCompleted($orderedItems),
             'notes_summary' => filled($first->notes) ? $first->notes : null,
+            'memo_summary' => $orderedItems
+                ->map(fn (StoreReturnRegistration $item): ?string => filled($item->cs_memo) ? (string) $item->cs_memo : null)
+                ->filter()
+                ->unique()
+                ->values()
+                ->implode(' / ') ?: null,
             'items' => $orderedItems->map(fn (StoreReturnRegistration $item): array => [
                 'id' => $item->id,
                 'item_name' => app(StoreReturnEcountProductOptions::class)->displayNameForStoredItemName($item->item_name),
                 'quantity' => $item->quantity ?? 1,
                 'status' => $item->status,
                 'notes' => $item->notes,
+                'cs_memo' => $item->cs_memo,
             ])->all(),
         ];
     }
@@ -989,7 +1096,7 @@ class StoreReturnRegistrationForm extends Component
     }
 
     /**
-     * @return array{id: null, itemName: string, quantity: string, status: string, notes: string}
+     * @return array{id: null, itemName: string, quantity: string, status: string, notes: string, csMemo: string}
      */
     private function defaultDetailItemRow(): array
     {
@@ -999,6 +1106,7 @@ class StoreReturnRegistrationForm extends Component
             'quantity' => '',
             'status' => (string) (config('store.return_registration.statuses')[0] ?? '정상'),
             'notes' => '',
+            'csMemo' => '',
         ];
     }
 
@@ -1054,6 +1162,7 @@ class StoreReturnRegistrationForm extends Component
             'quantity' => (string) ($item->quantity ?? 1),
             'status' => $item->status,
             'notes' => $item->notes ?? '',
+            'csMemo' => $item->cs_memo ?? '',
         ])->all();
     }
 }
