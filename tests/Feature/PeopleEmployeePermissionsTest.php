@@ -1222,6 +1222,63 @@ class PeopleEmployeePermissionsTest extends TestCase
         ]);
     }
 
+    public function test_demotion_from_coach_to_staff_clears_all_seven_matrix_flags(): void
+    {
+        // Coach has flags; Staff has no matrix entry → all 7 flags must be cleared on demotion
+        JobTitlePermission::query()->create([
+            'job_code' => 'Coach',
+            'is_coach_team_lead' => true,
+            'can_view_all_institutions' => true,
+            'setup_view' => true,
+        ]);
+
+        Employee::query()->create([
+            'EMPNO' => 'E050',
+            'KOREANAME' => '코치강등',
+            'ENGLISHNAME' => 'Coach Demote',
+            'JOB' => 'Coach',
+            'EMAIL' => 'coach-demote@example.com',
+            'PHONENO' => '010-5555-0001',
+            'WORKDEPT' => 'A01',
+            'STATUS' => 1,
+        ]);
+
+        $linkedUser = User::factory()->create([
+            'employee_empno' => 'E050',
+            'email' => 'coach-demote@example.com',
+            'is_admin' => false,
+            'is_coach_team_lead' => true,
+            'can_view_all_institutions' => true,
+            'setup_view' => true,
+            'setup_manage' => false,
+            'can_manage_store_inventory' => false,
+            'is_gs_brochure_admin' => false,
+            'is_deputy_admin' => false,
+        ]);
+
+        $admin = User::factory()->admin()->create();
+
+        // Demote: JOB 'Coach' → 'Staff' (no matrix entry for Staff → all flags false)
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openEditModal', 'E050')
+            ->set('editJob', 'Staff')
+            ->call('saveEmployee')
+            ->assertHasNoErrors();
+
+        // All 7 FLAG_COLUMNS must be cleared after demotion
+        $this->assertDatabaseHas('users', [
+            'id' => $linkedUser->id,
+            'is_coach_team_lead' => false,
+            'can_view_all_institutions' => false,
+            'setup_view' => false,
+            'setup_manage' => false,
+            'can_manage_store_inventory' => false,
+            'is_gs_brochure_admin' => false,
+            'is_deputy_admin' => false,
+        ]);
+    }
+
     public function test_is_admin_user_matrix_flags_are_not_overwritten_by_sync(): void
     {
         JobTitlePermission::query()->create([

@@ -428,6 +428,7 @@ class PeopleEmployeesList extends Component
                 );
                 $linkedUserPayload['team'] = $syncedTeam ?? '';
                 $linkedUser->forceFill($linkedUserPayload)->save();
+                $linkedUser->refresh();
 
                 if (! $linkedUser->is_admin) {
                     app(JobTitlePermissionSynchronizer::class)->syncUser($linkedUser, auth()->user());
@@ -565,6 +566,7 @@ class PeopleEmployeesList extends Component
                 $userPayload['team'] = $inferredTeam;
             }
             $newUser = User::query()->create($userPayload);
+            $newUser->refresh();
             app(JobTitlePermissionSynchronizer::class)->syncUser($newUser, auth()->user());
         });
 
@@ -968,9 +970,6 @@ class PeopleEmployeesList extends Component
                 'employee_empno' => $empNo,
                 'password' => Str::random(48),
                 'is_admin' => false,
-                'is_gs_brochure_admin' => false,
-                'can_manage_store_inventory' => false,
-                'is_coach_team_lead' => false,
                 'is_active' => true,
                 'email_verified_at' => null,
             ];
@@ -981,7 +980,9 @@ class PeopleEmployeesList extends Component
             if ($syncedTeam !== null) {
                 $accountPayload['team'] = $syncedTeam;
             }
-            User::query()->create($accountPayload);
+            $newMinimalUser = User::query()->create($accountPayload);
+            $newMinimalUser->refresh();
+            app(JobTitlePermissionSynchronizer::class)->syncUser($newMinimalUser, auth()->user());
         });
     }
 
