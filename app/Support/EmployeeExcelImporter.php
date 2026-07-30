@@ -281,7 +281,13 @@ class EmployeeExcelImporter
                     $userPayload['team'] = $inferredTeam;
                 }
 
-                User::query()->create($userPayload);
+                /** @var User $linkedUser */
+                $linkedUser = User::query()->create($userPayload);
+                $linkedUser->refresh();
+                app(JobTitlePermissionSynchronizer::class)->syncUser(
+                    $linkedUser,
+                    User::query()->find($actorUserId),
+                );
 
                 $this->trackInsertedEmployee($empNo);
 

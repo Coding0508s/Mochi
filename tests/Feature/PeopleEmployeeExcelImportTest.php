@@ -5,9 +5,11 @@ namespace Tests\Feature;
 use App\Livewire\PeopleEmployeesList;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\JobTitlePermission;
 use App\Models\User;
 use App\Support\EmployeeExcelImporter;
 use App\Support\EmployeeImportRollback;
+use App\Support\JobTitlePermissionSynchronizer;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -159,5 +161,59 @@ class PeopleEmployeeExcelImportTest extends TestCase
             ->test(PeopleEmployeesList::class)
             ->call('resetLastEmployeeImport')
             ->assertForbidden();
+    }
+
+    public function test_new_imported_user_gets_permissions_from_job_title_matrix(): void
+    {
+        $defaultJob = (string) config('employee_import.default_job', 'Staff');
+
+        JobTitlePermission::query()->create([
+            'job_code' => $defaultJob,
+            'setup_view' => false,
+            'setup_manage' => true,
+            'can_manage_store_inventory' => true,
+            'is_gs_brochure_admin' => false,
+            'is_coach_team_lead' => true,
+            'can_view_all_institutions' => false,
+            'is_deputy_admin' => false,
+        ]);
+
+        $admin = User::factory()->admin()->create();
+
+        app(EmployeeExcelImporter::class)->importRows(
+            [
+                ['성명', '부서', '전화', '모바일', 'Email', '사내전화(내선)'],
+                ['매트릭스신규', '팀 A', '', '010-3333-3333', 'matrix-new@example.com', ''],
+            ],
+            $admin->id,
+            dryRun: false,
+        );
+
+        $user = User::query()->where('email', 'matrix-new@example.com')->firstOrFail();
+        $this->assertTrue((bool) $user->setup_manage);
+        $this->assertTrue((bool) $user->setup_view);
+        $this->assertTrue((bool) $user->can_manage_store_inventory);
+        $this->assertTrue((bool) $user->is_coach_team_lead);
+        $this->assertFalse((bool) $user->is_gs_brochure_admin);
+        $this->assertFalse((bool) $user->is_deputy_admin);
+    }
+
+    public function test_new_imported_user_keeps_false_flags_when_matrix_row_missing(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        app(EmployeeExcelImporter::class)->importRows(
+            [
+                ['성명', '부서', '전화', '모바일', 'Email', '사내전화(내선)'],
+                ['노매트릭스', '팀 A', '', '010-4444-4444', 'no-matrix@example.com', ''],
+            ],
+            $admin->id,
+            dryRun: false,
+        );
+
+        $user = User::query()->where('email', 'no-matrix@example.com')->firstOrFail();
+        foreach (JobTitlePermissionSynchronizer::FLAG_COLUMNS as $column) {
+            $this->assertFalse((bool) $user->{$column}, $column);
+        }
     }
 }
