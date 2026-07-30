@@ -216,6 +216,10 @@ Route::middleware(['auth'])->group(function () {
             return view('pages.setup.common-codes');
         })->name('setup.common-codes');
 
+        Route::get('/setup/job-title-permissions', function () {
+            return view('pages.setup.job-title-permissions');
+        })->name('setup.job-title-permissions');
+
         Route::get('/setup/employees/create', function () {
             return view('pages.setup.employee-create');
         })->name('setup.employees.create');

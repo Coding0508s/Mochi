@@ -66,6 +66,13 @@ class SetupPagesTest extends TestCase
         $this->actingAs($admin)->get('/setup/common-codes')->assertOk();
     }
 
+    public function test_setup_job_title_permissions_returns_ok(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)->get('/setup/job-title-permissions')->assertOk();
+    }
+
     public function test_setup_hub_forbidden_for_user_without_setup_access(): void
     {
         $this->actingAs($this->user)->get('/setup')->assertForbidden();
@@ -81,6 +88,7 @@ class SetupPagesTest extends TestCase
         $this->actingAs($setupViewer)->get('/setup')->assertOk();
         $this->actingAs($setupViewer)->get('/setup/team')->assertOk();
         $this->actingAs($setupViewer)->get('/setup/common-codes')->assertOk();
+        $this->actingAs($setupViewer)->get('/setup/job-title-permissions')->assertOk();
     }
 
     public function test_setup_employee_create_allows_admin(): void
@@ -100,6 +108,7 @@ class SetupPagesTest extends TestCase
         $this->assertStringEndsWith('/setup', route('setup.index', [], false));
         $this->assertStringEndsWith('/setup/team', route('setup.team', [], false));
         $this->assertStringEndsWith('/setup/common-codes', route('setup.common-codes', [], false));
+        $this->assertStringEndsWith('/setup/job-title-permissions', route('setup.job-title-permissions', [], false));
         $this->assertStringEndsWith('/setup/employees/create', route('setup.employees.create', [], false));
     }
 }
