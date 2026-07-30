@@ -342,13 +342,13 @@
                                 <input type="text" wire:model.defer="createJob" maxlength="100"
                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header"
                                        placeholder="직책을 입력하세요"/>
-                                <p class="mt-1 text-[11px] text-amber-700">기존 직원 데이터가 없어 자유 입력입니다.</p>
+                                <p class="mt-1 text-[11px] text-amber-700">Setup에 등록된 직책이 없어 자유 입력입니다.</p>
                             @else
                                 <select wire:model.defer="createJob"
                                         class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                     <option value="">직책 선택</option>
                                     @foreach($jobOptions as $job)
-                                        <option value="{{ $job }}">{{ $job }}</option>
+                                        <option value="{{ $job->code }}">{{ $job->label }}</option>
                                     @endforeach
                                 </select>
                             @endif
@@ -466,8 +466,8 @@
                             <select wire:model.defer="editJob"
                                     class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                 <option value="">직책 선택</option>
-                                @foreach($jobOptions as $job)
-                                    <option value="{{ $job }}">{{ $job }}</option>
+                                @foreach($editJobOptions as $job)
+                                    <option value="{{ $job->code }}">{{ $job->label }}</option>
                                 @endforeach
                             </select>
                             @error('editJob') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
@@ -507,45 +507,17 @@
                                     </span>
                                 </div>
 
-                                <p class="text-[11px] text-gray-600 leading-snug">
-                                    관리자·GS Brochure·스토어 재고 등 특수 권한은 사용자 계정에서 직접 관리됩니다.
-                                </p>
-
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 rounded-md border border-gray-200 bg-white px-3 py-3">
+                                <div class="rounded-md border border-gray-200 bg-white px-3 py-3">
                                     <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                                         <input type="checkbox" wire:model.defer="editIsAdmin" class="rounded border-gray-300 text-mochi-header focus:ring-mochi-header">
-                                        <span>관리자</span>
-                                    </label>
-                                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                                        <input type="checkbox" wire:model.defer="editIsDeputyAdmin" class="rounded border-gray-300 text-mochi-header focus:ring-mochi-header">
-                                        <span>준관리자</span>
-                                    </label>
-                                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                                        <input type="checkbox" wire:model.defer="editSetupView" class="rounded border-gray-300 text-mochi-header focus:ring-mochi-header">
-                                        <span>Setup 조회</span>
-                                    </label>
-                                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                                        <input type="checkbox" wire:model.defer="editSetupManage" class="rounded border-gray-300 text-mochi-header focus:ring-mochi-header">
-                                        <span>Setup 관리</span>
-                                    </label>
-                                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                                        <input type="checkbox" wire:model.defer="editIsGsBrochureAdmin" class="rounded border-gray-300 text-mochi-header focus:ring-mochi-header">
-                                        <span>GS Brochure 관리자</span>
-                                    </label>
-                                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                                        <input type="checkbox" wire:model.defer="editCanManageStoreInventory" class="rounded border-gray-300 text-mochi-header focus:ring-mochi-header">
-                                        <span>Store 재고관리</span>
-                                    </label>
-                                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                                        <input type="checkbox" wire:model.defer="editCanViewAllInstitutions" class="rounded border-gray-300 text-mochi-header focus:ring-mochi-header">
-                                        <span>모든 기관 조회 가능</span>
+                                        <span>Full Access (관리자)</span>
                                     </label>
                                 </div>
-                                <p class="text-[11px] text-gray-500">
-                                    관리자 선택 시 Setup 조회/관리는 자동 활성화되며, 준관리자와 중복 지정되지 않습니다.
-                                </p>
-                                <p class="text-[11px] text-gray-500">
-                                    모든 기관 조회 가능은 조회 범위만 확장하며, 수정 권한은 기존 팀/관리자 규칙을 그대로 따릅니다.
+
+                                <p class="text-xs text-gray-500">
+                                    Setup 조회·관리, Store 재고, GS Brochure, Coach 팀 KPI, 기관 전체 조회, 부관리자 권한은
+                                    <a href="{{ route('setup.job-title-permissions') }}" class="text-[#2b78c5] underline">Setup → 직책 권한</a>
+                                    표에서 직책 기준으로 관리됩니다. Full Access(관리자)만 이 화면에서 지정합니다.
                                 </p>
 
                                 @if(! $hasLinkedLoginAccount)

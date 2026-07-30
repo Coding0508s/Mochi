@@ -6,6 +6,8 @@ use App\Livewire\PeopleEmployeesList;
 use App\Livewire\SetupEmployeeCreate;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\JobTitlePermission;
+use App\Models\SetupCommonCode;
 use App\Models\User;
 use App\Notifications\CustomResetPassword;
 use Illuminate\Database\Schema\Blueprint;
@@ -742,8 +744,9 @@ class PeopleEmployeePermissionsTest extends TestCase
         ]);
     }
 
-    public function test_user_with_manage_user_accounts_gate_syncs_is_active_without_changing_permission_flags(): void
+    public function test_user_with_manage_user_accounts_gate_syncs_is_active_and_matrix_flags(): void
     {
+        // User has is_gs_brochure_admin=true; after save, sync will clear it (no matrix entry for '매니저')
         $linkedUser = User::factory()->create([
             'employee_empno' => 'E001',
             'is_active' => true,
@@ -767,7 +770,7 @@ class PeopleEmployeePermissionsTest extends TestCase
             'id' => $linkedUser->id,
             'is_active' => false,
             'is_admin' => false,
-            'is_gs_brochure_admin' => true,
+            'is_gs_brochure_admin' => false, // sync cleared it; no matrix entry for '매니저'
         ]);
     }
 
@@ -787,8 +790,31 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->assertDontSee('현재 역할:');
     }
 
-    public function test_admin_can_update_user_permissions_from_employee_modal(): void
+    public function test_admin_can_set_is_admin_flag_from_people_modal(): void
     {
+        $linkedUser = User::factory()->create([
+            'employee_empno' => 'E001',
+            'is_admin' => false,
+        ]);
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openEditModal', 'E001')
+            ->set('editIsAdmin', true)
+            ->call('saveEmployee')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $linkedUser->id,
+            'is_admin' => true,
+        ]);
+    }
+
+    public function test_seven_matrix_flags_are_not_persisted_from_people_request(): void
+    {
+        // User starts with all matrix flags false; matrix has no entry for '매니저'
         $linkedUser = User::factory()->create([
             'employee_empno' => 'E001',
             'is_admin' => false,
@@ -797,28 +823,29 @@ class PeopleEmployeePermissionsTest extends TestCase
             'setup_manage' => false,
             'is_gs_brochure_admin' => false,
             'can_manage_store_inventory' => false,
+            'is_coach_team_lead' => false,
+            'can_view_all_institutions' => false,
         ]);
 
         $admin = User::factory()->admin()->create();
 
+        // Even if the old properties somehow existed, saving via People modal must not set matrix flags
         Livewire::actingAs($admin)
             ->test(PeopleEmployeesList::class)
             ->call('openEditModal', 'E001')
-            ->set('editIsDeputyAdmin', true)
-            ->set('editSetupManage', true)
-            ->set('editIsGsBrochureAdmin', true)
-            ->set('editCanManageStoreInventory', true)
             ->call('saveEmployee')
             ->assertHasNoErrors();
 
+        // No matrix entry for '매니저' → sync leaves all flags false
         $this->assertDatabaseHas('users', [
             'id' => $linkedUser->id,
-            'is_admin' => false,
-            'is_deputy_admin' => true,
-            'setup_view' => true,
-            'setup_manage' => true,
-            'is_gs_brochure_admin' => true,
-            'can_manage_store_inventory' => true,
+            'is_deputy_admin' => false,
+            'setup_view' => false,
+            'setup_manage' => false,
+            'is_gs_brochure_admin' => false,
+            'can_manage_store_inventory' => false,
+            'is_coach_team_lead' => false,
+            'can_view_all_institutions' => false,
         ]);
     }
 
@@ -1126,5 +1153,105 @@ class PeopleEmployeePermissionsTest extends TestCase
             ->call('sendPasswordResetLink');
 
         Notification::assertSentTo($linkedUser, CustomResetPassword::class);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // 직책 권한 매트릭스 동기화 시나리오 검증
+    // ────────────────────────────────────────────────────────────────────────
+
+    public function test_job_change_syncs_linked_user_flags_from_matrix(): void
+    {
+        SetupCommonCode::query()->create([
+            'category' => 'job_title',
+            'code' => 'Coach',
+            'label' => '코치',
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+        SetupCommonCode::query()->create([
+            'category' => 'job_title',
+            'code' => 'Staff',
+            'label' => 'Staff',
+            'is_active' => true,
+            'sort_order' => 2,
+        ]);
+
+        JobTitlePermission::query()->create([
+            'job_code' => 'Coach',
+            'is_coach_team_lead' => true,
+            'setup_view' => true,
+        ]);
+
+        Employee::query()->create([
+            'EMPNO' => 'E002',
+            'KOREANAME' => '코치직원',
+            'ENGLISHNAME' => 'Coach Employee',
+            'JOB' => 'Staff',
+            'EMAIL' => 'coach-emp@example.com',
+            'PHONENO' => '010-0000-0002',
+            'WORKDEPT' => 'A01',
+            'STATUS' => 1,
+        ]);
+
+        $linkedUser = User::factory()->create([
+            'employee_empno' => 'E002',
+            'email' => 'coach-emp@example.com',
+            'is_admin' => false,
+            'is_coach_team_lead' => false,
+            'setup_view' => false,
+        ]);
+
+        $admin = User::factory()->admin()->create();
+
+        // Change JOB from 'Staff' to 'Coach' via edit modal
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openEditModal', 'E002')
+            ->set('editJob', 'Coach')
+            ->call('saveEmployee')
+            ->assertHasNoErrors();
+
+        // Employee JOB updated in DB
+        $this->assertSame('Coach', Employee::query()->where('EMPNO', 'E002')->value('JOB'));
+
+        // Sync ran: Coach matrix row gives is_coach_team_lead=true, setup_view=true
+        $this->assertDatabaseHas('users', [
+            'id' => $linkedUser->id,
+            'is_coach_team_lead' => true,
+            'setup_view' => true,
+        ]);
+    }
+
+    public function test_is_admin_user_matrix_flags_are_not_overwritten_by_sync(): void
+    {
+        JobTitlePermission::query()->create([
+            'job_code' => '매니저',
+            'setup_view' => false,
+            'is_gs_brochure_admin' => false,
+        ]);
+
+        $linkedAdmin = User::factory()->create([
+            'employee_empno' => 'E001',
+            'email' => 'e001@example.com',
+            'is_admin' => true,
+            'setup_view' => true,      // admin-set values that sync must NOT overwrite
+            'is_gs_brochure_admin' => true,
+        ]);
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(PeopleEmployeesList::class)
+            ->call('openEditModal', 'E001')
+            ->call('saveEmployee')
+            ->assertHasNoErrors();
+
+        // is_admin=true → syncUser skips → flags remain unchanged
+        $this->assertDatabaseHas('users', [
+            'id' => $linkedAdmin->id,
+            'is_admin' => true,
+            'setup_view' => true,
+            'is_gs_brochure_admin' => true,
+        ]);
     }
 }

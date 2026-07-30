@@ -5,20 +5,22 @@ namespace App\Livewire;
 use App\Actions\SetTemporaryUserPassword;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\SetupCommonCode;
 use App\Models\User;
 use App\Support\DepartmentCodeGenerator;
 use App\Support\DepartmentDisplay;
 use App\Support\EmployeeExcelImporter;
 use App\Support\EmployeeImportRollback;
 use App\Support\EmployeeSex;
+use App\Support\JobTitlePermissionSynchronizer;
 use App\Support\TeamMenuContext;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -144,22 +146,6 @@ class PeopleEmployeesList extends Component
 
     public bool $editIsAdmin = false;
 
-    public bool $editIsDeputyAdmin = false;
-
-    public bool $editSetupView = false;
-
-    public bool $editSetupManage = false;
-
-    public bool $editIsGsBrochureAdmin = false;
-
-    public bool $editCanManageStoreInventory = false;
-
-    public bool $editCanViewAllInstitutions = false;
-
-    private ?bool $supportsSetupPermissionColumns = null;
-
-    private ?bool $supportsCanViewAllInstitutionsColumn = null;
-
     protected array $queryString = [
         'filterDept' => ['as' => 'team', 'except' => ''],
         'filterStatus' => ['as' => 'status', 'except' => '1'],
@@ -191,30 +177,6 @@ class PeopleEmployeesList extends Component
         $this->editUserIsActive = $this->shouldActivateUserFromEmployeeStatus(
             $value === null ? null : (string) $value
         );
-    }
-
-    public function updatedEditIsAdmin(bool $value): void
-    {
-        if ($value) {
-            $this->editIsDeputyAdmin = false;
-            $this->editSetupView = true;
-            $this->editSetupManage = true;
-        }
-    }
-
-    public function updatedEditIsDeputyAdmin(bool $value): void
-    {
-        if ($value) {
-            $this->editIsAdmin = false;
-            $this->editSetupView = true;
-        }
-    }
-
-    public function updatedEditSetupManage(bool $value): void
-    {
-        if ($value) {
-            $this->editSetupView = true;
-        }
     }
 
     public function sort(string $field): void
@@ -253,14 +215,6 @@ class PeopleEmployeesList extends Component
         $this->linkedUserId = $linkedUser?->id;
         $this->editUserIsActive = $this->shouldActivateUserFromEmployeeStatus($this->editStatus);
         $this->editIsAdmin = (bool) ($linkedUser?->is_admin);
-        $this->editIsDeputyAdmin = (bool) ($linkedUser?->is_deputy_admin);
-        $this->editSetupView = (bool) ($linkedUser?->setup_view);
-        $this->editSetupManage = (bool) ($linkedUser?->setup_manage);
-        $this->editIsGsBrochureAdmin = (bool) ($linkedUser?->is_gs_brochure_admin);
-        $this->editCanManageStoreInventory = (bool) ($linkedUser?->can_manage_store_inventory);
-        $this->editCanViewAllInstitutions = $this->supportsCanViewAllInstitutionsColumn()
-            ? (bool) ($linkedUser?->can_view_all_institutions)
-            : false;
 
         $this->resetErrorBag();
         $this->resetValidation();
@@ -283,12 +237,6 @@ class PeopleEmployeesList extends Component
         $this->linkedUserId = null;
         $this->editUserIsActive = true;
         $this->editIsAdmin = false;
-        $this->editIsDeputyAdmin = false;
-        $this->editSetupView = false;
-        $this->editSetupManage = false;
-        $this->editIsGsBrochureAdmin = false;
-        $this->editCanManageStoreInventory = false;
-        $this->editCanViewAllInstitutions = false;
 
         $this->resetErrorBag();
         $this->resetValidation();
@@ -302,13 +250,15 @@ class PeopleEmployeesList extends Component
             ->pluck('WORKDEPT')
             ->map(fn ($deptCode) => (string) $deptCode)
             ->all();
-        $jobOptions = $this->getJobOptions()
-            ->map(fn ($job) => (string) $job)
-            ->all();
 
+        $activeCodes = $this->getJobOptions()->pluck('code')->map(fn ($c) => (string) $c);
+        // Include legacy JOB if it is not among active SetupCommonCode entries
+        if ($this->editJob !== '' && ! $activeCodes->contains($this->editJob)) {
+            $activeCodes = $activeCodes->push($this->editJob);
+        }
         $jobRules = ['required', 'string', 'max:100'];
-        if ($jobOptions !== []) {
-            $jobRules[] = Rule::in($jobOptions);
+        if ($activeCodes->isNotEmpty()) {
+            $jobRules[] = Rule::in($activeCodes->all());
         }
 
         $validated = $this->validate([
@@ -413,18 +363,9 @@ class PeopleEmployeesList extends Component
                             'employee_empno' => $currentEmployeeEmpNo,
                             'password' => Str::random(48),
                             'is_admin' => false,
-                            'is_gs_brochure_admin' => false,
-                            'can_manage_store_inventory' => false,
-                            'is_coach_team_lead' => false,
-                            'is_deputy_admin' => false,
-                            'can_view_all_institutions' => false,
                             'is_active' => (bool) $this->editUserIsActive,
                             'email_verified_at' => null,
                         ];
-                        if ($this->supportsSetupPermissionColumns()) {
-                            $newUserPayload['setup_view'] = false;
-                            $newUserPayload['setup_manage'] = false;
-                        }
                         $syncedTeam = TeamMenuContext::inferUserTeamForRegistration(
                             $validated['editWorkDept'],
                             trim($validated['editJob'])
@@ -478,24 +419,8 @@ class PeopleEmployeesList extends Component
                     'email' => $normalizedEmail,
                     'employee_empno' => $currentEmployeeEmpNo,
                     'is_active' => $this->editUserIsActive,
+                    'is_admin' => (bool) $this->editIsAdmin,
                 ];
-
-                $nextIsAdmin = (bool) $this->editIsAdmin;
-                $nextIsDeputyAdmin = $nextIsAdmin ? false : (bool) $this->editIsDeputyAdmin;
-                $nextSetupManage = $nextIsAdmin ? true : (bool) $this->editSetupManage;
-                $nextSetupView = $nextIsAdmin ? true : ((bool) $this->editSetupView || $nextSetupManage || $nextIsDeputyAdmin);
-
-                $linkedUserPayload['is_admin'] = $nextIsAdmin;
-                $linkedUserPayload['is_deputy_admin'] = $nextIsDeputyAdmin;
-                $linkedUserPayload['is_gs_brochure_admin'] = (bool) $this->editIsGsBrochureAdmin;
-                $linkedUserPayload['can_manage_store_inventory'] = (bool) $this->editCanManageStoreInventory;
-                if ($this->supportsCanViewAllInstitutionsColumn()) {
-                    $linkedUserPayload['can_view_all_institutions'] = (bool) $this->editCanViewAllInstitutions;
-                }
-                if ($this->supportsSetupPermissionColumns()) {
-                    $linkedUserPayload['setup_view'] = $nextSetupView;
-                    $linkedUserPayload['setup_manage'] = $nextSetupManage;
-                }
 
                 $syncedTeam = TeamMenuContext::inferUserTeamForRegistration(
                     $validated['editWorkDept'],
@@ -503,6 +428,10 @@ class PeopleEmployeesList extends Component
                 );
                 $linkedUserPayload['team'] = $syncedTeam ?? '';
                 $linkedUser->forceFill($linkedUserPayload)->save();
+
+                if (! $linkedUser->is_admin) {
+                    app(JobTitlePermissionSynchronizer::class)->syncUser($linkedUser, auth()->user());
+                }
             });
         } catch (ValidationException $e) {
             throw $e;
@@ -567,13 +496,10 @@ class PeopleEmployeesList extends Component
             ->map(fn ($deptCode) => (string) $deptCode)
             ->all();
 
-        $jobOptions = $this->getJobOptions()
-            ->map(fn ($job) => (string) $job)
-            ->all();
-
+        $activeCodes = $this->getJobOptions()->pluck('code')->map(fn ($c) => (string) $c);
         $jobRules = ['required', 'string', 'max:100'];
-        if ($jobOptions !== []) {
-            $jobRules[] = Rule::in($jobOptions);
+        if ($activeCodes->isNotEmpty()) {
+            $jobRules[] = Rule::in($activeCodes->all());
         }
 
         $emailRules = ['required', 'email', 'max:100', Rule::unique('users', 'email')];
@@ -628,11 +554,6 @@ class PeopleEmployeesList extends Component
                 'employee_empno' => trim($validated['createEmpNo']),
                 'password' => Str::random(48),
                 'is_admin' => false,
-                'is_gs_brochure_admin' => false,
-                'can_manage_store_inventory' => false,
-                'is_coach_team_lead' => false,
-                'is_deputy_admin' => false,
-                'can_view_all_institutions' => false,
                 'is_active' => true,
                 'email_verified_at' => null,
             ];
@@ -643,7 +564,8 @@ class PeopleEmployeesList extends Component
             if ($inferredTeam !== null) {
                 $userPayload['team'] = $inferredTeam;
             }
-            User::query()->create($userPayload);
+            $newUser = User::query()->create($userPayload);
+            app(JobTitlePermissionSynchronizer::class)->syncUser($newUser, auth()->user());
         });
 
         $resetLinkSent = $this->sendResetLink($email) === Password::RESET_LINK_SENT;
@@ -1153,6 +1075,13 @@ class PeopleEmployeesList extends Component
             ->pluck('STATUS');
         $jobOptions = $this->getJobOptions();
 
+        // Build edit modal options: prepend a "(레거시)" entry when current editJob is not an active code
+        $editJobOptions = $jobOptions;
+        if ($this->editJob !== '' && $jobOptions->pluck('code')->doesntContain($this->editJob)) {
+            $legacyEntry = (object) ['code' => $this->editJob, 'label' => $this->editJob.' (레거시)'];
+            $editJobOptions = collect([$legacyEntry])->concat($jobOptions);
+        }
+
         return view('livewire.people-employees-list', [
             'employees' => $employees,
             'allCount' => $allCount,
@@ -1161,6 +1090,7 @@ class PeopleEmployeesList extends Component
             'deptOptions' => $deptOptions,
             'statusOptions' => $statusOptions,
             'jobOptions' => $jobOptions,
+            'editJobOptions' => $editJobOptions,
             'currentTeamLabel' => $this->resolveCurrentTeamLabel($deptOptions),
             'canManageEmployees' => Gate::allows('editEmployeeProfile'),
             'canManageEmployeeDepartment' => Gate::allows('manageEmployeeDepartment'),
@@ -1202,15 +1132,14 @@ class PeopleEmployeesList extends Component
             ]);
     }
 
-    private function getJobOptions()
+    private function getJobOptions(): Collection
     {
-        return Employee::query()
-            ->whereNotNull('JOB')
-            ->where('JOB', '!=', '')
-            ->select('JOB')
-            ->distinct()
-            ->orderBy('JOB')
-            ->pluck('JOB');
+        return SetupCommonCode::query()
+            ->where('category', 'job_title')
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('code')
+            ->get(['code', 'label']);
     }
 
     /**
@@ -1282,48 +1211,7 @@ class PeopleEmployeesList extends Component
      */
     private function linkedUserSelectColumns(): array
     {
-        $columns = [
-            'id',
-            'email',
-            'is_active',
-            'is_admin',
-            'is_deputy_admin',
-            'is_gs_brochure_admin',
-            'can_manage_store_inventory',
-        ];
-
-        if ($this->supportsCanViewAllInstitutionsColumn()) {
-            $columns[] = 'can_view_all_institutions';
-        }
-
-        if ($this->supportsSetupPermissionColumns()) {
-            $columns[] = 'setup_view';
-            $columns[] = 'setup_manage';
-        }
-
-        return $columns;
-    }
-
-    private function supportsSetupPermissionColumns(): bool
-    {
-        if ($this->supportsSetupPermissionColumns !== null) {
-            return $this->supportsSetupPermissionColumns;
-        }
-
-        $this->supportsSetupPermissionColumns = Schema::hasColumns('users', ['setup_view', 'setup_manage']);
-
-        return $this->supportsSetupPermissionColumns;
-    }
-
-    private function supportsCanViewAllInstitutionsColumn(): bool
-    {
-        if ($this->supportsCanViewAllInstitutionsColumn !== null) {
-            return $this->supportsCanViewAllInstitutionsColumn;
-        }
-
-        $this->supportsCanViewAllInstitutionsColumn = Schema::hasColumn('users', 'can_view_all_institutions');
-
-        return $this->supportsCanViewAllInstitutionsColumn;
+        return ['id', 'email', 'is_active', 'is_admin'];
     }
 
     private function shouldActivateUserFromEmployeeStatus(?string $employeeStatus): bool
