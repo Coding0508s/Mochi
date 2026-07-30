@@ -71,6 +71,48 @@ class SetupJobTitlePermissionMatrixTest extends TestCase
         $this->assertTrue((bool) $target->fresh()->is_coach_team_lead);
     }
 
+    public function test_injected_fake_job_code_is_not_persisted(): void
+    {
+        SetupCommonCode::query()->create([
+            'category' => 'job_title',
+            'code' => 'Coach',
+            'label' => '코치',
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+
+        $actor = User::factory()->create([
+            'setup_view' => true,
+            'setup_manage' => true,
+        ]);
+
+        $injectedRow = [
+            'label' => 'Injected',
+            'setup_view' => false,
+            'setup_manage' => true,
+            'can_manage_store_inventory' => true,
+            'is_gs_brochure_admin' => true,
+            'is_coach_team_lead' => true,
+            'can_view_all_institutions' => true,
+            'is_deputy_admin' => true,
+        ];
+
+        Livewire::actingAs($actor)
+            ->test(SetupJobTitlePermissionMatrix::class)
+            ->set('rows.Coach.is_coach_team_lead', true)
+            ->set('rows.FakeInjectedCode', $injectedRow)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('job_title_permissions', [
+            'job_code' => 'Coach',
+            'is_coach_team_lead' => 1,
+        ]);
+        $this->assertDatabaseMissing('job_title_permissions', [
+            'job_code' => 'FakeInjectedCode',
+        ]);
+    }
+
     public function test_setup_view_only_cannot_save(): void
     {
         SetupCommonCode::query()->create([

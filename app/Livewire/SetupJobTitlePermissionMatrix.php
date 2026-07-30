@@ -33,8 +33,11 @@ class SetupJobTitlePermissionMatrix extends Component
     {
         Gate::authorize('manageTeamStructure');
 
+        $allowedJobCodes = $this->activeJobTitleCodes();
+        $rowsToSave = array_intersect_key($this->rows, array_flip($allowedJobCodes));
+
         $rules = [];
-        foreach (array_keys($this->rows) as $jobCode) {
+        foreach (array_keys($rowsToSave) as $jobCode) {
             foreach (JobTitlePermissionSynchronizer::FLAG_COLUMNS as $column) {
                 $rules["rows.{$jobCode}.{$column}"] = ['boolean'];
             }
@@ -46,7 +49,7 @@ class SetupJobTitlePermissionMatrix extends Component
         $actor = auth()->user();
         $totalSynced = 0;
 
-        foreach ($this->rows as $jobCode => $row) {
+        foreach ($rowsToSave as $jobCode => $row) {
             $flags = [];
             foreach (JobTitlePermissionSynchronizer::FLAG_COLUMNS as $column) {
                 $flags[$column] = (bool) ($row[$column] ?? false);
@@ -77,6 +80,20 @@ class SetupJobTitlePermissionMatrix extends Component
         return view('livewire.setup-job-title-permission-matrix', [
             'canManage' => Gate::allows('manageTeamStructure'),
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function activeJobTitleCodes(): array
+    {
+        return SetupCommonCode::query()
+            ->where('category', 'job_title')
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('code')
+            ->pluck('code')
+            ->all();
     }
 
     private function loadRows(): void
