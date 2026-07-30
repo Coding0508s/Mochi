@@ -98,11 +98,25 @@
 | 용어 | 의미 |
 | --- | --- |
 | **일반 직원** | 로그인만 된 상태. 대부분 조회·일반 업무 가능 |
-| **Full Access(관리자)** | `is_admin = true`. Setup·Store 품목 관리·People 편집 등 |
-| **GS Brochure 관리자** | `is_gs_brochure_admin = true`. Brochure 운영 대시보드 |
-| **스토어 재고 수정 권한** | People 직원 모달에서 부여 가능. Full Access 없이도 Store 재고 수정 가능 |
+| **Full Access(관리자)** | `is_admin = true`. Setup·Store 품목 관리·People 편집 등. **사람 단위만** 지정 |
+| **직책 권한 표** | Setup → **직책 권한** 메뉴. 직책별 기능 플래그 7개를 한곳에서 관리 |
+| **기능 플래그(7개)** | Setup 조회·Setup 관리, Store 재고 수정, GS Brochure 관리, Coach 팀 KPI, 기관 전체 조회, 부관리자 — 직책 표에서 부여·동기화 |
 
 > 직원 마스터의 직책(JOB)만으로는 관리자가 되지 **않습니다.** 관리자는 `is_admin` 플래그로 판별합니다.
+
+**직책과 기능 권한**
+
+- Setup **직책 권한** 표에서 직책(`job_title` 공통코드)마다 위 **7개 기능 플래그**를 켜거나 끕니다.
+- 직원 `JOB`이 바뀌거나 표를 저장하면, 해당 직원의 로그인 계정(`users`)에 플래그가 **자동 동기화**됩니다.
+- **People**에서는 **Full Access(`is_admin`)** 와 **계정 활성(`is_active`)** 만 개인별로 지정합니다. 위 7개 플래그는 People에서 수동으로 바꾸지 않습니다.
+
+**운영(배포·초기 설정)**
+
+1. DB 마이그레이션 적용
+2. Setup → **직책 권한**에서 표를 채운 뒤 저장
+3. 필요 시 `php artisan users:sync-permissions-from-job-titles` 를 **수동** 실행
+
+> 표가 비어 있는 상태에서 위 전체 sync 명령을 실행하지 마세요. 비관리자 계정의 기능 플래그가 일괄 off 될 수 있습니다.
 
 ### 5.2 기능별 요약
 
@@ -116,7 +130,7 @@
 | Store 품목 관리·재고 수정 | X² | O | X |
 | GS Brochure 관리자 대시보드 | X | O | O |
 
-² Full Access **또는** 「스토어 재고 수량 수정」 권한이 있는 경우 Store 재고 수정 가능.
+² Full Access **또는** 직책 권한 표에서 「Store 재고 수정」이 켜진 경우 Store 재고 수정 가능.
 
 ### 5.3 데이터가 일부만 보일 때
 
