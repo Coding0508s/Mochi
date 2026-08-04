@@ -9,7 +9,7 @@
         "php": "^8.3",
         "laravel/framework": "^13.0",
         "laravel/tinker": "^3.0",
-        "livewire/livewire": "^4.2",
+        "livewire/livewire": "^4.3",
         "phpoffice/phpspreadsheet": "^5.7",
         "solapi/sdk": "^5.1"
     },
