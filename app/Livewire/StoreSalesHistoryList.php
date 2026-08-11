@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Component;
 use Livewire\WithPagination;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use RuntimeException;
@@ -99,6 +100,7 @@ class StoreSalesHistoryList extends Component
                 '수량',
                 '상태',
                 '결제수단',
+                '전하실 말씀',
             ];
 
             foreach ($headers as $index => $header) {
@@ -109,20 +111,22 @@ class StoreSalesHistoryList extends Component
 
             $row = 2;
             foreach ($rows as $item) {
-                $sheet->setCellValue('A'.$row, UnicodeTextNormalizer::toNfc((string) ($item->sold_at ?? '')));
-                $sheet->setCellValue('B'.$row, UnicodeTextNormalizer::toNfc((string) ($item->order_ref ?? '')));
-                $sheet->setCellValue('C'.$row, UnicodeTextNormalizer::toNfc((string) ($item->institution_nickname ?? '')));
-                $sheet->setCellValue('D'.$row, UnicodeTextNormalizer::toNfc((string) ($item->order_customer_name ?? '')));
-                $sheet->setCellValue('E'.$row, UnicodeTextNormalizer::toNfc((string) ($item->product_code ?? '')));
-                $sheet->setCellValue('F'.$row, UnicodeTextNormalizer::toNfc((string) ($item->product_name ?? '')));
+                // 자유 입력(전하실 말씀 등)이 =로 시작해도 수식으로 해석되지 않도록 문자열로 기록
+                $sheet->setCellValueExplicit('A'.$row, UnicodeTextNormalizer::toNfc((string) ($item->sold_at ?? '')), DataType::TYPE_STRING);
+                $sheet->setCellValueExplicit('B'.$row, UnicodeTextNormalizer::toNfc((string) ($item->order_ref ?? '')), DataType::TYPE_STRING);
+                $sheet->setCellValueExplicit('C'.$row, UnicodeTextNormalizer::toNfc((string) ($item->institution_nickname ?? '')), DataType::TYPE_STRING);
+                $sheet->setCellValueExplicit('D'.$row, UnicodeTextNormalizer::toNfc((string) ($item->order_customer_name ?? '')), DataType::TYPE_STRING);
+                $sheet->setCellValueExplicit('E'.$row, UnicodeTextNormalizer::toNfc((string) ($item->product_code ?? '')), DataType::TYPE_STRING);
+                $sheet->setCellValueExplicit('F'.$row, UnicodeTextNormalizer::toNfc((string) ($item->product_name ?? '')), DataType::TYPE_STRING);
                 $sheet->setCellValue('G'.$row, (int) ($item->qty ?? 0));
-                $sheet->setCellValue('H'.$row, UnicodeTextNormalizer::toNfc((string) ($item->order_status ?? '')));
-                $sheet->setCellValue('I'.$row, UnicodeTextNormalizer::toNfc((string) ($item->order_reason ?? '')));
+                $sheet->setCellValueExplicit('H'.$row, UnicodeTextNormalizer::toNfc((string) ($item->order_status ?? '')), DataType::TYPE_STRING);
+                $sheet->setCellValueExplicit('I'.$row, UnicodeTextNormalizer::toNfc((string) ($item->order_reason ?? '')), DataType::TYPE_STRING);
+                $sheet->setCellValueExplicit('J'.$row, UnicodeTextNormalizer::toNfc((string) ($item->order_memo ?? '')), DataType::TYPE_STRING);
 
                 $row++;
             }
 
-            foreach (range('A', 'I') as $column) {
+            foreach (range('A', 'J') as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);
             }
 
