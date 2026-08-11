@@ -94,7 +94,7 @@
     </div>
 
     <div class="mochi-table-card overflow-x-auto" aria-live="polite">
-        <table class="w-full min-w-[900px] text-sm">
+        <table class="w-full min-w-[1100px] text-sm">
             <thead class="mochi-table-head">
                 <tr>
                     <th class="px-3 py-2 text-left text-xs font-semibold">주문 일시</th>
@@ -105,10 +105,14 @@
                     <th class="px-3 py-2 text-right text-xs font-semibold">수량</th>
                     <th class="px-3 py-2 text-center text-xs font-semibold">상태</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">결제수단</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold">전하실 말씀</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
                 @forelse($paginatedItems as $item)
+                    @php
+                        $orderMemo = trim((string) ($item->order_memo ?? ''));
+                    @endphp
                     <tr>
                         <td class="px-3 py-2 text-gray-700">{{ $item->sold_at }}</td>
                         <td class="px-3 py-2 font-mono text-xs text-gray-700">{{ $item->order_ref }}</td>
@@ -121,10 +125,17 @@
                         <td class="px-3 py-2 text-right font-medium text-rose-600">{{ number_format((int) $item->qty) }}</td>
                         <td class="px-3 py-2 text-center text-gray-700">{{ $item->order_status }}</td>
                         <td class="px-3 py-2 text-gray-600">{{ $item->order_reason }}</td>
+                        <td class="max-w-[220px] px-3 py-2 text-gray-600">
+                            @if($orderMemo !== '')
+                                <span class="line-clamp-2 whitespace-pre-wrap break-words" title="{{ $orderMemo }}">{{ $orderMemo }}</span>
+                            @else
+                                <span class="text-gray-400">-</span>
+                            @endif
+                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="px-4 py-16 text-center text-gray-400">선택한 기간 및 검색어와 일치하는 판매 내역이 없습니다.</td>
+                        <td colspan="9" class="px-4 py-16 text-center text-gray-400">선택한 기간 및 검색어와 일치하는 판매 내역이 없습니다.</td>
                     </tr>
                 @endforelse
             </tbody>

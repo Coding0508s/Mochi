@@ -216,6 +216,7 @@ class GnuboardSalesHistoryRepository
         $orderStatusColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.order_status_column', 'od_status'));
         $orderSettleCaseColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.order_settle_case_column', 'od_settle_case'));
         $orderCustomerNameColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.order_customer_name_column', 'od_name'));
+        $orderMemoColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.order_memo_column', 'od_memo'));
         $cartProductIdColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.cart_product_id_column', 'it_id'));
         $cartQuantityColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.cart_quantity_column', 'ct_qty'));
         $cartNameColumn = $this->sanitizeSqlIdentifier((string) config('store.gnuboard.sales.cart_name_column', 'it_name'));
@@ -253,6 +254,7 @@ class GnuboardSalesHistoryRepository
                 ->selectRaw("o.`{$orderIdColumn}` as order_ref")
                 ->selectRaw(($orderSettleCaseColumn !== '' ? "o.`{$orderSettleCaseColumn}`" : "''").' as order_reason')
                 ->selectRaw(($orderCustomerNameColumn !== '' ? "o.`{$orderCustomerNameColumn}`" : "''").' as order_customer_name')
+                ->selectRaw(($orderMemoColumn !== '' ? "o.`{$orderMemoColumn}`" : "''").' as order_memo')
                 ->selectRaw($this->institutionNicknameSelectSql())
                 ->where("c.{$cartQuantityColumn}", '>', 0);
 

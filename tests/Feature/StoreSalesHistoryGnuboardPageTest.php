@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\TestCase;
 
 class StoreSalesHistoryGnuboardPageTest extends TestCase
@@ -43,6 +45,7 @@ class StoreSalesHistoryGnuboardPageTest extends TestCase
         Config::set('store.gnuboard.sales.cart_status_column', 'ct_status');
         Config::set('store.gnuboard.sales.order_settle_case_column', 'od_settle_case');
         Config::set('store.gnuboard.sales.order_customer_name_column', 'od_name');
+        Config::set('store.gnuboard.sales.order_memo_column', 'od_memo');
         Config::set('store.gnuboard.sales.order_member_id_column', 'mb_id');
         Config::set('store.gnuboard.sales.member_table', 'g5_member');
         Config::set('store.gnuboard.sales.member_id_column', 'mb_id');
@@ -91,8 +94,8 @@ class StoreSalesHistoryGnuboardPageTest extends TestCase
         ]);
 
         DB::connection('mysql_grapeseed_goods')->table('g5_shop_order')->insert([
-            ['od_id' => 'OD-OK', 'od_time' => now()->subHour()->format('Y-m-d H:i:s'), 'od_status' => '결제완료', 'od_settle_case' => '신용카드', 'od_name' => '홍길동', 'mb_id' => 'institution01'],
-            ['od_id' => 'OD-CANCEL', 'od_time' => now()->subMinutes(30)->format('Y-m-d H:i:s'), 'od_status' => '취소', 'od_settle_case' => '신용카드', 'od_name' => '김취소', 'mb_id' => 'institution01'],
+            ['od_id' => 'OD-OK', 'od_time' => now()->subHour()->format('Y-m-d H:i:s'), 'od_status' => '결제완료', 'od_settle_case' => '신용카드', 'od_name' => '홍길동', 'od_memo' => '기관 전화번호: 010-4232-4232', 'mb_id' => 'institution01'],
+            ['od_id' => 'OD-CANCEL', 'od_time' => now()->subMinutes(30)->format('Y-m-d H:i:s'), 'od_status' => '취소', 'od_settle_case' => '신용카드', 'od_name' => '김취소', 'od_memo' => '취소 메모', 'mb_id' => 'institution01'],
         ]);
 
         DB::connection('mysql_grapeseed_goods')->table('g5_shop_cart')->insert([
@@ -122,6 +125,8 @@ class StoreSalesHistoryGnuboardPageTest extends TestCase
             ->assertSee('행복학원')
             ->assertSee('결제완료')
             ->assertSee('신용카드')
+            ->assertSee('전하실 말씀')
+            ->assertSee('기관 전화번호: 010-4232-4232')
             ->assertDontSee('OD-CANCEL');
     }
 
@@ -144,6 +149,7 @@ class StoreSalesHistoryGnuboardPageTest extends TestCase
             'od_status' => '결제완료',
             'od_settle_case' => '무통장',
             'od_name' => '이주문',
+            'od_memo' => null,
             'mb_id' => 'institution02',
         ]);
 
@@ -179,8 +185,8 @@ class StoreSalesHistoryGnuboardPageTest extends TestCase
         ]);
 
         DB::connection('mysql_grapeseed_goods')->table('g5_shop_order')->insert([
-            ['od_id' => 'OD-EXPORT', 'od_time' => now()->subHour()->format('Y-m-d H:i:s'), 'od_status' => '결제완료', 'od_settle_case' => '신용카드', 'od_name' => '엑셀주문', 'mb_id' => 'institution03'],
-            ['od_id' => 'OD-SKIP', 'od_time' => now()->subHour()->format('Y-m-d H:i:s'), 'od_status' => '취소', 'od_settle_case' => '신용카드', 'od_name' => '제외', 'mb_id' => 'institution03'],
+            ['od_id' => 'OD-EXPORT', 'od_time' => now()->subHour()->format('Y-m-d H:i:s'), 'od_status' => '결제완료', 'od_settle_case' => '신용카드', 'od_name' => '엑셀주문', 'od_memo' => '=HYPERLINK("http://evil.example")', 'mb_id' => 'institution03'],
+            ['od_id' => 'OD-SKIP', 'od_time' => now()->subHour()->format('Y-m-d H:i:s'), 'od_status' => '취소', 'od_settle_case' => '신용카드', 'od_name' => '제외', 'od_memo' => null, 'mb_id' => 'institution03'],
         ]);
 
         DB::connection('mysql_grapeseed_goods')->table('g5_shop_cart')->insert([
@@ -192,12 +198,31 @@ class StoreSalesHistoryGnuboardPageTest extends TestCase
         $now = now();
         Carbon::setTestNow($now);
 
-        Livewire::actingAs($user)
+        $component = Livewire::actingAs($user)
             ->test(StoreSalesHistoryList::class)
             ->set('dateStart', $now->copy()->subDays(7)->format('Y-m-d'))
             ->set('dateEnd', $now->format('Y-m-d'))
             ->call('exportToExcel')
             ->assertFileDownloaded('Store_판매내역_'.$now->format('Ymd_His').'.xlsx');
+
+        $xlsxBinary = base64_decode((string) data_get($component->effects, 'download.content'), true);
+        $this->assertNotFalse($xlsxBinary);
+        $this->assertNotSame('', $xlsxBinary);
+
+        $tempPath = tempnam(sys_get_temp_dir(), 'store-sales-export-').'.xlsx';
+        file_put_contents($tempPath, $xlsxBinary);
+
+        try {
+            $sheet = IOFactory::load($tempPath)->getActiveSheet();
+
+            $this->assertSame('전하실 말씀', $sheet->getCell('J1')->getValue());
+
+            $memoCell = $sheet->getCell('J2');
+            $this->assertSame(DataType::TYPE_STRING, $memoCell->getDataType());
+            $this->assertSame('=HYPERLINK("http://evil.example")', $memoCell->getValue());
+        } finally {
+            @unlink($tempPath);
+        }
     }
 
     private function useSqliteGnuboardConnection(): void
@@ -232,6 +257,7 @@ class StoreSalesHistoryGnuboardPageTest extends TestCase
             $table->string('od_status')->nullable();
             $table->string('od_settle_case')->nullable();
             $table->string('od_name')->nullable();
+            $table->text('od_memo')->nullable();
             $table->string('mb_id')->nullable();
         });
 

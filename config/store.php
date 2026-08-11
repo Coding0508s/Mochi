@@ -31,6 +31,7 @@ return [
             'cart_status_column' => env('STORE_GNUBOARD_CART_STATUS_COLUMN', 'ct_status'),
             'order_settle_case_column' => env('STORE_GNUBOARD_ORDER_SETTLE_CASE_COLUMN', 'od_settle_case'),
             'order_customer_name_column' => env('STORE_GNUBOARD_ORDER_CUSTOMER_NAME_COLUMN', 'od_name'),
+            'order_memo_column' => env('STORE_GNUBOARD_ORDER_MEMO_COLUMN', 'od_memo'),
             'order_member_id_column' => env('STORE_GNUBOARD_ORDER_MEMBER_ID_COLUMN', 'mb_id'),
             'member_table' => env('STORE_GNUBOARD_MEMBER_TABLE', 'g5_member'),
             'member_id_column' => env('STORE_GNUBOARD_MEMBER_ID_COLUMN', 'mb_id'),
