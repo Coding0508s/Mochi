@@ -19,38 +19,33 @@ final class TeacherSupportListActivity
      */
     public static function applyHasSupportHistoryScope(Builder $query, ?int $year): void
     {
-        $query->where(function (Builder $outer) use ($year): void {
-            $first = true;
+        $query->whereRaw(self::supportHistorySqlCondition($year));
+    }
 
-            foreach (self::teacherCompletedDateColumns() as $column) {
-                $clause = function (Builder $inner) use ($column, $year): void {
-                    $inner->whereNotNull($column);
+    public static function supportHistorySqlCondition(?int $year): string
+    {
+        $conditions = [];
 
-                    if ($year !== null) {
-                        ExcelSerialDate::applyWhereYear($inner, $column, $year);
-                    }
-                };
-
-                if ($first) {
-                    $outer->where($clause);
-                    $first = false;
-                } else {
-                    $outer->orWhere($clause);
-                }
+        foreach (self::teacherCompletedDateColumns() as $column) {
+            $qualifiedColumn = 'Teachers.'.$column;
+            if ($year !== null) {
+                $conditions[] = '('.ExcelSerialDate::sqlColumnInYear($qualifiedColumn, $year).')';
+            } else {
+                $conditions[] = "({$qualifiedColumn} IS NOT NULL AND "
+                    .ExcelSerialDate::sqlDateValueIsNotBlank($qualifiedColumn).')';
             }
+        }
 
-            $first = self::appendTeacherIdUnionExistsClause(
-                $outer,
-                MochiTeacherSupportQuery::teacherIdUnionSql($year),
-                $first,
-            );
+        $conditions = array_merge(
+            $conditions,
+            self::supportExistsConditionsFromUnions($year),
+        );
 
-            self::appendTeacherIdUnionExistsClause(
-                $outer,
-                LegacyTeacherSupportQuery::teacherIdUnionSql($year),
-                $first,
-            );
-        });
+        if ($conditions === []) {
+            return '0 = 1';
+        }
+
+        return '('.implode(' OR ', $conditions).')';
     }
 
     /**
@@ -187,5 +182,27 @@ final class TeacherSupportListActivity
         $outer->orWhere($clause);
 
         return false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function supportExistsConditionsFromUnions(?int $year, ?int $month = null): array
+    {
+        $conditions = [];
+
+        foreach ([
+            MochiTeacherSupportQuery::teacherIdUnionSql($year, $month),
+            LegacyTeacherSupportQuery::teacherIdUnionSql($year, $month),
+        ] as $unionSql) {
+            if ($unionSql === null) {
+                continue;
+            }
+
+            $conditions[] = 'EXISTS (SELECT 1 FROM '.$unionSql
+                .' AS support_teacher_ids WHERE support_teacher_ids.teacher_id = Teachers.ID)';
+        }
+
+        return $conditions;
     }
 }

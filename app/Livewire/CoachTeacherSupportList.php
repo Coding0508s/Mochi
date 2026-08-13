@@ -28,7 +28,7 @@ use App\Models\SupportRecord;
 use App\Models\Teacher;
 use App\Models\User;
 use App\Support\CoachTeacherScope;
-use App\Support\CoachTeamKpiAggregator;
+use App\Support\CoachTeacherSupportInstitutionListBuilder;
 use App\Support\ExcelSerialDate;
 use App\Support\InstitutionResolver;
 use App\Support\ManagerNameNormalizer;
@@ -43,8 +43,8 @@ use App\Support\TeacherSupportListActivity;
 use App\Support\TeacherSupportReportEditAuthorization;
 use App\Support\TeamMenuContext;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -68,8 +68,6 @@ class CoachTeacherSupportList extends Component
     public string $filterMonth = '';
 
     public string $filterCoach = '';
-
-    public bool $showAllInstitutionsView = false;
 
     public string $search = '';
 
@@ -217,11 +215,13 @@ class CoachTeacherSupportList extends Component
         $this->crossTeamReadOnly = $this->isCrossTeamReadOnlyContext(TeamMenuContext::MENU_COACH);
 
         $year = request()->query('filterYear');
-        $this->filterYear = is_numeric($year) ? (string) (int) $year : '';
+        $this->filterYear = is_numeric($year) ? (string) (int) $year : (string) now()->year;
 
         $coach = request()->query('filterCoach');
         if (is_string($coach) && filled($coach)) {
             $this->filterCoach = $coach;
+        } else {
+            $this->filterCoach = $this->defaultCoachFilter();
         }
 
         $month = request()->query('filterMonth');
@@ -231,7 +231,7 @@ class CoachTeacherSupportList extends Component
 
         $this->maybeOpenCreateSupportFromQuery();
 
-        $this->filterCoach = $this->resolveAllowedFilterCoach();
+        $this->filterCoach = $this->resolveAllowedFilterCoach($this->filterCoach);
     }
 
     private function maybeOpenCreateSupportFromQuery(): void
@@ -541,6 +541,10 @@ class CoachTeacherSupportList extends Component
             'visit' => $this->openVisitView($teacherId, $form, $markCompleted),
             default => $this->supportReportViewMode = false,
         };
+
+        if ($this->supportReportViewMode) {
+            $this->hydrateSupportRoundFromActiveForm($teacherId);
+        }
     }
 
     private function endSupportReportViewMode(): void
@@ -938,6 +942,11 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
+        $teacher = Teacher::find((int) ($this->teacherDetailInfo['id'] ?? 0));
+        if (! $teacher || ! $this->canEditTeacher($teacher)) {
+            return;
+        }
+
         $this->teacherProfileForm = [
             'name' => $this->teacherDetailInfo['name'] ?? '',
             'email' => $this->teacherDetailInfo['email'] ?? '',
@@ -998,6 +1007,15 @@ class CoachTeacherSupportList extends Component
     {
 
         $this->assertCanMutateInTeamContext(TeamMenuContext::MENU_COACH);
+
+        if (! $this->teacherDetailInfo) {
+            return;
+        }
+
+        $teacher = Teacher::find((int) ($this->teacherDetailInfo['id'] ?? 0));
+        if (! $teacher || ! $this->canEditTeacher($teacher)) {
+            return;
+        }
 
         $this->resetRetireRecommendationForm();
         $this->confirmingRetire = true;
@@ -2482,12 +2500,7 @@ class CoachTeacherSupportList extends Component
 
     public function updatedFilterCoach(): void
     {
-        $this->filterCoach = $this->resolveAllowedFilterCoach();
-        $this->resetPage();
-    }
-
-    public function updatedShowAllInstitutionsView(): void
-    {
+        $this->filterCoach = $this->resolveAllowedFilterCoach($this->filterCoach);
         $this->resetPage();
     }
 
@@ -2505,10 +2518,10 @@ class CoachTeacherSupportList extends Component
     public function resetFilters(): void
     {
         $this->search = '';
-        $this->filterYear = '';
+        $this->filterYear = (string) now()->year;
         $this->filterRound = '';
         $this->filterMonth = '';
-        $this->filterCoach = '';
+        $this->filterCoach = $this->defaultCoachFilter();
         $this->kpiFilter = '';
         $this->resetPage();
     }
@@ -2615,8 +2628,6 @@ class CoachTeacherSupportList extends Component
 
         $baseQuery = $this->buildBaseQuery();
 
-        $this->applyDefaultYearScope($baseQuery);
-
         $kpiQuery = clone $baseQuery;
         $this->applyRoundFilter($kpiQuery);
         $this->applyMonthFilter($kpiQuery);
@@ -2626,14 +2637,46 @@ class CoachTeacherSupportList extends Component
             $kpis = $this->synchronizeRoundKpisWithDisplay($kpiQuery, $kpis, $this->resolvedFilterYear());
         }
 
-        $teachers = (clone $baseQuery)
+        $listQuery = (clone $baseQuery)
             ->tap(fn (Builder $q) => $this->applyKpiFilter($q))
             ->tap(fn (Builder $q) => $this->applyRoundFilter($q))
-            ->tap(fn (Builder $q) => $this->applyMonthFilter($q))
-            ->with(CoachTeacherScope::eagerLoads())
-            ->tap(fn (Builder $q) => $this->applyTeacherListOrdering($q))
-            ->select('Teachers.*')
-            ->paginate(50);
+            ->tap(fn (Builder $q) => $this->applyMonthFilter($q));
+
+        $groupedList = app(CoachTeacherSupportInstitutionListBuilder::class)->build(
+            $listQuery,
+            $this->resolvedFilterYear(),
+            max(1, (int) $this->getPage()),
+            50,
+        );
+
+        $teacherIds = $groupedList['teacher_ids'];
+
+        $teacherCollection = collect();
+        if ($teacherIds !== []) {
+            $teacherCollection = (clone $listQuery)
+                ->with(CoachTeacherScope::eagerLoads())
+                ->whereIn('Teachers.ID', $teacherIds)
+                ->select('Teachers.*')
+                ->get()
+                ->keyBy('ID');
+        }
+
+        $orderedTeachers = collect($teacherIds)
+            ->map(fn (int $teacherId): ?Teacher => $teacherCollection->get($teacherId))
+            ->filter()
+            ->values();
+
+        $groupPaginator = $groupedList['paginator'];
+        $teachers = new LengthAwarePaginator(
+            $orderedTeachers,
+            $groupPaginator->total(),
+            $groupPaginator->perPage(),
+            $groupPaginator->currentPage(),
+            [
+                'path' => request()->url(),
+                'pageName' => 'page',
+            ],
+        );
 
         TeacherSupportCompletionDisplay::flushRequestCache();
         TeacherSupportCompletionDisplay::preloadForTeachers(
@@ -2677,6 +2720,8 @@ class CoachTeacherSupportList extends Component
             'visitConfig' => config('coach_teacher_visit'),
             'displayYear' => $this->resolvedFilterYear(),
             'crossTeamReadOnly' => $this->crossTeamReadOnly,
+            'rowspansByTeacherId' => $groupedList['rowspans_by_teacher_id'],
+            'institutionGroupPaginator' => $groupPaginator,
         ]);
     }
 
@@ -2692,6 +2737,9 @@ class CoachTeacherSupportList extends Component
     /**
      * 현재 사용자 스코프에서 실제 지원 데이터(계획/완료/Essentials)에 존재하는 연도 목록.
      *
+     * 담당자·월 필터와 독립적으로 유지한다. 담당자 변경 시 옵션이 줄어들면
+     * 연도 select의 선택값이 브라우저에서 다른 연도(또는 전체)로 바뀐다.
+     *
      * @return Collection<int, int>
      */
     private function yearFilterOptions(): Collection
@@ -2699,14 +2747,13 @@ class CoachTeacherSupportList extends Component
         $baseQuery = Teacher::query();
         $this->applyTeacherListVisibilityFilter($baseQuery);
         $this->applyTeacherListScope($baseQuery);
-        $this->applyCoachFilter($baseQuery);
 
         $dateColumns = collect(ExcelSerialDate::teacherSupportDateColumns())
             ->filter(fn (string $column): bool => Schema::hasColumn('Teachers', $column))
             ->values();
 
         if ($dateColumns->isEmpty()) {
-            return collect();
+            return $this->pinnedYearFilterOptions(collect());
         }
 
         $yearSourceQuery = null;
@@ -2729,7 +2776,7 @@ class CoachTeacherSupportList extends Component
         }
 
         if ($yearSourceQuery === null) {
-            return collect();
+            return $this->pinnedYearFilterOptions(collect());
         }
 
         $years = DB::query()
@@ -2743,7 +2790,29 @@ class CoachTeacherSupportList extends Component
             ->map(fn (mixed $year): int => (int) $year)
             ->values();
 
-        return $years;
+        return $this->pinnedYearFilterOptions($years);
+    }
+
+    /**
+     * @param  Collection<int, int>  $years
+     * @return Collection<int, int>
+     */
+    private function pinnedYearFilterOptions(Collection $years): Collection
+    {
+        $pinned = collect([(int) now()->year]);
+
+        if (is_numeric($this->filterYear)) {
+            $selectedYear = (int) $this->filterYear;
+            if ($selectedYear >= 1900 && $selectedYear <= now()->year + 1) {
+                $pinned->push($selectedYear);
+            }
+        }
+
+        return $years
+            ->concat($pinned)
+            ->unique()
+            ->sortDesc()
+            ->values();
     }
 
     private function sqlExtractYearExpression(string $dateExpression): string
@@ -2839,20 +2908,13 @@ class CoachTeacherSupportList extends Component
 
         $this->applyCoachFilter($query);
 
-        if (! $this->showAllInstitutionsView) {
-            // 최신 지원 보기의 기본 집합은 "지원 이력 있는 교사"만 유지하되,
-            // 연도 필터는 아래 applyDefaultYearScope/applyKpiFilter 등에서 일관되게 처리한다.
-            // 여기서 연도를 함께 넣으면 완료/MOCHI 이력 기준으로 먼저 0건이 되어
-            // 계획/완료 통합 연도 필터가 무력화될 수 있다.
-            TeacherSupportListActivity::applyHasSupportHistoryScope($query, null);
-        }
-
         return $query;
     }
 
     /**
-     * 목록·KPI·필터 옵션에 공통 적용하는 교사 스코프.
-     * 기본: TR 담당 기관. 전체 기관 보기 또는 KPI 담당 코치 필터 시 숨김 기관만 제외.
+     * 목록·KPI·필터 옵션에 공통 적용하는 교사 조회 스코프.
+     * Coach 화면은 항상 전체 기관 조회를 허용하고, 숨김 기관만 제외한다.
+     * 저장 권한은 Action/Policy에서 기존 TR 범위를 유지한다.
      *
      * @param  Builder<Teacher>  $query
      */
@@ -2866,7 +2928,7 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
-        if ($this->usesWideInstitutionListScope($user) || TeamMenuContext::hasExpandedReadScope($user)) {
+        if ($this->usesWideInstitutionListScope($user)) {
             CoachTeacherScope::excludeHiddenInstitutions($query);
 
             return;
@@ -2879,11 +2941,15 @@ class CoachTeacherSupportList extends Component
     {
         $user ??= auth()->user();
 
-        if ($this->showAllInstitutionsView) {
+        if (! $user) {
+            return false;
+        }
+
+        if (TeamMenuContext::hasExpandedReadScope($user)) {
             return true;
         }
 
-        return $user?->canViewCoachTeamKpi() && filled($this->resolveAllowedFilterCoach());
+        return $user->isCoachTeam() || $user->canViewCoachTeamKpi();
     }
 
     /**
@@ -2891,7 +2957,7 @@ class CoachTeacherSupportList extends Component
      */
     private function applyCoachFilter(Builder $query): void
     {
-        $coach = $this->resolveAllowedFilterCoach();
+        $coach = $this->resolveAllowedFilterCoach($this->filterCoach);
 
         if (! filled($coach)) {
             return;
@@ -2905,31 +2971,14 @@ class CoachTeacherSupportList extends Component
         });
     }
 
-    private function resolveAllowedFilterCoach(): string
+    private function resolveAllowedFilterCoach(string $candidate): string
     {
-        if (! filled($this->filterCoach)) {
+        $candidate = trim($candidate);
+        if ($candidate === '') {
             return '';
         }
 
-        $user = auth()->user();
-
-        if (! $user) {
-            return '';
-        }
-
-        if ($user->canViewCoachTeamKpi()) {
-            return $this->filterCoach;
-        }
-
-        $normalizedFilter = ManagerNameNormalizer::normalize($this->filterCoach);
-
-        foreach (CoachTeacherScope::resolveTrAliases($user) as $alias) {
-            if (ManagerNameNormalizer::normalize($alias) === $normalizedFilter) {
-                return $this->filterCoach;
-            }
-        }
-
-        return '';
+        return $candidate;
     }
 
     /**
@@ -2978,14 +3027,6 @@ class CoachTeacherSupportList extends Component
         TeacherSupportListActivity::applyLatestSupportOrdering($query, $this->resolvedFilterYear());
     }
 
-    private function sqlNormalizedTeacherSkCodeExpression(): string
-    {
-        return match (DB::connection()->getDriverName()) {
-            'sqlite' => "ltrim(Teachers.SK_Code, '*')",
-            default => "TRIM(LEADING '*' FROM Teachers.SK_Code)",
-        };
-    }
-
     /**
      * 기본: 퇴직 제외(수업 미참여 포함). showAllTeachers 시 퇴직 교사도 포함.
      *
@@ -3000,23 +3041,23 @@ class CoachTeacherSupportList extends Component
         $query->excludeRetired();
     }
 
-    /**
-     * KPI·월·차수·상태 필터가 없을 때 선택 연도에 계획 또는 완료가 있는 교사만 목록·KPI에 포함한다.
-     *
-     * @param  Builder<Teacher>  $query
-     */
-    private function applyDefaultYearScope(Builder $query): void
+    private function defaultCoachFilter(): string
     {
-        if ($this->kpiFilter !== '' || $this->filterRound !== '' || $this->filterMonth !== '') {
-            return;
+        $user = auth()->user();
+        if (! $user) {
+            return '';
         }
 
-        $year = $this->resolvedFilterYear();
-        if ($year === null) {
-            return;
+        if ($user->canViewCoachTeamKpi() || TeamMenuContext::hasExpandedReadScope($user)) {
+            return '';
         }
 
-        CoachTeamKpiAggregator::applyAnySupportYearScope($query, $year);
+        $defaultCoach = trim($user->nameForCoReports());
+        if ($defaultCoach !== '') {
+            return $defaultCoach;
+        }
+
+        return trim((string) $user->name);
     }
 
     private function applyKpiFilter(Builder $query): void
@@ -3067,21 +3108,67 @@ class CoachTeacherSupportList extends Component
 
         $month = (int) $this->filterMonth;
         $year = $this->resolvedFilterYear();
-        $planRound = $this->filterRound !== '' ? $this->filterRound : '1';
-        $planColumn = TeacherSupportKpiCalculator::planColumnForFilterRound($planRound);
+        $dateColumns = $this->monthFilterTeacherDateColumns();
+        $unionConditions = TeacherSupportListActivity::supportExistsConditionsFromUnions($year, $month);
 
-        if ($planColumn === null) {
+        if ($dateColumns === [] && $unionConditions === []) {
             return;
         }
 
-        $query->whereNotNull($planColumn)
-            ->where(function (Builder $nested) use ($planColumn, $year, $month): void {
-                if ($year !== null) {
-                    ExcelSerialDate::applyWhereYear($nested, $planColumn, $year);
+        $query->where(function (Builder $outer) use ($dateColumns, $unionConditions, $year, $month): void {
+            $first = true;
+
+            foreach ($dateColumns as $column) {
+                $sql = ExcelSerialDate::sqlColumnInYearMonth('Teachers.'.$column, $year, $month);
+
+                if ($first) {
+                    $outer->whereRaw($sql);
+                    $first = false;
+                } else {
+                    $outer->orWhereRaw($sql);
+                }
+            }
+
+            foreach ($unionConditions as $existsSql) {
+                if ($first) {
+                    $outer->whereRaw($existsSql);
+                    $first = false;
+                } else {
+                    $outer->orWhereRaw($existsSql);
+                }
+            }
+        });
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function monthFilterTeacherDateColumns(): array
+    {
+        $cols = config('coach_teacher_support.columns', []);
+
+        if ($this->filterRound !== '') {
+            foreach (config('coach_teacher_support.kpi_rounds', []) as $round) {
+                if (($round['filter_round'] ?? '') !== $this->filterRound) {
+                    continue;
                 }
 
-                $nested->whereMonth($planColumn, $month);
-            });
+                return array_values(array_filter([
+                    $cols[$round['completed']] ?? null,
+                ], fn (mixed $column): bool => is_string($column) && $column !== ''));
+            }
+
+            return [];
+        }
+
+        $keys = [
+            'completed_1st', 'completed_2nd', 'completed_3rd', 'completed_4th',
+        ];
+
+        return array_values(array_filter(
+            array_map(fn (string $key): ?string => $cols[$key] ?? null, $keys),
+            fn (mixed $column): bool => is_string($column) && $column !== '',
+        ));
     }
 
     /**

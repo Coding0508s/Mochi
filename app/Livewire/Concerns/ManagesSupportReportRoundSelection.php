@@ -33,15 +33,43 @@ trait ManagesSupportReportRoundSelection
 
     protected function seedSupportRoundSelectionForEdit(?int $fallbackTeacherId = null): void
     {
+        // 이력 수정 진입 시에는 "다음 빈 차수 추천"을 다시 하지 않는다.
+        // 조회 화면에 보이던 값(기록 안 함 또는 저장된 session_number)을 유지한다.
+        $this->refreshSupportRoundRecordedOnly($fallbackTeacherId);
+    }
+
+    /**
+     * 조회/수정 공통: 활성 보고서 폼의 session_number → supportRound.
+     * null/0 이면 「기록 안 함」.
+     */
+    protected function hydrateSupportRoundFromActiveForm(?int $fallbackTeacherId = null): void
+    {
+        $sessionNumber = $this->activeSupportReportSessionNumber();
+        $this->supportRound = ($sessionNumber !== null && $sessionNumber >= 1 && $sessionNumber <= 4)
+            ? (string) $sessionNumber
+            : '';
+
+        $this->refreshSupportRoundRecordedOnly($fallbackTeacherId);
+    }
+
+    protected function refreshSupportRoundRecordedOnly(?int $fallbackTeacherId = null): void
+    {
         $teacherId = $fallbackTeacherId ?? $this->activeSupportReportTeacherId();
         if ($teacherId === null || $teacherId <= 0) {
+            $this->supportRoundRecorded = [];
+
             return;
         }
 
         $teacher = Teacher::query()->find($teacherId);
-        if ($teacher !== null) {
-            $this->seedSupportRoundSelection($teacher);
+        if ($teacher === null) {
+            $this->supportRoundRecorded = [];
+
+            return;
         }
+
+        $teacher->refresh();
+        $this->supportRoundRecorded = TeacherSupportSlotSync::recordedRounds($teacher);
     }
 
     protected function activeSupportReportTeacherId(): ?int
@@ -204,6 +232,33 @@ trait ManagesSupportReportRoundSelection
 
     private function activeSupportReportSupportDate(): mixed
     {
+        $form = $this->activeSupportReportForm();
+
+        return is_array($form) ? ($form['support_date'] ?? null) : null;
+    }
+
+    private function activeSupportReportSessionNumber(): ?int
+    {
+        $form = $this->activeSupportReportForm();
+        if (! is_array($form)) {
+            return null;
+        }
+
+        $raw = $form['session_number'] ?? null;
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+
+        $sessionNumber = (int) $raw;
+
+        return $sessionNumber > 0 ? $sessionNumber : null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function activeSupportReportForm(): ?array
+    {
         $candidates = [
             ['teacher_id' => 'visitTeacherId', 'form' => 'visitForm'],
             ['teacher_id' => 'onsiteTeacherId', 'form' => 'onsiteForm'],
@@ -236,7 +291,7 @@ trait ManagesSupportReportRoundSelection
                 continue;
             }
 
-            return $form['support_date'] ?? null;
+            return $form;
         }
 
         return null;

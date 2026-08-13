@@ -145,4 +145,14 @@ class ExcelSerialDateTest extends TestCase
         $this->assertStringContainsString("strftime('%Y', Teachers._1st_Support_Date)", $expression);
         $this->assertStringNotContainsString('NULLIF(TRIM(CAST(', $expression);
     }
+
+    public function test_sql_column_in_year_month_uses_normalized_date(): void
+    {
+        $expression = ExcelSerialDate::sqlColumnInYearMonth('Teachers._1st_Support_Date', 2026, 5);
+
+        $this->assertStringContainsString("strftime('%m'", $expression);
+        $this->assertStringContainsString("strftime('%Y'", $expression);
+        $this->assertStringContainsString('= 5', $expression);
+        $this->assertStringContainsString('= 2026', $expression);
+    }
 }

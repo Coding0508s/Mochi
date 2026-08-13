@@ -258,6 +258,35 @@ final class ExcelSerialDate
         };
     }
 
+    public static function sqlMonthEquals(string $column, int $month): string
+    {
+        $month = max(1, min(12, $month));
+
+        return match (Schema::getConnection()->getDriverName()) {
+            'sqlite' => "(CAST(strftime('%m', {$column}) AS INTEGER) = {$month})",
+            default => "(MONTH({$column}) = {$month})",
+        };
+    }
+
+    /**
+     * ISO 날짜·엑셀 serial 혼재 컬럼이 특정 연·월에 속하는지 여부.
+     */
+    public static function sqlColumnInYearMonth(string $column, ?int $year, int $month): string
+    {
+        $normalized = self::sqlNormalizedDateColumn($column);
+        $parts = [
+            "{$column} IS NOT NULL",
+            self::sqlDateValueIsNotBlank($column),
+            self::sqlMonthEquals($normalized, $month),
+        ];
+
+        if ($year !== null) {
+            $parts[] = self::sqlYearEquals($normalized, $year);
+        }
+
+        return '('.implode(' AND ', $parts).')';
+    }
+
     public static function sqlYearNotEquals(string $column, int $year): string
     {
         return match (Schema::getConnection()->getDriverName()) {
