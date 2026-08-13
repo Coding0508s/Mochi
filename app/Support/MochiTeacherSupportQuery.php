@@ -25,7 +25,7 @@ final class MochiTeacherSupportQuery
     /**
      * 연도(또는 전체)에 보고서가 있는 teacher_id UNION SQL.
      */
-    public static function teacherIdUnionSql(?int $year): ?string
+    public static function teacherIdUnionSql(?int $year, ?int $month = null): ?string
     {
         $parts = [];
 
@@ -36,7 +36,9 @@ final class MochiTeacherSupportQuery
                 self::sqlDateValueIsNotBlank("{$table}.support_date"),
             ];
 
-            if ($year !== null) {
+            if ($month !== null) {
+                $conditions[] = ExcelSerialDate::sqlColumnInYearMonth("{$table}.support_date", $year, $month);
+            } elseif ($year !== null) {
                 $conditions[] = ExcelSerialDate::sqlColumnInYear("{$table}.support_date", $year);
             }
 

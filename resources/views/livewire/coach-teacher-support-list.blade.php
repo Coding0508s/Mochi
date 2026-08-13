@@ -56,7 +56,7 @@
                 <span wire:loading.delay
                       wire:loading.class.remove="hidden"
                       wire:loading.class="inline-flex"
-                      wire:target="search,filterYear,filterRound,filterMonth,filterCoach,kpiFilter,showAllTeachers,showAllInstitutionsView,showExtendedColumns,setKpiFilter,resetFilters,clearSearch,clearRoundFilter,clearMonthFilter,clearKpiFilter,clearCoachFilter"
+                      wire:target="search,filterYear,filterRound,filterMonth,filterCoach,kpiFilter,showAllTeachers,showExtendedColumns,setKpiFilter,resetFilters,clearSearch,clearRoundFilter,clearMonthFilter,clearKpiFilter,clearCoachFilter"
                       class="hidden items-center gap-1.5 rounded-full border border-mochi-header/20 bg-mochi-header/5 px-2.5 py-1 text-xs font-medium text-mochi-header">
                     <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -68,6 +68,7 @@
 
             <div class="ml-auto flex flex-wrap items-center gap-2">
                 <select wire:model.live="filterYear"
+                        wire:key="teacher-support-year-filter"
                         class="py-1.5 px-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                     <option value="">전체</option>
                     @foreach($yearFilterOptions as $y)
@@ -96,9 +97,9 @@
             }
 
             if ($filterMonth) {
-                $planMonthRoundLabel = ($filterRound !== '' ? $filterRound : '1').'차';
+                $monthLabel = filled($filterYear) ? $filterYear.'년 '.$filterMonth.'월' : '전체 · '.$filterMonth.'월';
                 $activeFilterChips[] = [
-                    'label' => $planMonthRoundLabel.' 계획월: '.(filled($filterYear) ? $filterYear.'년 '.$filterMonth.'월' : '전체 · '.$filterMonth.'월'),
+                    'label' => ($filterRound !== '' ? $filterRound.'차 지원월: ' : '지원월: ').$monthLabel,
                     'action' => 'clearMonthFilter',
                 ];
             }
@@ -173,18 +174,8 @@
             </div>
 
             <div class="ml-auto flex flex-wrap items-center gap-3">
-                <div class="flex items-center gap-2 text-sm">
-                    <span class="text-gray-500">기관</span>
-                    <div class="mochi-toggle-group">
-                        <button type="button" wire:click="$set('showAllInstitutionsView', false)"
-                                class="mochi-toggle-btn {{ ! $showAllInstitutionsView ? 'mochi-toggle-btn--active' : '' }}">
-                            최신 지원 보기
-                        </button>
-                        <button type="button" wire:click="$set('showAllInstitutionsView', true)"
-                                class="mochi-toggle-btn {{ $showAllInstitutionsView ? 'mochi-toggle-btn--active' : '' }}">
-                            전체 기관 보기
-                        </button>
-                    </div>
+                <div class="inline-flex items-center rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600">
+                    전체 기관 기준 조회
                 </div>
                 <div class="flex items-center gap-2 text-sm">
                     <span class="text-gray-500">퇴직</span>
@@ -230,20 +221,8 @@
     @php
         $items = $teachers->items();
         $cols = config('coach_teacher_support.columns');
-        $rowspans = [];
-        $i = 0;
-        while ($i < count($items)) {
-            $sk = $items[$i]->SK_Code;
-            $count = 1;
-            while ($i + $count < count($items) && $items[$i + $count]->SK_Code === $sk) {
-                $count++;
-            }
-            $rowspans[$i] = $count;
-            for ($j = 1; $j < $count; $j++) {
-                $rowspans[$i + $j] = 0;
-            }
-            $i += $count;
-        }
+        // 보이는 열만 센다. 숨긴 계획 열을 colspan에 넣으면 필터 시 헤더 너비가 깨진다.
+        $tableColumnSpan = 11;
     @endphp
     <div class="mochi-table-card relative">
         <div class="md:hidden space-y-3 p-3">
@@ -310,13 +289,15 @@
                 <tbody>
                 @forelse($items as $idx => $teacher)
                     @php
-                        $isFirstInGroup = ($rowspans[$idx] ?? 0) > 0;
-                        $span = $rowspans[$idx] ?? 0;
+                        $teacherId = (int) $teacher->ID;
+                        $isFirstInGroup = (($rowspansByTeacherId[$teacherId] ?? 0) > 0);
+                        $span = $rowspansByTeacherId[$teacherId] ?? 0;
                         // 지원 일정 수정 모달 임시 비활성화. 복구 시 아래 주석을 해제할 것.
                         // $canOpenEditModal = $this->canOpenEditModal($teacher->ID);
                         $canOpenEditModal = false;
                     @endphp
                     <tr wire:key="teacher-{{ $teacher->ID }}"
+                        data-group-first="{{ $isFirstInGroup ? '1' : '0' }}"
                         class="mochi-table-row-hover">
                         @if($isFirstInGroup)
                             <td class="coach-support-sticky-sk coach-support-sk-code px-3 py-2 align-middle text-center font-mono text-xs text-purple-700"
@@ -344,7 +325,7 @@
                         </td>
                         <td class="coach-support-sticky-position px-3 py-2 align-middle">
                             @if($teacher->Position)
-                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
+                                <span class="inline-flex items-center whitespace-nowrap px-1.5 py-0.5 rounded text-xs font-medium
                                     {{ $teacher->isRetired() ? 'bg-red-100 text-red-800' : 'text-gray-700' }}">
                                     {{ $teacher->Position }}
                                 </span>
@@ -517,7 +498,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ $showExtendedColumns ? 18 : 14 }}" class="px-4 py-12 text-center text-gray-400">
+                        <td colspan="{{ $tableColumnSpan }}" class="px-4 py-12 text-center text-gray-400">
                             <div class="flex flex-col items-center gap-2">
                                 <svg class="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
@@ -532,9 +513,14 @@
             </table>
         </div>
 
-        @if($teachers->hasPages())
+        @if($institutionGroupPaginator->hasPages())
             <div class="px-4 py-3 border-t border-gray-100">
-                {{ $teachers->links() }}
+                <p class="mb-2 text-xs text-gray-500">
+                    기관 그룹 기준 · {{ $institutionGroupPaginator->firstItem() }}–{{ $institutionGroupPaginator->lastItem() }}
+                    / 전체 {{ $institutionGroupPaginator->total() }}개 그룹
+                    · 이번 페이지 교사 {{ $teachers->count() }}명
+                </p>
+                {{ $institutionGroupPaginator->links() }}
             </div>
         @endif
     </div>

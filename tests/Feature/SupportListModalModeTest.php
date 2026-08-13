@@ -304,6 +304,41 @@ class SupportListModalModeTest extends TestCase
             ->assertSee('[SK-CONTRACT-MODAL]');
     }
 
+    public function test_edit_modal_support_type_options_match_institution_report(): void
+    {
+        $record = $this->createSupportRecord([
+            'TR_Name' => '담당자A',
+            'Support_Type' => '대면',
+        ]);
+        $user = User::factory()->create(['name' => '담당자A']);
+
+        Livewire::actingAs($user)
+            ->test(SupportList::class)
+            ->call('openDetailModal', (int) $record->ID)
+            ->call('startModalEdit')
+            ->assertSeeHtml('value="전화"')
+            ->assertSeeHtml('value="대면"')
+            ->assertSeeHtml('value="화상"')
+            ->assertDontSeeHtml('value="이메일"')
+            ->assertDontSeeHtml('value="문자"')
+            ->assertDontSeeHtml('value="기타"');
+    }
+
+    public function test_edit_modal_keeps_legacy_support_type_visible_when_not_in_defaults(): void
+    {
+        $record = $this->createSupportRecord([
+            'TR_Name' => '담당자A',
+            'Support_Type' => '교사 지원 및 참관',
+        ]);
+        $user = User::factory()->create(['name' => '담당자A']);
+
+        Livewire::actingAs($user)
+            ->test(SupportList::class)
+            ->call('openDetailModal', (int) $record->ID)
+            ->assertSet('formSupportType', '교사 지원 및 참관')
+            ->assertSeeHtml('value="교사 지원 및 참관"');
+    }
+
     /**
      * @param  array<string, mixed>  $overrides
      */

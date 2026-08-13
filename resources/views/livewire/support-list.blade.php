@@ -365,19 +365,23 @@
                             </div>
 
                             <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                                {{-- 지원방법 --}}
+                                {{-- 지원방법: 기관 지원 보고서 작성 옵션과 동일 --}}
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">지원 방법</label>
+                                    @php
+                                        $institutionSupportTypes = array_values(config('support_report_defaults.institution_support_types', ['전화', '대면', '화상']));
+                                        if (filled($formSupportType) && ! in_array($formSupportType, $institutionSupportTypes, true)) {
+                                            // 과거·다른 경로로 저장된 값은 조회/수정 시 그대로 보이게 유지
+                                            $institutionSupportTypes[] = $formSupportType;
+                                        }
+                                    @endphp
                                     <select wire:model="formSupportType"
                                             @disabled($fieldsDisabled)
                                             class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header
                                                    {{ $fieldsDisabled ? 'border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed' : 'border-gray-300' }}">
-                                        <option>전화</option>
-                                        <option>대면</option>
-                                        <option>화상</option>
-                                        <option>이메일</option>
-                                        <option>문자</option>
-                                        <option>기타</option>
+                                        @foreach($institutionSupportTypes as $supportTypeOption)
+                                            <option value="{{ $supportTypeOption }}">{{ $supportTypeOption }}</option>
+                                        @endforeach
                                     </select>
                                 </div>
 

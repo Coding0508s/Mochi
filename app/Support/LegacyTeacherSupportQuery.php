@@ -14,12 +14,12 @@ final class LegacyTeacherSupportQuery
     /**
      * 연도(또는 전체)에 완료 지원이 있는 teacher_id UNION SQL.
      */
-    public static function teacherIdUnionSql(?int $year): ?string
+    public static function teacherIdUnionSql(?int $year, ?int $month = null): ?string
     {
         $parts = [];
 
         foreach (self::completionSources() as $source) {
-            $select = self::teacherIdSelectSql($source, $year);
+            $select = self::teacherIdSelectSql($source, $year, $month);
 
             if ($select !== null) {
                 $parts[] = $select;
@@ -197,7 +197,7 @@ final class LegacyTeacherSupportQuery
     /**
      * @param  array<string, mixed>  $source
      */
-    private static function teacherIdSelectSql(array $source, ?int $year): ?string
+    private static function teacherIdSelectSql(array $source, ?int $year, ?int $month = null): ?string
     {
         $table = $source['table'] ?? null;
 
@@ -211,7 +211,7 @@ final class LegacyTeacherSupportQuery
             return null;
         }
 
-        $conditions = self::completedRowConditions($table, $year);
+        $conditions = self::completedRowConditions($table, $year, $month);
 
         return 'SELECT '.$table.'.'.$teacherIdColumn.' AS teacher_id FROM '.$table
             .' WHERE '.implode(' AND ', $conditions);
@@ -243,7 +243,7 @@ final class LegacyTeacherSupportQuery
     /**
      * @return list<string>
      */
-    private static function completedRowConditions(string $table, ?int $year): array
+    private static function completedRowConditions(string $table, ?int $year, ?int $month = null): array
     {
         $teacherIdColumn = self::teacherIdColumn($table);
 
@@ -253,7 +253,9 @@ final class LegacyTeacherSupportQuery
             ExcelSerialDate::sqlDateValueIsNotBlank("{$table}.SupportDate"),
         ];
 
-        if ($year !== null) {
+        if ($month !== null) {
+            $conditions[] = ExcelSerialDate::sqlColumnInYearMonth("{$table}.SupportDate", $year, $month);
+        } elseif ($year !== null) {
             $conditions[] = ExcelSerialDate::sqlColumnInYear("{$table}.SupportDate", $year);
         }
 

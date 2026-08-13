@@ -363,6 +363,10 @@ trait OpensTeacherSupportHistoryDetail
             'visit' => $this->openVisitView($teacherId, $form, $markCompleted),
             default => $this->supportReportViewMode = false,
         };
+
+        if ($this->supportReportViewMode) {
+            $this->hydrateSupportRoundFromActiveForm($teacherId);
+        }
     }
 
     /**

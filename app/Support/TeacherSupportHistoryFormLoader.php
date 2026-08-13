@@ -391,7 +391,8 @@ class TeacherSupportHistoryFormLoader
                 'observe_summary_extra' => '',
                 'observe_class' => '',
                 'observe_age' => '',
-                'session_number' => 1,
+                // 기관 지원 행에는 차수 정보가 없으므로 「기록 안 함」으로 연다.
+                'session_number' => null,
                 'semester_label' => '1학기 지원',
                 'interview_date' => $base['support_date'],
                 'interview_time' => $this->formatTimeInput($record->Meet_Time),
