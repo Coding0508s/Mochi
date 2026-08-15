@@ -580,6 +580,100 @@ class PotentialInstitutionViewTest extends TestCase
         $this->assertStringContainsString('추가 미팅', (string) $detail->Description);
     }
 
+    public function test_meeting_form_allows_legacy_target_when_employee_english_name_matches_manager(): void
+    {
+        if (! Schema::hasTable('employee')) {
+            Schema::create('employee', function (Blueprint $table): void {
+                $table->string('EMPNO')->primary();
+                $table->string('WORKDEPT')->nullable();
+                $table->string('KOREANAME')->nullable();
+                $table->string('ENGLISHNAME')->nullable();
+                $table->string('EMAIL')->nullable();
+                $table->unsignedTinyInteger('STATUS')->default(1);
+            });
+        }
+
+        $user = User::factory()->create([
+            'name' => '김피터',
+            'email' => 'peter.legacy@example.test',
+            'is_admin' => false,
+        ]);
+
+        DB::table('employee')->insert([
+            'EMPNO' => 'E-LEGACY-PETER',
+            'WORKDEPT' => 'A02',
+            'KOREANAME' => '김피터',
+            'ENGLISHNAME' => 'Peter Kim',
+            'EMAIL' => 'peter.legacy@example.test',
+            'STATUS' => 1,
+        ]);
+
+        $accountName = '이관 잠재기관 '.uniqid('', true);
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-10',
+            'AccountManager' => 'Peter Kim',
+            'AccountCode' => null,
+            'AccountName' => $accountName,
+            'Type' => '신규',
+            'Gubun' => '방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'IsContract' => false,
+            'Possibility' => 'B',
+            'created_by' => null,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionMeetingForm::class, ['coNewTargetId' => (int) $target->ID])
+            ->set('meetingDate', '2026-08-15')
+            ->set('consultingType', '재방문')
+            ->set('description', '이관 기관 추가 미팅')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_CO_NewTarget_Detail', [
+            'AccountName' => $accountName,
+            'ConsultingType' => '재방문',
+            'AccountManager' => 'Peter Kim',
+        ]);
+    }
+
+    public function test_meeting_form_rejects_legacy_target_when_manager_does_not_match(): void
+    {
+        $user = User::factory()->create([
+            'name' => '다른사람',
+            'email' => 'other.legacy@example.test',
+            'is_admin' => false,
+        ]);
+
+        $target = CoNewTarget::query()->create([
+            'Year' => 2026,
+            'CreatedDate' => '2026-04-10',
+            'AccountManager' => 'Peter Kim',
+            'AccountCode' => null,
+            'AccountName' => '이관 타인 기관',
+            'Type' => '신규',
+            'Gubun' => '방문',
+            'LS' => 0,
+            'GS_K' => 0,
+            'GS_E' => 0,
+            'Total' => 0,
+            'IsContract' => false,
+            'Possibility' => 'B',
+            'created_by' => null,
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(PotentialInstitutionMeetingForm::class, ['coNewTargetId' => (int) $target->ID])
+            ->set('meetingDate', '2026-08-15')
+            ->set('consultingType', '재방문')
+            ->call('save')
+            ->assertHasErrors(['meetingForm']);
+    }
+
     public function test_meeting_form_does_not_send_mail_when_notify_addresses_empty(): void
     {
         Mail::fake();

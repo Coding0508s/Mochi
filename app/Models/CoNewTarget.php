@@ -66,11 +66,18 @@ class CoNewTarget extends Model
             return (int) $this->created_by === (int) $user->id;
         }
 
-        // 표기 차이(공백/점)로 같은 사람이 어긋나지 않도록 InstitutionList와 같은 정규화 키로 비교.
+        // 이전 플랫폼 이관 행은 created_by가 없다.
+        // 목록 스코프와 같이 영문명(nameForCoReports)을 쓰고, 로그인명도 허용한다.
         $managerKey = ManagerNameNormalizer::normalize((string) $this->AccountManager);
-        $userKey = ManagerNameNormalizer::normalize((string) $user->name);
+        if ($managerKey === '') {
+            return false;
+        }
 
-        return $managerKey !== '' && $userKey !== '' && $managerKey === $userKey;
+        $reportKey = ManagerNameNormalizer::normalize($user->nameForCoReports());
+        $loginKey = ManagerNameNormalizer::normalize((string) $user->name);
+
+        return ($reportKey !== '' && $managerKey === $reportKey)
+            || ($loginKey !== '' && $managerKey === $loginKey);
     }
 
     public function studentTotal(): int
