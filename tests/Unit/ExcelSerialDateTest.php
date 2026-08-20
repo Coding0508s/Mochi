@@ -89,6 +89,10 @@ class ExcelSerialDateTest extends TestCase
         $this->assertSame('', ExcelSerialDate::formatPlanMonthForYear($date, 2025));
         $this->assertSame('2026-03-01', ExcelSerialDate::toStorageStringForYear($date, 2026));
         $this->assertNull(ExcelSerialDate::toStorageStringForYear($date, 2025));
+        $this->assertSame('2026-03-01', ExcelSerialDate::displayStorageString($date));
+        $this->assertSame('2026-03-01', ExcelSerialDate::displayStorageString($date, null));
+        $this->assertSame('2026-03-01', ExcelSerialDate::displayStorageString($date, 2026));
+        $this->assertNull(ExcelSerialDate::displayStorageString($date, 2025));
     }
 
     public function test_display_completed_with_type_appends_type_label(): void

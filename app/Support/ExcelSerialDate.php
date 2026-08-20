@@ -143,7 +143,7 @@ final class ExcelSerialDate
         return self::isInYear($value, $year) ? self::toStorageString($value) : null;
     }
 
-    public static function displayStorageString(mixed $value, ?int $year): ?string
+    public static function displayStorageString(mixed $value, ?int $year = null): ?string
     {
         if ($year === null) {
             return self::toStorageString($value);
