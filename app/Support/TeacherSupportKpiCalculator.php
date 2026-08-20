@@ -26,7 +26,7 @@ class TeacherSupportKpiCalculator
      */
     public static function hiddenToggleKeys(): array
     {
-        return ['completed', 'unsupported'];
+        return ['completed', 'unsupported', 'any_completed', 'never_supported'];
     }
 
     /**
@@ -326,6 +326,8 @@ class TeacherSupportKpiCalculator
         match ($kpiKey) {
             'completed' => self::applyAllRoundsCompletedWithoutYearScope($query),
             'unsupported' => self::applyUnsupportedWithoutYearScope($query),
+            'any_completed' => self::applyAnyCompletedWithoutYearScope($query),
+            'never_supported' => self::applyNeverCompletedWithoutYearScope($query),
             default => self::applyRoundCompletedWithoutYearScope($query, $kpiKey),
         };
     }
@@ -455,14 +457,65 @@ class TeacherSupportKpiCalculator
         $query->whereRaw(self::sqlColumnCompletedInYear($completedCol, $year));
     }
 
-    public static function applyAllRoundsCompletedScope(Builder $query, int $year): void
+    public static function applyAnyCompletedScope(Builder $query, int $year): void
+    {
+        $query->whereRaw(self::sqlAnyRoundCompletedInYear(self::qualifiedCompletedColumns(), $year));
+    }
+
+    public static function applyNeverCompletedScope(Builder $query, int $year): void
+    {
+        $query->whereRaw('NOT '.self::sqlAnyRoundCompletedInYear(self::qualifiedCompletedColumns(), $year));
+    }
+
+    public static function applyAnyCompletedWithoutYearScope(Builder $query): void
     {
         $cols = config('coach_teacher_support.columns');
-        $completedColumns = array_map(
+        $rounds = config('coach_teacher_support.kpi_rounds', []);
+
+        if ($rounds === []) {
+            $query->whereRaw('0 = 1');
+
+            return;
+        }
+
+        $query->where(function (Builder $outer) use ($cols, $rounds): void {
+            $first = true;
+            foreach ($rounds as $round) {
+                $completedCol = $cols[$round['completed']];
+                if ($first) {
+                    $outer->whereNotNull($completedCol);
+                    $first = false;
+                } else {
+                    $outer->orWhereNotNull($completedCol);
+                }
+            }
+        });
+    }
+
+    public static function applyNeverCompletedWithoutYearScope(Builder $query): void
+    {
+        $cols = config('coach_teacher_support.columns');
+        foreach (config('coach_teacher_support.kpi_rounds', []) as $round) {
+            $query->whereNull($cols[$round['completed']]);
+        }
+    }
+
+    public static function applyAllRoundsCompletedScope(Builder $query, int $year): void
+    {
+        $query->whereRaw(self::sqlAllRoundsCompletedInYear(self::qualifiedCompletedColumns(), $year));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function qualifiedCompletedColumns(): array
+    {
+        $cols = config('coach_teacher_support.columns');
+
+        return array_map(
             fn (array $round): string => self::qualifiedTeacherColumn($cols[$round['completed']]),
             config('coach_teacher_support.kpi_rounds', []),
         );
-        $query->whereRaw(self::sqlAllRoundsCompletedInYear($completedColumns, $year));
     }
 
     public static function applyUnsupportedScope(Builder $query, int $year): void

@@ -40,6 +40,7 @@ use App\Support\TeacherSupportHistoryDetailResolver;
 use App\Support\TeacherSupportHistoryFormLoader;
 use App\Support\TeacherSupportKpiCalculator;
 use App\Support\TeacherSupportListActivity;
+use App\Support\TeacherSupportNewTeacherDisplay;
 use App\Support\TeacherSupportReportEditAuthorization;
 use App\Support\TeamMenuContext;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -72,6 +73,12 @@ class CoachTeacherSupportList extends Component
     public string $search = '';
 
     public string $kpiFilter = '';
+
+    /** teacher = 직급이 정확히 '교사'인 행만. 빈 문자열은 전체 직급. */
+    public string $filterPosition = 'teacher';
+
+    /** full_time | part_time | unspecified | ''(전체) */
+    public string $filterEmploymentType = '';
 
     public bool $showExtendedColumns = false;
 
@@ -2504,6 +2511,24 @@ class CoachTeacherSupportList extends Component
         $this->resetPage();
     }
 
+    public function updatedFilterPosition(): void
+    {
+        if ($this->filterPosition !== 'teacher') {
+            $this->filterPosition = '';
+        }
+
+        $this->resetPage();
+    }
+
+    public function updatedFilterEmploymentType(): void
+    {
+        if (TeacherEmploymentType::tryFrom($this->filterEmploymentType) === null) {
+            $this->filterEmploymentType = '';
+        }
+
+        $this->resetPage();
+    }
+
     public function updatedShowAllTeachers(): void
     {
         $this->resetPage();
@@ -2523,36 +2548,8 @@ class CoachTeacherSupportList extends Component
         $this->filterMonth = '';
         $this->filterCoach = $this->defaultCoachFilter();
         $this->kpiFilter = '';
-        $this->resetPage();
-    }
-
-    public function clearSearch(): void
-    {
-        $this->search = '';
-        $this->resetPage();
-    }
-
-    public function clearRoundFilter(): void
-    {
-        $this->filterRound = '';
-        $this->resetPage();
-    }
-
-    public function clearMonthFilter(): void
-    {
-        $this->filterMonth = '';
-        $this->resetPage();
-    }
-
-    public function clearKpiFilter(): void
-    {
-        $this->kpiFilter = '';
-        $this->resetPage();
-    }
-
-    public function clearCoachFilter(): void
-    {
-        $this->filterCoach = '';
+        $this->filterPosition = 'teacher';
+        $this->filterEmploymentType = '';
         $this->resetPage();
     }
 
@@ -2680,6 +2677,11 @@ class CoachTeacherSupportList extends Component
 
         TeacherSupportCompletionDisplay::flushRequestCache();
         TeacherSupportCompletionDisplay::preloadForTeachers(
+            $teachers->getCollection(),
+            $this->resolvedFilterYear(),
+        );
+        TeacherSupportNewTeacherDisplay::flushRequestCache();
+        TeacherSupportNewTeacherDisplay::preloadForTeachers(
             $teachers->getCollection(),
             $this->resolvedFilterYear(),
         );
@@ -2895,6 +2897,8 @@ class CoachTeacherSupportList extends Component
     {
         $query = Teacher::query();
         $this->applyTeacherListVisibilityFilter($query);
+        $this->applyPositionFilter($query);
+        $this->applyEmploymentTypeFilter($query);
         $this->applyTeacherListScope($query);
 
         if (filled($this->search)) {
@@ -2996,6 +3000,8 @@ class CoachTeacherSupportList extends Component
 
         $scopedTeacherQuery = Teacher::query();
         $this->applyTeacherListVisibilityFilter($scopedTeacherQuery);
+        $this->applyPositionFilter($scopedTeacherQuery);
+        $this->applyEmploymentTypeFilter($scopedTeacherQuery);
         $this->applyTeacherListScope($scopedTeacherQuery, $user);
 
         $query = AccountInformation::query()
@@ -3041,6 +3047,43 @@ class CoachTeacherSupportList extends Component
         $query->excludeRetired();
     }
 
+    /**
+     * 기본: 직급이 정확히 '교사'인 행만. 전체 직급이면 제한하지 않는다.
+     *
+     * @param  Builder<Teacher>  $query
+     */
+    private function applyPositionFilter(Builder $query): void
+    {
+        if ($this->filterPosition !== 'teacher') {
+            return;
+        }
+
+        $query->whereRaw("TRIM(COALESCE(Teachers.Position, '')) = ?", ['교사']);
+    }
+
+    /**
+     * @param  Builder<Teacher>  $query
+     */
+    private function applyEmploymentTypeFilter(Builder $query): void
+    {
+        $filterType = TeacherEmploymentType::tryFrom($this->filterEmploymentType);
+        if ($filterType === null) {
+            return;
+        }
+
+        if ($filterType === TeacherEmploymentType::Unspecified) {
+            $query->where(function (Builder $subQuery): void {
+                $subQuery->whereNull('Teachers.EmploymentType')
+                    ->orWhere('Teachers.EmploymentType', '')
+                    ->orWhere('Teachers.EmploymentType', TeacherEmploymentType::Unspecified->value);
+            });
+
+            return;
+        }
+
+        $query->where('Teachers.EmploymentType', $filterType->value);
+    }
+
     private function defaultCoachFilter(): string
     {
         $user = auth()->user();
@@ -3077,6 +3120,8 @@ class CoachTeacherSupportList extends Component
         match ($this->kpiFilter) {
             'completed' => TeacherSupportKpiCalculator::applyAllRoundsCompletedScope($query, $year),
             'unsupported' => TeacherSupportKpiCalculator::applyUnsupportedScope($query, $year),
+            'any_completed' => TeacherSupportKpiCalculator::applyAnyCompletedScope($query, $year),
+            'never_supported' => TeacherSupportKpiCalculator::applyNeverCompletedScope($query, $year),
             default => $this->applyRoundCompletedDisplayScope($query, $this->kpiFilter, $year),
         };
     }

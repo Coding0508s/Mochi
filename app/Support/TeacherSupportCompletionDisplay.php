@@ -259,11 +259,17 @@ final class TeacherSupportCompletionDisplay
             return ['date' => '', 'type' => ''];
         }
 
-        return ExcelSerialDate::completedDisplayParts(
+        $parts = ExcelSerialDate::completedDisplayParts(
             $teacher->getRawOriginal($dateColumn),
             $teacher->{$typeColumn},
             $year,
         );
+
+        if (TeacherSupportNewTeacherDisplay::isNewTeacherSupportType($parts['type'] ?? null)) {
+            return ['date' => '', 'type' => ''];
+        }
+
+        return $parts;
     }
 
     private static function teacherRoundHasCompletionInYear(Teacher $teacher, int $round, ?int $year): bool
@@ -286,7 +292,7 @@ final class TeacherSupportCompletionDisplay
             return false;
         }
 
-        return ExcelSerialDate::matchesFilterYear($teacher->getRawOriginal($dateColumn), $year);
+        return self::partsFromTeacherSlot($teacher, $round, $year)['date'] !== '';
     }
 
     /**
@@ -318,10 +324,14 @@ final class TeacherSupportCompletionDisplay
         $result = [];
 
         foreach ($teacherIds as $teacherId) {
-            $result[$teacherId] = self::dedupeReports(array_merge(
+            $filteredReports = array_values(array_filter(array_merge(
                 $mochiReports[$teacherId] ?? [],
                 $legacyReports[$teacherId] ?? [],
-            ));
+            ), fn (array $report): bool => ! TeacherSupportNewTeacherDisplay::isNewTeacherSupportType(
+                $report['type'] ?? null,
+            )));
+
+            $result[$teacherId] = self::dedupeReports($filteredReports);
         }
 
         return $result;
