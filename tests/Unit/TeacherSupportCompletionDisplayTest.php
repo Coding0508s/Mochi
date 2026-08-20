@@ -173,7 +173,7 @@ class TeacherSupportCompletionDisplayTest extends TestCase
         $this->assertSame('', $second['date']);
     }
 
-    public function test_parts_falls_back_to_legacy_new_teacher_when_teacher_slot_empty(): void
+    public function test_parts_excludes_legacy_new_teacher_when_teacher_slot_empty(): void
     {
         $teacherId = DB::table('Teachers')->insertGetId([
             'Name' => '신규교사',
@@ -189,8 +189,8 @@ class TeacherSupportCompletionDisplayTest extends TestCase
 
         $parts = TeacherSupportCompletionDisplay::parts($teacher, 1, 2024);
 
-        $this->assertSame('2024-02-17', $parts['date']);
-        $this->assertSame('교사 지원(신규교사)', $parts['type']);
+        $this->assertSame('', $parts['date']);
+        $this->assertSame('', $parts['type']);
     }
 
     public function test_parts_falls_back_to_mochi_report_when_year_filter_is_all(): void
@@ -232,8 +232,8 @@ class TeacherSupportCompletionDisplayTest extends TestCase
         $first = TeacherSupportCompletionDisplay::parts($teacher, 1, 2024);
         $second = TeacherSupportCompletionDisplay::parts($teacher, 2, 2024);
 
-        $this->assertSame('2024-02-17', $first['date']);
-        $this->assertSame('교사 지원(신규교사)', $first['type']);
+        $this->assertSame('', $first['date']);
+        $this->assertSame('', $first['type']);
         $this->assertSame('', $second['date']);
     }
 

@@ -771,15 +771,17 @@
         --coach-support-inst-width: 7.5rem;
         --coach-support-position-width: 4rem;
         --coach-support-employment-width: 5rem;
-        --coach-support-name-width: 4.5rem;
+        --coach-support-name-width: 8.25rem;
         --coach-support-essentials-gs-width: 5.5rem;
         --coach-support-essentials-ls-width: 5.5rem;
+        --coach-support-new-teacher-support-width: 8.5rem;
         --coach-support-plan1-date-width: 8.5rem;
         --coach-support-sticky-width: calc(
             var(--coach-support-sk-width) + var(--coach-support-inst-width) +
                 var(--coach-support-position-width) + var(--coach-support-employment-width) +
                 var(--coach-support-name-width) +
-                var(--coach-support-essentials-gs-width) + var(--coach-support-essentials-ls-width)
+                var(--coach-support-essentials-gs-width) + var(--coach-support-essentials-ls-width) +
+                var(--coach-support-new-teacher-support-width)
         );
         --coach-support-row-border: #e8ecf1;
         --coach-support-zone-divider: rgba(207, 214, 223, 0.9);
@@ -803,7 +805,7 @@
     }
 
     .coach-teacher-support-table .coach-support-col-completed {
-        width: 12%;
+        width: 8%;
     }
 
     .coach-teacher-support-table .coach-support-col-completed,
@@ -906,6 +908,11 @@
     .coach-teacher-support-table .coach-support-col-essentials-ls {
         width: var(--coach-support-essentials-ls-width);
         min-width: var(--coach-support-essentials-ls-width);
+    }
+
+    .coach-teacher-support-table .coach-support-col-new-teacher-support {
+        width: var(--coach-support-new-teacher-support-width);
+        min-width: var(--coach-support-new-teacher-support-width);
     }
 
     .coach-teacher-support-table th.coach-support-col-plan1-date,
@@ -1068,13 +1075,37 @@
         max-width: var(--coach-support-essentials-ls-width);
         background-color: #ffffff;
         background-clip: padding-box;
-        border-right: none;
-        box-shadow: none;
+        border-right: 1px solid var(--coach-support-row-border);
         white-space: nowrap;
         word-break: normal;
     }
 
     .coach-teacher-support-table .coach-support-sticky-essentials-ls--head {
+        top: 0;
+        z-index: 43;
+        background-color: #e8e6d9;
+        border-right: 1px solid #d5dcd6;
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-new-teacher-support {
+        position: sticky;
+        left: calc(
+            var(--coach-support-sk-width) + var(--coach-support-inst-width) +
+                var(--coach-support-name-width) + var(--coach-support-position-width) +
+                var(--coach-support-employment-width) +
+                var(--coach-support-essentials-gs-width) + var(--coach-support-essentials-ls-width)
+        );
+        z-index: 25;
+        width: var(--coach-support-new-teacher-support-width);
+        min-width: var(--coach-support-new-teacher-support-width);
+        max-width: var(--coach-support-new-teacher-support-width);
+        background-color: #ffffff;
+        background-clip: padding-box;
+        border-right: none;
+        box-shadow: none;
+    }
+
+    .coach-teacher-support-table .coach-support-sticky-new-teacher-support--head {
         top: 0;
         z-index: 45;
         background-color: #e8e6d9;
@@ -1085,9 +1116,11 @@
     .coach-teacher-support-table .coach-support-sticky-name .coach-support-name-link {
         display: block;
         max-width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        overflow: visible;
+        white-space: normal;
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+        line-height: 1.3;
     }
 
     .coach-teacher-support-table .coach-support-sticky-inst .coach-support-inst-link {
@@ -1131,16 +1164,49 @@
     .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-employment,
     .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-name,
     .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-essentials-gs,
-    .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-essentials-ls {
+    .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-essentials-ls,
+    .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-new-teacher-support {
         background-color: #eef5ff;
     }
 
-    .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-essentials-ls.coach-support-schedule-cell.cursor-pointer:hover {
+    .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-essentials-ls.coach-support-schedule-cell.cursor-pointer:hover,
+    .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-new-teacher-support.coach-support-schedule-cell.cursor-pointer:hover {
         background-color: #eaf3ff;
     }
 
     .coach-teacher-support-table .mochi-table-row-hover:hover > td.bg-green-50 {
         background-color: #e3f0ea;
+    }
+
+    .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-new-teacher-support.bg-green-50 {
+        background-color: #e3f0ea;
+    }
+
+    .coach-teacher-support-table .mochi-table-row-hover:hover > .coach-support-sticky-new-teacher-support.coach-support-schedule-cell.bg-green-50.cursor-pointer:hover {
+        background-color: #dff1e7;
+    }
+
+    .coach-teacher-support-table .coach-support-new-teacher-cell {
+        display: flex;
+        flex-direction: column;
+        gap: 0.125rem;
+        max-width: 100%;
+    }
+
+    .coach-teacher-support-table .coach-support-new-teacher-date {
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    .coach-teacher-support-table .coach-support-new-teacher-type {
+        display: block;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: #6b7280;
+        font-size: 0.625rem;
+        line-height: 1.2;
     }
 
     .mochi-calendar-card {
@@ -1335,7 +1401,7 @@
         border-right: none;
     }
 
-    .mochi-toggle-btn:hover:not(.mochi-toggle-btn--active) {
+    .mochi-toggle-btn:hover:not(.mochi-toggle-btn--active):not(.mochi-toggle-btn--active-success):not(.mochi-toggle-btn--active-danger) {
         background: #f9fafb;
     }
 

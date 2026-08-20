@@ -10,12 +10,10 @@
         @php
             $kpiToggleLabels = \App\Support\TeacherSupportKpiCalculator::visibleToggleLabels();
             $totalSupportCount = \App\Support\TeacherSupportKpiCalculator::totalSupportCount($kpis);
-            $allKpiLabels = \App\Support\TeacherSupportKpiCalculator::toggleLabels();
+            $unsupportedTeacherCount = max(0, (int) ($kpis['teacher_count'] ?? 0) - (int) ($kpis['any_completed'] ?? 0));
         @endphp
 
-        <div class="flex flex-wrap items-center gap-3 text-sm">
-            <h2 class="text-base font-semibold text-[#2b78c5]">교사 지원 현황</h2>
-            <span class="text-gray-300">|</span>
+        <div class="flex flex-wrap items-center gap-2 text-sm">
             <div class="mochi-toggle-group">
                 <span class="mochi-toggle-btn cursor-default pointer-events-none text-gray-700"
                       aria-label="기관 수">
@@ -27,11 +25,32 @@
                     교사 수
                     <span class="font-semibold">{{ $kpis['teacher_count'] ?? 0 }}</span>
                 </span>
-                <span class="mochi-toggle-btn cursor-default pointer-events-none text-green-800"
-                      aria-label="완료 교사 수" title="선택 연도에 1~4차 중 하나라도 완료한 교사 수">
-                    완료 교사
+            </div>
+            <span data-kpi-divider aria-hidden="true" class="h-6 w-px bg-gray-200"></span>
+
+            <div class="mochi-toggle-group">
+                <button type="button"
+                        wire:click="setKpiFilter('any_completed')"
+                        aria-pressed="{{ $kpiFilter === 'any_completed' ? 'true' : 'false' }}"
+                        aria-label="지원함 교사 수"
+                        title="선택 연도에 1~4차 중 하나라도 완료한 교사"
+                        class="mochi-toggle-btn {{ $kpiFilter === 'any_completed' ? 'mochi-toggle-btn--active-success' : 'text-green-800' }}">
+                    지원함
                     <span class="font-semibold">{{ $kpis['any_completed'] ?? 0 }}</span>
-                </span>
+                </button>
+                <button type="button"
+                        wire:click="setKpiFilter('never_supported')"
+                        aria-pressed="{{ $kpiFilter === 'never_supported' ? 'true' : 'false' }}"
+                        aria-label="미지원 교사 수"
+                        title="선택 연도에 완료일이 없는 교사"
+                        class="mochi-toggle-btn {{ $kpiFilter === 'never_supported' ? 'mochi-toggle-btn--active-danger' : '' }}">
+                    미지원
+                    <span class="font-semibold">{{ $unsupportedTeacherCount }}</span>
+                </button>
+            </div>
+            <span data-kpi-divider aria-hidden="true" class="h-6 w-px bg-gray-200"></span>
+
+            <div class="mochi-toggle-group">
                 @foreach($kpiToggleLabels as $kpiKey => $kpiLabel)
                     <button type="button"
                             wire:click="setKpiFilter('{{ $kpiKey }}')"
@@ -48,15 +67,21 @@
                         <span class="font-semibold">{{ $kpis[$kpiKey] ?? 0 }}</span>
                     </button>
                 @endforeach
-                <span class="mochi-toggle-btn cursor-default pointer-events-none text-gray-700"
-                      aria-label="총 지원 횟수">
-                    총 지원 횟수
-                    <span class="font-semibold">{{ $totalSupportCount }}</span>
-                </span>
+            </div>
+            <span data-kpi-divider aria-hidden="true" class="h-6 w-px bg-gray-200"></span>
+
+            <div class="flex flex-wrap items-center gap-2">
+                <div class="mochi-toggle-group">
+                    <span class="mochi-toggle-btn cursor-default pointer-events-none text-gray-700"
+                          aria-label="총 지원 횟수">
+                        총 지원 횟수
+                        <span class="font-semibold">{{ $totalSupportCount }}</span>
+                    </span>
+                </div>
                 <span wire:loading.delay
                       wire:loading.class.remove="hidden"
                       wire:loading.class="inline-flex"
-                      wire:target="search,filterYear,filterRound,filterMonth,filterCoach,kpiFilter,showAllTeachers,showExtendedColumns,setKpiFilter,resetFilters,clearSearch,clearRoundFilter,clearMonthFilter,clearKpiFilter,clearCoachFilter"
+                      wire:target="search,filterYear,filterRound,filterMonth,filterCoach,filterPosition,filterEmploymentType,kpiFilter,showAllTeachers,showExtendedColumns,setKpiFilter,resetFilters"
                       class="hidden items-center gap-1.5 rounded-full border border-mochi-header/20 bg-mochi-header/5 px-2.5 py-1 text-xs font-medium text-mochi-header">
                     <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -85,99 +110,100 @@
 
     {{-- Filter --}}
     <div class="mochi-filter-card">
-        @php
-            $activeFilterChips = [];
-
-            if ($kpiFilter) {
-                $activeFilterChips[] = ['label' => '상태: '.($allKpiLabels[$kpiFilter] ?? $kpiFilter), 'action' => 'clearKpiFilter'];
-            }
-
-            if ($filterRound) {
-                $activeFilterChips[] = ['label' => '차수: '.$filterRound.'차', 'action' => 'clearRoundFilter'];
-            }
-
-            if ($filterMonth) {
-                $monthLabel = filled($filterYear) ? $filterYear.'년 '.$filterMonth.'월' : '전체 · '.$filterMonth.'월';
-                $activeFilterChips[] = [
-                    'label' => ($filterRound !== '' ? $filterRound.'차 지원월: ' : '지원월: ').$monthLabel,
-                    'action' => 'clearMonthFilter',
-                ];
-            }
-
-            if ($filterCoach) {
-                $activeFilterChips[] = ['label' => '담당 코치: '.$filterCoach, 'action' => 'clearCoachFilter'];
-            }
-
-            if ($search) {
-                $activeFilterChips[] = ['label' => '검색어 적용', 'action' => 'clearSearch'];
-            }
-
-            if ($showAllTeachers) {
-                $activeFilterChips[] = ['label' => '퇴직 포함', 'action' => null];
-            }
-        @endphp
-
-        <div class="flex flex-wrap items-center gap-3">
-            <div class="hidden flex items-center gap-2 text-sm" aria-hidden="true">
-                <span class="text-gray-500">계획 차수</span>
-                <div class="mochi-toggle-group">
-                    <button type="button" wire:click="$set('filterRound', '')"
-                            class="mochi-toggle-btn {{ $filterRound === '' ? 'mochi-toggle-btn--active' : '' }}">
-                        전체
-                    </button>
-                    <button type="button" wire:click="$set('filterRound', '1')"
-                            class="mochi-toggle-btn {{ $filterRound === '1' ? 'mochi-toggle-btn--active' : '' }}">
-                        1차
-                    </button>
-                    <button type="button" wire:click="$set('filterRound', '2')"
-                            class="mochi-toggle-btn {{ $filterRound === '2' ? 'mochi-toggle-btn--active' : '' }}">
-                        2차
-                    </button>
+        <div class="flex flex-nowrap items-center gap-3 overflow-x-auto pb-1 text-sm">
+                <div class="hidden flex items-center gap-2 text-sm" aria-hidden="true">
+                    <span class="text-gray-500">계획 차수</span>
+                    <div class="mochi-toggle-group">
+                        <button type="button" wire:click="$set('filterRound', '')"
+                                class="mochi-toggle-btn {{ $filterRound === '' ? 'mochi-toggle-btn--active' : '' }}">
+                            전체
+                        </button>
+                        <button type="button" wire:click="$set('filterRound', '1')"
+                                class="mochi-toggle-btn {{ $filterRound === '1' ? 'mochi-toggle-btn--active' : '' }}">
+                            1차
+                        </button>
+                        <button type="button" wire:click="$set('filterRound', '2')"
+                                class="mochi-toggle-btn {{ $filterRound === '2' ? 'mochi-toggle-btn--active' : '' }}">
+                            2차
+                        </button>
+                    </div>
                 </div>
-            </div>
 
-            @if($coachFilterOptions->isNotEmpty())
-                <select wire:model.live="filterCoach"
-                        class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
-                    <option value="">전체 담당</option>
-                    @foreach($coachFilterOptions as $coachName)
-                        <option value="{{ $coachName }}">{{ $coachName }}</option>
-                    @endforeach
+                @if($coachFilterOptions->isNotEmpty())
+                    <select wire:model.live="filterCoach"
+                            class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                        <option value="">전체 담당</option>
+                        @foreach($coachFilterOptions as $coachName)
+                            <option value="{{ $coachName }}">{{ $coachName }}</option>
+                        @endforeach
+                    </select>
+                @endif
+
+                <select wire:model.live="filterMonth"
+                        class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                    <option value="">전체</option>
+                    @for($m = 1; $m <= 12; $m++)
+                        <option value="{{ $m }}">{{ $m }}월</option>
+                    @endfor
                 </select>
-            @endif
 
-            <select wire:model.live="filterMonth"
-                    class="py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
-                <option value="">전체</option>
-                @for($m = 1; $m <= 12; $m++)
-                    <option value="{{ $m }}">{{ $m }}월</option>
-                @endfor
-            </select>
-
-            @if($search || $filterRound || $filterMonth || $filterCoach || $kpiFilter)
-                <button wire:click="resetFilters"
-                        class="py-2 px-3 text-sm text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50">
-                    초기화
-                </button>
-            @endif
-
-            <div class="relative flex-1 min-w-56">
-                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
-                </svg>
-                <input type="text"
-                       wire:model.live.debounce.500ms="search"
-                       placeholder="이름, 기관명, SK코드 검색"
-                       class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
-            </div>
-
-            <div class="ml-auto flex flex-wrap items-center gap-3">
-                <div class="inline-flex items-center rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600">
-                    전체 기관 기준 조회
+                <div class="relative min-w-0 flex-1 md:min-w-[14rem] max-w-xl">
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+                    </svg>
+                    <input type="text"
+                           wire:model.live.debounce.500ms="search"
+                           placeholder="이름, 기관명, SK코드 검색"
+                           class="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header" />
                 </div>
-                <div class="flex items-center gap-2 text-sm">
+
+                @if($search || $filterRound || $filterMonth || $filterCoach || $kpiFilter || $filterPosition === '' || $filterEmploymentType !== '')
+                    <button wire:click="resetFilters"
+                            class="shrink-0 py-2 px-3 text-sm text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50">
+                        초기화
+                    </button>
+                @endif
+                <div class="flex shrink-0 items-center gap-2.5 whitespace-nowrap">
+                    <span class="text-gray-500">직급</span>
+                    <div class="mochi-toggle-group">
+                        <button type="button" wire:click="$set('filterPosition', 'teacher')"
+                                class="mochi-toggle-btn {{ $filterPosition === 'teacher' ? 'mochi-toggle-btn--active' : '' }}">
+                            교사만
+                        </button>
+                        <button type="button" wire:click="$set('filterPosition', '')"
+                                class="mochi-toggle-btn {{ $filterPosition === '' ? 'mochi-toggle-btn--active' : '' }}">
+                            전체
+                        </button>
+                    </div>
+                </div>
+                <div class="flex shrink-0 items-center gap-2.5 whitespace-nowrap">
+                    <span class="text-gray-500">근무형태</span>
+                    <div class="mochi-toggle-group">
+                        <button type="button" wire:click="$set('filterEmploymentType', '')"
+                                class="mochi-toggle-btn {{ $filterEmploymentType === '' ? 'mochi-toggle-btn--active' : '' }}">
+                            전체
+                        </button>
+                        <button type="button"
+                                title="{{ \App\Enums\TeacherEmploymentType::FullTime->label() }}"
+                                wire:click="$set('filterEmploymentType', '{{ \App\Enums\TeacherEmploymentType::FullTime->value }}')"
+                                class="mochi-toggle-btn {{ $filterEmploymentType === \App\Enums\TeacherEmploymentType::FullTime->value ? 'mochi-toggle-btn--active' : '' }}">
+                            풀타임
+                        </button>
+                        <button type="button"
+                                title="{{ \App\Enums\TeacherEmploymentType::PartTime->label() }}"
+                                wire:click="$set('filterEmploymentType', '{{ \App\Enums\TeacherEmploymentType::PartTime->value }}')"
+                                class="mochi-toggle-btn {{ $filterEmploymentType === \App\Enums\TeacherEmploymentType::PartTime->value ? 'mochi-toggle-btn--active' : '' }}">
+                            파트
+                        </button>
+                        <button type="button" wire:click="$set('filterEmploymentType', '{{ \App\Enums\TeacherEmploymentType::Unspecified->value }}')"
+                                class="mochi-toggle-btn {{ $filterEmploymentType === \App\Enums\TeacherEmploymentType::Unspecified->value ? 'mochi-toggle-btn--active' : '' }}">
+                            미지정
+                        </button>
+                    </div>
+                </div>
+                <div class="flex shrink-0 items-center gap-2.5 whitespace-nowrap">
                     <span class="text-gray-500">퇴직</span>
                     <div class="mochi-toggle-group">
                         <button type="button" wire:click="$set('showAllTeachers', false)"
@@ -190,30 +216,10 @@
                         </button>
                     </div>
                 </div>
-            </div>
         </div>
-
-        @if($activeFilterChips !== [])
-            <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 text-xs">
-                <span class="text-gray-400">적용 필터</span>
-                @foreach($activeFilterChips as $chip)
-                    <span class="inline-flex items-center gap-1 rounded-full border border-mochi-header/20 bg-mochi-header/10 px-2.5 py-1 font-medium text-mochi-header">
-                        {{ $chip['label'] }}
-                        @if($chip['action'])
-                            <button type="button"
-                                    wire:click="{{ $chip['action'] }}"
-                                    class="ml-0.5 text-mochi-header/60 hover:text-mochi-header"
-                                    aria-label="{{ $chip['label'] }} 필터 해제">
-                                ×
-                            </button>
-                        @endif
-                    </span>
-                @endforeach
-            </div>
-        @endif
-
-        <p class="mt-3 border-t border-gray-100 pt-3 text-xs text-gray-500">
-            계획·완료 칸을 클릭하면 일정을 수정할 수 있습니다.
+        <p class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3 text-xs text-gray-500">
+            <span>계획·완료 칸을 클릭하면 일정을 수정할 수 있습니다.</span>
+            <span class="text-gray-400">전체 기관 기준 조회</span>
         </p>
     </div>
 
@@ -222,7 +228,7 @@
         $items = $teachers->items();
         $cols = config('coach_teacher_support.columns');
         // 보이는 열만 센다. 숨긴 계획 열을 colspan에 넣으면 필터 시 헤더 너비가 깨진다.
-        $tableColumnSpan = 11;
+        $tableColumnSpan = 12;
     @endphp
     <div class="mochi-table-card relative">
         <div class="md:hidden space-y-3 p-3">
@@ -259,6 +265,7 @@
                     <col class="coach-support-col-employment">
                     <col class="coach-support-col-essentials-gs">
                     <col class="coach-support-col-essentials-ls">
+                    <col class="coach-support-col-new-teacher-support">
                     <col span="4" class="coach-support-col-completed">
                 </colgroup>
                 <thead class="mochi-table-head">
@@ -270,6 +277,7 @@
                     <th class="coach-support-sticky-employment coach-support-sticky-employment--head px-2 py-1.5 text-left">근무형태</th>
                     <th class="coach-support-sticky-essentials-gs coach-support-sticky-essentials-gs--head px-2 py-1.5 text-left" title="GS Essentials">GS Ess.</th>
                     <th class="coach-support-sticky-essentials-ls coach-support-sticky-essentials-ls--head px-2 py-1.5 text-left" title="LS Essentials">LS Ess.</th>
+                    <th class="coach-support-sticky-new-teacher-support coach-support-sticky-new-teacher-support--head px-2 py-1.5 text-left">신규교사 지원</th>
                     <th class="coach-support-col-plan-12-hidden px-3 py-2 text-left coach-support-col-plan1-date">1차 지원 계획일자</th>
                     <th class="coach-support-col-plan-12-hidden px-3 py-2 text-left">1차 지원 계획타입</th>
                     <th class="coach-support-col-plan-12-hidden px-3 py-2 text-left">2차 지원 계획일자</th>
@@ -289,33 +297,24 @@
                 <tbody>
                 @forelse($items as $idx => $teacher)
                     @php
-                        $teacherId = (int) $teacher->ID;
-                        $isFirstInGroup = (($rowspansByTeacherId[$teacherId] ?? 0) > 0);
-                        $span = $rowspansByTeacherId[$teacherId] ?? 0;
+                        $institutionIsTerminated = $teacher->institution?->isTerminatedCustomer() ?? false;
                         // 지원 일정 수정 모달 임시 비활성화. 복구 시 아래 주석을 해제할 것.
                         // $canOpenEditModal = $this->canOpenEditModal($teacher->ID);
                         $canOpenEditModal = false;
                     @endphp
                     <tr wire:key="teacher-{{ $teacher->ID }}"
-                        data-group-first="{{ $isFirstInGroup ? '1' : '0' }}"
+                        data-group-first="1"
                         class="mochi-table-row-hover">
-                        @if($isFirstInGroup)
-                            <td class="coach-support-sticky-sk coach-support-sk-code px-3 py-2 align-middle text-center font-mono text-xs text-purple-700"
-                                rowspan="{{ $span }}">
-                                {{ ltrim((string) $teacher->SK_Code, '*') }}
-                            </td>
-                            <td class="coach-support-sticky-inst px-3 py-2 align-middle text-center"
-                                rowspan="{{ $span }}">
-                                @php
-                                    $institutionIsTerminated = $teacher->institution?->isTerminatedCustomer() ?? false;
-                                @endphp
-                                <button type="button"
-                                        class="coach-support-inst-link cursor-pointer text-center underline {{ $institutionIsTerminated ? 'coach-support-inst-link--terminated text-red-700 hover:text-red-800' : 'text-mochi-header hover:text-mochi-header/80' }}"
-                                        wire:click.stop="openInstitutionModal('{{ $teacher->SK_Code }}')">
-                                    {{ $teacher->institution?->resolvedAccountName() ?: $teacher->School_Name }}
-                                </button>
-                            </td>
-                        @endif
+                        <td class="coach-support-sticky-sk coach-support-sk-code px-3 py-2 align-middle text-center font-mono text-xs text-purple-700">
+                            {{ ltrim((string) $teacher->SK_Code, '*') }}
+                        </td>
+                        <td class="coach-support-sticky-inst px-3 py-2 align-middle text-center">
+                            <button type="button"
+                                    class="coach-support-inst-link cursor-pointer text-center underline {{ $institutionIsTerminated ? 'coach-support-inst-link--terminated text-red-700 hover:text-red-800' : 'text-mochi-header hover:text-mochi-header/80' }}"
+                                    wire:click.stop="openInstitutionModal('{{ $teacher->SK_Code }}')">
+                                {{ $teacher->institution?->resolvedAccountName() ?: $teacher->School_Name }}
+                            </button>
+                        </td>
                         <td class="coach-support-sticky-name px-3 py-2 align-middle">
                             <button type="button"
                                     class="coach-support-name-link cursor-pointer text-left text-mochi-header underline hover:text-mochi-header/80"
@@ -343,7 +342,7 @@
                                 tabindex="0"
                                 aria-label="{{ $teacher->Name }} 지원 일정 수정"
                             @endif>
-                            {{ \App\Support\ExcelSerialDate::displayStorageString($teacher->getRawOriginal($cols['essentials_gs']), $displayYear) }}
+                            {{ \App\Support\ExcelSerialDate::displayStorageString($teacher->getRawOriginal($cols['essentials_gs'])) }}
                         </td>
                         <td class="coach-support-sticky-essentials-ls px-3 py-2 align-middle coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
@@ -352,7 +351,28 @@
                                 tabindex="0"
                                 aria-label="{{ $teacher->Name }} 지원 일정 수정"
                             @endif>
-                            {{ \App\Support\ExcelSerialDate::displayStorageString($teacher->getRawOriginal($cols['essentials_ls']), $displayYear) }}
+                            {{ \App\Support\ExcelSerialDate::displayStorageString($teacher->getRawOriginal($cols['essentials_ls'])) }}
+                        </td>
+                        @php
+                            $newTeacherSupportParts = \App\Support\TeacherSupportNewTeacherDisplay::parts($teacher, $displayYear);
+                        @endphp
+                        <td class="coach-support-sticky-new-teacher-support px-3 py-2 align-middle coach-support-schedule-cell {{ $newTeacherSupportParts['date'] !== '' ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
+                            @if($canOpenEditModal)
+                                wire:click="openEditModal({{ $teacher->ID }})"
+                                role="button"
+                                tabindex="0"
+                                aria-label="{{ $teacher->Name }} 지원 일정 수정"
+                            @endif>
+                            <div class="coach-support-new-teacher-cell">
+                                <span class="coach-support-new-teacher-date">
+                                    {{ $newTeacherSupportParts['date'] !== '' ? $newTeacherSupportParts['date'] : '-' }}
+                                </span>
+                                @if($newTeacherSupportParts['type'] !== '')
+                                    <span class="coach-support-new-teacher-type" title="{{ $newTeacherSupportParts['type'] }}">
+                                        {{ $newTeacherSupportParts['type'] }}
+                                    </span>
+                                @endif
+                            </div>
                         </td>
                         <td class="coach-support-col-plan-12-hidden px-3 py-2 align-middle coach-support-col-plan1-date coach-support-schedule-cell {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
                             @if($canOpenEditModal)
@@ -516,8 +536,8 @@
         @if($institutionGroupPaginator->hasPages())
             <div class="px-4 py-3 border-t border-gray-100">
                 <p class="mb-2 text-xs text-gray-500">
-                    기관 그룹 기준 · {{ $institutionGroupPaginator->firstItem() }}–{{ $institutionGroupPaginator->lastItem() }}
-                    / 전체 {{ $institutionGroupPaginator->total() }}개 그룹
+                    교사 기준 · {{ $institutionGroupPaginator->firstItem() }}–{{ $institutionGroupPaginator->lastItem() }}
+                    / 전체 {{ $institutionGroupPaginator->total() }}명
                     · 이번 페이지 교사 {{ $teachers->count() }}명
                 </p>
                 {{ $institutionGroupPaginator->links() }}
