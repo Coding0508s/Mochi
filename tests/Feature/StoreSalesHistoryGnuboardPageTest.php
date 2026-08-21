@@ -127,6 +127,12 @@ class StoreSalesHistoryGnuboardPageTest extends TestCase
             ->assertSee('신용카드')
             ->assertSee('전하실 말씀')
             ->assertSee('기관 전화번호: 010-4232-4232')
+            ->assertSeeHtml('table-fixed')
+            ->assertSeeHtml('block truncate')
+            ->assertSeeHtml('title="홍길동"')
+            ->assertSeeHtml('title="기관 전화번호: 010-4232-4232"')
+            ->assertSeeHtml('line-clamp-2 break-words')
+            ->assertDontSee('whitespace-pre-wrap')
             ->assertDontSee('OD-CANCEL');
     }
 

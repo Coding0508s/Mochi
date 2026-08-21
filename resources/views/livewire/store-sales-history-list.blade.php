@@ -94,7 +94,18 @@
     </div>
 
     <div class="mochi-table-card overflow-x-auto" aria-live="polite">
-        <table class="w-full min-w-[1100px] text-sm">
+        <table class="w-full min-w-[1180px] table-fixed text-sm">
+            <colgroup>
+                <col class="w-[10.5rem]">
+                <col class="w-[9.5rem]">
+                <col class="w-[11rem]">
+                <col class="w-[8rem]">
+                <col>
+                <col class="w-[3.5rem]">
+                <col class="w-[3.5rem]">
+                <col class="w-[5.5rem]">
+                <col class="w-[14rem]">
+            </colgroup>
             <thead class="mochi-table-head">
                 <tr>
                     <th class="px-3 py-2 text-left text-xs font-semibold">주문 일시</th>
@@ -114,20 +125,26 @@
                         $orderMemo = trim((string) ($item->order_memo ?? ''));
                     @endphp
                     <tr>
-                        <td class="px-3 py-2 text-gray-700">{{ $item->sold_at }}</td>
-                        <td class="px-3 py-2 font-mono text-xs text-gray-700">{{ $item->order_ref }}</td>
-                        <td class="px-3 py-2 text-gray-900">{{ $item->institution_nickname }}</td>
-                        <td class="px-3 py-2 text-gray-900">{{ $item->order_customer_name }}</td>
-                        <td class="px-3 py-2 text-gray-900">
+                        <td class="overflow-hidden px-3 py-2 whitespace-nowrap text-gray-700">{{ $item->sold_at }}</td>
+                        <td class="overflow-hidden px-3 py-2 font-mono text-xs text-gray-700">
+                            <span class="block truncate" title="{{ $item->order_ref }}">{{ $item->order_ref }}</span>
+                        </td>
+                        <td class="overflow-hidden px-3 py-2 break-words text-gray-900">{{ $item->institution_nickname }}</td>
+                        <td class="overflow-hidden px-3 py-2 text-gray-900">
+                            <span class="block truncate" title="{{ $item->order_customer_name }}">{{ $item->order_customer_name }}</span>
+                        </td>
+                        <td class="overflow-hidden px-3 py-2 break-words text-gray-900">
                             <span class="text-xs text-gray-500">[{{ $item->product_code }}]</span><br>
                             {{ $item->product_name }}
                         </td>
-                        <td class="px-3 py-2 text-right font-medium text-rose-600">{{ number_format((int) $item->qty) }}</td>
-                        <td class="px-3 py-2 text-center text-gray-700">{{ $item->order_status }}</td>
-                        <td class="px-3 py-2 text-gray-600">{{ $item->order_reason }}</td>
-                        <td class="max-w-[220px] px-3 py-2 text-gray-600">
+                        <td class="overflow-hidden px-3 py-2 text-right font-medium whitespace-nowrap text-rose-600">{{ number_format((int) $item->qty) }}</td>
+                        <td class="overflow-hidden px-3 py-2 text-center whitespace-nowrap text-gray-700">{{ $item->order_status }}</td>
+                        <td class="overflow-hidden px-3 py-2 text-gray-600">
+                            <span class="block truncate" title="{{ $item->order_reason }}">{{ $item->order_reason }}</span>
+                        </td>
+                        <td class="overflow-hidden px-3 py-2 text-gray-600">
                             @if($orderMemo !== '')
-                                <span class="line-clamp-2 whitespace-pre-wrap break-words" title="{{ $orderMemo }}">{{ $orderMemo }}</span>
+                                <span class="line-clamp-2 break-words leading-snug" title="{{ $orderMemo }}">{{ $orderMemo }}</span>
                             @else
                                 <span class="text-gray-400">-</span>
                             @endif
