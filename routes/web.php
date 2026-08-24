@@ -116,6 +116,10 @@ Route::middleware(['auth'])->group(function () {
         return view('pages.coach.teacher-support.index');
     })->name('coach.teacher-support.index');
 
+    Route::get('/coach/institution-coverage', function () {
+        return view('pages.coach.institution-coverage.index');
+    })->middleware('can:viewCoachTeamKpi')->name('coach.institution-coverage.index');
+
     Route::get('/coach/team-kpi', function () {
         return view('pages.coach.team-kpi.index');
     })->middleware('can:viewCoachTeamKpi')->name('coach.team-kpi.index');

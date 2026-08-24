@@ -67,6 +67,8 @@ return [
     'kpi_aggregate_labels' => [
         'completed' => '전차 완료',
         'unsupported' => '미지원',
+        'any_completed' => '지원함',
+        'never_supported' => '미지원',
     ],
 
     /*

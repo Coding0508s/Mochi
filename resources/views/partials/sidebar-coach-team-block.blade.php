@@ -38,6 +38,12 @@
             <span class="sidebar-subitem-label">퇴직교사 리스트</span>
         </a>
         @can('viewCoachTeamKpi')
+            <a href="/coach/institution-coverage?team_menu=coach"
+               class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ request()->routeIs('coach.institution-coverage.*') ? 'sidebar-subitem-active' : '' }}"
+               @if(request()->routeIs('coach.institution-coverage.*')) aria-current="page" @endif>
+                @include('partials.sidebar-menu-icon', ['name' => 'building', 'small' => true])
+                <span class="sidebar-subitem-label">지원방법·횟수</span>
+            </a>
             <a href="{{ route('coach.team-kpi.index', ['team_menu' => 'coach']) }}"
                class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ request()->routeIs('coach.team-kpi.*') ? 'sidebar-subitem-active' : '' }}"
                @if(request()->routeIs('coach.team-kpi.*')) aria-current="page" @endif>
