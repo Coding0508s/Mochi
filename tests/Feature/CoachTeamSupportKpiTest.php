@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Livewire\CoachTeacherSupportList;
 use App\Livewire\CoachTeamSupportKpiDashboard;
 use App\Models\User;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 class CoachTeamSupportKpiTest extends CoachTeacherSupportListTest
@@ -23,32 +25,6 @@ class CoachTeamSupportKpiTest extends CoachTeacherSupportListTest
             ->assertForbidden();
     }
 
-    public function test_coach_team_lead_sees_team_kpi_breakdown_by_tr(): void
-    {
-        $year = now()->year;
-        $lead = User::factory()->coachTeamLead()->create([
-            'name' => 'Team Lead',
-            'email' => 'lead@example.com',
-        ]);
-
-        $this->seedTeachersForKpi($year);
-
-        Livewire::actingAs($lead)
-            ->test(CoachTeamSupportKpiDashboard::class)
-            ->assertOk()
-            ->assertSee('Coach Team 지원 KPI')
-            ->assertSee('Coach A')
-            ->assertSee('Coach B')
-            ->assertViewHas('teamKpis', fn (array $kpis): bool => $kpis['first_round'] === 2)
-            ->assertViewHas('coachRows', function ($rows): bool {
-                $coachA = $rows->firstWhere('coach', 'Coach A');
-
-                return $coachA !== null
-                    && $coachA['first_round'] === 1
-                    && $coachA['teacher_count'] === 1;
-            });
-    }
-
     public function test_admin_can_access_team_kpi_page(): void
     {
         $admin = $this->createAdminUser();
@@ -58,37 +34,256 @@ class CoachTeamSupportKpiTest extends CoachTeacherSupportListTest
             ->assertOk();
     }
 
-    public function test_coach_name_opens_schedule_modal_with_planned_rounds_only(): void
+    public function test_team_lead_sees_type_month_matrix_by_coach(): void
+    {
+        $year = now()->year;
+        $lead = User::factory()->coachTeamLead()->create([
+            'name' => 'Team Lead',
+            'email' => 'lead@example.com',
+        ]);
+
+        $this->seedMatrixSupports($year);
+
+        Livewire::actingAs($lead)
+            ->test(CoachTeamSupportKpiDashboard::class)
+            ->assertOk()
+            ->assertSee('Coach Team 지원 KPI')
+            ->assertSee('Coach A')
+            ->assertSee('Coach B')
+            ->assertSee('전화')
+            ->assertSee('On-Site')
+            ->assertSee('LVA+FR/FB')
+            ->assertViewHas('coachRows', function ($rows) use ($year): bool {
+                $coachA = $rows->firstWhere('coach', 'Coach A');
+                $coachB = $rows->firstWhere('coach', 'Coach B');
+                $mar = sprintf('%04d-03', $year);
+                $apr = sprintf('%04d-04', $year);
+                $may = sprintf('%04d-05', $year);
+
+                return $coachA !== null
+                    && $coachB !== null
+                    && $coachA['total'] === 3
+                    && $coachA['institution_total'] === 1
+                    && $coachA['teacher_total'] === 2
+                    && ($coachA['rows']['inst_phone'][$mar] ?? 0) === 1
+                    && ($coachA['rows']['teacher_onsite'][$mar] ?? 0) === 1
+                    && ($coachA['rows']['teacher_lva'][$apr] ?? 0) === 1
+                    && $coachB['total'] === 1
+                    && ($coachB['rows']['inst_visit'][$may] ?? 0) === 1;
+            })
+            ->assertViewHas('teamTotal', 4)
+            ->assertViewHas('periodColumns', function ($columns) use ($year): bool {
+                $keys = collect($columns)->pluck('key')->all();
+                $spillover = collect($columns)->where('is_spillover', true)->pluck('label')->all();
+
+                return in_array(sprintf('%04d-01', $year), $keys, true)
+                    && in_array(sprintf('%04d-03', $year + 1), $keys, true)
+                    && count($columns) === 15
+                    && $spillover === [
+                        (($year + 1) % 100).'년 1월',
+                        (($year + 1) % 100).'년 2월',
+                        (($year + 1) % 100).'년 3월',
+                    ];
+            })
+            ->assertViewHas('activeCoachRows', fn ($rows): bool => $rows->pluck('coach')->values()->all() === ['Coach A', 'Coach B'])
+            ->assertViewHas('zeroCoachRows', fn ($rows): bool => $rows->isEmpty());
+    }
+
+    public function test_cell_click_opens_list_modal_then_detail(): void
     {
         $year = now()->year;
         $lead = User::factory()->coachTeamLead()->create();
 
+        $this->seedCoachTeamEmployees('Coach A');
         $this->createInstitution('SK001', '기관A', 'Coach A');
-        $this->createTeacher('SK001', '계획교사', [
-            'Plan_1st_Support_Date' => "{$year}-03-01",
-        ], forLatestView: false);
-        $this->createTeacher('SK001', '미계획교사', [
-            '_1st_Support_Date' => "{$year}-03-10",
+        $teacherId = $this->createTeacher('SK001', '김교사', [], forLatestView: false);
+
+        DB::table('S_SupportInfo_Account')->insert([
+            'Year' => $year,
+            'SK_Code' => 'SK001',
+            'Account_Name' => '기관A',
+            'TR_Name' => 'Coach A',
+            'Support_Date' => "{$year}-03-10",
+            'Support_Type' => '전화',
+            'Status' => '완료',
+            'Target' => '원장',
+        ]);
+
+        DB::table('teacher_onsite_support_reports')->insert([
+            'teacher_id' => $teacherId,
+            'sk_code' => 'SK001',
+            'coach_name' => 'Coach A',
+            'institution_name' => '기관A',
+            'teacher_name' => '김교사',
+            'support_date' => "{$year}-03-15",
+            'status' => '완료',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $component = Livewire::actingAs($lead)
+            ->test(CoachTeamSupportKpiDashboard::class)
+            ->call('openCellModal', 'Coach A', 'inst_phone', sprintf('%04d-03', $year))
+            ->assertSet('showListModal', true)
+            ->assertSee('원장')
+            ->assertSee('전화');
+
+        $items = $component->get('listModalItems');
+        $this->assertCount(1, $items);
+        $this->assertSame('account:1', $items[0]['detail_key']);
+
+        $component
+            ->call('openDetailFromList', $items[0]['detail_key'])
+            ->assertSet('showDetailModal', true)
+            ->assertNotSet('selectedDetail', null)
+            ->call('closeTeacherSupportHistoryDetailModal')
+            ->assertSet('showDetailModal', false)
+            ->call('closeListModal')
+            ->assertSet('showListModal', false);
+    }
+
+    public function test_onsite_row_includes_ls_onsite_when_configured(): void
+    {
+        $year = now()->year;
+        $lead = User::factory()->coachTeamLead()->create();
+
+        $this->seedCoachTeamEmployees('Coach A');
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createTeacher('SK001', '김교사', [], forLatestView: false);
+
+        DB::table('teacher_ls_onsite_lva_support_reports')->insert([
+            'teacher_id' => $teacherId,
+            'sk_code' => 'SK001',
+            'coach_name' => 'Coach A',
+            'institution_name' => '기관A',
+            'teacher_name' => '김교사',
+            'support_date' => "{$year}-06-01",
+            'status' => '완료',
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         Livewire::actingAs($lead)
             ->test(CoachTeamSupportKpiDashboard::class)
-            ->call('openCoachScheduleModal', 'Coach A')
-            ->assertSet('showCoachScheduleModal', true)
-            ->assertSee('계획교사')
-            ->assertSee('미계획교사')
-            ->assertSee($year.'년 3월 1일')
-            ->assertSee($year.'년 3월 10일')
-            ->assertSee('지원 완료 차수 집계')
-            ->assertSee('계획 일정 집계')
-            ->assertSee('1차')
-            ->assertSee('계획일')
-            ->assertViewHas('coachScheduleSummary', fn (array $summary): bool => $summary['teacher_count'] === 2
-                && $summary['planned_round_count'] === 2
-                && $summary['completed_count'] === 1
-                && $summary['pending_count'] === 1)
-            ->call('closeCoachScheduleModal')
-            ->assertSet('showCoachScheduleModal', false);
+            ->assertViewHas('coachRows', function ($rows) use ($year): bool {
+                $coachA = $rows->firstWhere('coach', 'Coach A');
+                $jun = sprintf('%04d-06', $year);
+
+                return $coachA !== null
+                    && ($coachA['rows']['teacher_onsite'][$jun] ?? 0) === 1
+                    && $coachA['total'] === 1;
+            });
+    }
+
+    public function test_demo_lesson_counts_in_teacher_matrix_row(): void
+    {
+        $year = now()->year;
+        $lead = User::factory()->coachTeamLead()->create();
+
+        $this->seedCoachTeamEmployees('Coach A');
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $teacherId = $this->createTeacher('SK001', '김교사', [], forLatestView: false);
+
+        DB::table('teacher_demo_lesson_support_reports')->insert([
+            'teacher_id' => $teacherId,
+            'sk_code' => 'SK001',
+            'coach_name' => 'Coach A',
+            'institution_name' => '기관A',
+            'teacher_name' => '김교사',
+            'support_date' => "{$year}-04-10",
+            'status' => '완료',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('S_Support_NewTeacher')->insert([
+            'TeacherId' => $teacherId,
+            'SupportDate' => "{$year}-04-20",
+            'Teacher' => '김교사',
+            'TR_Name' => 'Coach A',
+            'Status' => '완료',
+        ]);
+
+        Livewire::actingAs($lead)
+            ->test(CoachTeamSupportKpiDashboard::class)
+            ->set('filterYear', (string) $year)
+            ->assertSee('신규교사 시연수업')
+            ->assertViewHas('coachRows', function ($rows) use ($year): bool {
+                $coachA = $rows->firstWhere('coach', 'Coach A');
+                $apr = sprintf('%04d-04', $year);
+
+                return $coachA !== null
+                    && ($coachA['rows']['teacher_demo'][$apr] ?? 0) === 2
+                    && $coachA['teacher_total'] === 2
+                    && $coachA['total'] === 2;
+            });
+    }
+
+    public function test_institution_excludes_incomplete_and_teacher_synced_types(): void
+    {
+        $year = now()->year;
+        $lead = User::factory()->coachTeamLead()->create();
+
+        $this->seedCoachTeamEmployees('Coach A');
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+
+        DB::table('S_SupportInfo_Account')->insert([
+            [
+                'Year' => $year,
+                'SK_Code' => 'SK001',
+                'Account_Name' => '기관A',
+                'TR_Name' => 'Coach A',
+                'Support_Date' => "{$year}-03-01",
+                'Support_Type' => '전화',
+                'Status' => '진행중',
+            ],
+            [
+                'Year' => $year,
+                'SK_Code' => 'SK001',
+                'Account_Name' => '기관A',
+                'TR_Name' => 'Coach A',
+                'Support_Date' => "{$year}-03-02",
+                'Support_Type' => 'On-Site',
+                'Status' => '완료',
+            ],
+            [
+                'Year' => $year,
+                'SK_Code' => 'SK001',
+                'Account_Name' => '기관A',
+                'TR_Name' => 'Coach A',
+                'Support_Date' => "{$year}-03-03",
+                'Support_Type' => '대면',
+                'Status' => '완료',
+            ],
+        ]);
+
+        Livewire::actingAs($lead)
+            ->test(CoachTeamSupportKpiDashboard::class)
+            ->assertViewHas('coachRows', function ($rows) use ($year): bool {
+                $coachA = $rows->firstWhere('coach', 'Coach A');
+                $mar = sprintf('%04d-03', $year);
+
+                return $coachA !== null
+                    && $coachA['total'] === 1
+                    && ($coachA['rows']['inst_visit'][$mar] ?? 0) === 1
+                    && ($coachA['rows']['inst_phone'][$mar] ?? 0) === 0;
+            });
+    }
+
+    public function test_search_filters_coach_rows(): void
+    {
+        $year = now()->year;
+        $lead = User::factory()->coachTeamLead()->create();
+
+        $this->seedMatrixSupports($year);
+
+        Livewire::actingAs($lead)
+            ->test(CoachTeamSupportKpiDashboard::class)
+            ->set('searchCoach', 'Coach B')
+            ->assertSee('Coach B')
+            ->assertDontSee('Coach A')
+            ->assertViewHas('coachRows', fn ($rows): bool => $rows->count() === 1
+                && $rows->first()['coach'] === 'Coach B');
     }
 
     public function test_team_kpi_row_links_to_teacher_support_with_coach_filter(): void
@@ -96,7 +291,7 @@ class CoachTeamSupportKpiTest extends CoachTeacherSupportListTest
         $year = now()->year;
         $lead = User::factory()->coachTeamLead()->create();
 
-        $this->seedTeachersForKpi($year);
+        $this->seedMatrixSupports($year);
 
         $component = Livewire::actingAs($lead)
             ->test(CoachTeamSupportKpiDashboard::class)
@@ -113,215 +308,459 @@ class CoachTeamSupportKpiTest extends CoachTeacherSupportListTest
             ])
             ->test(CoachTeacherSupportList::class)
             ->assertSet('filterCoach', 'Coach A')
-            ->assertSee('김교사')
-            ->assertDontSee('이교사');
+            ->assertSee('김교사');
     }
 
-    public function test_by_coach_does_not_double_count_teacher_when_sk_has_multiple_tr_rows(): void
+    private function seedCoachTeamEmployees(string ...$englishNames): void
     {
-        $year = now()->year;
-        $lead = User::factory()->coachTeamLead()->create();
-
-        \DB::table('S_AccountName')->insert([
-            'SKcode' => 'SK-SPLIT-TR',
-            'AccountName' => '다중 TR 기관',
-        ]);
-        \DB::table('S_Account_Information')->insert([
-            ['SK_Code' => 'SK-SPLIT-TR', 'Account_Name' => '다중 TR A', 'TR' => 'Coach A'],
-            ['SK_Code' => 'SK-SPLIT-TR', 'Account_Name' => '다중 TR B', 'TR' => 'Coach B'],
-        ]);
-        $this->createTeacher('SK-SPLIT-TR', '단일교사', [
-            'Plan_1st_Support_Date' => "{$year}-03-01",
-        ], forLatestView: false);
-
-        $component = Livewire::actingAs($lead)
-            ->test(CoachTeamSupportKpiDashboard::class)
-            ->set('filterYear', $year);
-
-        $teamKpis = $component->viewData('teamKpis');
-        $coachRows = $component->viewData('coachRows');
-
-        $this->assertSame(1, $teamKpis['unsupported']);
-        $this->assertSame(1, $coachRows->sum('unsupported'));
-        $this->assertSame(1, $coachRows->sum('teacher_count'));
-    }
-
-    public function test_team_kpis_match_sum_of_coach_row_metrics(): void
-    {
-        $year = now()->year;
-        $lead = User::factory()->coachTeamLead()->create();
-
-        $this->seedTeachersForKpi($year);
-
-        $component = Livewire::actingAs($lead)
-            ->test(CoachTeamSupportKpiDashboard::class)
-            ->set('filterYear', $year);
-
-        $teamKpis = $component->viewData('teamKpis');
-        $coachRows = $component->viewData('coachRows');
-
-        foreach (['first_round', 'second_round', 'third_round', 'fourth_round', 'completed', 'any_completed', 'unsupported'] as $key) {
-            $this->assertSame($teamKpis[$key], $coachRows->sum($key), "팀 합계와 Coach 행 합이 {$key}에서 일치해야 합니다.");
+        foreach ($englishNames as $index => $name) {
+            DB::table('employee')->insert([
+                'EMPNO' => 'C'.str_pad((string) ($index + 1), 3, '0', STR_PAD_LEFT),
+                'WORKDEPT' => 'A05',
+                'KOREANAME' => $name.' 한글',
+                'ENGLISHNAME' => $name,
+                'EMAIL' => strtolower(str_replace(' ', '', $name)).'@example.com',
+                'STATUS' => 1,
+            ]);
         }
     }
 
-    public function test_any_completed_counts_teachers_with_at_least_one_completed_round(): void
+    private function seedMatrixSupports(int $year): void
     {
-        $year = now()->year;
-        $lead = User::factory()->coachTeamLead()->create();
-
+        $this->seedCoachTeamEmployees('Coach A', 'Coach B');
         $this->createInstitution('SK001', '기관A', 'Coach A');
-        // 1차만 완료 → any_completed 대상, 전차 완료(completed)는 아님
-        $this->createTeacher('SK001', '1차완료교사', [
-            '_1st_Support_Date' => "{$year}-03-10",
-            'Plan_1st_Support_Date' => "{$year}-03-01",
+        $this->createInstitution('SK002', '기관B', 'Coach B');
+        $teacherA = $this->createTeacher('SK001', '김교사', [], forLatestView: false);
+        $this->createTeacher('SK002', '이교사', [], forLatestView: false);
+
+        DB::table('S_SupportInfo_Account')->insert([
+            [
+                'Year' => $year,
+                'SK_Code' => 'SK001',
+                'Account_Name' => '기관A',
+                'TR_Name' => 'Coach A',
+                'Support_Date' => "{$year}-03-10",
+                'Support_Type' => '전화',
+                'Status' => '완료',
+            ],
+            [
+                'Year' => $year,
+                'SK_Code' => 'SK002',
+                'Account_Name' => '기관B',
+                'TR_Name' => 'Coach B',
+                'Support_Date' => "{$year}-05-12",
+                'Support_Type' => '대면',
+                'Status' => '완료',
+            ],
         ]);
-        // 계획만 있고 완료 없음 → any_completed 대상 아님(미지원)
-        $this->createTeacher('SK001', '계획만교사', [
-            'Plan_1st_Support_Date' => "{$year}-04-01",
-        ], forLatestView: false);
 
-        $component = Livewire::actingAs($lead)
-            ->test(CoachTeamSupportKpiDashboard::class)
-            ->set('filterYear', $year);
+        DB::table('teacher_onsite_support_reports')->insert([
+            'teacher_id' => $teacherA,
+            'sk_code' => 'SK001',
+            'coach_name' => 'Coach A',
+            'institution_name' => '기관A',
+            'teacher_name' => '김교사',
+            'support_date' => "{$year}-03-20",
+            'status' => '완료',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
-        $teamKpis = $component->viewData('teamKpis');
-
-        $this->assertSame(1, $teamKpis['any_completed']);
-        $this->assertSame(0, $teamKpis['completed']);
-        $this->assertSame(1, $teamKpis['unsupported']);
+        DB::table('teacher_lva_fb_support_reports')->insert([
+            'teacher_id' => $teacherA,
+            'sk_code' => 'SK001',
+            'coach_name' => 'Coach A',
+            'institution_name' => '기관A',
+            'teacher_name' => '김교사',
+            'support_date' => "{$year}-04-05",
+            'status' => '완료',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
-    public function test_team_kpi_includes_third_and_fourth_round_counts(): void
+    public function test_legacy_duplicate_of_mochi_is_not_double_counted(): void
     {
         $year = now()->year;
         $lead = User::factory()->coachTeamLead()->create();
 
+        $this->seedCoachTeamEmployees('Coach A');
         $this->createInstitution('SK001', '기관A', 'Coach A');
-        $this->createTeacher('SK001', '3차교사', [
-            '_3rd_Support_Date' => "{$year}-08-10",
-            'Plan_3rd_Support_Date' => "{$year}-08-01",
+        $teacherId = $this->createTeacher('SK001', '김교사', [], forLatestView: false);
+
+        DB::table('teacher_onsite_support_reports')->insert([
+            'teacher_id' => $teacherId,
+            'sk_code' => 'SK001',
+            'coach_name' => 'Coach A',
+            'institution_name' => '기관A',
+            'teacher_name' => '김교사',
+            'support_date' => "{$year}-03-15",
+            'status' => '완료',
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
-        $this->createTeacher('SK001', '4차교사', [
-            '_4th_Support_Date' => "{$year}-10-10",
-            'Plan_4th_Support_Date' => "{$year}-10-01",
+
+        DB::table('S_Support_OnSite')->insert([
+            'TR_Name' => 'Coach A',
+            'SK_Code' => 'SK001',
+            'Account_Name' => '기관A',
+            'Teacher' => '김교사',
+            'TeacherId' => $teacherId,
+            'SupportDate' => "{$year}-03-15",
+            'Status' => '완료',
         ]);
 
         Livewire::actingAs($lead)
             ->test(CoachTeamSupportKpiDashboard::class)
-            ->assertViewHas('teamKpis', fn (array $kpis): bool => $kpis['third_round'] === 1
-                && $kpis['fourth_round'] === 1);
+            ->assertViewHas('coachRows', function ($rows) use ($year): bool {
+                $coachA = $rows->firstWhere('coach', 'Coach A');
+                $mar = sprintf('%04d-03', $year);
+
+                return $coachA !== null
+                    && $coachA['total'] === 1
+                    && ($coachA['rows']['teacher_onsite'][$mar] ?? 0) === 1;
+            });
     }
 
-    public function test_schedule_modal_filters_rows_and_completion_by_selected_year(): void
+    public function test_coach_name_variants_are_grouped_together(): void
+    {
+        $year = now()->year;
+        $lead = User::factory()->coachTeamLead()->create();
+
+        $this->seedCoachTeamEmployees('Coach A');
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+
+        DB::table('S_SupportInfo_Account')->insert([
+            [
+                'Year' => $year,
+                'SK_Code' => 'SK001',
+                'Account_Name' => '기관A',
+                'TR_Name' => 'Coach A',
+                'Support_Date' => "{$year}-03-01",
+                'Support_Type' => '전화',
+                'Status' => '완료',
+            ],
+            [
+                'Year' => $year,
+                'SK_Code' => 'SK001',
+                'Account_Name' => '기관A',
+                'TR_Name' => 'Coach.A',
+                'Support_Date' => "{$year}-04-01",
+                'Support_Type' => '대면',
+                'Status' => '완료',
+            ],
+        ]);
+
+        Livewire::actingAs($lead)
+            ->test(CoachTeamSupportKpiDashboard::class)
+            ->assertViewHas('coachRows', function ($rows): bool {
+                return $rows->count() === 1
+                    && $rows->first()['total'] === 2;
+            });
+    }
+
+    public function test_coach_rows_are_sorted_alphabetically(): void
+    {
+        $year = now()->year;
+        $lead = User::factory()->coachTeamLead()->create();
+
+        $this->seedCoachTeamEmployees('Zoe Coach', 'Amy Coach', 'Zero Coach');
+        $this->createInstitution('SK001', '기관A', 'Zoe Coach');
+        $this->createInstitution('SK002', '기관B', 'Amy Coach');
+
+        DB::table('S_SupportInfo_Account')->insert([
+            [
+                'Year' => $year,
+                'SK_Code' => 'SK001',
+                'Account_Name' => '기관A',
+                'TR_Name' => 'Zoe Coach',
+                'Support_Date' => "{$year}-03-01",
+                'Support_Type' => '전화',
+                'Status' => '완료',
+            ],
+            [
+                'Year' => $year,
+                'SK_Code' => 'SK001',
+                'Account_Name' => '기관A',
+                'TR_Name' => 'Zoe Coach',
+                'Support_Date' => "{$year}-03-02",
+                'Support_Type' => '대면',
+                'Status' => '완료',
+            ],
+            [
+                'Year' => $year,
+                'SK_Code' => 'SK002',
+                'Account_Name' => '기관B',
+                'TR_Name' => 'Amy Coach',
+                'Support_Date' => "{$year}-03-03",
+                'Support_Type' => '전화',
+                'Status' => '완료',
+            ],
+        ]);
+
+        Livewire::actingAs($lead)
+            ->test(CoachTeamSupportKpiDashboard::class)
+            ->set('filterYear', (string) $year)
+            ->assertSee('지원 없음 1명')
+            ->assertViewHas('activeCoachRows', function ($rows): bool {
+                return $rows->pluck('coach')->values()->all() === ['Amy Coach', 'Zoe Coach']
+                    && $rows->first()['institution_total'] === 1
+                    && $rows->first()['teacher_total'] === 0;
+            })
+            ->assertViewHas('zeroCoachRows', function ($rows): bool {
+                return $rows->count() === 1
+                    && $rows->first()['coach'] === 'Zero Coach'
+                    && $rows->first()['total'] === 0;
+            });
+    }
+
+    public function test_export_downloads_support_detail_excel(): void
+    {
+        $year = now()->year;
+        $now = now();
+        Carbon::setTestNow($now);
+        $lead = User::factory()->coachTeamLead()->create();
+
+        $this->seedMatrixSupports($year);
+
+        Livewire::actingAs($lead)
+            ->test(CoachTeamSupportKpiDashboard::class)
+            ->assertSee('엑셀 다운로드')
+            ->call('exportToExcel')
+            ->assertFileDownloaded('Coach_Team_지원내역_'.$year.'_'.$now->format('Ymd_His').'.xlsx');
+
+        Carbon::setTestNow();
+    }
+
+    public function test_all_years_option_sums_recent_four_years(): void
     {
         $year = now()->year;
         $previousYear = $year - 1;
         $lead = User::factory()->coachTeamLead()->create();
 
+        $this->seedCoachTeamEmployees('Coach A');
         $this->createInstitution('SK001', '기관A', 'Coach A');
-        $this->createTeacher('SK001', '혼합교사', [
-            'Plan_1st_Support_Date' => "{$previousYear}-08-01",
-            '_1st_Support_Date' => "{$previousYear}-09-10",
-            'Plan_2nd_Support_Date' => "{$year}-03-01",
-            '_2nd_Support_Date' => "{$year}-03-15",
-        ]);
-        $this->createTeacher('SK001', '작년교사', [
-            'Plan_1st_Support_Date' => "{$previousYear}-05-01",
-            '_1st_Support_Date' => "{$year}-02-01",
-        ]);
-        $this->createTeacher('SK001', '연도교차교사', [
-            'Plan_3rd_Support_Date' => "{$year}-08-01",
-            '_3rd_Support_Date' => "{$previousYear}-12-20",
+
+        DB::table('S_SupportInfo_Account')->insert([
+            [
+                'Year' => $year,
+                'SK_Code' => 'SK001',
+                'Account_Name' => '기관A',
+                'TR_Name' => 'Coach A',
+                'Support_Date' => "{$year}-03-01",
+                'Support_Type' => '전화',
+                'Status' => '완료',
+            ],
+            [
+                'Year' => $previousYear,
+                'SK_Code' => 'SK001',
+                'Account_Name' => '기관A',
+                'TR_Name' => 'Coach A',
+                'Support_Date' => "{$previousYear}-03-15",
+                'Support_Type' => '대면',
+                'Status' => '완료',
+            ],
         ]);
 
         Livewire::actingAs($lead)
             ->test(CoachTeamSupportKpiDashboard::class)
-            ->set('filterYear', $year)
-            ->call('openCoachScheduleModal', 'Coach A')
-            ->assertSet('showCoachScheduleModal', true)
-            ->assertViewHas('coachScheduleRows', function (array $rows) use ($year): bool {
-                if (count($rows) !== 3) {
-                    return false;
-                }
-
-                $mixed = collect($rows)->firstWhere('teacher_name', '혼합교사');
-                $lastYearPlan = collect($rows)->firstWhere('teacher_name', '작년교사');
-                $crossYear = collect($rows)->firstWhere('teacher_name', '연도교차교사');
-
-                if ($mixed === null || $lastYearPlan === null || $crossYear === null) {
-                    return false;
-                }
-
-                $mixedOk = ($mixed['rounds'][0]['label'] ?? '') === '2차'
-                    && ($mixed['rounds'][0]['completed_date'] ?? '') === $year.'년 3월 15일';
-
-                $lastYearPlanOk = ($lastYearPlan['rounds'][0]['label'] ?? '') === '1차'
-                    && ($lastYearPlan['rounds'][0]['plan_date'] ?? '') === '—'
-                    && ($lastYearPlan['rounds'][0]['completed_date'] ?? '') === $year.'년 2월 1일';
-
-                $crossYearOk = ($crossYear['rounds'][0]['label'] ?? '') === '3차'
-                    && ($crossYear['rounds'][0]['completed_date'] ?? '') === '—';
-
-                return $mixedOk && $lastYearPlanOk && $crossYearOk;
+            ->set('filterYear', (string) $year)
+            ->assertViewHas('teamTotal', 1)
+            ->set('filterYear', '')
+            ->assertSee('전체 (최근 4년)')
+            ->assertViewHas('teamTotal', 2)
+            ->assertViewHas('periodColumns', function ($columns): bool {
+                return count($columns) === 12
+                    && collect($columns)->every(fn (array $col): bool => $col['is_spillover'] === false)
+                    && collect($columns)->pluck('key')->all() === range(1, 12);
             })
-            ->assertViewHas('coachScheduleSummary', fn (array $summary): bool => $summary['teacher_count'] === 3
-                && $summary['planned_round_count'] === 3
-                && $summary['completed_count'] === 2
-                && $summary['pending_count'] === 1);
+            ->assertViewHas('coachRows', function ($rows): bool {
+                $coachA = $rows->firstWhere('coach', 'Coach A');
+
+                return $coachA !== null
+                    && $coachA['total'] === 2
+                    && ($coachA['rows']['inst_phone'][3] ?? 0) === 1
+                    && ($coachA['rows']['inst_visit'][3] ?? 0) === 1;
+            });
     }
 
-    public function test_schedule_modal_shows_round_with_completion_only_in_selected_year(): void
+    public function test_business_year_includes_next_year_q1_in_totals_and_columns(): void
+    {
+        $year = now()->year;
+        $nextYear = $year + 1;
+        $lead = User::factory()->coachTeamLead()->create();
+
+        $this->seedCoachTeamEmployees('Coach A');
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+
+        DB::table('S_SupportInfo_Account')->insert([
+            [
+                'Year' => $year,
+                'SK_Code' => 'SK001',
+                'Account_Name' => '기관A',
+                'TR_Name' => 'Coach A',
+                'Support_Date' => "{$year}-06-10",
+                'Support_Type' => '전화',
+                'Status' => '완료',
+            ],
+            [
+                'Year' => $nextYear,
+                'SK_Code' => 'SK001',
+                'Account_Name' => '기관A',
+                'TR_Name' => 'Coach A',
+                'Support_Date' => "{$nextYear}-02-15",
+                'Support_Type' => '대면',
+                'Status' => '완료',
+            ],
+            [
+                'Year' => $nextYear,
+                'SK_Code' => 'SK001',
+                'Account_Name' => '기관A',
+                'TR_Name' => 'Coach A',
+                'Support_Date' => "{$nextYear}-04-01",
+                'Support_Type' => '화상',
+                'Status' => '완료',
+            ],
+        ]);
+
+        $febKey = sprintf('%04d-02', $nextYear);
+        $spilloverLabel = ($nextYear % 100).'년 2월';
+
+        Livewire::actingAs($lead)
+            ->test(CoachTeamSupportKpiDashboard::class)
+            ->set('filterYear', (string) $year)
+            ->assertSee($spilloverLabel)
+            ->assertViewHas('teamTotal', 2)
+            ->assertViewHas('coachRows', function ($rows) use ($year, $febKey): bool {
+                $coachA = $rows->firstWhere('coach', 'Coach A');
+                $jun = sprintf('%04d-06', $year);
+
+                return $coachA !== null
+                    && $coachA['total'] === 2
+                    && ($coachA['rows']['inst_phone'][$jun] ?? 0) === 1
+                    && ($coachA['rows']['inst_visit'][$febKey] ?? 0) === 1
+                    && ($coachA['rows']['inst_video'][sprintf('%04d-04', $year + 1)] ?? 0) === 0;
+            })
+            ->set('filterYear', (string) $nextYear)
+            ->assertViewHas('teamTotal', 2)
+            ->assertViewHas('coachRows', function ($rows) use ($febKey, $nextYear): bool {
+                $coachA = $rows->firstWhere('coach', 'Coach A');
+                $apr = sprintf('%04d-04', $nextYear);
+
+                return $coachA !== null
+                    && $coachA['total'] === 2
+                    && ($coachA['rows']['inst_visit'][$febKey] ?? 0) === 1
+                    && ($coachA['rows']['inst_video'][$apr] ?? 0) === 1;
+            });
+    }
+
+    public function test_spillover_cell_opens_list_modal(): void
+    {
+        $year = now()->year;
+        $nextYear = $year + 1;
+        $lead = User::factory()->coachTeamLead()->create();
+
+        $this->seedCoachTeamEmployees('Coach A');
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+
+        DB::table('S_SupportInfo_Account')->insert([
+            'Year' => $nextYear,
+            'SK_Code' => 'SK001',
+            'Account_Name' => '기관A',
+            'TR_Name' => 'Coach A',
+            'Support_Date' => "{$nextYear}-02-15",
+            'Support_Type' => '전화',
+            'Status' => '완료',
+            'Target' => '원장',
+        ]);
+
+        $periodKey = sprintf('%04d-02', $nextYear);
+
+        Livewire::actingAs($lead)
+            ->test(CoachTeamSupportKpiDashboard::class)
+            ->set('filterYear', (string) $year)
+            ->call('openCellModal', 'Coach A', 'inst_phone', $periodKey)
+            ->assertSet('showListModal', true)
+            ->assertSet('listModalPeriodKey', $periodKey)
+            ->assertSee('원장')
+            ->assertSee(($nextYear % 100).'년 2월');
+    }
+
+    public function test_export_shows_error_when_no_data(): void
+    {
+        $lead = User::factory()->coachTeamLead()->create();
+        $this->seedCoachTeamEmployees('Coach A');
+
+        Livewire::actingAs($lead)
+            ->test(CoachTeamSupportKpiDashboard::class)
+            ->call('exportToExcel')
+            ->assertNoFileDownloaded()
+            ->assertSee('다운로드할 데이터가 없습니다.');
+    }
+
+    public function test_only_active_coach_team_employees_are_listed(): void
     {
         $year = now()->year;
         $lead = User::factory()->coachTeamLead()->create();
 
+        $this->seedCoachTeamEmployees('Coach A');
+        DB::table('employee')->insert([
+            [
+                'EMPNO' => 'CS01',
+                'WORKDEPT' => 'A02',
+                'ENGLISHNAME' => 'Cs Person',
+                'STATUS' => 1,
+            ],
+            [
+                'EMPNO' => 'C999',
+                'WORKDEPT' => 'A05',
+                'ENGLISHNAME' => 'Inactive Coach',
+                'STATUS' => 0,
+            ],
+        ]);
+
         $this->createInstitution('SK001', '기관A', 'Coach A');
-        $this->createTeacher('SK001', '완료만교사', [
-            '_3rd_Support_Date' => "{$year}-08-20",
-            '_4th_Support_Date' => "{$year}-10-15",
+        $this->createInstitution('SKCS', 'CS기관', 'Cs Person');
+
+        DB::table('S_SupportInfo_Account')->insert([
+            [
+                'Year' => $year,
+                'SK_Code' => 'SK001',
+                'Account_Name' => '기관A',
+                'TR_Name' => 'Coach A',
+                'Support_Date' => "{$year}-03-01",
+                'Support_Type' => '전화',
+                'Status' => '완료',
+            ],
+            [
+                'Year' => $year,
+                'SK_Code' => 'SKCS',
+                'Account_Name' => 'CS기관',
+                'TR_Name' => 'Cs Person',
+                'Support_Date' => "{$year}-03-02",
+                'Support_Type' => '전화',
+                'Status' => '완료',
+            ],
+            [
+                'Year' => $year,
+                'SK_Code' => 'SK001',
+                'Account_Name' => '기관A',
+                'TR_Name' => 'Inactive Coach',
+                'Support_Date' => "{$year}-03-03",
+                'Support_Type' => '대면',
+                'Status' => '완료',
+            ],
         ]);
 
         Livewire::actingAs($lead)
             ->test(CoachTeamSupportKpiDashboard::class)
-            ->set('filterYear', $year)
-            ->call('openCoachScheduleModal', 'Coach A')
-            ->assertSet('showCoachScheduleModal', true)
-            ->assertSee('완료만교사')
-            ->assertViewHas('coachScheduleRows', function (array $rows) use ($year): bool {
-                $teacher = collect($rows)->firstWhere('teacher_name', '완료만교사');
-
-                if ($teacher === null || count($teacher['rounds'] ?? []) !== 2) {
-                    return false;
-                }
-
-                $third = collect($teacher['rounds'])->firstWhere('label', '3차');
-                $fourth = collect($teacher['rounds'])->firstWhere('label', '4차');
-
-                return $third !== null
-                    && ($third['plan_date'] ?? '') === '—'
-                    && ($third['completed_date'] ?? '') === $year.'년 8월 20일'
-                    && $fourth !== null
-                    && ($fourth['plan_date'] ?? '') === '—'
-                    && ($fourth['completed_date'] ?? '') === $year.'년 10월 15일';
-            })
-            ->assertViewHas('coachScheduleSummary', fn (array $summary): bool => $summary['teacher_count'] === 1
-                && $summary['planned_round_count'] === 2
-                && $summary['completed_count'] === 2
-                && $summary['pending_count'] === 0);
-    }
-
-    private function seedTeachersForKpi(int $year): void
-    {
-        $this->createInstitution('SK001', '기관A', 'Coach A');
-        $this->createInstitution('SK002', '기관B', 'Coach B');
-        $this->createTeacher('SK001', '김교사', [
-            '_1st_Support_Date' => "{$year}-03-10",
-            'Plan_1st_Support_Date' => "{$year}-03-01",
-        ]);
-        $this->createTeacher('SK002', '이교사', [
-            '_1st_Support_Date' => "{$year}-04-10",
-            'Plan_1st_Support_Date' => "{$year}-04-01",
-        ]);
+            ->assertSee('Coach A')
+            ->assertDontSee('Cs Person')
+            ->assertDontSee('Inactive Coach')
+            ->assertViewHas('coachRows', function ($rows): bool {
+                return $rows->count() === 1
+                    && $rows->first()['coach'] === 'Coach A'
+                    && $rows->first()['total'] === 1;
+            });
     }
 }
