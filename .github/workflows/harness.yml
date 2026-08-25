@@ -25,6 +25,7 @@ jobs:
           php-version: "8.5"
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite
           coverage: none
+          ini-values: max_execution_time=0
 
       - name: Setup Node
         uses: actions/setup-node@v4
