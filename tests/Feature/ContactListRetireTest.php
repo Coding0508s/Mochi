@@ -6,6 +6,7 @@ use App\Livewire\ContactList;
 use App\Models\Institution;
 use App\Models\RetirementList;
 use App\Models\Teacher;
+use App\Models\TeacherMasterDb;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -26,6 +27,7 @@ class ContactListRetireTest extends TestCase
     private function createContactTables(): void
     {
         Schema::dropIfExists('S_RetirementList');
+        Schema::dropIfExists('S_TeacherMasterDB');
         Schema::dropIfExists('Teachers');
         Schema::dropIfExists('S_Account_Information');
         Schema::dropIfExists('S_AccountName');
@@ -70,8 +72,30 @@ class ContactListRetireTest extends TestCase
             $table->dateTime('RetirementDate')->nullable();
             $table->boolean('RecommendYN')->nullable();
             $table->string('RecommendDescription', 190)->nullable();
-            $table->string('Description', 190)->nullable();
+            $table->text('Description')->nullable();
             $table->string('Status', 190)->nullable();
+            $table->string('FGC_Creator', 190)->nullable();
+            $table->dateTime('FGC_CreateDate')->nullable();
+            $table->string('FGC_LastModifier', 190)->nullable();
+            $table->dateTime('FGC_LastModifyDate')->nullable();
+        });
+
+        Schema::create('S_TeacherMasterDB', function (Blueprint $table): void {
+            $table->bigIncrements('ID');
+            $table->unsignedBigInteger('TearcherID')->nullable();
+            $table->unsignedBigInteger('TeacherID')->nullable();
+            $table->string('Name', 190)->nullable();
+            $table->string('SK_Code', 190)->nullable();
+            $table->string('Account_Name', 190)->nullable();
+            $table->string('School_Name', 190)->nullable();
+            $table->string('TR_Name', 190)->nullable();
+            $table->dateTime('RetirementDate')->nullable();
+            $table->string('Status', 190)->nullable();
+            $table->string('Email', 190)->nullable();
+            $table->string('Phone', 50)->nullable();
+            $table->dateTime('GrapeSEEDEssentials')->nullable();
+            $table->dateTime('LittleSEEDEssentials')->nullable();
+            $table->text('Description')->nullable();
             $table->string('FGC_Creator', 190)->nullable();
             $table->dateTime('FGC_CreateDate')->nullable();
             $table->string('FGC_LastModifier', 190)->nullable();
@@ -171,6 +195,45 @@ class ContactListRetireTest extends TestCase
             'Status' => '퇴직',
             'RecommendYN' => 0,
         ]);
+    }
+
+    public function test_retire_from_contact_list_preserves_long_description(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $longDescription = '2026: According to Mrs. Stella교육원감님, Nancy had to return back home. Last date was August 26, 2026. '
+            .'202410: Hired in July/August. Already taught Open Class. '.str_repeat('비고내용', 40);
+
+        $teacherId = $this->createTeacher('SK001', 'Nancy Nokuphiwa Phungula', [
+            'Description' => $longDescription,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(ContactList::class)
+            ->call('openEditModal', $teacherId)
+            ->call('openRetireModal')
+            ->set('retireRecommendChoice', 'no')
+            ->call('retire')
+            ->assertHasNoErrors();
+
+        $this->assertGreaterThan(190, mb_strlen($longDescription));
+
+        $this->assertDatabaseHas('Teachers', [
+            'ID' => $teacherId,
+            'Status' => '퇴직',
+            'Description' => $longDescription,
+        ]);
+
+        $this->assertDatabaseHas('S_RetirementList', [
+            'TearcherID' => $teacherId,
+            'Status' => '퇴직',
+            'Description' => $longDescription,
+        ]);
+
+        $master = TeacherMasterDb::findByTeacherId($teacherId);
+        $this->assertNotNull($master);
+        $this->assertSame($longDescription, $master->getAttribute('Description'));
     }
 
     public function test_retired_teacher_edit_modal_hides_retire_action(): void

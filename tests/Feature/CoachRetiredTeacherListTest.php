@@ -83,7 +83,7 @@ class CoachRetiredTeacherListTest extends TestCase
             $table->dateTime('RetirementDate')->nullable();
             $table->boolean('RecommendYN')->nullable();
             $table->string('RecommendDescription', 190)->nullable();
-            $table->string('Description', 190)->nullable();
+            $table->text('Description')->nullable();
             $table->string('Status', 190)->nullable();
             $table->string('FGC_Creator', 190)->nullable();
             $table->dateTime('FGC_CreateDate')->nullable();
@@ -106,7 +106,7 @@ class CoachRetiredTeacherListTest extends TestCase
             $table->string('Phone', 50)->nullable();
             $table->dateTime('GrapeSEEDEssentials')->nullable();
             $table->dateTime('LittleSEEDEssentials')->nullable();
-            $table->string('Description', 190)->nullable();
+            $table->text('Description')->nullable();
             $table->string('FGC_Creator', 190)->nullable();
             $table->dateTime('FGC_CreateDate')->nullable();
             $table->string('FGC_LastModifier', 190)->nullable();

@@ -130,7 +130,7 @@ class CoachTeacherSupportListTest extends TestCase
             $table->dateTime('RetirementDate')->nullable();
             $table->boolean('RecommendYN')->nullable();
             $table->string('RecommendDescription', 190)->nullable();
-            $table->string('Description', 190)->nullable();
+            $table->text('Description')->nullable();
             $table->string('Status', 190)->nullable();
             $table->string('FGC_Creator', 190)->nullable();
             $table->dateTime('FGC_CreateDate')->nullable();
