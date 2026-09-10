@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\UpdateTeacherProfile;
 use App\Actions\UpdateTeacherSupport;
 use App\Enums\TeacherEmploymentType;
 use App\Livewire\CoachTeacherSupportList;
@@ -2831,13 +2832,122 @@ class CoachTeacherSupportListTest extends TestCase
             ->set('teacherProfileForm.employment_type', 'full_time')
             ->set('teacherProfileForm.class_participation', 'out')
             ->call('saveTeacherProfile')
-            ->assertHasNoErrors();
+            ->assertHasNoErrors()
+            ->assertSet('showTeacherModal', false)
+            ->assertSee('교사 정보가 저장되었습니다.');
 
         $teacher = Teacher::find($id);
         $this->assertSame('김수정', $teacher->Name);
         $this->assertSame('new@test.com', $teacher->Email);
         $this->assertSame('full_time', $teacher->EmploymentType?->value ?? $teacher->getAttributes()['EmploymentType']);
         $this->assertFalse((bool) $teacher->getAttributes()['ClassInOut']);
+    }
+
+    public function test_save_teacher_profile_trims_email_and_saves(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $id = $this->createTeacher('SK001', '김교사', [
+            'Email' => ' spaced@test.com ',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openTeacherModal', $id)
+            ->call('startTeacherEdit')
+            ->set('teacherProfileForm.email', ' spaced@test.com ')
+            ->call('saveTeacherProfile')
+            ->assertHasNoErrors();
+
+        $this->assertSame('spaced@test.com', Teacher::find($id)?->Email);
+    }
+
+    public function test_save_teacher_profile_shows_invalid_email_error(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $id = $this->createTeacher('SK001', '김교사', [
+            'Email' => '없음',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openTeacherModal', $id)
+            ->call('startTeacherEdit')
+            ->set('teacherProfileForm.email', '없음')
+            ->call('saveTeacherProfile')
+            ->assertHasErrors(['teacherProfileForm.email'])
+            ->assertSet('showTeacherModal', true)
+            ->assertSee('올바른 이메일 형식이 아닙니다.');
+
+        $this->assertSame('없음', Teacher::find($id)?->Email);
+    }
+
+    public function test_save_teacher_profile_allows_description_over_2000_chars(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $id = $this->createTeacher('SK001', '김교사', [
+            'Email' => 'desc@test.com',
+        ]);
+        $longDescription = str_repeat('가', 2500);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openTeacherModal', $id)
+            ->call('startTeacherEdit')
+            ->set('teacherProfileForm.description', $longDescription)
+            ->call('saveTeacherProfile')
+            ->assertHasNoErrors();
+
+        $this->assertSame($longDescription, Teacher::find($id)?->Description);
+    }
+
+    public function test_save_teacher_profile_keeps_duplicate_email_when_unchanged(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '기존교사', [
+            'Email' => 'dup@test.com',
+        ]);
+        $id = $this->createTeacher('SK001', '수정교사', [
+            'Email' => 'dup@test.com',
+            'Phone' => '010-0000-0000',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openTeacherModal', $id)
+            ->call('startTeacherEdit')
+            ->set('teacherProfileForm.phone', '010-1111-2222')
+            ->call('saveTeacherProfile')
+            ->assertHasNoErrors();
+
+        $this->assertSame('010-1111-2222', Teacher::find($id)?->Phone);
+        $this->assertSame('dup@test.com', Teacher::find($id)?->Email);
+    }
+
+    public function test_coach_can_save_teacher_profile_when_sk_code_has_asterisk(): void
+    {
+        $coach = $this->createCoachUser('Coach A', 'coacha@example.com');
+
+        $this->createInstitution('SK1417', '스타기관', 'Coach A');
+        $id = $this->createTeacher('*SK1417', '별교사', [
+            'Email' => 'star@test.com',
+            'School_Name' => '스타기관',
+        ]);
+
+        $action = new UpdateTeacherProfile;
+        $action->execute($id, [
+            'name' => '별교사수정',
+            'email' => 'star@test.com',
+        ], $coach);
+
+        $this->assertSame('별교사수정', Teacher::find($id)?->Name);
     }
 
     public function test_retire_teacher_sets_class_in_out_false(): void

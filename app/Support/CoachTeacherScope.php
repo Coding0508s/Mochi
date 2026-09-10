@@ -47,6 +47,48 @@ final class CoachTeacherScope
     }
 
     /**
+     * 목록 whereHas(institution)로 빠지는 *SK 코드 교사도, 해석된 기관 TR이 맞으면 수정 허용.
+     */
+    public static function allowsWrite(Teacher $teacher, User $user): bool
+    {
+        if ($user->hasFullAccess()) {
+            return true;
+        }
+
+        $query = Teacher::query()->where('ID', $teacher->ID);
+        self::apply($query, $user);
+
+        if ($query->exists()) {
+            return true;
+        }
+
+        $hiddenSkCodes = self::hiddenInstitutionSkCodes();
+        $candidates = SkCodeNormalizer::candidates((string) ($teacher->SK_Code ?? ''));
+
+        if ($hiddenSkCodes !== [] && array_intersect($candidates, $hiddenSkCodes) !== []) {
+            return false;
+        }
+
+        if (TeamMenuContext::hasExpandedReadScope($user) || TeamMenuContext::hasAdminMenuDataScope($user)) {
+            return true;
+        }
+
+        if (! $user->isCoachTeam()) {
+            return false;
+        }
+
+        $aliases = self::resolveTrAliases($user);
+        if ($aliases === []) {
+            return false;
+        }
+
+        $institution = InstitutionResolver::resolveForTeacher($teacher);
+        $tr = ManagerNameNormalizer::normalize((string) ($institution?->accountInfo?->TR ?? ''));
+
+        return $tr !== '' && in_array($tr, $aliases, true);
+    }
+
+    /**
      * @param  Builder<Teacher>  $query
      */
     public static function applyTrScope(Builder $query, User $user): void
