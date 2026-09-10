@@ -954,6 +954,7 @@ class CoachTeacherSupportList extends Component
             return;
         }
 
+        $this->resetErrorBag();
         $this->teacherProfileForm = [
             'name' => $this->teacherDetailInfo['name'] ?? '',
             'email' => $this->teacherDetailInfo['email'] ?? '',
@@ -986,10 +987,12 @@ class CoachTeacherSupportList extends Component
         $classParticipation = (string) ($this->teacherProfileForm['class_participation'] ?? 'out');
         $gsEssentials = trim((string) ($this->teacherProfileForm['gs_essentials'] ?? ''));
         $lsEssentials = trim((string) ($this->teacherProfileForm['ls_essentials'] ?? ''));
+        $email = trim((string) ($this->teacherProfileForm['email'] ?? ''));
+        $this->teacherProfileForm['email'] = $email;
 
         $payload = [
             'name' => $this->teacherProfileForm['name'] ?? '',
-            'email' => $this->teacherProfileForm['email'] ?? '',
+            'email' => $email === '' ? null : $email,
             'phone' => $this->teacherProfileForm['phone'] ?? '',
             'position' => $this->teacherProfileForm['position'] ?? '',
             'description' => $this->teacherProfileForm['description'] ?? '',
@@ -1001,13 +1004,29 @@ class CoachTeacherSupportList extends Component
             'ls_essentials' => $lsEssentials === '' ? null : $lsEssentials,
         ];
 
-        $action = new UpdateTeacherProfile;
-        $action->execute($this->teacherDetailInfo['id'], $payload, $user);
+        try {
+            $action = new UpdateTeacherProfile;
+            $action->execute((int) $this->teacherDetailInfo['id'], $payload, $user);
+        } catch (AuthorizationException $e) {
+            $this->addError('teacherProfileForm', $e->getMessage());
+
+            return;
+        } catch (ValidationException $e) {
+            foreach ($e->errors() as $key => $messages) {
+                $formKey = str_starts_with($key, 'teacherProfileForm.')
+                    ? $key
+                    : 'teacherProfileForm.'.$key;
+
+                foreach ($messages as $message) {
+                    $this->addError($formKey, $message);
+                }
+            }
+
+            return;
+        }
 
         session()->flash('success', '교사 정보가 저장되었습니다.');
-        $this->teacherModalEditMode = false;
-
-        $this->openTeacherModal($this->teacherDetailInfo['id']);
+        $this->closeTeacherModal();
     }
 
     public function confirmRetireTeacher(): void
@@ -3308,10 +3327,12 @@ class CoachTeacherSupportList extends Component
             return false;
         }
 
-        $scopedQuery = Teacher::query()
-            ->where('ID', $teacher->ID);
+        if (! CoachTeacherScope::allowsWrite($teacher, $user)) {
+            return false;
+        }
+
+        $scopedQuery = Teacher::query()->where('ID', $teacher->ID);
         $this->applyTeacherListVisibilityFilter($scopedQuery);
-        CoachTeacherScope::apply($scopedQuery, $user);
 
         return $scopedQuery->exists();
     }
