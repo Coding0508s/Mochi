@@ -86,7 +86,9 @@ final class TeacherSupportCompletionDisplay
             $detailKey = (string) ($matched['detail_key'] ?? '');
         }
 
-        if (! self::isTeacherSupportDetailKey($detailKey)) {
+        // 기관 지원(account:)은 차수 칸에 넣지 않는다.
+        // 레거시 Teachers 완료일만 있는 경우는 detail_key 가 비어도 그대로 보여 준다.
+        if ($detailKey !== '' && ! self::isTeacherSupportDetailKey($detailKey)) {
             return ['date' => '', 'type' => '', 'extra' => 0, 'detail_key' => ''];
         }
 
@@ -292,14 +294,24 @@ final class TeacherSupportCompletionDisplay
         }
 
         $matched = self::matchingReport($teacher, $year, $parts['date'], $parts['type'] ?? '');
-        if ($matched === null || ! self::isTeacherSupportDetailKey((string) ($matched['detail_key'] ?? ''))) {
+        if ($matched !== null && self::isTeacherSupportDetailKey((string) ($matched['detail_key'] ?? ''))) {
+            return [
+                'date' => $parts['date'],
+                'type' => $parts['type'],
+                'detail_key' => $matched['detail_key'],
+            ];
+        }
+
+        // 실제 교사 지원 보고서가 있는데 슬롯 날짜와 안 맞으면, 고아 보고서가 1차부터
+        // 채워지도록 슬롯은 비운다. 보고서가 전혀 없으면 엑셀/교사 테이블 완료일을 유지한다.
+        if (self::completedOrphanReportsInYear((int) $teacher->ID, $year) !== []) {
             return ['date' => '', 'type' => ''];
         }
 
         return [
             'date' => $parts['date'],
             'type' => $parts['type'],
-            'detail_key' => $matched['detail_key'],
+            'detail_key' => '',
         ];
     }
 

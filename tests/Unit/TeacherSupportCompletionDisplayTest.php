@@ -95,6 +95,23 @@ class TeacherSupportCompletionDisplayTest extends TestCase
         $this->assertSame('On-Site', $parts['type']);
     }
 
+    public function test_parts_keeps_teacher_slot_when_no_reports_exist(): void
+    {
+        $teacherId = DB::table('Teachers')->insertGetId([
+            'Name' => '엑셀완료만',
+            '_1st_Support_Date' => '2026-03-10',
+            '_1st_Support_Type' => 'On-Site',
+        ]);
+
+        $teacher = Teacher::query()->findOrFail($teacherId);
+
+        $parts = TeacherSupportCompletionDisplay::parts($teacher, 1, 2026);
+
+        $this->assertSame('2026-03-10', $parts['date']);
+        $this->assertSame('On-Site', $parts['type']);
+        $this->assertSame('', $parts['detail_key']);
+    }
+
     public function test_unmatched_teacher_slot_does_not_hide_teacher_report_from_first_round(): void
     {
         $teacherId = DB::table('Teachers')->insertGetId([
