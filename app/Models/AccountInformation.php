@@ -6,6 +6,7 @@ use App\Support\ManagerNameNormalizer;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -26,6 +27,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $Customer_Type 고객 유형
  * @property string $Affiliate 가맹/제휴 정보
  * @property string $Address 주소
+ * @property Carbon|null $FGC_CreateDate
+ * @property Carbon|null $FGC_LastModifyDate
  */
 class AccountInformation extends Model
 {
@@ -97,12 +100,60 @@ class AccountInformation extends Model
         });
     }
 
+    public function isTerminatedCustomer(): bool
+    {
+        return str_contains((string) ($this->Customer_Type ?? ''), '해지');
+    }
+
+    public function isTerminatedThisCalendarYear(?int $year = null): bool
+    {
+        if (! $this->isTerminatedCustomer()) {
+            return false;
+        }
+
+        $modifiedAt = $this->FGC_LastModifyDate;
+        if ($modifiedAt === null) {
+            return false;
+        }
+
+        return (int) $modifiedAt->year === ($year ?? (int) now()->year);
+    }
+
+    public function currentYearTerminationBadgeLabel(?int $year = null): ?string
+    {
+        if (! $this->isTerminatedThisCalendarYear($year) || $this->FGC_LastModifyDate === null) {
+            return null;
+        }
+
+        return $this->FGC_LastModifyDate->format('y').'년 해지';
+    }
+
     public function scopeActiveCustomers(Builder $query): Builder
     {
         return $query->where(function (Builder $statusQuery): void {
             $statusQuery->whereNull('Customer_Type')
                 ->orWhere('Customer_Type', '')
                 ->orWhere('Customer_Type', 'not like', '%해지%');
+        });
+    }
+
+    /**
+     * 운영 기관 + 해당 연도에 해지된 기관.
+     * 해지 연도는 S_Account_Information.FGC_LastModifyDate 기준입니다.
+     */
+    public function scopeActiveCustomersIncludingTerminatedThisYear(Builder $query, ?int $year = null): Builder
+    {
+        $year ??= (int) now()->year;
+
+        return $query->where(function (Builder $statusQuery) use ($year): void {
+            $statusQuery->where(function (Builder $activeQuery): void {
+                $activeQuery->whereNull('Customer_Type')
+                    ->orWhere('Customer_Type', '')
+                    ->orWhere('Customer_Type', 'not like', '%해지%');
+            })->orWhere(function (Builder $thisYearTerminatedQuery) use ($year): void {
+                $thisYearTerminatedQuery->where('Customer_Type', 'like', '%해지%')
+                    ->whereYear('FGC_LastModifyDate', $year);
+            });
         });
     }
 

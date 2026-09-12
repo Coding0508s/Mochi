@@ -35,10 +35,11 @@ return [
     'all_years_lookback' => 3,
 
     /*
-    | 특정 연도 선택 시 업무 연도: Y-01-01 ~ (Y+1)-MM-DD (아래 월까지 spillover 열)
+    | 특정 연도 선택 시 업무 연도: N년 3월 1일 ~ (N+1)년 2월 말
+    | 열은 N년 3~12월 + 다음 해 1~2월(spillover)
     | 「전체」에는 spillover 열을 두지 않는다.
     */
-    'spillover_months' => [1, 2, 3],
+    'spillover_months' => [1, 2],
 
     'institution_types' => [
         '전화',

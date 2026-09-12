@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Schema;
 /**
  * Coach Team KPI — 지원 유형 × 기간 건수 매트릭스 집계.
  *
- * 특정 연도: 업무 연도 Y-01-01~(Y+1)-03-31, 열 키 "Y-m".
+ * 특정 연도: 업무 연도 N년 3월~(N+1)년 2월, 열 키 "Y-m".
  * 「전체」: 달력 1~12월 합산, 열 키 int 1~12 (spillover 없음).
  *
  * @phpstan-type PeriodKey int|string
@@ -173,7 +173,8 @@ final class CoachTeamSupportMatrixAggregator
         }
 
         $columns = [];
-        for ($month = 1; $month <= 12; $month++) {
+        $startMonth = ExcelSerialDate::CYCLE_START_MONTH;
+        for ($month = $startMonth; $month <= 12; $month++) {
             $columns[] = [
                 'key' => self::formatYearMonthKey($year, $month),
                 'year' => $year,
@@ -253,9 +254,9 @@ final class CoachTeamSupportMatrixAggregator
      */
     public static function spilloverMonths(): array
     {
-        $months = config('coach_team_kpi.spillover_months', [1, 2, 3]);
+        $months = config('coach_team_kpi.spillover_months', [1, 2]);
         if (! is_array($months)) {
-            return [1, 2, 3];
+            return [1, 2];
         }
 
         return array_values(array_filter(
@@ -274,15 +275,10 @@ final class CoachTeamSupportMatrixAggregator
         if ($filterYear === null) {
             $years = self::yearsForFilter(null);
 
-            return in_array((int) $date->year, $years, true);
+            return in_array(ExcelSerialDate::cycleYear($date), $years, true);
         }
 
-        $start = Carbon::create($filterYear, 1, 1)->startOfDay();
-        $spillover = self::spilloverMonths();
-        $lastMonth = $spillover !== [] ? max($spillover) : 3;
-        $end = Carbon::create($filterYear + 1, $lastMonth, 1)->endOfMonth()->startOfDay();
-
-        return $date->betweenIncluded($start, $end);
+        return ExcelSerialDate::isInYear($date, $filterYear);
     }
 
     /**

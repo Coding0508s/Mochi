@@ -6,15 +6,12 @@ use App\DataTransferObjects\InstitutionListFilters;
 use App\Support\InstitutionAccountListQuery;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use Livewire\WithPagination;
 
 class InstitutionTable extends Component
 {
-    use WithPagination;
-
     public string $search = '';
 
-    public string $statusFilter = 'all';
+    public string $statusFilter = 'active';
 
     public string $assignmentFilter = '';
 
@@ -46,25 +43,6 @@ class InstitutionTable extends Component
         if ($resetAssignment) {
             $this->assignmentFilter = '';
         }
-
-        $this->resetPage();
-    }
-
-    #[On('institution-filter-assignment-cleared')]
-    public function onAssignmentFilterCleared(): void
-    {
-        $this->resetPage();
-    }
-
-    #[On('institution-table-reset-page')]
-    public function resetTablePage(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatedAssignmentFilter(): void
-    {
-        $this->resetPage();
     }
 
     public function selectRow(int $institutionId): void
@@ -75,7 +53,7 @@ class InstitutionTable extends Component
     public function render(InstitutionAccountListQuery $accountListQuery)
     {
         $filters = InstitutionListFilters::fromComponent($this);
-        $institutions = $accountListQuery->paginate($filters, 20);
+        $institutions = $accountListQuery->list($filters);
 
         return view('livewire.institution-table', [
             'institutions' => $institutions,

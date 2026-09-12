@@ -93,6 +93,7 @@ class StoreTeacherVisitSupportReportTest extends TestCase
             $table->string('observe_summary_extra', 255)->nullable();
             $table->string('observe_class', 50)->nullable();
             $table->string('observe_age', 50)->nullable();
+            $table->json('observe_curriculum_rows')->nullable();
             $table->unsignedTinyInteger('session_number')->nullable();
             $table->string('semester_label', 100)->nullable();
             $table->date('interview_date')->nullable();
@@ -323,6 +324,42 @@ class StoreTeacherVisitSupportReportTest extends TestCase
             'observe_lesson' => null,
             'session_number' => null,
         ]);
+    }
+
+    public function test_observe_curriculum_rows_are_stored_and_grapeseed_syncs_scalars(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $teacher = $this->createTeacher();
+        $payload = array_merge($this->visitPayload(false, null), [
+            'observe_rows' => [
+                [
+                    'type' => 'GrapeSEED',
+                    'unit' => 2,
+                    'lesson' => 3,
+                    'class' => 'A반',
+                    'age' => '5',
+                ],
+                [
+                    'type' => 'LittleSEED',
+                    'unit' => 4,
+                    'lesson' => 1,
+                    'class' => '',
+                    'age' => '',
+                ],
+            ],
+        ]);
+
+        $report = app(StoreTeacherVisitSupportReport::class)->execute(
+            (int) $teacher->ID,
+            $payload,
+            $admin,
+        );
+
+        $this->assertSame(2, $report->observe_unit);
+        $this->assertSame(3, $report->observe_lesson);
+        $this->assertSame('A반', $report->observe_class);
+        $this->assertSame('LittleSEED', $report->observe_curriculum_rows[1]['type']);
+        $this->assertSame(4, $report->observe_curriculum_rows[1]['unit']);
     }
 
     public function test_rejects_duplicate_completed_report_on_same_teacher_and_date(): void

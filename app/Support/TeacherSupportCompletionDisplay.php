@@ -16,12 +16,12 @@ use Illuminate\Support\Collection;
 final class TeacherSupportCompletionDisplay
 {
     /**
-     * @var array<string, list<array{date: string, type: string, count: int}>>
+     * @var array<string, list<array{date: string, type: string, count: int, detail_key: string}>>
      */
     private static array $orphanReportsByTeacherYear = [];
 
     /**
-     * @var array<string, array<int, array{date: string, type: string, count: int}>>
+     * @var array<string, array<int, array{date: string, type: string, count: int, detail_key: string}>>
      */
     private static array $orphanAssignmentsCache = [];
 
@@ -57,28 +57,44 @@ final class TeacherSupportCompletionDisplay
     }
 
     /**
-     * @return array{date: string, type: string, extra: int}
+     * @return array{date: string, type: string, extra: int, detail_key: string}
      */
     public static function parts(Teacher $teacher, int $round, ?int $year): array
     {
         $parts = self::partsFromTeacherSlot($teacher, $round, $year);
 
         if ($parts['date'] === '') {
-            $parts = self::orphanAssignments($teacher, $year)[$round] ?? ['date' => '', 'type' => '', 'count' => 1];
+            $parts = self::orphanAssignments($teacher, $year)[$round] ?? [
+                'date' => '',
+                'type' => '',
+                'count' => 1,
+                'detail_key' => '',
+            ];
         }
 
         if ($parts['date'] === '') {
-            return ['date' => '', 'type' => '', 'extra' => 0];
+            return ['date' => '', 'type' => '', 'extra' => 0, 'detail_key' => ''];
         }
 
         $count = isset($parts['count'])
             ? (int) $parts['count']
             : self::reportCountForDate($teacher, $year, $parts['date']);
 
+        $detailKey = (string) ($parts['detail_key'] ?? '');
+        if ($detailKey === '') {
+            $matched = self::matchingReport($teacher, $year, $parts['date'], $parts['type'] ?? '');
+            $detailKey = (string) ($matched['detail_key'] ?? '');
+        }
+
+        if (! self::isTeacherSupportDetailKey($detailKey)) {
+            return ['date' => '', 'type' => '', 'extra' => 0, 'detail_key' => ''];
+        }
+
         return [
             'date' => $parts['date'],
             'type' => $parts['type'],
             'extra' => max(0, $count - 1),
+            'detail_key' => $detailKey,
         ];
     }
 
@@ -101,7 +117,7 @@ final class TeacherSupportCompletionDisplay
     }
 
     /**
-     * @return array<int, array{date: string, type: string, count: int}>
+     * @return array<int, array{date: string, type: string, count: int, detail_key: string}>
      */
     private static function orphanAssignments(Teacher $teacher, ?int $year): array
     {
@@ -118,7 +134,7 @@ final class TeacherSupportCompletionDisplay
     }
 
     /**
-     * @return array<int, array{date: string, type: string, count: int}>
+     * @return array<int, array{date: string, type: string, count: int, detail_key: string}>
      */
     private static function buildOrphanAssignments(Teacher $teacher, ?int $year): array
     {
@@ -144,6 +160,7 @@ final class TeacherSupportCompletionDisplay
                 'date' => $report['date'],
                 'type' => $report['type'],
                 'count' => $report['count'],
+                'detail_key' => $report['detail_key'] ?? '',
             ];
         }
 
@@ -153,8 +170,8 @@ final class TeacherSupportCompletionDisplay
     /**
      * Teachers N차 완료 칸에 이미 표시되는 지원일(날짜)은 다른 차수 고아 슬롯에 다시 넣지 않는다.
      *
-     * @param  list<array{date: string, type: string, count: int}>  $reports
-     * @return list<array{date: string, type: string, count: int}>
+     * @param  list<array{date: string, type: string, count: int, detail_key?: string}>  $reports
+     * @return list<array{date: string, type: string, count: int, detail_key: string}>
      */
     private static function excludeReportsMatchingTeacherSlots(Teacher $teacher, ?int $year, array $reports): array
     {
@@ -179,8 +196,8 @@ final class TeacherSupportCompletionDisplay
     /**
      * 같은 지원일은 타입과 무관하게 한 칸으로 묶는다. 대표 타입은 첫 번째 건을 쓴다.
      *
-     * @param  list<array{date: string, type: string, count?: int}>  $reports
-     * @return list<array{date: string, type: string, count: int}>
+     * @param  list<array{date: string, type: string, count?: int, detail_key?: string}>  $reports
+     * @return list<array{date: string, type: string, count: int, detail_key: string}>
      */
     private static function dedupeReports(array $reports): array
     {
@@ -212,6 +229,7 @@ final class TeacherSupportCompletionDisplay
                 'date' => $report['date'],
                 'type' => $report['type'],
                 'count' => $addCount,
+                'detail_key' => (string) ($report['detail_key'] ?? ''),
             ];
         }
 
@@ -269,7 +287,20 @@ final class TeacherSupportCompletionDisplay
             return ['date' => '', 'type' => ''];
         }
 
-        return $parts;
+        if (($parts['date'] ?? '') === '') {
+            return ['date' => '', 'type' => ''];
+        }
+
+        $matched = self::matchingReport($teacher, $year, $parts['date'], $parts['type'] ?? '');
+        if ($matched === null || ! self::isTeacherSupportDetailKey((string) ($matched['detail_key'] ?? ''))) {
+            return ['date' => '', 'type' => ''];
+        }
+
+        return [
+            'date' => $parts['date'],
+            'type' => $parts['type'],
+            'detail_key' => $matched['detail_key'],
+        ];
     }
 
     private static function teacherRoundHasCompletionInYear(Teacher $teacher, int $round, ?int $year): bool
@@ -296,7 +327,7 @@ final class TeacherSupportCompletionDisplay
     }
 
     /**
-     * @return list<array{date: string, type: string, count: int}>
+     * @return list<array{date: string, type: string, count: int, detail_key: string}>
      */
     private static function completedOrphanReportsInYear(int $teacherId, ?int $year): array
     {
@@ -314,7 +345,7 @@ final class TeacherSupportCompletionDisplay
 
     /**
      * @param  list<int>  $teacherIds
-     * @return array<int, list<array{date: string, type: string, count: int}>>
+     * @return array<int, list<array{date: string, type: string, count: int, detail_key: string}>>
      */
     private static function orphanReportsForTeacherIds(array $teacherIds, ?int $year): array
     {
@@ -335,5 +366,41 @@ final class TeacherSupportCompletionDisplay
         }
 
         return $result;
+    }
+
+    /**
+     * 같은 지원일의 교사 지원 보고서만 연결한다.
+     * 기관 지원(account:)은 차수 칸에 넣지 않는다.
+     *
+     * @return array{date: string, type: string, count?: int, detail_key: string}|null
+     */
+    private static function matchingReport(Teacher $teacher, ?int $year, string $date, string $type): ?array
+    {
+        $reports = self::completedOrphanReportsInYear((int) $teacher->ID, $year);
+        $dateMatches = array_values(array_filter(
+            $reports,
+            fn (array $report): bool => $report['date'] === $date
+                && self::isTeacherSupportDetailKey((string) ($report['detail_key'] ?? '')),
+        ));
+
+        if ($dateMatches === []) {
+            return null;
+        }
+
+        $type = trim($type);
+        if ($type !== '') {
+            foreach ($dateMatches as $report) {
+                if (trim($report['type']) === $type) {
+                    return $report;
+                }
+            }
+        }
+
+        return $dateMatches[0];
+    }
+
+    private static function isTeacherSupportDetailKey(string $detailKey): bool
+    {
+        return str_starts_with($detailKey, 'mochi:') || str_starts_with($detailKey, 'legacy:');
     }
 }

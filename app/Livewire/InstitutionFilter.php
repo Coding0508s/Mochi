@@ -9,7 +9,7 @@ class InstitutionFilter extends Component
 {
     public string $search = '';
 
-    public string $statusFilter = 'all';
+    public string $statusFilter = 'active';
 
     public string $filterCo = '';
 
@@ -38,7 +38,7 @@ class InstitutionFilter extends Component
 
     public function mount(
         string $search = '',
-        string $statusFilter = 'all',
+        string $statusFilter = 'active',
         string $filterCo = '',
         string $filterTr = '',
         string $filterCs = '',
@@ -78,7 +78,7 @@ class InstitutionFilter extends Component
     public function clearListFilters(): void
     {
         $this->search = '';
-        $this->statusFilter = 'all';
+        $this->statusFilter = 'active';
         $this->filterCo = '';
         $this->filterTr = '';
         $this->filterCs = '';
@@ -86,7 +86,7 @@ class InstitutionFilter extends Component
         $this->dispatch(
             'filter-updated',
             search: '',
-            statusFilter: 'all',
+            statusFilter: 'active',
             filterCo: '',
             filterTr: '',
             filterCs: '',
@@ -102,7 +102,7 @@ class InstitutionFilter extends Component
 
     public function clearStatusFilter(): void
     {
-        $this->statusFilter = 'all';
+        $this->statusFilter = 'active';
         $this->dispatchFilterUpdated();
     }
 

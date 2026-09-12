@@ -46,8 +46,8 @@ class InstitutionList extends Component
     public string $search = '';
     // 상단 검색창에 입력된 텍스트. 빈 문자열로 시작합니다.
 
-    public string $statusFilter = 'all';
-    // 기관 상태 필터: active | terminated | all (기본: S_Account_Information 전체 = phpMyAdmin 행 수와 동일)
+    public string $statusFilter = 'active';
+    // 기관 상태 필터: active | terminated | all (기본: 운영 기관)
 
     public string $assignmentFilter = '';
     // 담당자 배정 상태 필터: '' | assigned | unassigned | my_assigned
@@ -164,11 +164,6 @@ class InstitutionList extends Component
 
     public string $editCs = '';
 
-    public function updatingAssignmentFilter(): void
-    {
-        $this->dispatch('institution-table-reset-page');
-    }
-
     public function mount(): void
     {
         $sidebarContext = trim((string) request()->query('sidebar_context', ''));
@@ -194,8 +189,6 @@ class InstitutionList extends Component
         $this->filterTr = $filterTr;
         $this->filterCs = $filterCs;
 
-        $this->dispatch('institution-table-reset-page');
-
         if ($resetAssignment) {
             $this->assignmentFilter = '';
         }
@@ -205,7 +198,6 @@ class InstitutionList extends Component
     public function clearAssignmentFilter(): void
     {
         $this->assignmentFilter = '';
-        $this->dispatch('institution-table-reset-page');
     }
 
     #[On('institution-view-all-toggle-requested')]
@@ -228,7 +220,6 @@ class InstitutionList extends Component
         ])->save();
 
         $this->syncInstitutionViewToggleState();
-        $this->dispatch('institution-table-reset-page');
     }
 
     #[On('institution-row-selected')]
@@ -242,7 +233,7 @@ class InstitutionList extends Component
     {
         $this->onFilterUpdated(
             search: '',
-            statusFilter: 'all',
+            statusFilter: 'active',
             filterCo: '',
             filterTr: '',
             filterCs: '',
@@ -282,17 +273,6 @@ class InstitutionList extends Component
             $this->sortField = $field;
             $this->sortDirection = 'asc';
         }
-        $this->dispatch('institution-table-reset-page');
-    }
-
-    public function updatedSortField(): void
-    {
-        $this->dispatch('institution-table-reset-page');
-    }
-
-    public function updatedSortDirection(): void
-    {
-        $this->dispatch('institution-table-reset-page');
     }
 
     // ─── 기관 행 클릭 시 상세 모달 열기 ────────────────────────────────
@@ -1115,7 +1095,7 @@ class InstitutionList extends Component
     private function catalogRowExistsById(int $id): bool
     {
         return $this->accountListQuery()
-            ->accountInformationListQuery($this->listFilters())
+            ->accountInformationListQuery($this->listFilters()->forDetailLookup())
             ->where('ID', $id)
             ->exists();
     }
@@ -1127,7 +1107,7 @@ class InstitutionList extends Component
         }
 
         return $this->accountListQuery()
-            ->accountInformationListQuery($this->listFilters())
+            ->accountInformationListQuery($this->listFilters()->forDetailLookup())
             ->where('SK_Code', $skCode)
             ->exists();
     }

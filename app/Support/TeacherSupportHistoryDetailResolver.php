@@ -274,6 +274,12 @@ class TeacherSupportHistoryDetailResolver
             return '-';
         }
 
+        if ($column === 'observe_curriculum_rows') {
+            $formatted = VisitObserveCurriculumRows::formatForDisplay($value);
+
+            return $formatted !== '' ? $formatted : '-';
+        }
+
         if (in_array($column, ['support_date', 'interview_date'], true)) {
             return $this->formatDisplayDate($value);
         }

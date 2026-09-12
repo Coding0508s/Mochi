@@ -47,6 +47,7 @@ class MochiTeacherSupportQueryTest extends TestCase
 
         $this->assertSame('2026-05-01', $reports[10][0]['date']);
         $this->assertSame('교사 지원 및 참관', $reports[10][0]['type']);
+        $this->assertStringStartsWith('mochi:teacher_visit_support_reports:', $reports[10][0]['detail_key']);
         $this->assertSame('2026-06-01', $reports[20][0]['date']);
     }
 

@@ -79,6 +79,7 @@ class InstitutionListTest extends TestCase
             $table->string('Affiliate', 255)->nullable();
             $table->string('Address', 255)->nullable();
             $table->timestamp('FGC_CreateDate')->nullable();
+            $table->timestamp('FGC_LastModifyDate')->nullable();
         });
 
         Schema::create('S_GSNumber', function (Blueprint $table): void {
@@ -1357,8 +1358,20 @@ class InstitutionListTest extends TestCase
         $this->assertSame('전체 기관', $component->viewData('statusScopeLabel'));
     }
 
-    public function test_active_status_filter_excludes_terminated_rows(): void
+    public function test_status_filter_defaults_to_active_operating_institutions(): void
     {
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(InstitutionList::class)
+            ->assertSet('statusFilter', 'active')
+            ->assertSee('운영 기관');
+    }
+
+    public function test_active_status_filter_excludes_prior_year_terminated_rows(): void
+    {
+        $this->travelTo('2026-09-12 12:00:00');
+
         $user = User::factory()->create();
 
         DB::table('S_Account_Information')->insert([
@@ -1366,11 +1379,13 @@ class InstitutionListTest extends TestCase
                 'SK_Code' => 'SK-ACTIVE',
                 'Account_Name' => '운영 기관',
                 'Customer_Type' => 'GTS 13 기존',
+                'FGC_LastModifyDate' => '2026-01-10 10:00:00',
             ],
             [
                 'SK_Code' => 'SK-TERM',
-                'Account_Name' => '해지 기관',
+                'Account_Name' => '작년 해지 기관',
                 'Customer_Type' => 'GTS 16 Conversion 해지',
+                'FGC_LastModifyDate' => '2025-03-01 10:00:00',
             ],
         ]);
 
@@ -1381,6 +1396,50 @@ class InstitutionListTest extends TestCase
         $this->assertSame(1, $component->viewData('allInstitutionCount'));
         $this->assertSame(1, $component->get('institutionTableTotal'));
         $this->assertSame('운영 기관', $component->viewData('statusScopeLabel'));
+    }
+
+    public function test_active_status_filter_includes_current_year_terminated_rows_with_badge(): void
+    {
+        $this->travelTo('2026-09-12 12:00:00');
+
+        $user = User::factory()->create();
+
+        DB::table('S_Account_Information')->insert([
+            [
+                'SK_Code' => 'SK-ACTIVE',
+                'Account_Name' => '운영 기관',
+                'Customer_Type' => 'GTS 13 기존',
+                'FGC_LastModifyDate' => '2026-01-10 10:00:00',
+            ],
+            [
+                'SK_Code' => 'SK-TERM-THIS-YEAR',
+                'Account_Name' => '올해 해지 기관',
+                'Customer_Type' => 'GTS 16 Conversion 해지',
+                'FGC_LastModifyDate' => '2026-04-15 09:00:00',
+            ],
+            [
+                'SK_Code' => 'SK-TERM-LAST-YEAR',
+                'Account_Name' => '작년 해지 기관',
+                'Customer_Type' => 'GTS 16 Conversion 해지',
+                'FGC_LastModifyDate' => '2025-11-01 09:00:00',
+            ],
+        ]);
+
+        $html = Livewire::actingAs($user)
+            ->test(InstitutionTable::class)
+            ->assertViewHas('institutions', function ($institutions): bool {
+                $codes = $institutions->pluck('SK_Code')->all();
+
+                return $institutions->count() === 2
+                    && in_array('SK-TERM-THIS-YEAR', $codes, true)
+                    && ! in_array('SK-TERM-LAST-YEAR', $codes, true);
+            })
+            ->html();
+
+        $this->assertStringContainsString('올해 해지 기관', $html);
+        $this->assertStringContainsString('26년 해지', $html);
+        $this->assertStringNotContainsString('작년 해지 기관', $html);
+        $this->assertStringNotContainsString('해당 년도 해지', $html);
     }
 
     public function test_default_sort_orders_by_fgc_create_date_ascending(): void
@@ -2319,6 +2378,7 @@ class InstitutionListTest extends TestCase
             ->set('filterCo', 'Peter Kim')
             ->assertDontSee('초기화 유지')
             ->call('clearListFilters')
+            ->assertSet('statusFilter', 'active')
             ->assertSet('filterCo', '')
             ->assertSet('filterTr', '')
             ->assertSet('filterCs', '')

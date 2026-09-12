@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Support\CoachTeacherScope;
 use App\Support\CoachTeamInstitutionCoverageAggregator;
 use App\Support\CoachTeamSupportMatrixAggregator;
+use App\Support\ExcelSerialDate;
 use App\Support\ManagerNameNormalizer;
 use App\Support\TeacherSupportHistoryDetailResolver;
 use App\Support\TeamMenuContext;
@@ -59,7 +60,7 @@ class CoachInstitutionCoverageList extends Component
         } elseif (is_numeric($queryYear)) {
             $this->filterYear = (string) (int) $queryYear;
         } else {
-            $this->filterYear = (string) (config('coach_teacher_support.default_year') ?? now()->year);
+            $this->filterYear = (string) (config('coach_teacher_support.default_year') ?? ExcelSerialDate::currentCycleYear());
         }
 
         $coach = request()->query('filterCoach');

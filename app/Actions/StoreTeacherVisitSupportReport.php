@@ -13,11 +13,13 @@ use App\Support\SupportReportStoredMailNotifier;
 use App\Support\TeacherSupportReportSupportRecordBuilder;
 use App\Support\TeacherSupportSlotSync;
 use App\Support\TeamMenuContext;
+use App\Support\VisitObserveCurriculumRows;
 use App\Support\VisitSupportReportUniquenessGuard;
 use App\Support\VisitSupportReportValidationPresenter;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class StoreTeacherVisitSupportReport
 {
@@ -90,6 +92,7 @@ class StoreTeacherVisitSupportReport
                 'observe_summary_extra' => $validated['observe_summary_extra'] ?? null,
                 'observe_class' => $validated['observe_class'] ?? null,
                 'observe_age' => $validated['observe_age'] ?? null,
+                'observe_curriculum_rows' => $validated['observe_curriculum_rows'] ?? null,
                 'session_number' => $validated['session_number'] ?? null,
                 'semester_label' => $validated['semester_label'] ?? null,
                 'interview_date' => $validated['interview_date'] ?? null,
@@ -134,7 +137,9 @@ class StoreTeacherVisitSupportReport
      */
     private function validate(array $data): array
     {
-        $data = NullableFormInteger::normalizePayload($data);
+        $data = VisitObserveCurriculumRows::applyToPayload(
+            NullableFormInteger::normalizePayload($data),
+        );
 
         $markCompleted = (bool) ($data['mark_completed'] ?? false);
 
@@ -153,6 +158,13 @@ class StoreTeacherVisitSupportReport
                 'observe_summary_extra' => ['nullable', 'string', 'max:255'],
                 'observe_class' => ['nullable', 'string', 'max:50'],
                 'observe_age' => ['nullable', 'string', 'max:50'],
+                'observe_rows' => ['nullable', 'array', 'max:4'],
+                'observe_rows.*.type' => ['required', 'string', Rule::in(VisitObserveCurriculumRows::types())],
+                'observe_rows.*.unit' => ['nullable', 'integer', 'min:0', 'max:99'],
+                'observe_rows.*.lesson' => ['nullable', 'integer', 'min:0', 'max:99'],
+                'observe_rows.*.class' => ['nullable', 'string', 'max:50'],
+                'observe_rows.*.age' => ['nullable', 'string', 'max:50'],
+                'observe_curriculum_rows' => ['nullable', 'array'],
                 'session_number' => ['nullable', 'integer', 'min:1', 'max:9'],
                 'semester_label' => ['nullable', 'string', 'max:100'],
                 'interview_date' => ['nullable', 'date'],

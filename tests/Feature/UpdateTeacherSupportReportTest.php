@@ -111,6 +111,7 @@ class UpdateTeacherSupportReportTest extends TestCase
             $table->string('observe_summary_extra', 255)->nullable();
             $table->string('observe_class', 50)->nullable();
             $table->string('observe_age', 50)->nullable();
+            $table->json('observe_curriculum_rows')->nullable();
             $table->unsignedTinyInteger('session_number')->nullable();
             $table->string('semester_label', 100)->nullable();
             $table->date('interview_date')->nullable();

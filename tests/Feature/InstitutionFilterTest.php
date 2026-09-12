@@ -8,6 +8,12 @@ use Tests\TestCase;
 
 class InstitutionFilterTest extends TestCase
 {
+    public function test_status_filter_defaults_to_active(): void
+    {
+        Livewire::test(InstitutionFilter::class)
+            ->assertSet('statusFilter', 'active');
+    }
+
     public function test_dispatches_filter_updated_when_status_changes(): void
     {
         Livewire::test(InstitutionFilter::class, [
@@ -30,12 +36,12 @@ class InstitutionFilterTest extends TestCase
         ])
             ->call('clearListFilters')
             ->assertSet('search', '')
-            ->assertSet('statusFilter', 'all')
+            ->assertSet('statusFilter', 'active')
             ->assertSet('filterCo', '')
             ->assertDispatched('filter-updated', function (string $event, array $params): bool {
                 return $event === 'filter-updated'
                     && ($params['search'] ?? null) === ''
-                    && ($params['statusFilter'] ?? null) === 'all'
+                    && ($params['statusFilter'] ?? null) === 'active'
                     && ($params['filterCo'] ?? null) === ''
                     && ($params['resetAssignment'] ?? null) === true;
             });

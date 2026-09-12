@@ -42,12 +42,6 @@
                                 @enderror
                             </div>
                             <div>
-                                <label class="block text-xs text-gray-500 mb-1">장소</label>
-                                <input type="text" wire:model="visitForm.support_location"
-                                       placeholder="예: 분당 ○○어학원"
-                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
-                            </div>
-                            <div>
                                 <label class="block text-xs text-gray-500 mb-1"><span class="text-red-500">*</span> 지원 목적</label>
                                 <input type="text" wire:model="visitForm.support_purpose"
                                        placeholder="예: 신임 교사 온보딩, 정기 수업 참관, 특정 이슈 해결등"
@@ -56,73 +50,63 @@
                                     <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                                 @enderror
                             </div>
-                            <div>
-                                <label class="block text-xs text-gray-500 mb-1">지원 방법</label>
-                                <select wire:model="visitForm.meeting_type"
-                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
-                                    @foreach($visitConfig['method_options'] ?? [] as $method)
-                                        <option value="{{ $method }}">{{ $method }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs text-gray-500 mb-1">
-                                    현황 차수
+                            <div class="grid grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-3">
+                                <div class="min-w-0">
+                                    <label class="block text-xs text-gray-500 mb-1">지원 방법</label>
+                                    <select wire:model="visitForm.meeting_type"
+                                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
+                                        @foreach($visitConfig['method_options'] ?? [] as $method)
+                                            <option value="{{ $method }}">{{ $method }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="min-w-0">
+                                    <label class="block text-xs text-gray-500 mb-1">
+                                        현황 차수
+                                        @php
+                                            $referenceYear = method_exists($this, 'supportRoundReferenceYear') ? $this->supportRoundReferenceYear() : null;
+                                        @endphp
+                                        @if($referenceYear !== null)
+                                            <span class="ml-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                                                기준 연도 {{ $referenceYear }}
+                                            </span>
+                                        @endif
+                                    </label>
                                     @php
-                                        $referenceYear = method_exists($this, 'supportRoundReferenceYear') ? $this->supportRoundReferenceYear() : null;
+                                        $roundOptions = method_exists($this, 'supportRoundOptions') ? $this->supportRoundOptions() : [];
                                     @endphp
-                                    @if($referenceYear !== null)
-                                        <span class="ml-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
-                                            기준 연도 {{ $referenceYear }}
-                                        </span>
-                                    @endif
-                                </label>
-                                @php
-                                    $roundOptions = method_exists($this, 'supportRoundOptions') ? $this->supportRoundOptions() : [];
-                                @endphp
-                                <select wire:model="supportRound"
-                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
-                                    <option value="">기록 안 함</option>
-                                    @foreach($roundOptions as $option)
-                                        <option value="{{ $option['value'] }}" @disabled((bool) ($option['disabled'] ?? false))>
-                                            {{ $option['label'] }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                @error('support_round')
-                                    <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
-                                @enderror
-                            </div>
-                            <div>
-                                <label class="block text-xs text-gray-500 mb-1">면담 시간</label>
-                                <input type="time" wire:model="visitForm.interview_time"
-                                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
+                                    <select wire:model="supportRound"
+                                            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
+                                        <option value="">기록 안 함</option>
+                                        @foreach($roundOptions as $option)
+                                            <option value="{{ $option['value'] }}" @disabled((bool) ($option['disabled'] ?? false))>
+                                                {{ $option['label'] }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @error('support_round')
+                                        <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                                <div class="min-w-0">
+                                    <label class="block text-xs text-gray-500 mb-1">면담 시간</label>
+                                    <input type="time" wire:model="visitForm.interview_time"
+                                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
+                                </div>
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="block text-xs text-gray-500 mb-1">참관 수업 정보</label>
-                                <div class="flex flex-nowrap items-center gap-2 overflow-x-auto text-xs text-gray-600">
-                                    <span class="shrink-0">Unit</span>
-                                    <input type="number" min="0" max="99" wire:model="visitForm.observe_unit"
-                                           class="w-14 shrink-0 px-2 py-1 text-sm border border-gray-300 rounded-lg text-center">
-                                    <span class="shrink-0">Lesson</span>
-                                    <input type="number" min="0" max="99" wire:model="visitForm.observe_lesson"
-                                           class="w-14 shrink-0 px-2 py-1 text-sm border border-gray-300 rounded-lg text-center">
+                                @include('partials.coach.visit-observe-curriculum-rows', [
+                                    'observeInputClass' => 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header',
+                                    'observeLabelClass' => 'block text-xs text-gray-500 mb-1',
+                                    'observeTypeClass' => 'flex h-[38px] items-center text-sm font-semibold text-gray-800',
+                                ])
+                                <div class="mt-3">
+                                    <label class="block text-xs text-gray-500 mb-1">기타</label>
                                     <input type="text" wire:model="visitForm.observe_summary_extra"
-                                           class="w-24 shrink-0 px-2 py-1 text-sm border border-gray-300 rounded-lg">
-                                    <span class="shrink-0">반</span>
-                                    <input type="text" wire:model="visitForm.observe_class"
-                                           class="w-14 shrink-0 px-2 py-1 text-sm border border-gray-300 rounded-lg text-center">
-                                    <span class="shrink-0">세</span>
-                                    <input type="text" wire:model="visitForm.observe_age"
-                                           class="w-14 shrink-0 px-2 py-1 text-sm border border-gray-300 rounded-lg text-center">
+                                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
                                 </div>
                                 <p class="mt-1 text-xs text-gray-400">Unit·Lesson 등 참관 수업 정보는 해당 없으면 비워 두셔도 됩니다.</p>
-                                @error('visitForm.observe_unit')
-                                    <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
-                                @enderror
-                                @error('visitForm.observe_lesson')
-                                    <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
-                                @enderror
                             </div>
                         </div>
                     </section>

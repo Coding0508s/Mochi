@@ -1,5 +1,5 @@
 <div class="mochi-table-card">
-    <div class="overflow-x-auto isolate">
+    <div class="institution-list-table-scroll isolate">
         <table class="institution-list-table w-full text-sm whitespace-nowrap">
             <thead class="mochi-table-head">
             <tr class="text-gray-700">
@@ -48,15 +48,22 @@
                 <tr wire:key="institution-row-{{ $account->ID }}"
                     wire:click="selectRow({{ $account->ID }})"
                     class="mochi-table-row-hover transition-colors cursor-pointer">
-                    <td class="institution-sticky-no px-3 py-2 text-gray-500 text-xs">{{ $institutions->firstItem() + $index }}</td>
+                    <td class="institution-sticky-no px-3 py-2 text-gray-500 text-xs">{{ $index + 1 }}</td>
                     <td class="institution-sticky-sk px-3 py-2">
                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
                             {{ $account->SK_Code ?? '-' }}
                         </span>
                     </td>
                     <td class="institution-sticky-name px-3 py-2 font-medium">
-                        <span class="text-blue-700 hover:underline">
-                            {{ $account->Account_Name ?: ($master?->AccountName ?? '-') }}
+                        <span class="inline-flex min-w-0 max-w-full items-center gap-1.5">
+                            <span class="truncate text-blue-700 hover:underline">
+                                {{ $account->Account_Name ?: ($master?->AccountName ?? '-') }}
+                            </span>
+                            @if($currentYearTerminationBadge = $account->currentYearTerminationBadgeLabel())
+                                <span class="inline-flex shrink-0 items-center rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-medium leading-none text-red-600">
+                                    {{ $currentYearTerminationBadge }}
+                                </span>
+                            @endif
                         </span>
                         @if($master?->EnglishName)
                             <span class="block text-xs text-gray-400">{{ $master->EnglishName }}</span>
@@ -109,10 +116,4 @@
             </tbody>
         </table>
     </div>
-
-    @if($institutions->hasPages())
-        <div class="px-4 py-3 border-t border-gray-200">
-            {{ $institutions->links() }}
-        </div>
-    @endif
 </div>

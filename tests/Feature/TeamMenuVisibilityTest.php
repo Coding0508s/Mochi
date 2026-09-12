@@ -104,7 +104,7 @@ class TeamMenuVisibilityTest extends TestCase
         $response->assertDontSee('sidebar-subitem-label">신청 내역<', false);
     }
 
-    public function test_coach_team_sidebar_shows_brochure_request_menu_only(): void
+    public function test_coach_team_sidebar_hides_brochure_request_menu(): void
     {
         $coach = User::factory()->create([
             'team' => 'COACH',
@@ -114,9 +114,34 @@ class TeamMenuVisibilityTest extends TestCase
         $response = $this->actingAs($coach)->get(route('profile.edit'));
 
         $response->assertOk();
-        $response->assertSee('co/gs-brochure/request?team_menu=coach', false);
-        $response->assertSee('sidebar-subitem-label">브로셔 신청<', false);
-        $response->assertDontSee('sidebar-subitem-label">신청 내역<', false);
+        $response->assertDontSee('co/gs-brochure/request?team_menu=coach', false);
+    }
+
+    public function test_coach_team_sidebar_places_retired_teachers_after_teacher_support(): void
+    {
+        $coach = User::factory()->create([
+            'team' => 'COACH',
+            'is_admin' => false,
+        ]);
+
+        $html = $this->actingAs($coach)
+            ->get(route('profile.edit'))
+            ->assertOk()
+            ->getContent();
+
+        $coachSection = (string) str($html)->after('Coach Team')->before('Configuration');
+        $teacherSupportPos = strpos($coachSection, 'sidebar-subitem-label">교사 지원 현황<');
+        $retiredTeachersPos = strpos($coachSection, 'sidebar-subitem-label">퇴직교사 리스트<');
+        $institutionsPos = strpos($coachSection, 'sidebar-subitem-label">기관리스트<');
+        $supportsPos = strpos($coachSection, 'sidebar-subitem-label">교사 및 기관 지원<');
+
+        $this->assertNotFalse($teacherSupportPos);
+        $this->assertNotFalse($retiredTeachersPos);
+        $this->assertNotFalse($institutionsPos);
+        $this->assertNotFalse($supportsPos);
+        $this->assertGreaterThan($teacherSupportPos, $retiredTeachersPos);
+        $this->assertGreaterThan($retiredTeachersPos, $institutionsPos);
+        $this->assertGreaterThan($institutionsPos, $supportsPos);
     }
 
     public function test_cs_user_can_access_brochure_request_and_list_pages(): void

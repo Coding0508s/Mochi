@@ -20,6 +20,7 @@ use App\Models\Teacher;
 use App\Models\User;
 use App\Support\SkCodeNormalizer;
 use App\Support\TeacherSupportReportEditAuthorization;
+use App\Support\VisitObserveCurriculumRows;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -27,6 +28,7 @@ use InvalidArgumentException;
 trait ManagesCoachTeacherSupportCreateModals
 {
     use HandlesVisitSupportReportValidationFailures;
+    use ManagesVisitObserveCurriculumRows;
 
     public function openCoachTeacherSupportCreateModal(string $action, int $teacherId): void
     {
@@ -1265,6 +1267,7 @@ trait ManagesCoachTeacherSupportCreateModals
             'observe_summary_extra' => '',
             'observe_class' => '',
             'observe_age' => '',
+            'observe_rows' => VisitObserveCurriculumRows::defaultRows(),
             'session_number' => 1,
             'semester_label' => config('coach_teacher_visit.semester_options.0', '1학기 지원'),
             'interview_date' => now()->format('Y-m-d'),

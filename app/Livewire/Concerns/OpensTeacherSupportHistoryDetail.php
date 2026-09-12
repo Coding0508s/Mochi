@@ -5,6 +5,7 @@ namespace App\Livewire\Concerns;
 use App\Support\TeacherSupportHistoryDetailResolver;
 use App\Support\TeacherSupportHistoryFormLoader;
 use App\Support\TeacherSupportReportEditAuthorization;
+use App\Support\VisitObserveCurriculumRows;
 use Illuminate\Support\Facades\Gate;
 
 trait OpensTeacherSupportHistoryDetail
@@ -532,7 +533,7 @@ trait OpensTeacherSupportHistoryDetail
     private function openVisitView(int $teacherId, array $form, bool $markCompleted): void
     {
         $this->visitTeacherId = $teacherId;
-        $this->visitForm = $form;
+        $this->visitForm = VisitObserveCurriculumRows::hydrateForm($form);
         $this->visitMarkCompleted = $markCompleted;
         $this->showVisitModal = true;
     }
