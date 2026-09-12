@@ -2130,7 +2130,7 @@ class CoachTeacherSupportListTest extends TestCase
             ->assertSee('LVA + FB');
     }
 
-    public function test_opening_teacher_modal_skips_rebuilding_teacher_rows(): void
+    public function test_opening_teacher_modal_keeps_teacher_rows(): void
     {
         $admin = $this->createAdminUser();
         $year = now()->year;
@@ -2150,8 +2150,7 @@ class CoachTeacherSupportListTest extends TestCase
             ->assertSee('모달교사')
             ->assertSee('TR 교사정보');
 
-        $this->assertTrue($component->viewData('preserveTeacherListDom'));
-        $this->assertCount(0, $component->viewData('teachers'));
+        $this->assertNotEmpty($component->viewData('teachers'));
     }
 
     public function test_teacher_modal_shows_create_pills_when_no_history_and_class_out(): void

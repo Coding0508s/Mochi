@@ -211,16 +211,14 @@
         </p>
     </div>
 
-    {{-- Table: 교사 모달만 열 때는 이 블록을 다시 그리지 않는다. --}}
+    {{-- Table --}}
     @php
         $items = $teachers;
         $cols = config('coach_teacher_support.columns');
         // 보이는 열만 센다. 숨긴 계획 열을 colspan에 넣으면 필터 시 헤더 너비가 깨진다.
         $tableColumnSpan = 12;
     @endphp
-    <div id="coach-teacher-support-results"
-         @if($preserveTeacherListDom ?? false) wire:ignore @endif>
-        @if(! ($preserveTeacherListDom ?? false))
+    <div id="coach-teacher-support-results">
     <div class="mochi-table-card relative">
         <div class="md:hidden space-y-3 p-3">
             @forelse($items as $teacher)
@@ -521,7 +519,6 @@
             </div>
         @endif
     </div>
-        @endif
     </div>
 
     {{-- Institution Info Modal --}}
