@@ -2130,6 +2130,30 @@ class CoachTeacherSupportListTest extends TestCase
             ->assertSee('LVA + FB');
     }
 
+    public function test_opening_teacher_modal_skips_rebuilding_teacher_rows(): void
+    {
+        $admin = $this->createAdminUser();
+        $year = now()->year;
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $id = $this->createTeacher('SK001', '모달교사', [
+            '_1st_Support_Date' => "{$year}-03-10",
+        ]);
+
+        $component = Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class);
+
+        $this->assertNotEmpty($component->viewData('teachers'));
+
+        $component->call('openTeacherModal', $id)
+            ->assertSet('showTeacherModal', true)
+            ->assertSee('모달교사')
+            ->assertSee('TR 교사정보');
+
+        $this->assertTrue($component->viewData('preserveTeacherListDom'));
+        $this->assertCount(0, $component->viewData('teachers'));
+    }
+
     public function test_teacher_modal_shows_create_pills_when_no_history_and_class_out(): void
     {
         $admin = $this->createAdminUser();
