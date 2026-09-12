@@ -222,6 +222,15 @@ class CoachTeacherSupportList extends Component
 
     public bool $crossTeamReadOnly = false;
 
+    /**
+     * 목록 전체 재조회를 건너뛸 때 KPI 숫자를 그대로 보여 주기 위한 스냅샷.
+     *
+     * @var array<string, int>
+     */
+    public array $cachedListKpis = [];
+
+    private bool $skipHeavyTeacherListQuery = false;
+
     public function mount(): void
     {
         $this->crossTeamReadOnly = $this->isCrossTeamReadOnlyContext(TeamMenuContext::MENU_COACH);
@@ -461,10 +470,12 @@ class CoachTeacherSupportList extends Component
         }
 
         $this->showTeacherModal = true;
+        $this->preserveTeacherListDom();
     }
 
     public function closeTeacherModal(): void
     {
+        $this->preserveTeacherListDom();
         $this->showTeacherModal = false;
         $this->teacherDetailInfo = null;
         $this->teacherDetailHistory = [];
@@ -477,6 +488,9 @@ class CoachTeacherSupportList extends Component
 
     public function openTeacherSupportHistoryDetail(string $detailKey, ?int $teacherId = null): void
     {
+        if ($this->showTeacherModal || $this->showInstitutionModal) {
+            $this->preserveTeacherListDom();
+        }
         if ($detailKey === '') {
             return;
         }
@@ -525,6 +539,10 @@ class CoachTeacherSupportList extends Component
 
     public function closeTeacherSupportHistoryDetailModal(): void
     {
+        if ($this->showTeacherModal || $this->showInstitutionModal) {
+            $this->preserveTeacherListDom();
+        }
+
         $this->showTeacherSupportHistoryDetailModal = false;
         $this->selectedTeacherSupportHistoryDetail = null;
     }
@@ -926,6 +944,8 @@ class CoachTeacherSupportList extends Component
             return null;
         }
 
+        $this->preserveTeacherListDom();
+
         return $teacher;
     }
 
@@ -1014,6 +1034,13 @@ class CoachTeacherSupportList extends Component
             'ls_essentials' => $this->teacherDetailInfo['ls_essentials'] ?? '',
         ];
         $this->teacherModalEditMode = true;
+        $this->preserveTeacherListDom();
+    }
+
+    public function cancelTeacherEdit(): void
+    {
+        $this->teacherModalEditMode = false;
+        $this->preserveTeacherListDom();
     }
 
     public function updatedTeacherProfileForm(mixed $value, ?string $key = null): void
@@ -1023,6 +1050,7 @@ class CoachTeacherSupportList extends Component
         }
 
         $this->teacherProfileForm['phone'] = KoreanMobilePhoneFormatter::format((string) $value);
+        $this->preserveTeacherListDom();
     }
 
     public function saveTeacherProfile(): void
@@ -1103,12 +1131,14 @@ class CoachTeacherSupportList extends Component
 
         $this->resetRetireRecommendationForm();
         $this->confirmingRetire = true;
+        $this->preserveTeacherListDom();
     }
 
     public function cancelRetireTeacher(): void
     {
         $this->confirmingRetire = false;
         $this->resetRetireRecommendationForm();
+        $this->preserveTeacherListDom();
     }
 
     public function retireTeacher(): void
@@ -2672,6 +2702,15 @@ class CoachTeacherSupportList extends Component
     {
         $this->editModalAllowedByTeacherId = null;
 
+        if ($this->skipHeavyTeacherListQuery) {
+            return view('livewire.coach-teacher-support-list', $this->teacherSupportListViewData(
+                teachers: collect(),
+                kpis: $this->cachedListKpis,
+                rowspansByTeacherId: [],
+                preserveTeacherListDom: true,
+            ));
+        }
+
         $baseQuery = $this->buildBaseQuery();
 
         $kpiQuery = clone $baseQuery;
@@ -2729,10 +2768,40 @@ class CoachTeacherSupportList extends Component
 
         $this->hydrateTeacherInstitutions($teachers);
         $this->editModalAllowedByTeacherId = $this->buildEditModalAllowedMap($teachers);
+        $this->cachedListKpis = $kpis;
 
-        return view('livewire.coach-teacher-support-list', [
+        return view('livewire.coach-teacher-support-list', $this->teacherSupportListViewData(
+            teachers: $teachers,
+            kpis: $kpis,
+            rowspansByTeacherId: $rowspansByTeacherId,
+            preserveTeacherListDom: false,
+        ));
+    }
+
+    /**
+     * 교사 모달만 바꿀 때는 799명 목록·KPI를 다시 만들지 않는다.
+     */
+    private function preserveTeacherListDom(): void
+    {
+        $this->skipHeavyTeacherListQuery = true;
+    }
+
+    /**
+     * @param  Collection<int, Teacher>  $teachers
+     * @param  array<string, int>  $kpis
+     * @param  array<int, int>  $rowspansByTeacherId
+     * @return array<string, mixed>
+     */
+    private function teacherSupportListViewData(
+        Collection $teachers,
+        array $kpis,
+        array $rowspansByTeacherId,
+        bool $preserveTeacherListDom,
+    ): array {
+        return [
             'teachers' => $teachers,
             'kpis' => $kpis,
+            'preserveTeacherListDom' => $preserveTeacherListDom,
             'yearFilterOptions' => $this->yearFilterOptions(),
             'coachFilterOptions' => $this->coachFilterOptions(),
             'supportTypes' => config('coach_teacher_support.support_types', []),
@@ -2752,7 +2821,7 @@ class CoachTeacherSupportList extends Component
             'displayYear' => $this->resolvedFilterYear(),
             'crossTeamReadOnly' => $this->crossTeamReadOnly,
             'rowspansByTeacherId' => $rowspansByTeacherId,
-        ]);
+        ];
     }
 
     private function resolvedFilterYear(): ?int

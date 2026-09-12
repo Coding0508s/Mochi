@@ -211,13 +211,16 @@
         </p>
     </div>
 
-    {{-- Table --}}
+    {{-- Table: 교사 모달만 열 때는 이 블록을 다시 그리지 않는다. --}}
     @php
         $items = $teachers;
         $cols = config('coach_teacher_support.columns');
         // 보이는 열만 센다. 숨긴 계획 열을 colspan에 넣으면 필터 시 헤더 너비가 깨진다.
         $tableColumnSpan = 12;
     @endphp
+    <div id="coach-teacher-support-results"
+         @if($preserveTeacherListDom ?? false) wire:ignore @endif>
+        @if(! ($preserveTeacherListDom ?? false))
     <div class="mochi-table-card relative">
         <div class="md:hidden space-y-3 p-3">
             @forelse($items as $teacher)
@@ -516,6 +519,8 @@
                     전체 {{ $teachers->count() }}명
                 </p>
             </div>
+        @endif
+    </div>
         @endif
     </div>
 
@@ -1521,7 +1526,7 @@
                 <div class="px-6 py-4 bg-gray-50 border-t flex justify-end gap-2">
                     @if($teacherModalEditMode)
                         <button type="button"
-                                wire:click="$set('teacherModalEditMode', false)"
+                                wire:click="cancelTeacherEdit"
                                 class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 cursor-pointer">
                             취소
                         </button>
