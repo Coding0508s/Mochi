@@ -70,6 +70,10 @@ final class InstitutionCatalog
             ? 'FGC_CreateDate'
             : DB::raw('NULL as FGC_CreateDate');
 
+        $columns[] = Schema::hasColumn('S_Account_Information', 'FGC_LastModifyDate')
+            ? 'FGC_LastModifyDate'
+            : DB::raw('NULL as FGC_LastModifyDate');
+
         $columns[] = DB::raw('0 as is_master_only');
 
         return $columns;
@@ -97,6 +101,10 @@ final class InstitutionCatalog
         $columns[] = Schema::hasColumn('S_AccountName', 'FGC_CreateDate')
             ? 'm.FGC_CreateDate as FGC_CreateDate'
             : DB::raw('NULL as FGC_CreateDate');
+
+        $columns[] = Schema::hasColumn('S_AccountName', 'FGC_LastModifyDate')
+            ? 'm.FGC_LastModifyDate as FGC_LastModifyDate'
+            : DB::raw('NULL as FGC_LastModifyDate');
 
         $columns[] = DB::raw('1 as is_master_only');
 

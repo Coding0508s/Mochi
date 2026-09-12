@@ -3,10 +3,10 @@
 namespace App\Support;
 
 use App\DataTransferObjects\InstitutionListFilters;
+use App\Models\AccountInformation;
 use App\Models\Employee;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -123,30 +123,12 @@ final class InstitutionAccountListQuery
             });
     }
 
-    public function paginate(InstitutionListFilters $filters, int $perPage = 20): LengthAwarePaginator
+    /**
+     * @return Collection<int, AccountInformation>
+     */
+    public function list(InstitutionListFilters $filters): Collection
     {
-        $page = Paginator::resolveCurrentPage(default: 1);
-        $baseQuery = $this->accountInformationListQuery($filters);
-
-        $countCacheKey = $this->paginationCountCacheKey($filters, $perPage);
-        $total = Cache::remember($countCacheKey, now()->addSeconds(30), fn (): int => (clone $baseQuery)->count());
-
-        $items = (clone $baseQuery)
-            ->with($this->accountInformationEagerLoads())
-            ->tap(fn (Builder $query) => $this->applyAccountInformationListSort($query, $filters))
-            ->forPage($page, $perPage)
-            ->get();
-
-        return new LengthAwarePaginator(
-            items: $items,
-            total: $total,
-            perPage: $perPage,
-            currentPage: $page,
-            options: [
-                'path' => Paginator::resolveCurrentPath(),
-                'pageName' => 'page',
-            ],
-        );
+        return $this->listQueryForExport($filters)->get();
     }
 
     public function listQueryForExport(InstitutionListFilters $filters): Builder
@@ -182,11 +164,7 @@ final class InstitutionAccountListQuery
         $query->where(function (Builder $statusQuery): void {
             $statusQuery->whereDoesntHave('accountInfo')
                 ->orWhereHas('accountInfo', function (Builder $sub): void {
-                    $sub->where(function (Builder $customerTypeQuery): void {
-                        $customerTypeQuery->whereNull('Customer_Type')
-                            ->orWhere('Customer_Type', '')
-                            ->orWhere('Customer_Type', 'not like', '%해지%');
-                    });
+                    $sub->activeCustomersIncludingTerminatedThisYear();
                 });
         });
     }
@@ -203,7 +181,7 @@ final class InstitutionAccountListQuery
             return;
         }
 
-        $query->activeCustomers();
+        $query->activeCustomersIncludingTerminatedThisYear();
     }
 
     public function applyTeamInstitutionScope(Builder $query): void
@@ -636,27 +614,5 @@ final class InstitutionAccountListQuery
             str_replace('_', ' ', $spaceNormalized),
             str_replace('-', ' ', $spaceNormalized),
         ], static fn (string $alias): bool => trim($alias) !== '')));
-    }
-
-    private function paginationCountCacheKey(InstitutionListFilters $filters, int $perPage): string
-    {
-        $user = auth()->user();
-
-        return 'institution-list:paginate-total:'.sha1((string) json_encode([
-            'user_id' => $user?->id,
-            'team_menu' => request()->query('team_menu'),
-            'search' => $filters->search,
-            'status_filter' => $filters->statusFilter,
-            'assignment_filter' => $filters->assignmentFilter,
-            'filter_co' => $filters->filterCo,
-            'filter_tr' => $filters->filterTr,
-            'filter_cs' => $filters->filterCs,
-            'sort_field' => $filters->sortField,
-            'sort_direction' => $filters->sortDirection,
-            'per_page' => $perPage,
-            'manager_column' => $this->currentUserManagerColumn(),
-            'aliases' => $this->resolveCurrentUserManagerAliases(),
-            'hidden_sk_hash' => sha1(implode('|', $this->hiddenInstitutionSkCodes())),
-        ], JSON_UNESCAPED_UNICODE));
     }
 }

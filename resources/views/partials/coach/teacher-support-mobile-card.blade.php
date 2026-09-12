@@ -83,36 +83,36 @@
         @endif
 
         <button type="button"
-                class="rounded-lg border border-green-100 bg-green-50 px-2.5 py-2 text-left {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
-                @if($canOpenEditModal)
-                    wire:click="openEditModal({{ $teacher->ID }})"
+                class="rounded-lg border border-green-100 bg-green-50 px-2.5 py-2 text-left {{ $done1 !== '' ? 'cursor-pointer' : 'cursor-default' }}"
+                @if($done1 !== '')
+                    wire:click.stop="openCompletedRoundSupport({{ $teacher->ID }}, 1)"
                 @endif>
             <div class="text-[11px] text-green-700">1차 완료</div>
             <div class="mt-0.5 font-medium text-gray-800">{{ $done1 !== '' ? $done1 : '-' }}</div>
         </button>
 
         <button type="button"
-                class="rounded-lg border border-green-100 bg-green-50 px-2.5 py-2 text-left {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
-                @if($canOpenEditModal)
-                    wire:click="openEditModal({{ $teacher->ID }})"
+                class="rounded-lg border border-green-100 bg-green-50 px-2.5 py-2 text-left {{ $done2 !== '' ? 'cursor-pointer' : 'cursor-default' }}"
+                @if($done2 !== '')
+                    wire:click.stop="openCompletedRoundSupport({{ $teacher->ID }}, 2)"
                 @endif>
             <div class="text-[11px] text-green-700">2차 완료</div>
             <div class="mt-0.5 font-medium text-gray-800">{{ $done2 !== '' ? $done2 : '-' }}</div>
         </button>
 
         <button type="button"
-                class="rounded-lg border border-green-100 bg-green-50 px-2.5 py-2 text-left {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
-                @if($canOpenEditModal)
-                    wire:click="openEditModal({{ $teacher->ID }})"
+                class="rounded-lg border border-green-100 bg-green-50 px-2.5 py-2 text-left {{ $done3 !== '' ? 'cursor-pointer' : 'cursor-default' }}"
+                @if($done3 !== '')
+                    wire:click.stop="openCompletedRoundSupport({{ $teacher->ID }}, 3)"
                 @endif>
             <div class="text-[11px] text-green-700">3차 완료</div>
             <div class="mt-0.5 font-medium text-gray-800">{{ $done3 !== '' ? $done3 : '-' }}</div>
         </button>
 
         <button type="button"
-                class="rounded-lg border border-green-100 bg-green-50 px-2.5 py-2 text-left {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
-                @if($canOpenEditModal)
-                    wire:click="openEditModal({{ $teacher->ID }})"
+                class="rounded-lg border border-green-100 bg-green-50 px-2.5 py-2 text-left {{ $done4 !== '' ? 'cursor-pointer' : 'cursor-default' }}"
+                @if($done4 !== '')
+                    wire:click.stop="openCompletedRoundSupport({{ $teacher->ID }}, 4)"
                 @endif>
             <div class="text-[11px] text-green-700">4차 완료</div>
             <div class="mt-0.5 font-medium text-gray-800">{{ $done4 !== '' ? $done4 : '-' }}</div>

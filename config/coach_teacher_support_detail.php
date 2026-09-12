@@ -78,6 +78,7 @@ return [
         'observe_lesson' => '관찰 Lesson',
         'observe_class' => '관찰 반',
         'observe_age' => '관찰 연령',
+        'observe_curriculum_rows' => '참관 수업 정보',
         'teacher_experience' => '교사 경력',
         'session_number' => '차수',
         'semester_label' => '학기',

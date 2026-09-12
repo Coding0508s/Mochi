@@ -25,6 +25,9 @@ final class ExcelSerialDate
     /** @var int 엑셀 serial로 볼 수 있는 최대값 (대략 2077년) */
     private const SERIAL_MAX = 65_000;
 
+    /** 업무 연도 시작 월. N년 = N년 3월 ~ (N+1)년 2월. */
+    public const CYCLE_START_MONTH = 3;
+
     public static function isSerial(mixed $value): bool
     {
         if ($value === null || $value === '') {
@@ -98,9 +101,43 @@ final class ExcelSerialDate
 
     public static function isInYear(mixed $value, int $year): bool
     {
+        return self::cycleYearFromValue($value) === $year;
+    }
+
+    public static function cycleYearFromValue(mixed $value): ?int
+    {
         $parsed = self::parse($value);
 
-        return $parsed !== null && $parsed->year === $year;
+        return $parsed === null ? null : self::cycleYear($parsed);
+    }
+
+    public static function cycleYear(CarbonInterface $date): int
+    {
+        return $date->month >= self::CYCLE_START_MONTH
+            ? (int) $date->year
+            : (int) $date->year - 1;
+    }
+
+    public static function currentCycleYear(?CarbonInterface $today = null): int
+    {
+        return self::cycleYear($today ?? now());
+    }
+
+    public static function cycleStartDate(int $year): Carbon
+    {
+        return Carbon::create($year, self::CYCLE_START_MONTH, 1)->startOfDay();
+    }
+
+    public static function cycleEndExclusive(int $year): Carbon
+    {
+        return Carbon::create($year + 1, self::CYCLE_START_MONTH, 1)->startOfDay();
+    }
+
+    public static function calendarYearForCycleMonth(int $cycleYear, int $month): int
+    {
+        $month = max(1, min(12, $month));
+
+        return $month >= self::CYCLE_START_MONTH ? $cycleYear : $cycleYear + 1;
     }
 
     public static function matchesFilterYear(mixed $value, ?int $year): bool
@@ -115,7 +152,7 @@ final class ExcelSerialDate
             return true;
         }
 
-        return $parsed->year === $year;
+        return self::isInYear($value, $year);
     }
 
     public static function formatPlanMonthForYear(mixed $value, int $year): string
@@ -198,8 +235,8 @@ final class ExcelSerialDate
     public static function serialBoundsForYear(int $year): array
     {
         return [
-            self::dateToSerial(Carbon::create($year, 1, 1)->startOfDay()),
-            self::dateToSerial(Carbon::create($year, 12, 31)->startOfDay()),
+            self::dateToSerial(self::cycleStartDate($year)),
+            self::dateToSerial(self::cycleEndExclusive($year)->subDay()),
         ];
     }
 
@@ -238,9 +275,12 @@ final class ExcelSerialDate
      */
     public static function sqlColumnInYear(string $column, int $year): string
     {
-        [$minSerial, $maxSerial] = self::serialBoundsForYear($year);
+        $normalized = self::sqlNormalizedDateColumn($column);
+        $start = self::cycleStartDate($year)->toDateString();
+        $endExclusive = self::cycleEndExclusive($year)->toDateString();
 
-        return "({$column} IS NOT NULL AND ".self::sqlDateValueIsNotBlank($column).' AND ('.self::sqlYearEquals($column, $year)." OR ({$column} >= {$minSerial} AND {$column} <= {$maxSerial})))";
+        return "({$column} IS NOT NULL AND ".self::sqlDateValueIsNotBlank($column)
+            ." AND {$normalized} >= '{$start}' AND {$normalized} < '{$endExclusive}')";
     }
 
     /**
@@ -281,10 +321,23 @@ final class ExcelSerialDate
         ];
 
         if ($year !== null) {
-            $parts[] = self::sqlYearEquals($normalized, $year);
+            $parts[] = self::sqlYearEquals($normalized, self::calendarYearForCycleMonth($year, $month));
         }
 
         return '('.implode(' AND ', $parts).')';
+    }
+
+    public static function sqlCycleYearExpression(string $dateExpression): string
+    {
+        $startMonth = self::CYCLE_START_MONTH;
+
+        return match (Schema::getConnection()->getDriverName()) {
+            'sqlite' => "CASE WHEN CAST(strftime('%m', {$dateExpression}) AS INTEGER) >= {$startMonth}"
+                ." THEN CAST(strftime('%Y', {$dateExpression}) AS INTEGER)"
+                ." ELSE CAST(strftime('%Y', {$dateExpression}) AS INTEGER) - 1 END",
+            default => "CASE WHEN MONTH({$dateExpression}) >= {$startMonth}"
+                ." THEN YEAR({$dateExpression}) ELSE YEAR({$dateExpression}) - 1 END",
+        };
     }
 
     public static function sqlYearNotEquals(string $column, int $year): string

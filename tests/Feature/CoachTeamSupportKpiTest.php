@@ -76,13 +76,14 @@ class CoachTeamSupportKpiTest extends CoachTeacherSupportListTest
                 $keys = collect($columns)->pluck('key')->all();
                 $spillover = collect($columns)->where('is_spillover', true)->pluck('label')->all();
 
-                return in_array(sprintf('%04d-01', $year), $keys, true)
-                    && in_array(sprintf('%04d-03', $year + 1), $keys, true)
-                    && count($columns) === 15
+                return ! in_array(sprintf('%04d-01', $year), $keys, true)
+                    && in_array(sprintf('%04d-03', $year), $keys, true)
+                    && in_array(sprintf('%04d-02', $year + 1), $keys, true)
+                    && ! in_array(sprintf('%04d-03', $year + 1), $keys, true)
+                    && count($columns) === 12
                     && $spillover === [
                         (($year + 1) % 100).'년 1월',
                         (($year + 1) % 100).'년 2월',
-                        (($year + 1) % 100).'년 3월',
                     ];
             })
             ->assertViewHas('activeCoachRows', fn ($rows): bool => $rows->pluck('coach')->values()->all() === ['Coach A', 'Coach B'])
@@ -642,14 +643,14 @@ class CoachTeamSupportKpiTest extends CoachTeacherSupportListTest
                     && ($coachA['rows']['inst_video'][sprintf('%04d-04', $year + 1)] ?? 0) === 0;
             })
             ->set('filterYear', (string) $nextYear)
-            ->assertViewHas('teamTotal', 2)
+            ->assertViewHas('teamTotal', 1)
             ->assertViewHas('coachRows', function ($rows) use ($febKey, $nextYear): bool {
                 $coachA = $rows->firstWhere('coach', 'Coach A');
                 $apr = sprintf('%04d-04', $nextYear);
 
                 return $coachA !== null
-                    && $coachA['total'] === 2
-                    && ($coachA['rows']['inst_visit'][$febKey] ?? 0) === 1
+                    && $coachA['total'] === 1
+                    && ($coachA['rows']['inst_visit'][$febKey] ?? 0) === 0
                     && ($coachA['rows']['inst_video'][$apr] ?? 0) === 1;
             });
     }

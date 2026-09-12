@@ -25,3 +25,13 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 .worktrees/
+
+# cursor-kit (local install; do not overwrite project skills)
+.cursor/commands/
+.cursor/skills/aesthetic/
+.cursor/skills/backend-development/
+.cursor/skills/frontend-design/
+.cursor/skills/frontend-development/
+.cursor/skills/problem-solving/
+.cursor/skills/research/
+.cursor/skills/sequential-thinking/

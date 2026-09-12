@@ -85,6 +85,11 @@ class ExcelSerialDateTest extends TestCase
 
         $this->assertTrue(ExcelSerialDate::isInYear($date, 2026));
         $this->assertFalse(ExcelSerialDate::isInYear($date, 2025));
+        $this->assertTrue(ExcelSerialDate::isInYear('2027-02-10', 2026));
+        $this->assertFalse(ExcelSerialDate::isInYear('2026-02-10', 2026));
+        $this->assertTrue(ExcelSerialDate::isInYear('2026-02-10', 2025));
+        $this->assertSame(2026, ExcelSerialDate::cycleYearFromValue('2027-01-15'));
+        $this->assertSame(2025, ExcelSerialDate::cycleYearFromValue('2026-02-28'));
         $this->assertSame('2026년 3월', ExcelSerialDate::formatPlanMonthForYear($date, 2026));
         $this->assertSame('', ExcelSerialDate::formatPlanMonthForYear($date, 2025));
         $this->assertSame('2026-03-01', ExcelSerialDate::toStorageStringForYear($date, 2026));
@@ -132,6 +137,8 @@ class ExcelSerialDateTest extends TestCase
         $expression = ExcelSerialDate::sqlColumnInYear('Teachers.Plan_1st_Support_Date', 2026);
 
         $this->assertStringContainsString("NULLIF(TRIM(CAST(Teachers.Plan_1st_Support_Date AS TEXT)), '') IS NOT NULL", $expression);
+        $this->assertStringContainsString(">= '2026-03-01'", $expression);
+        $this->assertStringContainsString("< '2027-03-01'", $expression);
     }
 
     public function test_sql_normalized_date_column_applies_date_to_raw_column(): void
@@ -158,5 +165,10 @@ class ExcelSerialDateTest extends TestCase
         $this->assertStringContainsString("strftime('%Y'", $expression);
         $this->assertStringContainsString('= 5', $expression);
         $this->assertStringContainsString('= 2026', $expression);
+
+        $january = ExcelSerialDate::sqlColumnInYearMonth('Teachers._1st_Support_Date', 2026, 1);
+
+        $this->assertStringContainsString('= 1', $january);
+        $this->assertStringContainsString('= 2027', $january);
     }
 }

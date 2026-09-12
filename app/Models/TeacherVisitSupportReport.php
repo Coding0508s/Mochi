@@ -21,6 +21,7 @@ class TeacherVisitSupportReport extends Model
         'observe_summary_extra',
         'observe_class',
         'observe_age',
+        'observe_curriculum_rows',
         'session_number',
         'semester_label',
         'interview_date',
@@ -40,6 +41,7 @@ class TeacherVisitSupportReport extends Model
         return [
             'support_date' => 'date',
             'interview_date' => 'date',
+            'observe_curriculum_rows' => 'array',
         ];
     }
 

@@ -90,21 +90,6 @@
                     목록 갱신 중
                 </span>
             </div>
-
-            <div class="ml-auto flex flex-wrap items-center gap-2">
-                <select wire:model.live="filterYear"
-                        wire:key="teacher-support-year-filter"
-                        class="py-1.5 px-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
-                    <option value="">전체</option>
-                    @foreach($yearFilterOptions as $y)
-                        <option value="{{ $y }}">{{ $y }}년</option>
-                    @endforeach
-                </select>
-                <a href="{{ \App\Support\TeamMenuContext::route('supports.create') }}"
-                   class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600">
-                    기관지원보고서
-                </a>
-            </div>
         </div>
     </div>
 
@@ -139,8 +124,19 @@
                     </select>
                 @endif
 
+                <select wire:model.live="filterYear"
+                        wire:key="teacher-support-year-filter"
+                        class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header"
+                        aria-label="연도">
+                    <option value="">전체</option>
+                    @foreach($yearFilterOptions as $y)
+                        <option value="{{ $y }}">{{ $y }}년</option>
+                    @endforeach
+                </select>
+
                 <select wire:model.live="filterMonth"
-                        class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                        class="shrink-0 py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header"
+                        aria-label="월">
                     <option value="">전체</option>
                     @for($m = 1; $m <= 12; $m++)
                         <option value="{{ $m }}">{{ $m }}월</option>
@@ -203,19 +199,11 @@
                         </button>
                     </div>
                 </div>
-                <div class="flex shrink-0 items-center gap-2.5 whitespace-nowrap">
-                    <span class="text-gray-500">퇴직</span>
-                    <div class="mochi-toggle-group">
-                        <button type="button" wire:click="$set('showAllTeachers', false)"
-                                class="mochi-toggle-btn {{ ! $showAllTeachers ? 'mochi-toggle-btn--active' : '' }}">
-                            제외
-                        </button>
-                        <button type="button" wire:click="$set('showAllTeachers', true)"
-                                class="mochi-toggle-btn {{ $showAllTeachers ? 'mochi-toggle-btn--active' : '' }}">
-                            포함
-                        </button>
-                    </div>
-                </div>
+
+                <a href="{{ \App\Support\TeamMenuContext::route('supports.create') }}"
+                   class="ml-auto inline-flex shrink-0 items-center justify-center rounded-lg border border-mochi-header bg-white px-3 py-2 text-sm font-semibold text-mochi-header transition hover:bg-mochi-header/5">
+                    기관지원보고서
+                </a>
         </div>
         <p class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3 text-xs text-gray-500">
             <span>계획·완료 칸을 클릭하면 일정을 수정할 수 있습니다.</span>
@@ -225,7 +213,7 @@
 
     {{-- Table --}}
     @php
-        $items = $teachers->items();
+        $items = $teachers;
         $cols = config('coach_teacher_support.columns');
         // 보이는 열만 센다. 숨긴 계획 열을 colspan에 넣으면 필터 시 헤더 너비가 깨진다.
         $tableColumnSpan = 12;
@@ -237,7 +225,15 @@
                     // 지원 일정 수정 모달 임시 비활성화. 복구 시 아래 주석을 해제할 것.
                     // $canOpenEditModal = $this->canOpenEditModal($teacher->ID);
                     $canOpenEditModal = false;
+                    $rowspan = (int) ($rowspansByTeacherId[$teacher->ID] ?? 0);
                 @endphp
+                @if($rowspan > 0)
+                    <p class="px-1 pt-1 text-xs font-semibold text-gray-600">
+                        {{ ltrim((string) $teacher->SK_Code, '*') }}
+                        ·
+                        {{ $teacher->institution?->resolvedAccountName() ?: $teacher->School_Name }}
+                    </p>
+                @endif
                 @include('partials.coach.teacher-support-mobile-card', [
                     'teacher' => $teacher,
                     'cols' => $cols,
@@ -301,20 +297,25 @@
                         // 지원 일정 수정 모달 임시 비활성화. 복구 시 아래 주석을 해제할 것.
                         // $canOpenEditModal = $this->canOpenEditModal($teacher->ID);
                         $canOpenEditModal = false;
+                        $rowspan = (int) ($rowspansByTeacherId[$teacher->ID] ?? 0);
                     @endphp
                     <tr wire:key="teacher-{{ $teacher->ID }}"
-                        data-group-first="1"
+                        @if($rowspan > 0) data-group-first="1" @endif
                         class="mochi-table-row-hover">
-                        <td class="coach-support-sticky-sk coach-support-sk-code px-3 py-2 align-middle text-center font-mono text-xs text-purple-700">
-                            {{ ltrim((string) $teacher->SK_Code, '*') }}
-                        </td>
-                        <td class="coach-support-sticky-inst px-3 py-2 align-middle text-center">
-                            <button type="button"
-                                    class="coach-support-inst-link cursor-pointer text-center underline {{ $institutionIsTerminated ? 'coach-support-inst-link--terminated text-red-700 hover:text-red-800' : 'text-mochi-header hover:text-mochi-header/80' }}"
-                                    wire:click.stop="openInstitutionModal('{{ $teacher->SK_Code }}')">
-                                {{ $teacher->institution?->resolvedAccountName() ?: $teacher->School_Name }}
-                            </button>
-                        </td>
+                        @if($rowspan > 0)
+                            <td class="coach-support-sticky-sk coach-support-sk-code px-3 py-2 align-middle text-center font-mono text-xs text-purple-700"
+                                rowspan="{{ $rowspan }}">
+                                {{ ltrim((string) $teacher->SK_Code, '*') }}
+                            </td>
+                            <td class="coach-support-sticky-inst px-3 py-2 align-middle text-center"
+                                rowspan="{{ $rowspan }}">
+                                <button type="button"
+                                        class="coach-support-inst-link cursor-pointer text-center underline {{ $institutionIsTerminated ? 'coach-support-inst-link--terminated text-red-700 hover:text-red-800' : 'text-mochi-header hover:text-mochi-header/80' }}"
+                                        wire:click.stop="openInstitutionModal('{{ $teacher->SK_Code }}')">
+                                    {{ $teacher->institution?->resolvedAccountName() ?: $teacher->School_Name }}
+                                </button>
+                            </td>
+                        @endif
                         <td class="coach-support-sticky-name px-3 py-2 align-middle">
                             <button type="button"
                                     class="coach-support-name-link cursor-pointer text-left text-mochi-header underline hover:text-mochi-header/80"
@@ -463,52 +464,28 @@
                                 @endif
                             </td>
                         @endif
-                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\TeacherSupportCompletionDisplay::parts($teacher, 1, $displayYear)['date'] !== '' ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
-                            @if($canOpenEditModal)
-                                wire:click="openEditModal({{ $teacher->ID }})"
-                                role="button"
-                                tabindex="0"
-                                aria-label="{{ $teacher->Name }} 지원 일정 수정"
-                            @endif>
+                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\TeacherSupportCompletionDisplay::parts($teacher, 1, $displayYear)['date'] !== '' ? 'bg-green-50' : '' }}">
                             @include('partials.coach.teacher-support-completed-cell', [
                                 'teacher' => $teacher,
                                 'round' => 1,
                                 'displayYear' => $displayYear,
                             ])
                         </td>
-                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\TeacherSupportCompletionDisplay::parts($teacher, 2, $displayYear)['date'] !== '' ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
-                            @if($canOpenEditModal)
-                                wire:click="openEditModal({{ $teacher->ID }})"
-                                role="button"
-                                tabindex="0"
-                                aria-label="{{ $teacher->Name }} 지원 일정 수정"
-                            @endif>
+                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\TeacherSupportCompletionDisplay::parts($teacher, 2, $displayYear)['date'] !== '' ? 'bg-green-50' : '' }}">
                             @include('partials.coach.teacher-support-completed-cell', [
                                 'teacher' => $teacher,
                                 'round' => 2,
                                 'displayYear' => $displayYear,
                             ])
                         </td>
-                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\TeacherSupportCompletionDisplay::parts($teacher, 3, $displayYear)['date'] !== '' ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
-                            @if($canOpenEditModal)
-                                wire:click="openEditModal({{ $teacher->ID }})"
-                                role="button"
-                                tabindex="0"
-                                aria-label="{{ $teacher->Name }} 지원 일정 수정"
-                            @endif>
+                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\TeacherSupportCompletionDisplay::parts($teacher, 3, $displayYear)['date'] !== '' ? 'bg-green-50' : '' }}">
                             @include('partials.coach.teacher-support-completed-cell', [
                                 'teacher' => $teacher,
                                 'round' => 3,
                                 'displayYear' => $displayYear,
                             ])
                         </td>
-                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\TeacherSupportCompletionDisplay::parts($teacher, 4, $displayYear)['date'] !== '' ? 'bg-green-50' : '' }} {{ $canOpenEditModal ? 'cursor-pointer' : 'cursor-default' }}"
-                            @if($canOpenEditModal)
-                                wire:click="openEditModal({{ $teacher->ID }})"
-                                role="button"
-                                tabindex="0"
-                                aria-label="{{ $teacher->Name }} 지원 일정 수정"
-                            @endif>
+                        <td class="coach-support-col-completed coach-support-schedule-cell {{ \App\Support\TeacherSupportCompletionDisplay::parts($teacher, 4, $displayYear)['date'] !== '' ? 'bg-green-50' : '' }}">
                             @include('partials.coach.teacher-support-completed-cell', [
                                 'teacher' => $teacher,
                                 'round' => 4,
@@ -533,14 +510,11 @@
             </table>
         </div>
 
-        @if($institutionGroupPaginator->hasPages())
+        @if($teachers->isNotEmpty())
             <div class="px-4 py-3 border-t border-gray-100">
-                <p class="mb-2 text-xs text-gray-500">
-                    교사 기준 · {{ $institutionGroupPaginator->firstItem() }}–{{ $institutionGroupPaginator->lastItem() }}
-                    / 전체 {{ $institutionGroupPaginator->total() }}명
-                    · 이번 페이지 교사 {{ $teachers->count() }}명
+                <p class="text-xs text-gray-500">
+                    전체 {{ $teachers->count() }}명
                 </p>
-                {{ $institutionGroupPaginator->links() }}
             </div>
         @endif
     </div>
@@ -549,35 +523,111 @@
     @if($showInstitutionModal && $institutionInfo)
         <div class="mochi-modal-overlay" wire:click.self="closeInstitutionModal">
             <div class="mochi-modal-shell max-w-4xl max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex flex-col" @click.stop>
-                <x-admin.modal-header title="TR 기관정보조회" close-action="closeInstitutionModal" />
+                <x-admin.modal-header :title="$institutionModalEditMode ? '기관정보 수정하기' : 'TR 기관정보조회'" close-action="closeInstitutionModal">
+                    <x-slot:actions>
+                        @if(! $institutionModalEditMode && $this->canCreateTeacherForOpenedInstitution())
+                            <button type="button"
+                                    wire:click="startInstitutionTeacherCreate"
+                                    class="cursor-pointer rounded-lg border border-mochi-header px-3 py-1.5 text-xs text-mochi-header hover:bg-mochi-header/5">
+                                교사 추가
+                            </button>
+                        @endif
+                        @if(! $institutionModalEditMode && $this->canEditOpenedInstitutionManagers())
+                            <button type="button"
+                                    wire:click="startInstitutionInfoEdit"
+                                    class="cursor-pointer rounded-lg border border-amber-300 px-3 py-1.5 text-xs text-amber-700 hover:bg-amber-50">
+                                수정
+                            </button>
+                        @endif
+                    </x-slot:actions>
+                </x-admin.modal-header>
                 <div class="mochi-modal-body-scroll px-6 py-4 space-y-6">
-
-                    {{-- 기관정보 --}}
+                    @if($institutionTeacherCreateNotice !== '')
+                        <p class="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700" role="status">
+                            {{ $institutionTeacherCreateNotice }}
+                        </p>
+                    @endif
                     <div>
                         <h4 class="mb-3 text-base font-semibold text-mochi-header">기관정보</h4>
+                        @if($errors->has('editDetailInstitutionName') || $errors->has('editDetailAddress'))
+                            <p class="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+                                {{ $errors->first('editDetailInstitutionName') ?: $errors->first('editDetailAddress') }}
+                            </p>
+                        @endif
                         <div class="grid grid-cols-2 gap-4 text-sm">
                             <div class="flex items-center gap-3">
                                 <span class="text-gray-500 w-20 shrink-0">기관명:</span>
-                                <span class="flex-1 min-w-0 truncate rounded-lg bg-gray-50 px-3 py-1.5 {{ ! empty($institutionInfo['is_terminated']) ? 'text-red-700 font-medium' : 'text-gray-800' }}">
-                                    {{ $institutionInfo['name'] }}
-                                </span>
+                                @if($institutionModalEditMode && $this->canEditOpenedInstitutionInfo())
+                                    <input type="text"
+                                           wire:model="editDetailInstitutionName"
+                                           class="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-1.5 text-gray-800 focus:ring-2 focus:ring-mochi-header">
+                                @else
+                                    <span class="flex-1 min-w-0 truncate rounded-lg bg-gray-50 px-3 py-1.5 {{ ! empty($institutionInfo['is_terminated']) ? 'text-red-700 font-medium' : 'text-gray-800' }}">
+                                        {{ $institutionInfo['name'] }}
+                                    </span>
+                                @endif
                             </div>
                             <div class="flex items-center gap-3">
                                 <span class="text-gray-500 w-20 shrink-0">Consultant:</span>
-                                <span class="flex-1 rounded-lg bg-gray-50 px-3 py-1.5 text-gray-800">{{ $institutionInfo['co'] }}</span>
+                                @if($institutionModalEditMode && $this->canEditOpenedInstitutionInfo())
+                                    <select wire:model="editDetailCo"
+                                            class="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-gray-800 focus:ring-2 focus:ring-mochi-header">
+                                        <option value="">미지정</option>
+                                        @if(filled($editDetailCo) && ! in_array($editDetailCo, $coManagerOptions, true))
+                                            <option value="{{ $editDetailCo }}">{{ $editDetailCo }}</option>
+                                        @endif
+                                        @foreach($coManagerOptions as $manager)
+                                            <option value="{{ $manager }}">{{ $manager }}</option>
+                                        @endforeach
+                                    </select>
+                                @else
+                                    <span class="flex-1 rounded-lg bg-gray-50 px-3 py-1.5 text-gray-800">{{ $institutionInfo['co'] }}</span>
+                                @endif
                             </div>
                             <div class="flex items-center gap-3">
                                 <span class="text-gray-500 w-20 shrink-0">주소:</span>
-                                <span class="flex-1 rounded-lg bg-gray-50 px-3 py-1.5 text-gray-800">{{ $institutionInfo['address'] }}</span>
+                                @if($institutionModalEditMode && $this->canEditOpenedInstitutionInfo())
+                                    <input type="text"
+                                           wire:model="editDetailAddress"
+                                           class="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-gray-800 focus:ring-2 focus:ring-mochi-header">
+                                @else
+                                    <span class="flex-1 rounded-lg bg-gray-50 px-3 py-1.5 text-gray-800">{{ $institutionInfo['address'] }}</span>
+                                @endif
                             </div>
                             <div class="flex items-center gap-3">
                                 <span class="text-gray-500 w-20 shrink-0">CS:</span>
-                                <span class="flex-1 rounded-lg bg-gray-50 px-3 py-1.5 text-gray-800">{{ $institutionInfo['cs'] }}</span>
+                                @if($institutionModalEditMode && $this->canEditOpenedInstitutionInfo())
+                                    <select wire:model="editDetailCs"
+                                            class="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-gray-800 focus:ring-2 focus:ring-mochi-header">
+                                        <option value="">미지정</option>
+                                        @if(filled($editDetailCs) && ! in_array($editDetailCs, $csManagerOptions, true))
+                                            <option value="{{ $editDetailCs }}">{{ $editDetailCs }}</option>
+                                        @endif
+                                        @foreach($csManagerOptions as $manager)
+                                            <option value="{{ $manager }}">{{ $manager }}</option>
+                                        @endforeach
+                                    </select>
+                                @else
+                                    <span class="flex-1 rounded-lg bg-gray-50 px-3 py-1.5 text-gray-800">{{ $institutionInfo['cs'] }}</span>
+                                @endif
                             </div>
                             <div></div>
                             <div class="flex items-center gap-3">
                                 <span class="text-gray-500 w-20 shrink-0">Coach:</span>
-                                <span class="flex-1 rounded-lg bg-gray-50 px-3 py-1.5 text-gray-800">{{ $institutionInfo['tr'] }}</span>
+                                @if($institutionModalEditMode)
+                                    <select wire:model="editDetailTr"
+                                            class="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-gray-800 focus:ring-2 focus:ring-mochi-header">
+                                        <option value="">미지정</option>
+                                        @if(filled($editDetailTr) && ! in_array($editDetailTr, $trManagerOptions, true))
+                                            <option value="{{ $editDetailTr }}">{{ $editDetailTr }}</option>
+                                        @endif
+                                        @foreach($trManagerOptions as $manager)
+                                            <option value="{{ $manager }}">{{ $manager }}</option>
+                                        @endforeach
+                                    </select>
+                                @else
+                                    <span class="flex-1 rounded-lg bg-gray-50 px-3 py-1.5 text-gray-800">{{ $institutionInfo['tr'] }}</span>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -664,7 +714,16 @@
 
                     {{-- Contacts --}}
                     <div>
-                        <h4 class="text-sm font-semibold text-gray-700 mb-2">Contacts:</h4>
+                        <div class="mb-2 flex items-center justify-between gap-2">
+                            <h4 class="text-sm font-semibold text-gray-700">Contacts:</h4>
+                            @if(! $institutionModalEditMode && $this->canCreateTeacherForOpenedInstitution())
+                                <button type="button"
+                                        wire:click="startInstitutionTeacherCreate"
+                                        class="cursor-pointer rounded-lg border border-mochi-header px-3 py-1 text-xs text-mochi-header hover:bg-mochi-header/5">
+                                    교사 추가
+                                </button>
+                            @endif
+                        </div>
                         <div class="overflow-x-auto border border-gray-200 rounded">
                             <table class="w-full text-xs whitespace-nowrap">
                                 <thead class="mochi-table-head text-gray-700">
@@ -702,8 +761,161 @@
                     </div>
 
                 </div>
+                @if($institutionModalEditMode)
+                    <div class="flex justify-end gap-2 border-t bg-gray-50 px-6 py-4">
+                        <button type="button"
+                                wire:click="cancelInstitutionInfoEdit"
+                                class="cursor-pointer rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                            취소
+                        </button>
+                        <button type="button"
+                                wire:click="saveInstitutionInfo"
+                                class="cursor-pointer rounded-lg bg-mochi-header px-4 py-2 text-sm text-white hover:bg-mochi-header/90">
+                            저장하기
+                        </button>
+                    </div>
+                @endif
             </div>
         </div>
+    @endif
+
+    @if($showInstitutionTeacherCreateModal && $institutionInfo)
+        @teleport('body')
+            <div class="mochi-modal-overlay z-[60]" wire:click.self="cancelInstitutionTeacherCreate">
+                <div class="mochi-modal-shell max-w-2xl max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex flex-col" @click.stop>
+                    <x-admin.modal-header title="신규 교사 생성" close-action="cancelInstitutionTeacherCreate" />
+                    <div class="mochi-modal-body-scroll space-y-4 px-6 py-4">
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700">기관명</label>
+                            <div class="rounded-lg border border-blue-200 bg-blue-50/60 px-3 py-2.5 text-sm font-medium text-gray-900">
+                                <span class="text-blue-700">[{{ $institutionInfo['sk_code'] ?? '-' }}]</span>
+                                {{ $institutionInfo['name'] ?? '-' }}
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">
+                                    Name <span class="text-red-500">*</span>
+                                </label>
+                                <input type="text" wire:model="newTeacherForm.name"
+                                       class="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header {{ $errors->has('newTeacherForm.name') ? 'border-red-400' : 'border-gray-300' }}">
+                                @error('newTeacherForm.name') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">직급</label>
+                                <select wire:model="newTeacherForm.position"
+                                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                                    <option value="">선택</option>
+                                    <option value="원장">원장</option>
+                                    <option value="교장">교장</option>
+                                    <option value="부원장">부원장</option>
+                                    <option value="교사">교사</option>
+                                    <option value="행정">행정</option>
+                                    <option value="교수 부장">교수 부장</option>
+                                    <option value="교감">교감</option>
+                                    <option value="기타">기타</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">eMail</label>
+                                <input type="email" wire:model="newTeacherForm.email"
+                                       class="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header {{ $errors->has('newTeacherForm.email') ? 'border-red-400' : 'border-gray-300' }}">
+                                @error('newTeacherForm.email') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Phone</label>
+                                <input type="tel"
+                                       inputmode="numeric"
+                                       maxlength="13"
+                                       placeholder="010-0000-0000"
+                                       wire:model.live="newTeacherForm.phone"
+                                       x-on:input="
+                                           let d = $el.value.replace(/\D/g, '').slice(0, 11);
+                                           $el.value = d.length > 7
+                                               ? d.slice(0, 3) + '-' + d.slice(3, 7) + '-' + d.slice(7)
+                                               : (d.length > 3 ? d.slice(0, 3) + '-' + d.slice(3) : d);
+                                       "
+                                       class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">GrapeSEED Essentials</label>
+                                <input type="date" wire:model="newTeacherForm.gs_essentials"
+                                       class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">LittleSEED Essentials</label>
+                                <input type="date" wire:model="newTeacherForm.ls_essentials"
+                                       class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header">
+                            </div>
+                        </div>
+
+                        <div class="space-y-4 border-b border-t border-gray-100 py-4">
+                            <div class="grid grid-cols-[110px_1fr] items-center gap-3">
+                                <label class="text-sm font-medium text-gray-700">근무 형태</label>
+                                <div class="flex items-center gap-6 text-sm">
+                                    <label class="inline-flex cursor-pointer items-center gap-2">
+                                        <input type="radio" wire:model="newTeacherForm.employment_type" value="full_time"
+                                               class="h-4 w-4 border-gray-300 text-mochi-header focus:ring-mochi-header">
+                                        <span class="text-gray-700">Full Time</span>
+                                    </label>
+                                    <label class="inline-flex cursor-pointer items-center gap-2">
+                                        <input type="radio" wire:model="newTeacherForm.employment_type" value="part_time"
+                                               class="h-4 w-4 border-gray-300 text-mochi-header focus:ring-mochi-header">
+                                        <span class="text-gray-700">Part Time</span>
+                                    </label>
+                                    <label class="inline-flex cursor-pointer items-center gap-2">
+                                        <input type="radio" wire:model="newTeacherForm.employment_type" value="unspecified"
+                                               class="h-4 w-4 border-gray-500 text-gray-500 focus:ring-gray-400">
+                                        <span class="text-gray-500">미지정</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-[110px_1fr] items-center gap-3">
+                                <label class="text-sm font-medium text-gray-700">수업참여</label>
+                                <div class="flex items-center gap-6 text-sm">
+                                    <label class="inline-flex cursor-pointer items-center gap-2">
+                                        <input type="radio" wire:model="newTeacherForm.class_participation" value="in"
+                                               class="h-4 w-4 border-gray-300 text-mochi-header focus:ring-mochi-header">
+                                        <span class="text-gray-700">수업(O)</span>
+                                    </label>
+                                    <label class="inline-flex cursor-pointer items-center gap-2">
+                                        <input type="radio" wire:model="newTeacherForm.class_participation" value="out"
+                                               class="h-4 w-4 border-gray-300 text-mochi-header focus:ring-mochi-header">
+                                        <span class="text-gray-700">수업(X)</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700">Description</label>
+                            <textarea wire:model="newTeacherForm.description" rows="4"
+                                      class="w-full resize-none rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mochi-header {{ $errors->has('newTeacherForm.description') ? 'border-red-400' : 'border-gray-300' }}"></textarea>
+                            @error('newTeacherForm.description') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-2 border-t bg-gray-50 px-6 py-4">
+                        <button type="button"
+                                wire:click="cancelInstitutionTeacherCreate"
+                                class="cursor-pointer rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                            취소
+                        </button>
+                        <button type="button"
+                                wire:click="saveInstitutionTeacher"
+                                class="cursor-pointer rounded-lg bg-mochi-header px-4 py-2 text-sm text-white hover:bg-mochi-header/90">
+                            저장하기
+                        </button>
+                    </div>
+                </div>
+            </div>
+        @endteleport
     @endif
 
     {{-- Edit Modal --}}
@@ -930,6 +1142,11 @@
                     <x-slot:actions>
                         @if(! $teacherModalEditMode && ! ($teacherDetailInfo['is_retired'] ?? false))
                             <button type="button"
+                                    wire:click.stop="openVisitModal({{ (int) $teacherDetailInfo['id'] }})"
+                                    class="cursor-pointer rounded-lg border border-mochi-header/40 bg-transparent px-3 py-1.5 text-xs text-mochi-header hover:bg-mochi-header/5">
+                                교사지원 보고서
+                            </button>
+                            <button type="button"
                                     wire:click="confirmRetireTeacher"
                                     class="cursor-pointer rounded-lg border border-red-300 px-3 py-1.5 text-xs text-red-700 hover:bg-red-50">
                                 퇴직
@@ -1026,7 +1243,17 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                                    <input type="text" wire:model="teacherProfileForm.phone"
+                                    <input type="tel"
+                                           inputmode="numeric"
+                                           maxlength="13"
+                                           placeholder="010-0000-0000"
+                                           wire:model.live="teacherProfileForm.phone"
+                                           x-on:input="
+                                               let d = $el.value.replace(/\D/g, '').slice(0, 11);
+                                               $el.value = d.length > 7
+                                                   ? d.slice(0, 3) + '-' + d.slice(3, 7) + '-' + d.slice(7)
+                                                   : (d.length > 3 ? d.slice(0, 3) + '-' + d.slice(3) : d);
+                                           "
                                            class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
                                 </div>
                             </div>

@@ -81,6 +81,12 @@ class TeacherSupportCompletionDisplayTest extends TestCase
             '_1st_Support_Type' => 'On-Site',
         ]);
 
+        DB::table('S_Support_OnSite')->insert([
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2026-04-01 00:00:00',
+            'Status' => '완료',
+        ]);
+
         $teacher = Teacher::query()->findOrFail($teacherId);
 
         $parts = TeacherSupportCompletionDisplay::parts($teacher, 1, 2026);
@@ -89,13 +95,55 @@ class TeacherSupportCompletionDisplayTest extends TestCase
         $this->assertSame('On-Site', $parts['type']);
     }
 
+    public function test_parts_keeps_teacher_slot_when_no_reports_exist(): void
+    {
+        $teacherId = DB::table('Teachers')->insertGetId([
+            'Name' => '엑셀완료만',
+            '_1st_Support_Date' => '2026-03-10',
+            '_1st_Support_Type' => 'On-Site',
+        ]);
+
+        $teacher = Teacher::query()->findOrFail($teacherId);
+
+        $parts = TeacherSupportCompletionDisplay::parts($teacher, 1, 2026);
+
+        $this->assertSame('2026-03-10', $parts['date']);
+        $this->assertSame('On-Site', $parts['type']);
+        $this->assertSame('', $parts['detail_key']);
+    }
+
+    public function test_unmatched_teacher_slot_does_not_hide_teacher_report_from_first_round(): void
+    {
+        $teacherId = DB::table('Teachers')->insertGetId([
+            'Name' => '완료일불일치',
+            '_1st_Support_Date' => '2026-04-27',
+            '_1st_Support_Type' => '교사 지원 및 참관',
+        ]);
+
+        $visitId = DB::table('teacher_visit_support_reports')->insertGetId([
+            'teacher_id' => $teacherId,
+            'support_date' => '2026-04-07',
+            'status' => '완료',
+        ]);
+
+        $teacher = Teacher::query()->findOrFail($teacherId);
+
+        $first = TeacherSupportCompletionDisplay::parts($teacher, 1, 2026);
+        $second = TeacherSupportCompletionDisplay::parts($teacher, 2, 2026);
+
+        $this->assertSame('2026-04-07', $first['date']);
+        $this->assertSame('교사 지원 및 참관', $first['type']);
+        $this->assertSame('mochi:teacher_visit_support_reports:'.$visitId, $first['detail_key']);
+        $this->assertSame('', $second['date']);
+    }
+
     public function test_parts_falls_back_to_mochi_report_when_teacher_slot_empty(): void
     {
         $teacherId = DB::table('Teachers')->insertGetId([
             'Name' => '홍길동',
         ]);
 
-        DB::table('teacher_visit_support_reports')->insert([
+        $visitId = DB::table('teacher_visit_support_reports')->insertGetId([
             'teacher_id' => $teacherId,
             'support_date' => '2026-03-15',
             'status' => '완료',
@@ -107,6 +155,7 @@ class TeacherSupportCompletionDisplayTest extends TestCase
 
         $this->assertSame('2026-03-15', $parts['date']);
         $this->assertSame('교사 지원 및 참관', $parts['type']);
+        $this->assertSame('mochi:teacher_visit_support_reports:'.$visitId, $parts['detail_key']);
     }
 
     public function test_year_filter_does_not_duplicate_mochi_report_into_second_round(): void
@@ -130,6 +179,7 @@ class TeacherSupportCompletionDisplayTest extends TestCase
 
         $this->assertSame('2026-06-18', $first['date']);
         $this->assertSame('교사 지원 및 참관', $first['type']);
+        $this->assertNotSame('', $first['detail_key']);
         $this->assertSame('', $second['date']);
         $this->assertSame('', $second['type']);
     }
@@ -140,6 +190,12 @@ class TeacherSupportCompletionDisplayTest extends TestCase
             'Name' => '전체연도',
             '_1st_Support_Date' => '2026-04-01',
             '_1st_Support_Type' => 'On-Site',
+        ]);
+
+        DB::table('S_Support_OnSite')->insert([
+            'TeacherId' => $teacherId,
+            'SupportDate' => '2026-04-01 00:00:00',
+            'Status' => '완료',
         ]);
 
         $teacher = Teacher::query()->findOrFail($teacherId);

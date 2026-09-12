@@ -135,11 +135,15 @@ class TeacherSupportHistoryFormLoader
             }
         }
 
-        foreach (['procedures', 'verbal_tools', 'language_arts_tools', 'evaluations', 'strength_areas', 'growth_areas', 'support_content'] as $jsonField) {
+        foreach (['procedures', 'verbal_tools', 'language_arts_tools', 'evaluations', 'strength_areas', 'growth_areas', 'support_content', 'observe_curriculum_rows'] as $jsonField) {
             if (isset($form[$jsonField]) && is_string($form[$jsonField])) {
                 $decoded = json_decode($form[$jsonField], true);
                 $form[$jsonField] = is_array($decoded) ? $decoded : [];
             }
+        }
+
+        if ($action === 'visit') {
+            $form = VisitObserveCurriculumRows::hydrateForm($form);
         }
 
         return [

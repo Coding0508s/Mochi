@@ -92,7 +92,7 @@ final class MochiTeacherSupportQuery
      * 완료(status=완료) MOCHI 보고서를 교사 ID별로 한 번에 조회한다.
      *
      * @param  list<int>  $teacherIds
-     * @return array<int, list<array{date: string, type: string}>>
+     * @return array<int, list<array{date: string, type: string, detail_key: string}>>
      */
     public static function completedReportsForTeacherIds(array $teacherIds, ?int $year): array
     {
@@ -111,7 +111,7 @@ final class MochiTeacherSupportQuery
             ->whereIn('teacher_id', $teacherIds)
             ->orderBy('teacher_id')
             ->orderBy('support_date')
-            ->get(['teacher_id', 'support_date', 'type_label']);
+            ->get(['teacher_id', 'support_date', 'type_label', 'record_id', 'source_table']);
 
         $grouped = [];
 
@@ -123,9 +123,14 @@ final class MochiTeacherSupportQuery
             }
 
             $teacherId = (int) $row->teacher_id;
+            $recordId = (int) ($row->record_id ?? 0);
+            $sourceTable = (string) ($row->source_table ?? '');
             $grouped[$teacherId][] = [
                 'date' => $date,
                 'type' => (string) $row->type_label,
+                'detail_key' => ($recordId > 0 && $sourceTable !== '')
+                    ? 'mochi:'.$sourceTable.':'.$recordId
+                    : '',
                 'sort' => Carbon::parse($date)->getTimestamp(),
             ];
         }
@@ -138,6 +143,7 @@ final class MochiTeacherSupportQuery
                 fn (array $report): array => [
                     'date' => $report['date'],
                     'type' => $report['type'],
+                    'detail_key' => $report['detail_key'],
                 ],
                 $reports,
             );
@@ -169,7 +175,8 @@ final class MochiTeacherSupportQuery
             $typeLabel = str_replace("'", "''", (string) ($typeLabels[$table] ?? ''));
 
             $parts[] = 'SELECT '.$table.'.teacher_id AS teacher_id, '.$table.'.support_date AS support_date, '
-                ."'{$typeLabel}' AS type_label FROM ".$table
+                ."'{$typeLabel}' AS type_label, ".$table.'.id AS record_id, '
+                ."'{$table}' AS source_table FROM ".$table
                 .' WHERE '.implode(' AND ', $conditions);
         }
 

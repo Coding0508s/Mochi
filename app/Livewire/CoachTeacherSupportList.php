@@ -19,9 +19,12 @@ use App\Actions\UpdateTeacherProfile;
 use App\Actions\UpdateTeacherSupport;
 use App\Actions\UpdateTeacherSupportReport;
 use App\Enums\TeacherEmploymentType;
+use App\Livewire\Concerns\CreatesCoachInstitutionTeacher;
+use App\Livewire\Concerns\EditsCoachInstitutionInfo;
 use App\Livewire\Concerns\GuardsCrossTeamReadOnlyContext;
 use App\Livewire\Concerns\HandlesVisitSupportReportValidationFailures;
 use App\Livewire\Concerns\ManagesSupportReportRoundSelection;
+use App\Livewire\Concerns\ManagesVisitObserveCurriculumRows;
 use App\Models\AccountInformation;
 use App\Models\Institution;
 use App\Models\SupportRecord;
@@ -31,6 +34,7 @@ use App\Support\CoachTeacherScope;
 use App\Support\CoachTeacherSupportInstitutionListBuilder;
 use App\Support\ExcelSerialDate;
 use App\Support\InstitutionResolver;
+use App\Support\KoreanMobilePhoneFormatter;
 use App\Support\ManagerNameNormalizer;
 use App\Support\SkCodeNormalizer;
 use App\Support\TeacherRetirementRecommendation;
@@ -43,9 +47,9 @@ use App\Support\TeacherSupportListActivity;
 use App\Support\TeacherSupportNewTeacherDisplay;
 use App\Support\TeacherSupportReportEditAuthorization;
 use App\Support\TeamMenuContext;
+use App\Support\VisitObserveCurriculumRows;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -53,14 +57,15 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Livewire\Component;
-use Livewire\WithPagination;
 
 class CoachTeacherSupportList extends Component
 {
+    use CreatesCoachInstitutionTeacher;
+    use EditsCoachInstitutionInfo;
     use GuardsCrossTeamReadOnlyContext;
     use HandlesVisitSupportReportValidationFailures;
     use ManagesSupportReportRoundSelection;
-    use WithPagination;
+    use ManagesVisitObserveCurriculumRows;
 
     public string $filterYear = '';
 
@@ -222,7 +227,7 @@ class CoachTeacherSupportList extends Component
         $this->crossTeamReadOnly = $this->isCrossTeamReadOnlyContext(TeamMenuContext::MENU_COACH);
 
         $year = request()->query('filterYear');
-        $this->filterYear = is_numeric($year) ? (string) (int) $year : (string) now()->year;
+        $this->filterYear = is_numeric($year) ? (string) (int) $year : (string) ExcelSerialDate::currentCycleYear();
 
         $coach = request()->query('filterCoach');
         if (is_string($coach) && filled($coach)) {
@@ -303,6 +308,7 @@ class CoachTeacherSupportList extends Component
 
         $accountInfo = $institution->accountInfo;
 
+        $this->institutionModalEditMode = false;
         $this->institutionInfo = [
             'sk_code' => $normalizedSkCode,
             'name' => $institution->resolvedAccountName(),
@@ -313,6 +319,15 @@ class CoachTeacherSupportList extends Component
             'tr' => $accountInfo?->TR ?? '',
             'cs' => $accountInfo?->CS ?? '',
             'is_terminated' => $institution->isTerminatedCustomer(),
+        ];
+        $this->selectedInstitution = [
+            'skcode' => $normalizedSkCode,
+            'name' => $this->institutionInfo['name'],
+            'address' => $this->institutionInfo['address'],
+            'co' => $this->institutionInfo['co'],
+            'tr' => $this->institutionInfo['tr'],
+            'cs' => $this->institutionInfo['cs'],
+            'master_id' => (int) $institution->ID,
         ];
 
         try {
@@ -391,6 +406,8 @@ class CoachTeacherSupportList extends Component
         $this->institutionSupportHistory = [];
         $this->teacherSupportHistory = [];
         $this->institutionContacts = [];
+        $this->resetInstitutionInfoEditState();
+        $this->resetInstitutionTeacherCreateState();
     }
 
     public function openTeacherModal(int $teacherId): void
@@ -510,6 +527,35 @@ class CoachTeacherSupportList extends Component
     {
         $this->showTeacherSupportHistoryDetailModal = false;
         $this->selectedTeacherSupportHistoryDetail = null;
+    }
+
+    public function openCompletedRoundSupport(int $teacherId, int $round): void
+    {
+        if ($teacherId <= 0 || $round < 1 || $round > 4) {
+            return;
+        }
+
+        if (! $this->canViewTeacher($teacherId)) {
+            return;
+        }
+
+        $teacher = Teacher::query()->find($teacherId);
+        if ($teacher === null) {
+            return;
+        }
+
+        $parts = TeacherSupportCompletionDisplay::parts($teacher, $round, $this->resolvedFilterYear());
+        if ($parts['date'] === '') {
+            return;
+        }
+
+        $detailKey = trim((string) ($parts['detail_key'] ?? ''));
+        if ($detailKey === '' || str_starts_with($detailKey, 'account:')) {
+            return;
+        }
+
+        $this->showTeacherModal = false;
+        $this->openTeacherSupportHistoryDetail($detailKey, $teacherId);
     }
 
     private function expectedSupportHistorySkCode(): ?string
@@ -812,7 +858,7 @@ class CoachTeacherSupportList extends Component
     private function openVisitView(int $teacherId, array $form, bool $markCompleted): void
     {
         $this->visitTeacherId = $teacherId;
-        $this->visitForm = $form;
+        $this->visitForm = VisitObserveCurriculumRows::hydrateForm($form);
         $this->visitMarkCompleted = $markCompleted;
         $this->showVisitModal = true;
     }
@@ -958,7 +1004,7 @@ class CoachTeacherSupportList extends Component
         $this->teacherProfileForm = [
             'name' => $this->teacherDetailInfo['name'] ?? '',
             'email' => $this->teacherDetailInfo['email'] ?? '',
-            'phone' => $this->teacherDetailInfo['phone'] ?? '',
+            'phone' => KoreanMobilePhoneFormatter::format((string) ($this->teacherDetailInfo['phone'] ?? '')),
             'position' => $this->teacherDetailInfo['position'] ?? '',
             'description' => $this->teacherDetailInfo['description'] ?? '',
             'class_participation' => $this->teacherDetailInfo['class_participation'] ?? 'out',
@@ -968,6 +1014,15 @@ class CoachTeacherSupportList extends Component
             'ls_essentials' => $this->teacherDetailInfo['ls_essentials'] ?? '',
         ];
         $this->teacherModalEditMode = true;
+    }
+
+    public function updatedTeacherProfileForm(mixed $value, ?string $key = null): void
+    {
+        if ($key !== 'phone') {
+            return;
+        }
+
+        $this->teacherProfileForm['phone'] = KoreanMobilePhoneFormatter::format((string) $value);
     }
 
     public function saveTeacherProfile(): void
@@ -989,6 +1044,9 @@ class CoachTeacherSupportList extends Component
         $lsEssentials = trim((string) ($this->teacherProfileForm['ls_essentials'] ?? ''));
         $email = trim((string) ($this->teacherProfileForm['email'] ?? ''));
         $this->teacherProfileForm['email'] = $email;
+        $this->teacherProfileForm['phone'] = KoreanMobilePhoneFormatter::format(
+            (string) ($this->teacherProfileForm['phone'] ?? '')
+        );
 
         $payload = [
             'name' => $this->teacherProfileForm['name'] ?? '',
@@ -2482,6 +2540,7 @@ class CoachTeacherSupportList extends Component
             'observe_summary_extra' => '',
             'observe_class' => '',
             'observe_age' => '',
+            'observe_rows' => VisitObserveCurriculumRows::defaultRows(),
             'session_number' => 1,
             'semester_label' => config('coach_teacher_visit.semester_options.0', '1학기 지원'),
             'interview_date' => now()->format('Y-m-d'),
@@ -2494,15 +2553,8 @@ class CoachTeacherSupportList extends Component
         ];
     }
 
-    public function updatedSearch(): void
-    {
-        $this->resetPage();
-    }
-
     public function updatedFilterYear(): void
     {
-        $this->resetPage();
-
         if ($this->filterYear === '') {
             return;
         }
@@ -2514,20 +2566,9 @@ class CoachTeacherSupportList extends Component
         $this->filterYear = (string) max($minYear, min($maxYear, $year));
     }
 
-    public function updatedFilterRound(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatedFilterMonth(): void
-    {
-        $this->resetPage();
-    }
-
     public function updatedFilterCoach(): void
     {
         $this->filterCoach = $this->resolveAllowedFilterCoach($this->filterCoach);
-        $this->resetPage();
     }
 
     public function updatedFilterPosition(): void
@@ -2535,8 +2576,6 @@ class CoachTeacherSupportList extends Component
         if ($this->filterPosition !== 'teacher') {
             $this->filterPosition = '';
         }
-
-        $this->resetPage();
     }
 
     public function updatedFilterEmploymentType(): void
@@ -2544,32 +2583,23 @@ class CoachTeacherSupportList extends Component
         if (TeacherEmploymentType::tryFrom($this->filterEmploymentType) === null) {
             $this->filterEmploymentType = '';
         }
-
-        $this->resetPage();
-    }
-
-    public function updatedShowAllTeachers(): void
-    {
-        $this->resetPage();
     }
 
     public function setKpiFilter(string $filter): void
     {
         $this->kpiFilter = $this->kpiFilter === $filter ? '' : $filter;
-        $this->resetPage();
     }
 
     public function resetFilters(): void
     {
         $this->search = '';
-        $this->filterYear = (string) now()->year;
+        $this->filterYear = (string) ExcelSerialDate::currentCycleYear();
         $this->filterRound = '';
         $this->filterMonth = '';
         $this->filterCoach = $this->defaultCoachFilter();
         $this->kpiFilter = '';
         $this->filterPosition = 'teacher';
         $this->filterEmploymentType = '';
-        $this->resetPage();
     }
 
     public function openEditModal(int $id): void
@@ -2661,8 +2691,6 @@ class CoachTeacherSupportList extends Component
         $groupedList = app(CoachTeacherSupportInstitutionListBuilder::class)->build(
             $listQuery,
             $this->resolvedFilterYear(),
-            max(1, (int) $this->getPage()),
-            50,
         );
 
         $teacherIds = $groupedList['teacher_ids'];
@@ -2677,48 +2705,30 @@ class CoachTeacherSupportList extends Component
                 ->keyBy('ID');
         }
 
-        $orderedTeachers = collect($teacherIds)
+        /** @var Collection<int, Teacher> $teachers */
+        $teachers = collect($teacherIds)
             ->map(fn (int $teacherId): ?Teacher => $teacherCollection->get($teacherId))
             ->filter()
             ->values();
 
-        $groupPaginator = $groupedList['paginator'];
-        $teachers = new LengthAwarePaginator(
-            $orderedTeachers,
-            $groupPaginator->total(),
-            $groupPaginator->perPage(),
-            $groupPaginator->currentPage(),
-            [
-                'path' => request()->url(),
-                'pageName' => 'page',
-            ],
-        );
-
         TeacherSupportCompletionDisplay::flushRequestCache();
         TeacherSupportCompletionDisplay::preloadForTeachers(
-            $teachers->getCollection(),
+            $teachers,
             $this->resolvedFilterYear(),
         );
         TeacherSupportNewTeacherDisplay::flushRequestCache();
         TeacherSupportNewTeacherDisplay::preloadForTeachers(
-            $teachers->getCollection(),
+            $teachers,
             $this->resolvedFilterYear(),
         );
 
-        $displayYear = $this->resolvedFilterYear();
-        $visibleRound1CompletionCount = $teachers->getCollection()
-            ->filter(function (Teacher $teacher) use ($displayYear): bool {
-                return TeacherSupportCompletionDisplay::parts($teacher, 1, $displayYear)['date'] !== '';
-            })
-            ->count();
-        $visibleRound2CompletionCount = $teachers->getCollection()
-            ->filter(function (Teacher $teacher) use ($displayYear): bool {
-                return TeacherSupportCompletionDisplay::parts($teacher, 2, $displayYear)['date'] !== '';
-            })
-            ->count();
+        [$teachers, $rowspansByTeacherId] = $this->sortTeachersWithinInstitutionsByLatestSupport(
+            $teachers,
+            $this->resolvedFilterYear(),
+        );
 
         $this->hydrateTeacherInstitutions($teachers);
-        $this->editModalAllowedByTeacherId = $this->buildEditModalAllowedMap($teachers->getCollection());
+        $this->editModalAllowedByTeacherId = $this->buildEditModalAllowedMap($teachers);
 
         return view('livewire.coach-teacher-support-list', [
             'teachers' => $teachers,
@@ -2741,8 +2751,7 @@ class CoachTeacherSupportList extends Component
             'visitConfig' => config('coach_teacher_visit'),
             'displayYear' => $this->resolvedFilterYear(),
             'crossTeamReadOnly' => $this->crossTeamReadOnly,
-            'rowspansByTeacherId' => $groupedList['rowspans_by_teacher_id'],
-            'institutionGroupPaginator' => $groupPaginator,
+            'rowspansByTeacherId' => $rowspansByTeacherId,
         ]);
     }
 
@@ -2753,6 +2762,90 @@ class CoachTeacherSupportList extends Component
         }
 
         return (int) $this->filterYear;
+    }
+
+    /**
+     * 기관 묶음 순서는 유지하고, 같은 기관 안 교사만 표에 보이는 최신 지원일 내림차순으로 맞춘다.
+     *
+     * @param  Collection<int, Teacher>  $teachers
+     * @return array{0: Collection<int, Teacher>, 1: array<int, int>}
+     */
+    private function sortTeachersWithinInstitutionsByLatestSupport(Collection $teachers, ?int $year): array
+    {
+        $groups = [];
+        $groupOrder = [];
+
+        foreach ($teachers as $teacher) {
+            $groupKey = SkCodeNormalizer::normalize((string) $teacher->SK_Code) ?? '__none__:'.$teacher->ID;
+
+            if (! array_key_exists($groupKey, $groups)) {
+                $groupOrder[] = $groupKey;
+                $groups[$groupKey] = [];
+            }
+
+            $groups[$groupKey][] = $teacher;
+        }
+
+        $sorted = collect();
+        $rowspansByTeacherId = [];
+
+        foreach ($groupOrder as $groupKey) {
+            $group = $groups[$groupKey];
+
+            usort($group, function (Teacher $left, Teacher $right) use ($year): int {
+                $leftDate = $this->displayedLatestSupportDate($left, $year);
+                $rightDate = $this->displayedLatestSupportDate($right, $year);
+
+                if ($leftDate !== $rightDate) {
+                    if ($leftDate === '') {
+                        return 1;
+                    }
+
+                    if ($rightDate === '') {
+                        return -1;
+                    }
+
+                    return strcmp($rightDate, $leftDate);
+                }
+
+                return ((int) $left->ID) <=> ((int) $right->ID);
+            });
+
+            $span = count($group);
+
+            foreach ($group as $index => $teacher) {
+                $rowspansByTeacherId[(int) $teacher->ID] = $index === 0 ? $span : 0;
+                $sorted->push($teacher);
+            }
+        }
+
+        return [$sorted->values(), $rowspansByTeacherId];
+    }
+
+    private function displayedLatestSupportDate(Teacher $teacher, ?int $year): string
+    {
+        $dates = [];
+        $newTeacherDate = TeacherSupportNewTeacherDisplay::parts($teacher, $year)['date'] ?? '';
+
+        if ($newTeacherDate !== '') {
+            $dates[] = $newTeacherDate;
+        }
+
+        for ($round = 1; $round <= 4; $round++) {
+            $date = TeacherSupportCompletionDisplay::parts($teacher, $round, $year)['date'] ?? '';
+
+            if ($date !== '') {
+                $dates[] = $date;
+            }
+        }
+
+        if ($dates === []) {
+            return '';
+        }
+
+        rsort($dates, SORT_STRING);
+
+        return $dates[0];
     }
 
     /**
@@ -2820,7 +2913,7 @@ class CoachTeacherSupportList extends Component
      */
     private function pinnedYearFilterOptions(Collection $years): Collection
     {
-        $pinned = collect([(int) now()->year]);
+        $pinned = collect([ExcelSerialDate::currentCycleYear()]);
 
         if (is_numeric($this->filterYear)) {
             $selectedYear = (int) $this->filterYear;
@@ -2838,23 +2931,18 @@ class CoachTeacherSupportList extends Component
 
     private function sqlExtractYearExpression(string $dateExpression): string
     {
-        return match (DB::connection()->getDriverName()) {
-            'sqlite' => "CAST(strftime('%Y', {$dateExpression}) AS INTEGER)",
-            default => "YEAR({$dateExpression})",
-        };
+        return ExcelSerialDate::sqlCycleYearExpression($dateExpression);
     }
 
     /**
      * Teachers.SK_Code가 *SK2693 형태이거나 S_AccountName 행이 없을 때도
      * S_Account_Information 기준으로 institution·해지 스타일을 붙인다.
      *
-     * @param  LengthAwarePaginator<Teacher>  $teachers
+     * @param  Collection<int, Teacher>  $teachers
      */
-    private function hydrateTeacherInstitutions($teachers): void
+    private function hydrateTeacherInstitutions(Collection $teachers): void
     {
-        $collection = $teachers->getCollection();
-
-        $normalizedSkCodes = $collection
+        $normalizedSkCodes = $teachers
             ->map(fn (Teacher $teacher): ?string => SkCodeNormalizer::normalize($teacher->SK_Code))
             ->filter()
             ->unique()
@@ -2875,7 +2963,7 @@ class CoachTeacherSupportList extends Component
             ->get()
             ->keyBy(fn (AccountInformation $info): string => SkCodeNormalizer::normalize($info->SK_Code) ?? $info->SK_Code);
 
-        $collection->each(function (Teacher $teacher) use ($institutionsBySk, $accountInfosBySk): void {
+        $teachers->each(function (Teacher $teacher) use ($institutionsBySk, $accountInfosBySk): void {
             $normalizedSkCode = SkCodeNormalizer::normalize($teacher->SK_Code);
 
             if ($normalizedSkCode === null) {
@@ -2908,8 +2996,6 @@ class CoachTeacherSupportList extends Component
 
             $teacher->setRelation('institution', InstitutionResolver::fromAccountInformation($accountInfo));
         });
-
-        $teachers->setCollection($collection);
     }
 
     private function buildBaseQuery(): Builder

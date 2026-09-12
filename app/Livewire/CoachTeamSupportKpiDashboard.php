@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Support\CoachTeamSupportMatrixAggregator;
+use App\Support\ExcelSerialDate;
 use App\Support\ManagerNameNormalizer;
 use App\Support\TeacherSupportHistoryDetailResolver;
 use App\Support\TeamMenuContext;
@@ -45,7 +46,7 @@ class CoachTeamSupportKpiDashboard extends Component
         } elseif (is_numeric($queryYear)) {
             $this->filterYear = (string) (int) $queryYear;
         } else {
-            $this->filterYear = (string) (config('coach_teacher_support.default_year') ?? now()->year);
+            $this->filterYear = (string) (config('coach_teacher_support.default_year') ?? ExcelSerialDate::currentCycleYear());
         }
     }
 
@@ -71,7 +72,7 @@ class CoachTeamSupportKpiDashboard extends Component
 
     public function teacherSupportUrl(string $coach): string
     {
-        $year = $this->resolvedYear() ?? now()->year;
+        $year = $this->resolvedYear() ?? ExcelSerialDate::currentCycleYear();
 
         return TeamMenuContext::route('coach.teacher-support.index', array_filter([
             'filterYear' => $year,

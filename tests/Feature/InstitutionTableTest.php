@@ -44,10 +44,11 @@ class InstitutionTableTest extends TestCase
             $table->string('Customer_Type', 255)->nullable();
             $table->string('Address', 255)->nullable();
             $table->timestamp('FGC_CreateDate')->nullable();
+            $table->timestamp('FGC_LastModifyDate')->nullable();
         });
     }
 
-    public function test_paginates_account_information_rows_with_eager_loaded_institution(): void
+    public function test_lists_account_information_rows_with_eager_loaded_institution(): void
     {
         $user = User::factory()->create();
 
@@ -66,9 +67,9 @@ class InstitutionTableTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(InstitutionTable::class)
-            ->assertViewHas('institutions', function ($paginator): bool {
-                return $paginator->total() === 2
-                    && $paginator->first()->relationLoaded('institution');
+            ->assertViewHas('institutions', function ($institutions): bool {
+                return $institutions->count() === 2
+                    && $institutions->first()->relationLoaded('institution');
             });
     }
 
@@ -87,7 +88,7 @@ class InstitutionTableTest extends TestCase
             ->assertDispatched('institution-row-selected', institutionId: $account->ID);
     }
 
-    public function test_filter_updated_event_resets_pagination(): void
+    public function test_shows_all_matching_rows_without_pagination(): void
     {
         $user = User::factory()->create();
 
@@ -99,11 +100,14 @@ class InstitutionTableTest extends TestCase
             ]);
         }
 
-        Livewire::actingAs($user)
+        $html = Livewire::actingAs($user)
             ->test(InstitutionTable::class)
-            ->call('gotoPage', 2)
-            ->assertSet('paginators.page', 2)
-            ->call('onFilterUpdated', search: '', statusFilter: 'all', filterCo: '', filterTr: '', filterCs: '', resetAssignment: false)
-            ->assertSet('paginators.page', 1);
+            ->assertViewHas('institutions', function ($institutions): bool {
+                return $institutions->count() === 21;
+            })
+            ->html();
+
+        $this->assertStringContainsString('institution-list-table-scroll', $html);
+        $this->assertStringNotContainsString('mochi-pagination-nav', $html);
     }
 }

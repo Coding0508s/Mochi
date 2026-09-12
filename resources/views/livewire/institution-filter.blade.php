@@ -12,7 +12,7 @@
         ];
 
         $activeFilterChips = [];
-        if ($statusFilter !== 'all') {
+        if ($statusFilter !== 'active') {
             $activeFilterChips[] = [
                 'label' => '상태: '.($statusLabelMap[$statusFilter] ?? $statusFilter),
                 'action' => 'clearStatusFilter',

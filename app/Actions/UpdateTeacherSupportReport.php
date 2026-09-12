@@ -304,6 +304,7 @@ final class UpdateTeacherSupportReport
                 'observe_summary_extra' => $validated['observe_summary_extra'] ?? null,
                 'observe_class' => $validated['observe_class'] ?? null,
                 'observe_age' => $validated['observe_age'] ?? null,
+                'observe_curriculum_rows' => $validated['observe_curriculum_rows'] ?? $validated['observe_rows'] ?? null,
                 'session_number' => $validated['session_number'] ?? null,
                 'semester_label' => $validated['semester_label'] ?? null,
                 'interview_date' => $validated['interview_date'] ?? null,

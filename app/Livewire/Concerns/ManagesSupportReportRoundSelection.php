@@ -154,7 +154,7 @@ trait ManagesSupportReportRoundSelection
                 : null;
             $recommended = $referenceYear !== null
                 && $planDate !== null
-                && $planDate->year === $referenceYear;
+                && ExcelSerialDate::cycleYear($planDate) === $referenceYear;
             $disabled = in_array($round, $recordedRounds, true);
 
             $label = $round.'차';
@@ -185,7 +185,7 @@ trait ManagesSupportReportRoundSelection
         $supportDate = $this->activeSupportReportSupportDate();
         $parsed = ExcelSerialDate::parse($supportDate);
 
-        return $parsed?->year;
+        return $parsed === null ? null : ExcelSerialDate::cycleYear($parsed);
     }
 
     /**
@@ -222,7 +222,7 @@ trait ManagesSupportReportRoundSelection
             }
 
             $planDate = ExcelSerialDate::parse($teacher->getRawOriginal($planColumn));
-            if ($planDate !== null && $planDate->year === $referenceYear) {
+            if ($planDate !== null && ExcelSerialDate::cycleYear($planDate) === $referenceYear) {
                 return $round;
             }
         }

@@ -668,6 +668,20 @@
         border-spacing: 0;
     }
 
+    .institution-list-table-scroll {
+        --institution-table-max-height: min(68vh, calc(100dvh - 17.5rem));
+        max-height: var(--institution-table-max-height);
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .institution-list-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        background: #e8e6d9;
+    }
+
     .institution-list-table .institution-sticky-no,
     .institution-list-table .institution-sticky-sk,
     .institution-list-table .institution-sticky-name {
@@ -702,7 +716,7 @@
     .institution-list-table .institution-sticky-no--head,
     .institution-list-table .institution-sticky-sk--head,
     .institution-list-table .institution-sticky-name--head {
-        z-index: 16;
+        z-index: 26;
         background: #e8e6d9;
     }
 
@@ -821,6 +835,27 @@
         display: flex;
         flex-direction: column;
         gap: 0.125rem;
+    }
+
+    .coach-teacher-support-table .coach-support-completed-open {
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .coach-teacher-support-table .coach-support-completed-open:hover .coach-support-completed-date,
+    .coach-teacher-support-table .coach-support-completed-open:focus-visible .coach-support-completed-date {
+        text-decoration: underline;
+    }
+
+    .coach-teacher-support-table .coach-support-completed-open:focus-visible {
+        outline: 2px solid #93c5fd;
+        outline-offset: 2px;
+        border-radius: 0.25rem;
     }
 
     .coach-teacher-support-table .coach-support-completed-date {

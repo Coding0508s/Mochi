@@ -552,6 +552,12 @@ class SupportCreateFormTest extends TestCase
             ->assertSee('Coach Team 교사 지원 및 참관 보고서 작성')
             ->assertSee('아래 입력 항목을 작성한 뒤 저장해 주세요.')
             ->assertSee('교사 지원 및 참관 보고서')
+            ->assertDontSeeHtml('visitForm.support_location')
+            ->assertDontSee('예: 분당 ○○어학원')
+            ->assertSeeHtml('sm:grid-cols-3')
+            ->assertSee('지원 방법')
+            ->assertSee('현황 차수')
+            ->assertSee('면담 시간')
             ->call('selectInstitution', 'SK-COACH-TYPES')
             ->assertSee('교사를 선택하세요')
             ->set('formTeacherId', $teacherId)
@@ -562,7 +568,17 @@ class SupportCreateFormTest extends TestCase
             ->assertDontSee('교사 지원 유형 선택')
             ->assertSee('세부 지원 내용')
             ->assertDontSee('기관 이슈 및 논의 사항')
-            ->assertSet('formTarget', '김교사');
+            ->assertSet('formTarget', '김교사')
+            ->assertSee('참관한 커리큘럼 행 추가')
+            ->assertSee('GrapeSEED')
+            ->assertSee('LittleSEED')
+            ->assertDontSeeHtml('visitForm.observe_rows.0.unit')
+            ->call('addVisitObserveRow', 'LittleSEED')
+            ->assertSeeHtml('visitForm.observe_rows.0.unit')
+            ->assertSee('SET')
+            ->assertSee('Day')
+            ->call('addVisitObserveRow', 'GrapeSEED')
+            ->assertSeeHtml('visitForm.observe_rows.1.unit');
     }
 
     public function test_support_method_selects_sync_on_change(): void
@@ -685,6 +701,32 @@ class SupportCreateFormTest extends TestCase
             ->assertSee('3차 (해당 연도 계획)')
             ->assertSee('4차')
             ->assertSee('기준 연도 '.$year);
+    }
+
+    public function test_coach_team_support_round_uses_march_to_february_cycle_year(): void
+    {
+        $this->travelTo('2027-01-15 10:00:00');
+
+        Institution::query()->create([
+            'SKcode' => 'SK-COACH-CYCLE-ROUND',
+            'AccountName' => 'Coach 주기 차시 기관',
+        ]);
+
+        $teacherId = (int) DB::table('Teachers')->insertGetId([
+            'SK_Code' => 'SK-COACH-CYCLE-ROUND',
+            'Name' => '주기교사',
+            'Plan_2nd_Support_Date' => '2026-05-01',
+        ]);
+
+        $user = User::factory()->create(['team' => 'COACH']);
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'coach'])
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-COACH-CYCLE-ROUND')
+            ->set('formTeacherId', $teacherId)
+            ->assertSet('supportRound', '2')
+            ->assertSee('기준 연도 2026');
     }
 
     public function test_coach_teacher_selector_excludes_retired_teacher(): void

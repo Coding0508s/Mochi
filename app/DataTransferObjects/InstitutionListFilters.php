@@ -28,4 +28,21 @@ readonly class InstitutionListFilters
             sortDirection: $component->sortDirection,
         );
     }
+
+    /**
+     * 상세 모달 조회용: 목록 검색·상태 필터와 무관하게 권한 범위 안 기관을 찾습니다.
+     */
+    public function forDetailLookup(): self
+    {
+        return new self(
+            search: '',
+            statusFilter: 'all',
+            assignmentFilter: '',
+            filterCo: '',
+            filterTr: '',
+            filterCs: '',
+            sortField: $this->sortField,
+            sortDirection: $this->sortDirection,
+        );
+    }
 }

@@ -22,21 +22,20 @@
             @include('partials.sidebar-menu-icon', ['name' => 'users', 'small' => true])
             <span class="sidebar-subitem-label">교사 지원 현황</span>
         </a>
-        @include('partials.sidebar-shared-team-menus', [
-            'teamMenuQuery' => 'coach',
-            'sharedTeamMenus' => [
-                ['label' => '교사 및 기관 지원', 'path' => '/supports', 'route' => 'supports', 'icon' => 'document'],
-                ['label' => '기관리스트', 'path' => '/institutions', 'route' => 'institutions', 'icon' => 'building'],
-                ['label' => '교직원 연락처보기', 'path' => '/contacts', 'route' => 'contacts', 'icon' => 'phone'],
-            ],
-        ])
-        @include('partials.sidebar-brochure-team-menus', ['teamMenuQuery' => 'coach'])
         <a href="/coach/retired-teachers?team_menu=coach"
            class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ ($retiredTeachersSidebarActive ?? (request()->routeIs('coach.retired-teachers.*') && request()->query('sidebar_context') !== 'admin')) ? 'sidebar-subitem-active' : '' }}"
            @if($retiredTeachersSidebarActive ?? (request()->routeIs('coach.retired-teachers.*') && request()->query('sidebar_context') !== 'admin')) aria-current="page" @endif>
             @include('partials.sidebar-menu-icon', ['name' => 'users', 'small' => true])
             <span class="sidebar-subitem-label">퇴직교사 리스트</span>
         </a>
+        @include('partials.sidebar-shared-team-menus', [
+            'teamMenuQuery' => 'coach',
+            'sharedTeamMenus' => [
+                ['label' => '기관리스트', 'path' => '/institutions', 'route' => 'institutions', 'icon' => 'building'],
+                ['label' => '교사 및 기관 지원', 'path' => '/supports', 'route' => 'supports', 'icon' => 'document'],
+                ['label' => '교직원 연락처보기', 'path' => '/contacts', 'route' => 'contacts', 'icon' => 'phone'],
+            ],
+        ])
         @can('viewCoachTeamKpi')
             <a href="/coach/institution-coverage?team_menu=coach"
                class="sidebar-subitem sidebar-subitem-row sidebar-focusable {{ request()->routeIs('coach.institution-coverage.*') ? 'sidebar-subitem-active' : '' }}"

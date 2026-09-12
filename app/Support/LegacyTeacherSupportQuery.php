@@ -70,7 +70,7 @@ final class LegacyTeacherSupportQuery
 
     /**
      * @param  list<int>  $teacherIds
-     * @return array<int, list<array{date: string, type: string}>>
+     * @return array<int, list<array{date: string, type: string, detail_key: string}>>
      */
     public static function completedReportsForTeacherIds(array $teacherIds, ?int $year): array
     {
@@ -106,7 +106,11 @@ final class LegacyTeacherSupportQuery
                 $query->where('Status', '완료');
             }
 
+            $hasId = Schema::hasColumn($table, 'ID');
             $select = [$teacherIdColumn, 'SupportDate'];
+            if ($hasId) {
+                $select[] = 'ID';
+            }
             foreach (['LVA_TYPE', 'ReportType'] as $optionalColumn) {
                 if (Schema::hasColumn($table, $optionalColumn)) {
                     $select[] = $optionalColumn;
@@ -126,9 +130,11 @@ final class LegacyTeacherSupportQuery
                 }
 
                 $teacherId = (int) $row->{$teacherIdColumn};
+                $recordId = $hasId ? (int) ($row->ID ?? 0) : 0;
                 $reportsByTeacher[$teacherId][] = [
                     'date' => $date,
                     'type' => self::resolveTypeLabel($source, $row),
+                    'detail_key' => $recordId > 0 ? 'legacy:'.$table.':'.$recordId : '',
                     'sort' => Carbon::parse($date)->getTimestamp(),
                 ];
             }
@@ -142,6 +148,7 @@ final class LegacyTeacherSupportQuery
                 fn (array $report): array => [
                     'date' => $report['date'],
                     'type' => $report['type'],
+                    'detail_key' => $report['detail_key'],
                 ],
                 $reports,
             );
