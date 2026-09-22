@@ -248,6 +248,7 @@ class SharedSupplyExcelImporterTest extends TestCase
 
         try {
             $result = app(SharedSupplyExcelImporter::class)->importFromFile($path, $actor->id);
+            $this->assertSame(0, (int) ini_get('max_execution_time'));
         } finally {
             @unlink($path);
         }

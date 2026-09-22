@@ -55,7 +55,7 @@ class SharedSupplyExcelImporter
      */
     public function importFromFile(string $filePath, int $actorUserId): array
     {
-        set_time_limit(120);
+        ImportExecutionTime::extendForLongImport();
 
         $spreadsheet = IOFactory::load($filePath);
         $headerMissingResult = null;
