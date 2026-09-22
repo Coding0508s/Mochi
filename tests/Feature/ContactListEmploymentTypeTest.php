@@ -238,6 +238,36 @@ class ContactListEmploymentTypeTest extends TestCase
         ]);
     }
 
+    public function test_contact_edit_modal_includes_bujang_position_option(): void
+    {
+        $this->seedInstitution('SK-EMP-7');
+
+        $teacherId = Teacher::query()->create([
+            'SK_Code' => 'SK-EMP-7',
+            'Name' => '직급교사',
+            'Email' => 'position@example.com',
+            'Position' => '교사',
+            'Status' => '활성화',
+            'EmploymentType' => TeacherEmploymentType::Unspecified->value,
+            'ClassInOut' => false,
+        ])->ID;
+
+        $user = User::factory()->admin()->create();
+
+        Livewire::actingAs($user)
+            ->test(ContactList::class)
+            ->call('openEditModal', $teacherId)
+            ->assertSeeHtml('value="부장"')
+            ->set('newPosition', '부장')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('Teachers', [
+            'ID' => $teacherId,
+            'Position' => '부장',
+        ]);
+    }
+
     private function seedInstitution(string $skCode): void
     {
         Institution::query()->create([

@@ -3193,6 +3193,7 @@ class CoachTeacherSupportListTest extends TestCase
             ->assertSee('교사정보 수정하기')
             ->assertSee('저장하기')
             ->assertSee('취소')
+            ->assertSeeHtml('value="부장"')
             ->assertDontSee('>수정하기<', false)
             ->set('teacherProfileForm.name', '김수정')
             ->set('teacherProfileForm.email', 'new@test.com')
@@ -3208,6 +3209,27 @@ class CoachTeacherSupportListTest extends TestCase
         $this->assertSame('new@test.com', $teacher->Email);
         $this->assertSame('full_time', $teacher->EmploymentType?->value ?? $teacher->getAttributes()['EmploymentType']);
         $this->assertFalse((bool) $teacher->getAttributes()['ClassInOut']);
+    }
+
+    public function test_teacher_edit_modal_includes_bujang_position_option(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $id = $this->createTeacher('SK001', '김교사', [
+            'Position' => '교사',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CoachTeacherSupportList::class)
+            ->call('openTeacherModal', $id)
+            ->call('startTeacherEdit')
+            ->assertSeeHtml('value="부장"')
+            ->set('teacherProfileForm.position', '부장')
+            ->call('saveTeacherProfile')
+            ->assertHasNoErrors();
+
+        $this->assertSame('부장', Teacher::find($id)->Position);
     }
 
     public function test_save_teacher_profile_trims_email_and_saves(): void
