@@ -814,6 +814,7 @@
                                     <option value="부원장">부원장</option>
                                     <option value="교사">교사</option>
                                     <option value="행정">행정</option>
+                                    <option value="부장">부장</option>
                                     <option value="교수 부장">교수 부장</option>
                                     <option value="교감">교감</option>
                                     <option value="기타">기타</option>
@@ -1229,6 +1230,7 @@
                                         <option value="부원장">부원장</option>
                                         <option value="교사">교사</option>
                                         <option value="행정">행정</option>
+                                        <option value="부장">부장</option>
                                         <option value="교수 부장">교수 부장</option>
                                         <option value="교감">교감</option>
                                         <option value="기타">기타</option>
