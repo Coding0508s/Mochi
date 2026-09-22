@@ -501,4 +501,38 @@ class ContactListRetireTest extends TestCase
             ->set('teacherStatusFilter', 'active')
             ->assertSee('신규 생성');
     }
+
+    public function test_status_filter_label_shows_employed_instead_of_active(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(ContactList::class)
+            ->assertSee('재직')
+            ->assertDontSeeHtml('>활성</button>');
+    }
+
+    public function test_retired_teachers_show_retired_badge_in_list(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->createInstitution('SK001', '기관A', 'Coach A');
+        $this->createTeacher('SK001', '재직교사');
+        $this->createRetiredTeacherWithRecord('SK001', '퇴직교사');
+
+        Livewire::actingAs($admin)
+            ->test(ContactList::class)
+            ->set('teacherStatusFilter', 'all')
+            ->assertSee('재직교사')
+            ->assertSee('퇴직교사')
+            ->assertSeeHtml('bg-green-100 text-green-700">재직</span>')
+            ->assertSeeHtml('bg-red-100 text-red-700">퇴직</span>');
+
+        Livewire::actingAs($admin)
+            ->test(ContactList::class)
+            ->set('teacherStatusFilter', 'active')
+            ->assertSee('재직교사')
+            ->assertSeeHtml('bg-green-100 text-green-700">재직</span>')
+            ->assertDontSeeHtml('bg-red-100 text-red-700">퇴직</span>');
+    }
 }
