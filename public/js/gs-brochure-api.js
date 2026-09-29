@@ -115,6 +115,8 @@ window.RequestAPI = {
     },
     create: (data) => apiCall('/requests', 'POST', data),
     update: (id, data) => apiCall(`/requests/${id}`, 'PUT', data),
+    delete: (id) => apiCall(`/requests/${id}`, 'DELETE'),
+    deleteMany: (ids) => apiCall('/requests/bulk-delete', 'POST', { ids }),
     addInvoices: (id, invoices) => apiCall(`/requests/${id}/invoices`, 'POST', { invoices }),
     deleteInvoices: (id) => apiCall(`/requests/${id}/invoices`, 'DELETE'),
 };
