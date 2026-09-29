@@ -85,7 +85,8 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/gs-brochure-api.js') }}"></script>
+@php($gsBrochureApiJsVersion = @filemtime(public_path('js/gs-brochure-api.js')) ?: time())
+<script src="{{ asset('js/gs-brochure-api.js') }}?v={{ $gsBrochureApiJsVersion }}"></script>
 <script>
         const CAN_EDIT_STAFF_REQUESTS = @json(auth()->check());
         const CAN_DELETE_REQUESTS = @json(auth()->user()?->can('manageGsBrochureAdmin') ?? false);

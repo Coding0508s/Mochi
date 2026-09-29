@@ -51,6 +51,7 @@ class GsBrochurePublicListV2PageTest extends TestCase
         $response->assertSee('이 페이지 전체 선택', false);
         $response->assertSee('deleteRequestById', false);
         $response->assertSee('CAN_DELETE_REQUESTS = true', false);
+        $response->assertSee('gs-brochure-api.js?v=', false);
     }
 
     public function test_legacy_staff_requests_route_redirects_to_staff_list_for_all_authenticated_users(): void
