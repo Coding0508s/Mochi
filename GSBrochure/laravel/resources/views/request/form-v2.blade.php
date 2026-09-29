@@ -180,7 +180,8 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/gs-brochure-api.js') }}"></script>
+@php($gsBrochureApiJsVersion = @filemtime(public_path('js/gs-brochure-api.js')) ?: time())
+<script src="{{ asset('js/gs-brochure-api.js') }}?v={{ $gsBrochureApiJsVersion }}"></script>
 <script>
 (function() {
     window.skipPhoneVerification = @json(auth()->check());
