@@ -33,6 +33,8 @@ class GsBrochurePublicListV2PageTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('신청 내역 조회', false);
+        $response->assertDontSee('선택 삭제', false);
+        $response->assertSee('CAN_DELETE_REQUESTS = false', false);
     }
 
     public function test_brochure_admin_user_can_see_staff_list_view_from_unified_route(): void
@@ -45,6 +47,10 @@ class GsBrochurePublicListV2PageTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('신청 내역 조회', false);
+        $response->assertSee('선택 삭제', false);
+        $response->assertSee('이 페이지 전체 선택', false);
+        $response->assertSee('deleteRequestById', false);
+        $response->assertSee('CAN_DELETE_REQUESTS = true', false);
     }
 
     public function test_legacy_staff_requests_route_redirects_to_staff_list_for_all_authenticated_users(): void

@@ -57,6 +57,20 @@
                     </div>
                 </section>
 
+                @if(auth()->user()?->can('manageGsBrochureAdmin'))
+                    <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark px-4 py-3">
+                        <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                            <input type="checkbox" id="selectAllVisibleRequests" class="rounded border-gray-300 text-primary focus:ring-primary">
+                            이 페이지 전체 선택
+                        </label>
+                        <button type="button"
+                                id="deleteSelectedRequestsBtn"
+                                class="inline-flex items-center gap-1 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50">
+                            선택 삭제
+                        </button>
+                    </div>
+                @endif
+
                 <div id="requestsContainer" class="space-y-3">
                     <!-- 신청 내역이 여기에 표시됩니다 -->
                 </div>
@@ -74,10 +88,12 @@
 <script src="{{ asset('js/gs-brochure-api.js') }}"></script>
 <script>
         const CAN_EDIT_STAFF_REQUESTS = @json(auth()->check());
+        const CAN_DELETE_REQUESTS = @json(auth()->user()?->can('manageGsBrochureAdmin') ?? false);
         let allRequests = [];
         let filteredRequests = [];
         let currentPage = 1;
         const itemsPerPage = 10;
+        const selectedRequestIds = new Set();
 
         async function loadBrochureOptions() {
             try {
@@ -158,6 +174,7 @@
                 `;
                 document.getElementById('pagination').innerHTML = '';
                 document.getElementById('paginationInfo').textContent = '';
+                syncSelectAllCheckbox();
                 return;
             }
 
@@ -172,6 +189,7 @@
             });
 
             updatePagination(totalPages, totalItems);
+            syncSelectAllCheckbox();
         }
 
         function updatePagination(totalPages, totalItems) {
@@ -286,21 +304,50 @@
             card.id = cardId;
             card.dataset.groupIndex = groupIndex;
             card.dataset.requestIndex = requestIndex;
+            card.dataset.requestId = String(request.id);
 
-            const editButton = isEditable
+            const isSelected = selectedRequestIds.has(Number(request.id));
+            const selectCheckbox = CAN_DELETE_REQUESTS
+                ? `<label class="shrink-0 cursor-pointer">
+                        <input type="checkbox"
+                               class="request-select-checkbox rounded border-gray-300 text-primary focus:ring-primary"
+                               value="${request.id}"
+                               ${isSelected ? 'checked' : ''}
+                               aria-label="신청 선택"
+                               onchange="toggleRequestSelection(this)">
+                   </label>`
+                : '';
+
+            const rowDeleteButton = CAN_DELETE_REQUESTS
+                ? `<button type="button"
+                           class="m-3 shrink-0 rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                           onclick="deleteRequestById(${Number(request.id)})"
+                           aria-label="이 신청 삭제">삭제</button>`
+                : '';
+
+            const actionButtons = (isEditable || CAN_DELETE_REQUESTS)
                 ? `<div class="card-actions mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
-                    <button type="button" class="m-[5px] px-4 py-2 bg-primary hover:bg-purple-800 text-white font-medium rounded-lg transition-colors" onclick="editRequest('${cardId}')">수정</button>
+                    ${CAN_DELETE_REQUESTS
+                        ? `<button type="button" class="m-[5px] px-4 py-2 border border-red-300 text-red-700 font-medium rounded-lg hover:bg-red-50 transition-colors" onclick="deleteRequestById(${Number(request.id)})">삭제</button>`
+                        : ''}
+                    ${isEditable
+                        ? `<button type="button" class="m-[5px] px-4 py-2 bg-primary hover:bg-purple-800 text-white font-medium rounded-lg transition-colors" onclick="editRequest('${cardId}')">수정</button>`
+                        : ''}
                    </div>`
                 : '';
 
             card.innerHTML = `
-                <button type="button" class="accordion-toggle w-full flex flex-wrap items-center gap-3 px-4 py-3.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors" aria-expanded="false" aria-controls="${cardId}-details" onclick="toggleCard('${cardId}')">
+                <div class="flex items-stretch">
+                    ${selectCheckbox ? `<div class="flex items-center pl-4">${selectCheckbox}</div>` : ''}
+                    <button type="button" class="accordion-toggle min-w-0 flex-1 flex flex-wrap items-center gap-3 px-4 py-3.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors" aria-expanded="false" aria-controls="${cardId}-details" onclick="toggleCard('${cardId}')">
                     <span class="material-icons accordion-chevron text-gray-400 transition-transform duration-200">expand_more</span>
                     <span class="flex-1 min-w-[120px] font-semibold text-gray-900 dark:text-white truncate">${request.schoolname}</span>
                     <span class="hidden md:block flex-1 text-sm text-gray-600 dark:text-gray-300 truncate">${brochureSummary} · 총 ${totalQuantity}권</span>
                     <span class="hidden sm:block text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">${formatDate(request.date)}</span>
                     ${statusBadge}
-                </button>
+                    </button>
+                    ${rowDeleteButton}
+                </div>
                 <div id="${cardId}-details" class="accordion-details hidden border-t border-gray-200 dark:border-gray-700">
                     <div class="request-info grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
                         <div class="info-item space-y-1">
@@ -332,7 +379,7 @@
                         <div class="info-label text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">운송장 번호</div>
                         ${invoiceListHtml}
                     </div>
-                    ${editButton}
+                    ${actionButtons}
                 </div>
             `;
 
@@ -588,8 +635,106 @@
             setTimeout(() => alertDiv.classList.add('hidden'), 3000);
         }
 
+        function visibleRequestIds() {
+            return Array.from(document.querySelectorAll('.request-select-checkbox'))
+                .map((el) => Number(el.value))
+                .filter((id) => Number.isInteger(id) && id > 0);
+        }
+
+        function toggleRequestSelection(checkbox) {
+            const id = Number(checkbox.value);
+            if (!Number.isInteger(id) || id <= 0) {
+                return;
+            }
+
+            if (checkbox.checked) {
+                selectedRequestIds.add(id);
+            } else {
+                selectedRequestIds.delete(id);
+            }
+
+            syncSelectAllCheckbox();
+        }
+
+        function syncSelectAllCheckbox() {
+            const selectAll = document.getElementById('selectAllVisibleRequests');
+            if (!selectAll) {
+                return;
+            }
+
+            const ids = visibleRequestIds();
+            selectAll.checked = ids.length > 0 && ids.every((id) => selectedRequestIds.has(id));
+            selectAll.indeterminate = ids.some((id) => selectedRequestIds.has(id)) && !selectAll.checked;
+        }
+
+        async function deleteRequestById(requestId) {
+            const id = Number(requestId);
+            if (!Number.isInteger(id) || id <= 0) {
+                return;
+            }
+
+            if (!confirm('이 신청을 삭제할까요? 이 작업은 되돌릴 수 없습니다.')) {
+                return;
+            }
+
+            try {
+                await RequestAPI.delete(id);
+                selectedRequestIds.delete(id);
+                showAlert('신청을 삭제했습니다.', 'success');
+                await loadRequests();
+            } catch (error) {
+                console.error('신청 삭제 오류:', error);
+                showAlert('신청을 삭제하는 중 오류가 발생했습니다.', 'danger');
+            }
+        }
+
+        async function deleteSelectedRequests() {
+            const ids = Array.from(selectedRequestIds);
+            if (ids.length === 0) {
+                showAlert('삭제할 신청을 선택해 주세요.', 'danger');
+                return;
+            }
+
+            if (!confirm(`선택한 신청 ${ids.length}건을 삭제할까요? 이 작업은 되돌릴 수 없습니다.`)) {
+                return;
+            }
+
+            try {
+                await RequestAPI.deleteMany(ids);
+                selectedRequestIds.clear();
+                showAlert('선택한 신청을 삭제했습니다.', 'success');
+                await loadRequests();
+            } catch (error) {
+                console.error('신청 삭제 오류:', error);
+                showAlert('신청을 삭제하는 중 오류가 발생했습니다.', 'danger');
+            }
+        }
+
         window.addEventListener('DOMContentLoaded', function() {
             loadRequests();
+
+            const selectAll = document.getElementById('selectAllVisibleRequests');
+            if (selectAll) {
+                selectAll.addEventListener('change', function () {
+                    const ids = visibleRequestIds();
+                    ids.forEach((id) => {
+                        if (selectAll.checked) {
+                            selectedRequestIds.add(id);
+                        } else {
+                            selectedRequestIds.delete(id);
+                        }
+                    });
+                    document.querySelectorAll('.request-select-checkbox').forEach((el) => {
+                        el.checked = selectAll.checked;
+                    });
+                    syncSelectAllCheckbox();
+                });
+            }
+
+            const deleteBtn = document.getElementById('deleteSelectedRequestsBtn');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', deleteSelectedRequests);
+            }
         });
     </script>
 @endpush

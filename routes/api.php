@@ -61,6 +61,7 @@ Route::prefix('gs-brochure')->group(function () {
         Route::post('contacts', [ContactController::class, 'store']);
         Route::put('contacts/{id}', [ContactController::class, 'update']);
         Route::delete('contacts/{id}', [ContactController::class, 'destroy']);
+        Route::post('requests/bulk-delete', [RequestController::class, 'destroyMany']);
         Route::delete('requests/{id}', [RequestController::class, 'destroy']);
         Route::post('stock-history', [StockHistoryController::class, 'store']);
         Route::get('admin/users', [AdminController::class, 'users']);

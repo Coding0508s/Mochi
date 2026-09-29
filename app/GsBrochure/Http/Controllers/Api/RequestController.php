@@ -298,6 +298,21 @@ class RequestController extends Controller
         return response()->json(['success' => true]);
     }
 
+    public function destroyMany(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:200'],
+            'ids.*' => ['integer', 'distinct'],
+        ]);
+
+        $deleted = BrochureRequest::query()->whereIn('id', $data['ids'])->delete();
+
+        return response()->json([
+            'success' => true,
+            'deleted' => $deleted,
+        ]);
+    }
+
     public function addInvoices(Request $request, string $id): JsonResponse
     {
         $data = $request->validate(['invoices' => 'required|array', 'invoices.*' => 'string']);

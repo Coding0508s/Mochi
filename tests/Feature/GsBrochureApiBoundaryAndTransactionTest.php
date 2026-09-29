@@ -208,12 +208,93 @@ class GsBrochureApiBoundaryAndTransactionTest extends TestCase
             ->delete('/api/gs-brochure/requests/'.$request->id)
             ->assertForbidden();
 
+        $this->actingAs($staffUser)
+            ->postJson('/api/gs-brochure/requests/bulk-delete', [
+                'ids' => [$request->id],
+            ])
+            ->assertForbidden();
+
         $adminUser = User::factory()->create([
             'is_gs_brochure_admin' => true,
         ]);
         $this->actingAs($adminUser)
             ->getJson('/api/gs-brochure/requests')
             ->assertOk();
+    }
+
+    public function test_admin_can_bulk_delete_selected_requests(): void
+    {
+        $adminUser = User::factory()->create([
+            'is_gs_brochure_admin' => true,
+        ]);
+        $keep = BrochureRequest::create([
+            'date' => '2026-09-01',
+            'schoolname' => '유지 기관',
+            'address' => '서울시',
+            'phone' => '010-1111-1111',
+            'contact_id' => null,
+            'contact_name' => null,
+        ]);
+        $removeA = BrochureRequest::create([
+            'date' => '2026-09-02',
+            'schoolname' => '삭제 기관 A',
+            'address' => '서울시',
+            'phone' => '010-2222-2222',
+            'contact_id' => null,
+            'contact_name' => null,
+        ]);
+        $removeB = BrochureRequest::create([
+            'date' => '2026-09-03',
+            'schoolname' => '삭제 기관 B',
+            'address' => '서울시',
+            'phone' => '010-3333-3333',
+            'contact_id' => null,
+            'contact_name' => null,
+        ]);
+
+        $this->actingAs($adminUser)
+            ->postJson('/api/gs-brochure/requests/bulk-delete', [
+                'ids' => [$removeA->id, $removeB->id],
+            ])
+            ->assertOk()
+            ->assertJson([
+                'success' => true,
+                'deleted' => 2,
+            ]);
+
+        $this->assertDatabaseHas((new BrochureRequest)->getTable(), [
+            'id' => $keep->id,
+        ]);
+        $this->assertDatabaseMissing((new BrochureRequest)->getTable(), [
+            'id' => $removeA->id,
+        ]);
+        $this->assertDatabaseMissing((new BrochureRequest)->getTable(), [
+            'id' => $removeB->id,
+        ]);
+    }
+
+    public function test_admin_can_delete_a_single_request(): void
+    {
+        $adminUser = User::factory()->create([
+            'is_gs_brochure_admin' => true,
+        ]);
+        $request = BrochureRequest::create([
+            'date' => '2026-09-04',
+            'schoolname' => '단건 삭제 기관',
+            'address' => '서울시',
+            'phone' => '010-4444-4444',
+            'contact_id' => null,
+            'contact_name' => null,
+        ]);
+
+        $this->actingAs($adminUser)
+            ->deleteJson('/api/gs-brochure/requests/'.$request->id)
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseMissing((new BrochureRequest)->getTable(), [
+            'id' => $request->id,
+        ]);
     }
 
     public function test_request_store_is_atomic_when_stock_validation_fails(): void
