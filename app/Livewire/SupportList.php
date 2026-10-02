@@ -10,7 +10,6 @@ use App\Support\SupportRecordTeacherCompletionSync;
 use App\Support\SupportReportStoredMailNotifier;
 use App\Support\TeamMenuContext;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
@@ -69,6 +68,8 @@ class SupportList extends Component
     public bool $showContractModal = false;
 
     public string $contractSkCode = '';
+
+    public string $contractInstitutionKeyword = '';
 
     public string $contractAccountName = '';
 
@@ -160,6 +161,60 @@ class SupportList extends Component
             ->where('SKcode', $value)
             ->first();
         $this->contractAccountName = $inst?->resolvedAccountName() ?? '';
+
+        if ($this->contractAccountName !== '' && trim($this->contractInstitutionKeyword) === '') {
+            $this->contractInstitutionKeyword = $this->contractAccountName;
+        }
+    }
+
+    public function updatedContractInstitutionKeyword(string $value): void
+    {
+        $keyword = trim($value);
+
+        if ($keyword === '') {
+            $this->contractSkCode = '';
+            $this->contractAccountName = '';
+
+            return;
+        }
+
+        $inst = Institution::query()
+            ->with('accountInfo')
+            ->where(function ($query) use ($keyword): void {
+                $query->where('AccountName', $keyword)
+                    ->orWhere('SKcode', $keyword)
+                    ->orWhereHas('accountInfo', function ($info) use ($keyword): void {
+                        $info->where('Account_Name', $keyword);
+                    });
+            })
+            ->first();
+
+        if ($inst) {
+            $this->contractSkCode = (string) $inst->SKcode;
+            $this->contractAccountName = $inst->resolvedAccountName();
+            $this->contractInstitutionKeyword = $inst->resolvedAccountName();
+
+            return;
+        }
+
+        $this->contractSkCode = '';
+        $this->contractAccountName = '';
+    }
+
+    public function selectContractInstitution(string $skCode): void
+    {
+        $inst = Institution::query()
+            ->with('accountInfo')
+            ->where('SKcode', $skCode)
+            ->first();
+
+        if (! $inst) {
+            return;
+        }
+
+        $this->contractSkCode = (string) $inst->SKcode;
+        $this->contractAccountName = $inst->resolvedAccountName();
+        $this->contractInstitutionKeyword = $inst->resolvedAccountName();
     }
 
     public function selectContractDocument(int $id): void
@@ -172,6 +227,7 @@ class SupportList extends Component
         $this->contractSelectedId = (int) $doc->id;
         $this->contractSkCode = (string) ($doc->sk_code ?? '');
         $this->contractAccountName = (string) ($doc->account_name ?? '');
+        $this->contractInstitutionKeyword = (string) ($doc->account_name ?? '');
         $this->contractChangedAccountName = (string) ($doc->changed_account_name ?? '');
         $this->contractBusinessNumber = (string) ($doc->business_number ?? '');
         $this->contractDocumentDate = $doc->document_date?->format('Y-m-d') ?? '';
@@ -384,6 +440,7 @@ class SupportList extends Component
     private function resetContractUploadForm(): void
     {
         $this->contractSkCode = '';
+        $this->contractInstitutionKeyword = '';
         $this->contractAccountName = '';
         $this->contractChangedAccountName = '';
         $this->contractBusinessNumber = '';
@@ -680,24 +737,16 @@ class SupportList extends Component
             $this->filterYear = '';
         }
 
-        $shouldLoadInstitutions = $this->showContractModal || $this->showModal;
-        $institutions = $shouldLoadInstitutions
-            ? $this->institutionsForModalOptions()
-            : collect();
-
         $keyword = trim($this->formInstitutionKeyword);
         $institutionSuggestions = collect();
         if ($keyword !== '' && blank($this->formSkCode)) {
-            $institutionSuggestions = Institution::query()
-                ->with('accountInfo')
-                ->search($keyword)
-                ->orderBy('AccountName')
-                ->limit(8)
-                ->get(['SKcode', 'AccountName'])
-                ->map(fn (Institution $inst): object => (object) [
-                    'SKcode' => (string) $inst->SKcode,
-                    'AccountName' => $inst->resolvedAccountName(),
-                ]);
+            $institutionSuggestions = $this->institutionSuggestionsFor($keyword);
+        }
+
+        $contractKeyword = trim($this->contractInstitutionKeyword);
+        $contractInstitutionSuggestions = collect();
+        if ($this->showContractModal && $contractKeyword !== '' && blank($this->contractSkCode)) {
+            $contractInstitutionSuggestions = $this->institutionSuggestionsFor($contractKeyword);
         }
 
         $contractDocumentRows = $this->showContractModal && filled($this->contractSkCode)
@@ -711,8 +760,8 @@ class SupportList extends Component
         return view('livewire.support-list', [
             'records' => $records,
             'years' => $years,
-            'institutions' => $institutions,
             'institutionSuggestions' => $institutionSuggestions,
+            'contractInstitutionSuggestions' => $contractInstitutionSuggestions,
             'contractDocumentRows' => $contractDocumentRows,
             'crossTeamReadOnly' => TeamMenuContext::isCrossTeamReadOnlyContext(auth()->user()),
         ]);
@@ -773,73 +822,21 @@ class SupportList extends Component
     }
 
     /**
-     * CO/지원 모달 기관 선택 목록.
-     *
-     * Eloquent 모델을 캐시에 그대로 저장하면 역직렬화 후 문자열 등 잘못된 타입이 섞여
-     * Blade에서 $inst->SKcode 접근 시 500이 날 수 있어 스칼라 배열만 캐시합니다.
+     * 기관명·SK코드 입력에 맞는 후보를 최대 8개 돌려줍니다.
      *
      * @return Collection<int, object{SKcode: string, AccountName: string}>
      */
-    private function institutionsForModalOptions(): Collection
+    private function institutionSuggestionsFor(string $keyword): Collection
     {
-        $cached = Cache::remember(
-            'support-list:institutions-for-modal:v2',
-            now()->addMinutes(10),
-            function (): array {
-                return Institution::query()
-                    ->with('accountInfo')
-                    ->whereNotNull('SKcode')
-                    ->orderBy('AccountName')
-                    ->get(['SKcode', 'AccountName'])
-                    ->map(fn (Institution $inst): array => [
-                        'SKcode' => (string) $inst->SKcode,
-                        'AccountName' => $inst->resolvedAccountName(),
-                    ])
-                    ->values()
-                    ->all();
-            },
-        );
-
-        return collect($cached)
-            ->map(function (mixed $row): ?object {
-                if ($row instanceof Institution) {
-                    return (object) [
-                        'SKcode' => (string) $row->SKcode,
-                        'AccountName' => $row->resolvedAccountName(),
-                    ];
-                }
-
-                if (is_array($row)) {
-                    $skCode = trim((string) ($row['SKcode'] ?? $row['sk_code'] ?? ''));
-                    $accountName = trim((string) ($row['AccountName'] ?? $row['account_name'] ?? ''));
-
-                    if ($skCode === '') {
-                        return null;
-                    }
-
-                    return (object) [
-                        'SKcode' => $skCode,
-                        'AccountName' => $accountName !== '' ? $accountName : $skCode,
-                    ];
-                }
-
-                if (is_object($row)) {
-                    $skCode = trim((string) ($row->SKcode ?? $row->sk_code ?? ''));
-                    $accountName = trim((string) ($row->AccountName ?? $row->account_name ?? ''));
-
-                    if ($skCode === '') {
-                        return null;
-                    }
-
-                    return (object) [
-                        'SKcode' => $skCode,
-                        'AccountName' => $accountName !== '' ? $accountName : $skCode,
-                    ];
-                }
-
-                return null;
-            })
-            ->filter()
-            ->values();
+        return Institution::query()
+            ->with('accountInfo')
+            ->search($keyword)
+            ->orderBy('AccountName')
+            ->limit(8)
+            ->get(['SKcode', 'AccountName'])
+            ->map(fn (Institution $inst): object => (object) [
+                'SKcode' => (string) $inst->SKcode,
+                'AccountName' => $inst->resolvedAccountName(),
+            ]);
     }
 }

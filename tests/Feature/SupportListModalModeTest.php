@@ -34,12 +34,20 @@ class SupportListModalModeTest extends TestCase
             $table->increments('ID');
             $table->string('SKcode', 100)->unique();
             $table->string('AccountName', 255);
+            $table->string('Director', 255)->nullable();
+            $table->string('Address', 255)->nullable();
         });
 
         Schema::create('S_Account_Information', function (Blueprint $table): void {
             $table->increments('ID');
             $table->string('SK_Code', 100);
             $table->string('Account_Name', 255)->nullable();
+            $table->string('CO', 100)->nullable();
+            $table->string('TR', 100)->nullable();
+            $table->string('CS', 100)->nullable();
+            $table->string('Customer_Type', 100)->nullable();
+            $table->string('Affiliate', 100)->nullable();
+            $table->string('Address', 255)->nullable();
         });
 
         Schema::create('S_SupportInfo_Account', function (Blueprint $table): void {
@@ -274,9 +282,11 @@ class SupportListModalModeTest extends TestCase
         Livewire::actingAs($user)
             ->test(SupportList::class)
             ->call('openContractUploadModal')
-            ->set('contractSkCode', 'SK-CONTRACT-MODAL')
+            ->set('contractInstitutionKeyword', '계약 업로드')
+            ->assertSee('계약 업로드 기관')
+            ->call('selectContractInstitution', 'SK-CONTRACT-MODAL')
             ->assertSet('contractSkCode', 'SK-CONTRACT-MODAL')
-            ->assertSee('계약 업로드 기관');
+            ->assertSet('contractInstitutionKeyword', '계약 업로드 기관');
     }
 
     public function test_contract_upload_modal_tolerates_poisoned_institutions_cache(): void
@@ -299,9 +309,11 @@ class SupportListModalModeTest extends TestCase
         Livewire::actingAs($user)
             ->test(SupportList::class)
             ->call('openContractUploadModal')
-            ->set('contractSkCode', 'SK-CONTRACT-MODAL')
+            ->set('contractInstitutionKeyword', '계약 업로드')
+            ->assertSee('계약 업로드 기관')
+            ->call('selectContractInstitution', 'SK-CONTRACT-MODAL')
             ->assertSet('contractSkCode', 'SK-CONTRACT-MODAL')
-            ->assertSee('[SK-CONTRACT-MODAL]');
+            ->assertSee('SK-CONTRACT-MODAL');
     }
 
     public function test_edit_modal_support_type_options_match_institution_report(): void

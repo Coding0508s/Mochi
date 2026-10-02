@@ -539,13 +539,28 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">기관명 <span class="text-red-500">*</span></label>
-                                <select wire:model.live="contractSkCode"
-                                        class="w-full py-2 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header">
-                                    <option value="">기관을 선택하세요</option>
-                                    @foreach($institutions as $inst)
-                                        <option value="{{ $inst->SKcode }}">[{{ $inst->SKcode }}] {{ $inst->AccountName }}</option>
-                                    @endforeach
-                                </select>
+                                <input type="text"
+                                       wire:model.live.debounce.200ms="contractInstitutionKeyword"
+                                       placeholder="기관명 또는 SK코드를 입력하세요"
+                                       class="w-full py-2 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-mochi-header
+                                              {{ $errors->has('contractSkCode') ? 'border-red-400' : 'border-gray-300' }}" />
+                                @if(filled($contractInstitutionKeyword) && blank($contractSkCode) && $contractInstitutionSuggestions->isNotEmpty())
+                                    <div class="mt-2 max-h-44 overflow-auto border border-gray-200 rounded-lg bg-white shadow-sm">
+                                        @foreach($contractInstitutionSuggestions as $inst)
+                                            <button type="button"
+                                                    wire:click="selectContractInstitution('{{ $inst->SKcode }}')"
+                                                    class="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors">
+                                                <span class="font-medium text-gray-900">{{ $inst->AccountName }}</span>
+                                                <span class="ml-2 text-xs text-gray-500">({{ $inst->SKcode }})</span>
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                @endif
+                                @if(filled($contractSkCode))
+                                    <p class="mt-1 text-xs text-blue-600">
+                                        선택된 기관: {{ $contractAccountName }} ({{ $contractSkCode }})
+                                    </p>
+                                @endif
                                 @error('contractSkCode') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                             </div>
                             <div>
