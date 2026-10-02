@@ -116,7 +116,7 @@
                                 wire:click="$set('teacherStatusFilter', 'active')"
                                 aria-pressed="{{ $teacherStatusFilter === 'active' ? 'true' : 'false' }}"
                                 class="mochi-toggle-btn {{ $teacherStatusFilter === 'active' ? 'mochi-toggle-btn--active' : '' }}">
-                            활성
+                            재직
                         </button>
                         <button type="button"
                                 wire:click="$set('teacherStatusFilter', 'retired')"
@@ -173,6 +173,7 @@
                     <th class="contact-sticky-name contact-sticky-name--head px-3 py-2 text-left text-xs font-semibold">이름</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">직급</th>
                     <th class="px-3 py-2 text-center text-xs font-semibold">근무 형태</th>
+                    <th class="px-3 py-2 text-center text-xs font-semibold">상태</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">이메일</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">전화번호</th>
                     <th class="px-3 py-2 text-left text-xs font-semibold">GrapeSEED Essentials</th>
@@ -211,6 +212,13 @@
                         <td class="px-3 py-2.5 text-center">
                             <span class="text-xs text-gray-700">{{ $this->employmentTypeLabel($teacher) }}</span>
                         </td>
+                        <td class="px-3 py-2.5 text-center">
+                            @if($teacher->isRetired())
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">퇴직</span>
+                            @else
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">재직</span>
+                            @endif
+                        </td>
                         <td class="px-3 py-2.5 text-gray-600 text-xs">{{ $teacher->Email ?? '-' }}</td>
                         <td class="px-3 py-2.5 text-gray-600">{{ $teacher->Phone ?? '-' }}</td>
                         <td class="px-3 py-2.5 text-gray-600 text-xs">
@@ -231,7 +239,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="15" class="px-4 py-16 text-center text-gray-400">
+                        <td colspan="16" class="px-4 py-16 text-center text-gray-400">
                             <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                       d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
