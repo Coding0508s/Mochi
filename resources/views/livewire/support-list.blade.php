@@ -649,6 +649,9 @@
                                            class="flex items-center justify-center w-full px-4 py-2.5 text-sm font-medium text-white bg-mochi-header hover:bg-mochi-header/90 rounded-lg cursor-pointer transition-colors">
                                         파일 선택
                                     </label>
+                                    <p class="text-xs text-gray-500 leading-relaxed">
+                                        허용 형식: PDF, 이미지(JPG, PNG, GIF, WEBP), Word, Excel · 최대 100MB
+                                    </p>
                                     <div wire:loading wire:target="contractUpload" class="text-xs text-blue-600">파일 처리 중…</div>
                                     @error('contractUpload') <p class="text-xs text-red-500">{{ $message }}</p> @enderror
 

@@ -36,6 +36,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // 계약서 업로드는 100MB까지 허용합니다. 미설정 시 Livewire 임시 업로드 기본값(12MB)에서 먼저 거절됩니다.
+        config([
+            'livewire.temporary_file_upload.rules' => ['required', 'file', 'max:102400'],
+        ]);
+
         RateLimiter::for('external-institution-ingest', function (Request $request): Limit {
             return Limit::perMinute(120)->by($request->bearerToken() ?: $request->ip());
         });

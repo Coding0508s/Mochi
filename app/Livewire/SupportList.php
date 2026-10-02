@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
@@ -81,7 +82,12 @@ class SupportList extends Component
 
     public string $contractConsultant = '';
 
-    /** @var TemporaryUploadedFile|null */
+    /**
+     * 계약서 임시 업로드. 저장 시점의 required 여부는 신규/수정에 따라 메서드에서 다시 검사합니다.
+     *
+     * @var TemporaryUploadedFile|null
+     */
+    #[Validate(['nullable', 'file', 'max:102400', 'mimes:pdf,jpg,jpeg,png,gif,webp,doc,docx,xls,xlsx'])]
     public $contractUpload = null;
 
     public ?int $contractSelectedId = null;
@@ -99,6 +105,9 @@ class SupportList extends Component
         'formSupportDate.date' => '올바른 날짜 형식이 아닙니다.',
         'formSupportTime.required' => '지원 시간을 입력해 주세요.',
         'formSupportTime.regex' => '지원 시간은 HH:MM 형식으로 입력해 주세요.',
+        'contractUpload.max' => '파일 크기는 100MB 이하여야 합니다.',
+        'contractUpload.mimes' => '허용 형식: PDF, 이미지, Word, Excel',
+        'contractUpload.uploaded' => '파일 업로드에 실패했습니다. 크기는 100MB 이하여야 하며, 서버 업로드 제한을 넘기면 저장되지 않습니다.',
     ];
 
     // ─── 필터 변경 시 1페이지로 초기화 ───────────────────────────
@@ -204,7 +213,7 @@ class SupportList extends Component
             'contractUpload' => [
                 'required',
                 'file',
-                'max:20480',
+                'max:102400',
                 'mimes:pdf,jpg,jpeg,png,gif,webp,doc,docx,xls,xlsx',
             ],
         ], [
@@ -212,8 +221,9 @@ class SupportList extends Component
             'contractDocumentDate.required' => '날짜를 선택해 주세요.',
             'contractDocumentTime.required' => '시간을 입력해 주세요.',
             'contractUpload.required' => '업로드할 파일을 선택해 주세요.',
-            'contractUpload.max' => '파일 크기는 20MB 이하여야 합니다.',
+            'contractUpload.max' => '파일 크기는 100MB 이하여야 합니다.',
             'contractUpload.mimes' => '허용 형식: PDF, 이미지, Word, Excel',
+            'contractUpload.uploaded' => '파일 업로드에 실패했습니다. 크기는 100MB 이하여야 하며, 서버 업로드 제한을 넘기면 저장되지 않습니다.',
         ]);
 
         $file = $this->contractUpload;
@@ -277,15 +287,16 @@ class SupportList extends Component
             'contractUpload' => [
                 'nullable',
                 'file',
-                'max:20480',
+                'max:102400',
                 'mimes:pdf,jpg,jpeg,png,gif,webp,doc,docx,xls,xlsx',
             ],
         ], [
             'contractSkCode.required' => '기관을 선택해 주세요.',
             'contractDocumentDate.required' => '날짜를 선택해 주세요.',
             'contractDocumentTime.required' => '시간을 입력해 주세요.',
-            'contractUpload.max' => '파일 크기는 20MB 이하여야 합니다.',
+            'contractUpload.max' => '파일 크기는 100MB 이하여야 합니다.',
             'contractUpload.mimes' => '허용 형식: PDF, 이미지, Word, Excel',
+            'contractUpload.uploaded' => '파일 업로드에 실패했습니다. 크기는 100MB 이하여야 하며, 서버 업로드 제한을 넘기면 저장되지 않습니다.',
         ]);
 
         $doc = ContractDocument::query()->findOrFail($this->contractSelectedId);

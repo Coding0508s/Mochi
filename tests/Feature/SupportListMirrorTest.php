@@ -322,4 +322,16 @@ class SupportListMirrorTest extends TestCase
         $this->assertDatabaseMissing('contract_documents', ['id' => (int) $doc->id]);
         $this->assertFalse(Storage::disk('local')->exists($storedPath));
     }
+
+    public function test_contract_upload_rejects_files_over_100mb_and_shows_allowed_types(): void
+    {
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(SupportList::class)
+            ->call('openContractUploadModal')
+            ->assertSee('허용 형식: PDF, 이미지(JPG, PNG, GIF, WEBP), Word, Excel · 최대 100MB')
+            ->set('contractUpload', UploadedFile::fake()->create('huge.pdf', 102401, 'application/pdf'))
+            ->assertHasErrors(['contractUpload' => 'The contractUpload field must not be greater than 102400 kilobytes.']);
+    }
 }
