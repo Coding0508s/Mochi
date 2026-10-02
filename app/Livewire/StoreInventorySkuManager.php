@@ -3,9 +3,8 @@
 namespace App\Livewire;
 
 use App\Models\StoreInventorySku;
-use App\Repositories\GrapeSeed\GnuboardShopItemRepository;
 use App\Repositories\Store\StoreInventorySkuRepository;
-use App\Services\Store\EcountApiClient;
+use App\Services\Store\StoreInventoryProductNameResolver;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
@@ -14,7 +13,6 @@ use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
-use Throwable;
 
 class StoreInventorySkuManager extends Component
 {
@@ -275,61 +273,17 @@ class StoreInventorySkuManager extends Component
         foreach ($skus as $sku) {
             $codes[] = (string) $sku->prod_cd;
         }
-        $codes = array_values(array_unique(array_filter(array_map(
-            static fn (string $c): string => strtoupper(trim($c)),
-            $codes
-        ), static fn (string $c): bool => $c !== '')));
 
-        $nameMap = [];
-        if ($codes !== []) {
-            try {
-                $nameMap = app(GnuboardShopItemRepository::class)->getProductNameMapByProductCodes($codes);
-            } catch (Throwable $exception) {
-                report($exception);
-            }
-        }
-
-        $missingForEcount = [];
-        foreach ($skus as $sku) {
-            $key = $this->normalizedProdCdKey((string) $sku->prod_cd);
-            if ($key === '') {
-                continue;
-            }
-            $gnuboardName = trim((string) ($nameMap[$key] ?? ''));
-            if ($gnuboardName === '' && $this->shouldResolveNamesFromEcount()) {
-                $missingForEcount[] = $key;
-            }
-        }
-
-        $ecountNameMap = [];
-        if ($missingForEcount !== []) {
-            try {
-                $ecountNameMap = app(EcountApiClient::class)->fetchProductDisplayNamesByCodes(array_values(array_unique($missingForEcount)));
-            } catch (Throwable $exception) {
-                report($exception);
-            }
-        }
+        $nameMap = app(StoreInventoryProductNameResolver::class)->namesForCodes($codes);
 
         $byId = [];
         foreach ($skus as $sku) {
             $key = $this->normalizedProdCdKey((string) $sku->prod_cd);
             $name = trim((string) ($nameMap[$key] ?? ''));
-            if ($name === '') {
-                $name = trim((string) ($ecountNameMap[$key] ?? ''));
-            }
             $byId[(int) $sku->id] = $name !== '' ? $name : '-';
         }
 
         return $byId;
-    }
-
-    private function shouldResolveNamesFromEcount(): bool
-    {
-        if (! (bool) config('store.ecount.fetch_product_names', true)) {
-            return false;
-        }
-
-        return strtolower((string) config('store.data_source', 'ecount')) === 'ecount';
     }
 
     private function normalizedProdCdKey(string $code): string

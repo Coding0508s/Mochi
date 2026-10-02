@@ -70,6 +70,8 @@ return [
         'product_basic_endpoint' => env('ECOUNT_API_PRODUCT_BASIC_ENDPOINT', '/OAPI/V2/InventoryBasic/GetBasicProductsList'),
         'product_basic_chunk_size' => max(1, (int) env('ECOUNT_PRODUCT_BASIC_CHUNK_SIZE', 20)),
         'fetch_product_names' => filter_var(env('ECOUNT_FETCH_PRODUCT_NAMES', 'true'), FILTER_VALIDATE_BOOLEAN),
+        // 실서버 품목조회는 10분에 1회. 0이면 간격 제한을 두지 않습니다.
+        'product_name_lookup_interval_seconds' => max(0, (int) env('ECOUNT_PRODUCT_NAME_LOOKUP_INTERVAL_SECONDS', 600)),
         'movement_endpoint' => env('ECOUNT_API_MOVEMENT_ENDPOINT', ''),
         'sale_list_endpoint' => env('ECOUNT_API_SALE_LIST_ENDPOINT', ''),
         'sale_list_include_com_code' => filter_var(env('ECOUNT_SALE_LIST_INCLUDE_COM_CODE', 'true'), FILTER_VALIDATE_BOOLEAN),

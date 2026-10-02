@@ -10,6 +10,7 @@ class StoreInventorySku extends Model
 {
     protected $fillable = [
         'prod_cd',
+        'product_name',
         'is_active',
         'sort_order',
         'memo',

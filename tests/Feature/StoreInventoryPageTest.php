@@ -212,6 +212,7 @@ class StoreInventoryPageTest extends TestCase
         ]);
 
         $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getProductNameMapByProductCodes')->andReturn([]);
         $mock->shouldReceive('getNotifyQuantityMapByProductCodes')
             ->once()
             ->andReturn(['P-NOTI' => 77]);
@@ -292,6 +293,7 @@ class StoreInventoryPageTest extends TestCase
         ]);
 
         $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getProductNameMapByProductCodes')->andReturn([]);
         $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
         $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn(['P-AUDIT' => 8]);
         $mock->shouldReceive('getCategoryPathMapByProductCodes')->once()->andReturn([]);
@@ -342,6 +344,7 @@ class StoreInventoryPageTest extends TestCase
         ]);
 
         $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getProductNameMapByProductCodes')->andReturn([]);
         $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
         $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn(['P-SRC' => 3]);
         $mock->shouldReceive('getCategoryPathMapByProductCodes')->once()->andReturn([]);
@@ -414,6 +417,7 @@ class StoreInventoryPageTest extends TestCase
         ]);
 
         $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getProductNameMapByProductCodes')->andReturn([]);
         $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
         $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn(['P-ACT-DED' => 95]);
         $mock->shouldReceive('getCategoryPathMapByProductCodes')->once()->andReturn([]);
@@ -455,6 +459,7 @@ class StoreInventoryPageTest extends TestCase
         ]);
 
         $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getProductNameMapByProductCodes')->andReturn([]);
         $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
         $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn(['P-UPD' => 7]);
         $mock->shouldReceive('getCategoryPathMapByProductCodes')->once()->andReturn([]);
@@ -511,6 +516,7 @@ class StoreInventoryPageTest extends TestCase
         ]);
 
         $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getProductNameMapByProductCodes')->andReturn([]);
         $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
         $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn(['P-MEMO' => 5]);
         $mock->shouldReceive('getCategoryPathMapByProductCodes')->once()->andReturn([]);
@@ -551,6 +557,7 @@ class StoreInventoryPageTest extends TestCase
         ]);
 
         $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getProductNameMapByProductCodes')->andReturn([]);
         $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
         $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn(['P-SAME' => 9]);
         $mock->shouldReceive('getCategoryPathMapByProductCodes')->once()->andReturn([]);
@@ -591,6 +598,7 @@ class StoreInventoryPageTest extends TestCase
         ]);
 
         $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getProductNameMapByProductCodes')->andReturn([]);
         $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->twice()->andReturn([]);
         $mock->shouldReceive('getStockQuantityMapByProductCodes')->twice()->andReturn(['P-NOADMIN' => 3]);
         $mock->shouldReceive('getCategoryPathMapByProductCodes')->twice()->andReturn([]);
@@ -631,6 +639,7 @@ class StoreInventoryPageTest extends TestCase
         ]);
 
         $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getProductNameMapByProductCodes')->andReturn([]);
         $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->twice()->andReturn([]);
         $mock->shouldReceive('getStockQuantityMapByProductCodes')->twice()->andReturn(['P-VALID' => 1]);
         $mock->shouldReceive('getCategoryPathMapByProductCodes')->twice()->andReturn([]);
@@ -1170,7 +1179,7 @@ class StoreInventoryPageTest extends TestCase
             ->assertSee('00P001')
             ->assertSee('00P025');
 
-        Http::assertSentCount(4);
+        Http::assertSentCount(3);
     }
 
     /** @test */
@@ -1253,6 +1262,7 @@ class StoreInventoryPageTest extends TestCase
         ]);
 
         $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getProductNameMapByProductCodes')->andReturn([]);
         $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
         $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn([]);
         $mock->shouldReceive('getCategoryPathMapByProductCodes')
@@ -1309,6 +1319,7 @@ class StoreInventoryPageTest extends TestCase
         ]);
 
         $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getProductNameMapByProductCodes')->andReturn([]);
         $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
         $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn([]);
         $mock->shouldReceive('getCategoryPathMapByProductCodes')
@@ -1365,6 +1376,7 @@ class StoreInventoryPageTest extends TestCase
         ]);
 
         $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getProductNameMapByProductCodes')->andReturn([]);
         $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
         $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn([]);
         $mock->shouldReceive('getCategoryPathMapByProductCodes')
@@ -1419,6 +1431,7 @@ class StoreInventoryPageTest extends TestCase
         ]);
 
         $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getProductNameMapByProductCodes')->andReturn([]);
         $mock->shouldReceive('getNotifyQuantityMapByProductCodes')->once()->andReturn([]);
         $mock->shouldReceive('getStockQuantityMapByProductCodes')->once()->andReturn([]);
         $mock->shouldReceive('getCategoryPathMapByProductCodes')->once()->andReturn([]);
@@ -1430,5 +1443,66 @@ class StoreInventoryPageTest extends TestCase
             ->test(StoreInventoryList::class)
             ->assertSet('items.0.category_path', '미분류')
             ->assertSee('미분류');
+    }
+
+    public function test_inventory_page_uses_saved_product_name_without_ecount_lookup(): void
+    {
+        StoreInventorySku::query()->create([
+            'prod_cd' => 'P-SAVED',
+            'product_name' => '저장된 상품명',
+            'is_active' => true,
+            'sort_order' => 0,
+        ]);
+
+        Http::fake([
+            'https://oapi.ecount.com/OAPI/V2/InventoryBalance/GetListInventoryBalanceStatus*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-SAVED', 'BAL_QTY' => '4'],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('store.inventory.index'))
+            ->assertOk()
+            ->assertSee('저장된 상품명');
+
+        Http::assertNotSent(function ($request): bool {
+            return str_contains($request->url(), 'GetBasicProductsList');
+        });
+    }
+
+    public function test_product_name_lookup_runs_once_within_the_interval(): void
+    {
+        Config::set('store.ecount.product_code', 'P-LIMIT');
+
+        Http::fake([
+            'https://oapi.ecount.com/OAPI/V2/InventoryBalance/GetListInventoryBalanceStatus*' => Http::response([
+                'Status' => '200',
+                'Data' => [
+                    'Result' => [
+                        ['PROD_CD' => 'P-LIMIT', 'BAL_QTY' => '1'],
+                    ],
+                ],
+            ], 200),
+            'https://oapi.ecount.com/OAPI/V2/InventoryBasic/GetBasicProductsList*' => Http::response([], 412),
+        ]);
+
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $this->get(route('store.inventory.index'))->assertOk();
+        $this->get(route('store.inventory.index'))->assertOk();
+
+        $lookupCount = collect(Http::recorded())
+            ->filter(fn (array $pair): bool => str_contains($pair[0]->url(), 'GetBasicProductsList'))
+            ->count();
+
+        $this->assertSame(1, $lookupCount);
     }
 }

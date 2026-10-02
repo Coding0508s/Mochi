@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use App\Livewire\StoreInventorySkuManager;
 use App\Models\StoreInventorySku;
 use App\Models\User;
+use App\Repositories\GrapeSeed\GnuboardShopItemRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Mockery;
 use Tests\TestCase;
 
 class StoreInventorySkuManagerPageTest extends TestCase
@@ -189,5 +191,30 @@ class StoreInventorySkuManagerPageTest extends TestCase
         $sku->refresh();
         $this->assertNull($sku->image_url);
         Storage::disk('public')->assertMissing('store-skus/legacy.png');
+    }
+
+    public function test_adding_sku_shows_gnuboard_name_without_ecount_lookup(): void
+    {
+        Config::set('store.data_source', 'ecount');
+        Config::set('store.ecount.fetch_product_names', true);
+        Config::set('store.ecount.base_url', 'https://oapi.ecount.com');
+        Config::set('store.ecount.session_id', 'session-test');
+
+        Http::fake();
+
+        $mock = Mockery::mock(GnuboardShopItemRepository::class);
+        $mock->shouldReceive('getProductNameMapByProductCodes')
+            ->andReturn(['NEWCODE' => '쇼핑몰 상품명']);
+        $this->app->instance(GnuboardShopItemRepository::class, $mock);
+
+        $admin = User::factory()->create(['is_admin' => true]);
+        $this->actingAs($admin);
+
+        Livewire::test(StoreInventorySkuManager::class)
+            ->set('newProdCd', 'NEWCODE')
+            ->call('addSku')
+            ->assertSee('쇼핑몰 상품명');
+
+        Http::assertNothingSent();
     }
 }

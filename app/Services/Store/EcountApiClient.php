@@ -202,10 +202,9 @@ final class EcountApiClient
         }
         $productCodes = array_values(array_unique($productCodes));
 
-        $nameMap = [];
-        if ((bool) config('store.ecount.fetch_product_names', true) && $productCodes !== []) {
-            $nameMap = $this->fetchBasicProductNames($productCodes);
-        }
+        $nameMap = $productCodes === []
+            ? []
+            : app(StoreInventoryProductNameResolver::class)->namesForCodes($productCodes);
 
         $notifyQtyMap = [];
         if ($productCodes !== []) {
@@ -254,7 +253,10 @@ final class EcountApiClient
                 : 0;
 
             $fromRowName = (string) $this->pick($row, ['PROD_DES', 'prod_des', 'product_name', 'item_name'], '');
-            $fromListName = ($productCode !== '' && $productCode !== '-') ? ($nameMap[$productCode] ?? null) : null;
+            $normalizedCodeKey = strtoupper(trim($productCode));
+            $fromListName = ($normalizedCodeKey !== '' && $normalizedCodeKey !== '-')
+                ? ($nameMap[$normalizedCodeKey] ?? null)
+                : null;
             $productName = $fromListName !== null && $fromListName !== ''
                 ? $fromListName
                 : ($fromRowName !== '' ? $fromRowName : '-');

@@ -39,6 +39,67 @@ class StoreInventorySkuRepository
     }
 
     /**
+     * @param  array<int, string>  $productCodes
+     * @return array<string, string> normalized_prod_cd => product_name
+     */
+    public function getStoredProductNameMapByProductCodes(array $productCodes): array
+    {
+        $codes = $this->normalizeCodes($productCodes);
+        if ($codes === []) {
+            return [];
+        }
+
+        return StoreInventorySku::query()
+            ->whereIn('prod_cd', $codes)
+            ->get(['prod_cd', 'product_name'])
+            ->reduce(function (array $carry, StoreInventorySku $sku): array {
+                $name = trim((string) ($sku->product_name ?? ''));
+                if ($name === '') {
+                    return $carry;
+                }
+
+                $carry[strtoupper(trim((string) $sku->prod_cd))] = $name;
+
+                return $carry;
+            }, []);
+    }
+
+    /**
+     * 비어 있는 품목명만 채웁니다. 이미 저장된 이름은 유지합니다.
+     *
+     * @param  array<string, string>  $namesByCode
+     */
+    public function fillEmptyProductNames(array $namesByCode): void
+    {
+        foreach ($namesByCode as $code => $name) {
+            $key = strtoupper(trim((string) $code));
+            $trimmed = trim((string) $name);
+            if ($key === '' || $trimmed === '') {
+                continue;
+            }
+
+            StoreInventorySku::query()
+                ->where('prod_cd', $key)
+                ->where(function ($query): void {
+                    $query->whereNull('product_name')->orWhere('product_name', '');
+                })
+                ->update(['product_name' => mb_substr($trimmed, 0, 255)]);
+        }
+    }
+
+    /**
+     * @param  array<int, string>  $productCodes
+     * @return array<int, string>
+     */
+    private function normalizeCodes(array $productCodes): array
+    {
+        return array_values(array_unique(array_filter(array_map(
+            static fn (string $code): string => strtoupper(trim($code)),
+            $productCodes
+        ), static fn (string $code): bool => $code !== '')));
+    }
+
+    /**
      * @return array<int, string>
      */
     public function getActiveProductCodes(): array
