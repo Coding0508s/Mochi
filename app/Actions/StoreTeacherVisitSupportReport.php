@@ -8,6 +8,7 @@ use App\Models\TeacherVisitSupportReport;
 use App\Models\User;
 use App\Support\CoachTeacherScope;
 use App\Support\CoachTeacherSupportPayload;
+use App\Support\InstitutionSupportTimeSlots;
 use App\Support\NullableFormInteger;
 use App\Support\SupportReportStoredMailNotifier;
 use App\Support\TeacherSupportReportSupportRecordBuilder;
@@ -113,9 +114,9 @@ class StoreTeacherVisitSupportReport
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public function validatedPayload(array $data): array
+    public function validatedPayload(array $data, ?string $preservedInterviewTime = null): array
     {
-        return $this->validate($data);
+        return $this->validate($data, $preservedInterviewTime);
     }
 
     private function authorize(Teacher $teacher, User $user): void
@@ -135,7 +136,7 @@ class StoreTeacherVisitSupportReport
     /**
      * @return array<string, mixed>
      */
-    private function validate(array $data): array
+    private function validate(array $data, ?string $preservedInterviewTime = null): array
     {
         $data = VisitObserveCurriculumRows::applyToPayload(
             NullableFormInteger::normalizePayload($data),
@@ -168,7 +169,7 @@ class StoreTeacherVisitSupportReport
                 'session_number' => ['nullable', 'integer', 'min:1', 'max:9'],
                 'semester_label' => ['nullable', 'string', 'max:100'],
                 'interview_date' => ['nullable', 'date'],
-                'interview_time' => ['nullable', 'string', 'max:10'],
+                'interview_time' => InstitutionSupportTimeSlots::rules($preservedInterviewTime),
                 'meeting_type' => ['nullable', 'string', 'max:50'],
                 'pre_request_notes' => ['nullable', 'string', 'max:1000'],
                 'monitoring_feedback' => array_filter([

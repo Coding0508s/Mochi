@@ -90,8 +90,11 @@
                                 </div>
                                 <div class="min-w-0">
                                     <label class="block text-xs text-gray-500 mb-1">면담 시간</label>
-                                    <input type="time" wire:model="visitForm.interview_time"
-                                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
+                                    <x-coach.interview-time-select
+                                        wire:model="visitForm.interview_time"
+                                        :value="$visitForm['interview_time'] ?? null"
+                                        error-key="visitForm.interview_time"
+                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header"/>
                                 </div>
                             </div>
                             <div class="sm:col-span-2">

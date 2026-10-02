@@ -85,7 +85,7 @@ class StoreTeacherDemoLessonSupportReport
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public function validatedPayload(array $data): array
+    public function validatedPayload(array $data, ?string $preservedInterviewTime = null): array
     {
         return $this->validate($data);
     }

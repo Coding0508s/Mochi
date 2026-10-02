@@ -1626,6 +1626,16 @@ class SupportCreateFormTest extends TestCase
             ->assertSet('formSupportTime', '14:30');
     }
 
+    public function test_coach_visit_interview_time_snaps_to_the_nearest_half_hour(): void
+    {
+        $this->travelTo('2026-10-02 18:23:00');
+
+        Livewire::actingAs(User::factory()->create())
+            ->withQueryParams(['team_menu' => 'coach'])
+            ->test(SupportCreateForm::class)
+            ->assertSet('visitForm.interview_time', '18:30');
+    }
+
     public function test_institution_support_save_rejects_times_that_are_not_half_hours(): void
     {
         Institution::query()->create([

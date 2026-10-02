@@ -31,6 +31,48 @@ final class InstitutionSupportTimeSlots
         return in_array($time, self::slots(), true);
     }
 
+    public static function defaultValue(): string
+    {
+        return self::nearest(now());
+    }
+
+    /**
+     * 비어 있으면 통과한다. 값이 있으면 30분 칸이거나, 수정 중인 기존 시각이어야 한다.
+     *
+     * @return list<mixed>
+     */
+    public static function rules(?string $preserved = null): array
+    {
+        return [
+            'nullable',
+            'string',
+            'max:10',
+            function (string $attribute, mixed $value, \Closure $fail) use ($preserved): void {
+                if (self::accepts($value, $preserved)) {
+                    return;
+                }
+
+                $fail('면담 시간은 30분 단위로 선택해 주세요.');
+            },
+        ];
+    }
+
+    public static function accepts(mixed $value, ?string $preserved = null): bool
+    {
+        if ($value === null || (is_string($value) && trim($value) === '')) {
+            return true;
+        }
+
+        if (! is_string($value)) {
+            return false;
+        }
+
+        $normalized = self::normalize($value);
+        $kept = self::normalize($preserved);
+
+        return $normalized !== null && (self::isSlot($normalized) || $normalized === $kept);
+    }
+
     public static function nearest(CarbonInterface $time): string
     {
         $rounded = $time->copy()->seconds(0);

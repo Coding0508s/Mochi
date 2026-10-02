@@ -246,6 +246,39 @@ class StoreTeacherVisitSupportReportTest extends TestCase
         Mail::assertNothingSent();
     }
 
+    public function test_interview_time_must_be_a_half_hour_unless_the_saved_time_is_kept(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $teacher = $this->createTeacher();
+        $payload = $this->visitPayload(false, null);
+        $payload['interview_time'] = '18:23';
+
+        try {
+            app(StoreTeacherVisitSupportReport::class)->execute(
+                (int) $teacher->ID,
+                $payload,
+                $admin,
+            );
+            $this->fail('30분이 아닌 면담 시간은 저장되면 안 됩니다.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                '면담 시간은 30분 단위로 선택해 주세요.',
+                $exception->validator->errors()->first('interview_time'),
+            );
+        }
+
+        $kept = app(StoreTeacherVisitSupportReport::class)->validatedPayload($payload, '18:23:00');
+        $this->assertSame('18:23', $kept['interview_time']);
+
+        $payload['interview_time'] = '18:30';
+        $saved = app(StoreTeacherVisitSupportReport::class)->execute(
+            (int) $teacher->ID,
+            $payload,
+            $admin,
+        );
+        $this->assertSame('18:30', $saved->interview_time);
+    }
+
     public function test_support_purpose_is_required(): void
     {
         $admin = User::factory()->admin()->create();

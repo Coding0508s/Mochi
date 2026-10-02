@@ -285,8 +285,11 @@
                             </div>
                             <div class="min-w-0">
                                 <label class="block text-sm font-medium text-gray-700 mb-1">면담 시간</label>
-                                <input type="time" wire:model.blur="visitForm.interview_time"
-                                       class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                                <x-coach.interview-time-select
+                                    wire:model.blur="visitForm.interview_time"
+                                    :value="$visitForm['interview_time'] ?? null"
+                                    error-key="visitForm.interview_time"
+                                    class="w-full py-1.5 px-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                             </div>
                         </div>
                     </div>

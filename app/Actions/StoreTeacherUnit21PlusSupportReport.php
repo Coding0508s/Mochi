@@ -8,6 +8,7 @@ use App\Models\TeacherUnit21PlusSupportReport;
 use App\Models\User;
 use App\Support\CoachTeacherScope;
 use App\Support\CoachTeacherSupportPayload;
+use App\Support\InstitutionSupportTimeSlots;
 use App\Support\NullableFormInteger;
 use App\Support\TeacherSupportNewTeacherDisplay;
 use App\Support\TeacherSupportSlotSync;
@@ -102,9 +103,9 @@ class StoreTeacherUnit21PlusSupportReport
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public function validatedPayload(array $data): array
+    public function validatedPayload(array $data, ?string $preservedInterviewTime = null): array
     {
-        return $this->validate($data);
+        return $this->validate($data, $preservedInterviewTime);
     }
 
     private function authorize(Teacher $teacher, User $user): void
@@ -124,7 +125,7 @@ class StoreTeacherUnit21PlusSupportReport
     /**
      * @return array<string, mixed>
      */
-    private function validate(array $data): array
+    private function validate(array $data, ?string $preservedInterviewTime = null): array
     {
         $data = NullableFormInteger::normalizePayload($data);
 
@@ -138,7 +139,7 @@ class StoreTeacherUnit21PlusSupportReport
             'session_number' => ['nullable', 'integer', 'min:1', 'max:9'],
             'semester_label' => ['nullable', 'string', 'max:100'],
             'interview_date' => ['nullable', 'date'],
-            'interview_time' => ['nullable', 'string', 'max:10'],
+            'interview_time' => InstitutionSupportTimeSlots::rules($preservedInterviewTime),
             'method' => ['nullable', 'string', 'max:50'],
             'progress_unit' => ['nullable', 'integer', 'min:0', 'max:99'],
             'progress_lesson' => ['nullable', 'integer', 'min:0', 'max:99'],

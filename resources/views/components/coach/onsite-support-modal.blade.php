@@ -92,8 +92,11 @@
                                 <div class="flex gap-2">
                                     <input type="date" wire:model="onsiteForm.interview_date"
                                            class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
-                                    <input type="time" wire:model="onsiteForm.interview_time"
-                                           class="w-32 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
+                                    <x-coach.interview-time-select
+                                        wire:model="onsiteForm.interview_time"
+                                        :value="$onsiteForm['interview_time'] ?? null"
+                                        error-key="onsiteForm.interview_time"
+                                        class="w-32 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header"/>
                                 </div>
                             </div>
                             <div>

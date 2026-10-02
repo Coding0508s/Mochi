@@ -70,8 +70,11 @@
                                 <div class="flex gap-2">
                                     <input type="date" wire:model="unit21PlusForm.interview_date"
                                            class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
-                                    <input type="time" wire:model="unit21PlusForm.interview_time"
-                                           class="w-32 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
+                                    <x-coach.interview-time-select
+                                        wire:model="unit21PlusForm.interview_time"
+                                        :value="$unit21PlusForm['interview_time'] ?? null"
+                                        error-key="unit21PlusForm.interview_time"
+                                        class="w-32 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header"/>
                                 </div>
                             </div>
                             <div>

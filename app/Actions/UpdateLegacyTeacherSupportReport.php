@@ -67,8 +67,12 @@ final class UpdateLegacyTeacherSupportReport
 
         /** @var object{validatedPayload: callable} $store */
         $store = app($storeClass);
+        $preservedInterviewTime = $row->interview_time ?? $row->MeetingTime ?? $row->Meet_Time ?? null;
         $validated = CoachTeacherSupportPayload::applyTrustedContext(
-            $store->validatedPayload($data),
+            $store->validatedPayload(
+                $data,
+                is_scalar($preservedInterviewTime) ? (string) $preservedInterviewTime : null,
+            ),
             $teacher,
         );
 

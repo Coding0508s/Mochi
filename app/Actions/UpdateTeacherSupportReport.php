@@ -94,8 +94,12 @@ final class UpdateTeacherSupportReport
 
         /** @var object{validatedPayload: callable} $store */
         $store = app($storeClass);
+        $preservedInterviewTime = $report->getAttribute('interview_time');
         $validated = CoachTeacherSupportPayload::applyTrustedContext(
-            $store->validatedPayload($data),
+            $store->validatedPayload(
+                $data,
+                is_scalar($preservedInterviewTime) ? (string) $preservedInterviewTime : null,
+            ),
             $teacher,
         );
 

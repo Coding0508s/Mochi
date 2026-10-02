@@ -28,6 +28,17 @@ class InstitutionSupportTimeSlotsTest extends TestCase
         $this->assertSame('00:00', InstitutionSupportTimeSlots::nearest(Carbon::parse('2026-10-02 23:50:00')));
     }
 
+    public function test_accepts_half_hours_and_a_saved_time_that_is_being_kept(): void
+    {
+        $this->assertTrue(InstitutionSupportTimeSlots::accepts(null));
+        $this->assertTrue(InstitutionSupportTimeSlots::accepts(''));
+        $this->assertTrue(InstitutionSupportTimeSlots::accepts('18:30'));
+        $this->assertTrue(InstitutionSupportTimeSlots::accepts('18:30:00'));
+        $this->assertFalse(InstitutionSupportTimeSlots::accepts('18:23'));
+        $this->assertTrue(InstitutionSupportTimeSlots::accepts('18:23', '18:23:00'));
+        $this->assertFalse(InstitutionSupportTimeSlots::accepts('18:23', '18:00'));
+    }
+
     public function test_options_keep_a_saved_time_that_is_not_on_a_slot(): void
     {
         $options = InstitutionSupportTimeSlots::optionsIncluding('11:20:00');

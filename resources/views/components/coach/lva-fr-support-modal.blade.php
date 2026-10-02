@@ -92,8 +92,11 @@
                                 <div class="flex gap-2">
                                     <input type="date" wire:model="lvaFrForm.interview_date"
                                            class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
-                                    <input type="time" wire:model="lvaFrForm.interview_time"
-                                           class="w-32 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header">
+                                    <x-coach.interview-time-select
+                                        wire:model="lvaFrForm.interview_time"
+                                        :value="$lvaFrForm['interview_time'] ?? null"
+                                        error-key="lvaFrForm.interview_time"
+                                        class="w-32 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-mochi-header"/>
                                 </div>
                             </div>
                             <div>

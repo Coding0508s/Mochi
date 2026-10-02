@@ -8,6 +8,7 @@ use App\Models\TeacherLsOnsiteLvaSupportReport;
 use App\Models\User;
 use App\Support\CoachTeacherScope;
 use App\Support\CoachTeacherSupportPayload;
+use App\Support\InstitutionSupportTimeSlots;
 use App\Support\NullableFormInteger;
 use App\Support\TeacherSupportNewTeacherDisplay;
 use App\Support\TeacherSupportSlotSync;
@@ -98,9 +99,9 @@ class StoreTeacherLsOnsiteLvaSupportReport
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public function validatedPayload(array $data): array
+    public function validatedPayload(array $data, ?string $preservedInterviewTime = null): array
     {
-        return $this->validate($data);
+        return $this->validate($data, $preservedInterviewTime);
     }
 
     private function authorize(Teacher $teacher, User $user): void
@@ -120,7 +121,7 @@ class StoreTeacherLsOnsiteLvaSupportReport
     /**
      * @return array<string, mixed>
      */
-    private function validate(array $data): array
+    private function validate(array $data, ?string $preservedInterviewTime = null): array
     {
         $data = NullableFormInteger::normalizePayload($data);
 
@@ -139,7 +140,7 @@ class StoreTeacherLsOnsiteLvaSupportReport
             'session_number' => ['nullable', 'integer', 'min:1', 'max:9'],
             'semester_label' => ['nullable', 'string', 'max:100'],
             'interview_date' => ['nullable', 'date'],
-            'interview_time' => ['nullable', 'string', 'max:10'],
+            'interview_time' => InstitutionSupportTimeSlots::rules($preservedInterviewTime),
             'method' => ['nullable', 'string', 'max:50'],
             'other_notes' => ['nullable', 'string', 'max:2000'],
             'lesson_length_minutes' => ['nullable', 'integer', 'min:0', 'max:999'],
