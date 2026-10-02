@@ -16,6 +16,7 @@ use App\Models\SupportRecord;
 use App\Models\Teacher;
 use App\Models\UrgentSupportNotification;
 use App\Models\User;
+use App\Support\InstitutionSupportTimeSlots;
 use App\Support\SkCodeNormalizer;
 use App\Support\SupportReportStoredMailNotifier;
 use App\Support\TeamMenuContext;
@@ -133,6 +134,7 @@ class SupportCreateForm extends Component
             ? (string) $requestedTeamMenu
             : (TeamMenuContext::activeMenu($user) ?? 'co');
         $this->applyInitialReportMode();
+        $this->snapInstitutionSupportTime();
         $this->applyDefaultCompletionForReportMode();
 
         $prefillId = $potentialTargetId ?? request()->integer('potential_target_id');
@@ -240,6 +242,30 @@ class SupportCreateForm extends Component
         $this->formCompleted = $this->reportMode === 'institution';
     }
 
+    /**
+     * 기관 지원 작성은 30분 칸만 고른다. 화면을 열 때 지금 시각에 가장 가까운 칸으로 맞춘다.
+     */
+    private function snapInstitutionSupportTime(): void
+    {
+        if ($this->reportMode !== 'institution') {
+            return;
+        }
+
+        if (InstitutionSupportTimeSlots::isSlot($this->formSupportTime)) {
+            return;
+        }
+
+        $this->formSupportTime = InstitutionSupportTimeSlots::nearest(now());
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function institutionSupportTimeOptions(): array
+    {
+        return InstitutionSupportTimeSlots::optionsIncluding($this->formSupportTime);
+    }
+
     public function setReportMode(string $mode): void
     {
         if (! in_array($mode, ['institution', 'teacher', 'issue'], true)) {
@@ -262,6 +288,7 @@ class SupportCreateForm extends Component
         $this->reportMode = $mode;
 
         if ($previousMode !== $this->reportMode) {
+            $this->snapInstitutionSupportTime();
             $this->applyDefaultCompletionForReportMode();
             $this->syncCommunicationTemplatesOnModeChange($previousMode);
             $this->formTeacherId = null;
@@ -959,11 +986,16 @@ class SupportCreateForm extends Component
         }
 
         $rules = $this->rules;
+        $messages = [];
+        if ($this->reportMode === 'institution') {
+            $rules['formSupportTime'] = ['required', InstitutionSupportTimeSlots::VALIDATION_REGEX];
+            $messages['formSupportTime.regex'] = '지원 시간은 30분 단위로 선택해 주세요.';
+        }
         if ($this->reportMode === 'teacher') {
             $rules['formTarget'] = ['required', 'string', 'max:255'];
         }
 
-        $this->validate($rules);
+        $this->validate($rules, $messages);
 
         if ($this->formPotentialTargetId !== null && ! config('potential_institutions.show_support_report_ui')) {
             $this->addError('formSkCode', '잠재기관에서는 기관 지원 보고서 작성 기능을 사용하지 않습니다.');

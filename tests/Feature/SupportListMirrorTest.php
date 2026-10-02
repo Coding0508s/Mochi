@@ -147,7 +147,7 @@ class SupportListMirrorTest extends TestCase
             ->call('openDetailModal', $record->ID)
             ->call('startModalEdit')
             ->set('formSupportDate', '2026-04-12')
-            ->set('formSupportTime', '11:20')
+            ->set('formSupportTime', '11:30')
             ->set('formSupportType', '대면')
             ->set('formToAccount', '수정된 소통 내용')
             ->call('save')
@@ -157,7 +157,7 @@ class SupportListMirrorTest extends TestCase
             'AccountName' => '편집 대상 기관',
             'AccountManager' => '잠재 담당자',
             'MeetingDate' => '2026-04-12 00:00:00',
-            'MeetingTime' => '11:20',
+            'MeetingTime' => '11:30',
             'ConsultingType' => '대면',
             'Possibility' => 'A',
             'Description' => '수정된 소통 내용',
@@ -220,7 +220,7 @@ class SupportListMirrorTest extends TestCase
             ->call('openDetailModal', $record->ID)
             ->call('startModalEdit')
             ->set('formSupportDate', '2026-04-12')
-            ->set('formSupportTime', '11:20')
+            ->set('formSupportTime', '11:30')
             ->call('save')
             ->assertHasNoErrors();
 
@@ -333,5 +333,64 @@ class SupportListMirrorTest extends TestCase
             ->assertSee('허용 형식: PDF, 이미지(JPG, PNG, GIF, WEBP), Word, Excel · 최대 100MB')
             ->set('contractUpload', UploadedFile::fake()->create('huge.pdf', 102401, 'application/pdf'))
             ->assertHasErrors(['contractUpload' => 'The contractUpload field must not be greater than 102400 kilobytes.']);
+    }
+
+    public function test_edit_keeps_a_saved_time_that_is_not_a_half_hour_until_a_slot_is_chosen(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-EDIT-TIME',
+            'AccountName' => '시간 유지 기관',
+        ]);
+
+        $record = SupportRecord::query()->create([
+            'Year' => 2026,
+            'SK_Code' => 'SK-EDIT-TIME',
+            'Account_Name' => '시간 유지 기관',
+            'TR_Name' => '담당',
+            'Support_Date' => '2026-04-01',
+            'Meet_Time' => '11:20:00',
+            'Support_Type' => '전화',
+            'Target' => '원장',
+            'TO_Account' => '기존 내용',
+            'Status' => '진행중',
+            'CreatedDate' => now(),
+        ]);
+
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(SupportList::class)
+            ->call('openDetailModal', $record->ID)
+            ->call('startModalEdit')
+            ->assertSet('formSupportTime', '11:20')
+            ->assertSee('11:20')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_SupportInfo_Account', [
+            'ID' => $record->ID,
+            'Meet_Time' => '11:20:00',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(SupportList::class)
+            ->call('openDetailModal', $record->ID)
+            ->call('startModalEdit')
+            ->set('formSupportTime', '10:10')
+            ->call('save')
+            ->assertHasErrors(['formSupportTime' => '지원 시간은 30분 단위로 선택해 주세요.']);
+
+        Livewire::actingAs($admin)
+            ->test(SupportList::class)
+            ->call('openDetailModal', $record->ID)
+            ->call('startModalEdit')
+            ->set('formSupportTime', '11:30')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('S_SupportInfo_Account', [
+            'ID' => $record->ID,
+            'Meet_Time' => '11:30:00',
+        ]);
     }
 }

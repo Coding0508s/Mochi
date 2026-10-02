@@ -428,11 +428,18 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             지원 시간 <span class="text-red-500">*</span>
                         </label>
-                        <input type="time"
-                               wire:model="formSupportTime"
-                               @disabled(!$institutionSelected)
-                               class="w-full py-1.5 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
-                                      {{ $institutionSelected ? 'border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}"/>
+                        <select wire:model="formSupportTime"
+                                @disabled(!$institutionSelected)
+                                class="w-full py-1.5 px-3 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
+                                       {{ $errors->has('formSupportTime') ? 'border-red-400' : '' }}
+                                       {{ $institutionSelected ? 'border-gray-300' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' }}">
+                            @foreach($this->institutionSupportTimeOptions() as $timeOption)
+                                <option value="{{ $timeOption }}">{{ $timeOption }}</option>
+                            @endforeach
+                        </select>
+                        @error('formSupportTime')
+                            <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <div>

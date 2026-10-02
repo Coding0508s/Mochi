@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\ContractDocument;
 use App\Models\Institution;
 use App\Models\SupportRecord;
+use App\Support\InstitutionSupportTimeSlots;
 use App\Support\SupportRecordCascadeDeleter;
 use App\Support\SupportRecordTeacherCompletionSync;
 use App\Support\SupportReportStoredMailNotifier;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -634,7 +636,14 @@ class SupportList extends Component
         $wasCompleted = $record->isCompleted();
 
         $this->formSupportTime = $this->normalizeTimeForInput($this->formSupportTime);
-        $this->validate();
+        $allowedTimes = InstitutionSupportTimeSlots::optionsIncluding(
+            $this->normalizeTimeForInput($record->Meet_Time),
+        );
+        $rules = $this->rules;
+        $rules['formSupportTime'] = ['required', Rule::in($allowedTimes)];
+        $this->validate($rules, [
+            'formSupportTime.in' => '지원 시간은 30분 단위로 선택해 주세요.',
+        ]);
 
         DB::transaction(function (): void {
             $data = SupportRecord::filterAttributesForTable([
@@ -765,6 +774,14 @@ class SupportList extends Component
             'contractDocumentRows' => $contractDocumentRows,
             'crossTeamReadOnly' => TeamMenuContext::isCrossTeamReadOnlyContext(auth()->user()),
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function institutionSupportTimeOptions(): array
+    {
+        return InstitutionSupportTimeSlots::optionsIncluding($this->formSupportTime);
     }
 
     private function normalizeTimeForInput(mixed $value): string

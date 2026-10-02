@@ -1233,7 +1233,7 @@ class SupportCreateFormTest extends TestCase
             ->test(SupportCreateForm::class)
             ->call('selectInstitution', 'SK-CONTRACT-1')
             ->set('formSupportDate', '2026-04-11')
-            ->set('formSupportTime', '10:10')
+            ->set('formSupportTime', '10:00')
             ->call('save')
             ->assertHasNoErrors();
 
@@ -1262,7 +1262,7 @@ class SupportCreateFormTest extends TestCase
             ->test(SupportCreateForm::class)
             ->call('selectInstitution', '', true, (int) $potential->ID)
             ->set('formSupportDate', '2026-04-21')
-            ->set('formSupportTime', '15:10')
+            ->set('formSupportTime', '15:00')
             ->set('formSupportType', '대면')
             ->set('formToAccount', '무SK 잠재기관 소통')
             ->set('formToDepart', '내부 공유')
@@ -1280,7 +1280,7 @@ class SupportCreateFormTest extends TestCase
             'AccountName' => '무SK 잠재 기관',
             'AccountManager' => '잠재 담당자',
             'MeetingDate' => '2026-04-21 00:00:00',
-            'MeetingTime' => '15:10',
+            'MeetingTime' => '15:00',
             'ConsultingType' => '대면',
             'Possibility' => 'C',
         ]);
@@ -1328,7 +1328,7 @@ class SupportCreateFormTest extends TestCase
             ->test(SupportCreateForm::class)
             ->call('selectInstitution', '', true, (int) $potential->ID)
             ->set('formSupportDate', '2026-04-22')
-            ->set('formSupportTime', '11:20')
+            ->set('formSupportTime', '11:30')
             ->set('sfUpload', $upload)
             ->call('save')
             ->assertHasErrors(['sfUpload']);
@@ -1360,7 +1360,7 @@ class SupportCreateFormTest extends TestCase
             ->test(SupportCreateForm::class)
             ->call('selectInstitution', 'SK-SF-1')
             ->set('formSupportDate', '2026-04-11')
-            ->set('formSupportTime', '10:10')
+            ->set('formSupportTime', '10:00')
             ->set('sfUpload', $upload)
             ->call('save')
             ->assertHasNoErrors();
@@ -1609,5 +1609,36 @@ class SupportCreateFormTest extends TestCase
         Livewire::actingAs($user)
             ->test(SupportCreateForm::class, ['potentialTargetId' => (int) $target->ID])
             ->assertSet('formPotentialTargetId', null);
+    }
+
+    public function test_institution_support_time_snaps_to_the_nearest_half_hour(): void
+    {
+        $user = User::factory()->create();
+
+        $this->travelTo('2026-10-02 14:20:00');
+
+        Livewire::actingAs($user)
+            ->withQueryParams(['team_menu' => 'coach'])
+            ->test(SupportCreateForm::class)
+            ->assertSet('reportMode', 'teacher')
+            ->assertSet('formSupportTime', '14:20')
+            ->call('setReportMode', 'institution')
+            ->assertSet('formSupportTime', '14:30');
+    }
+
+    public function test_institution_support_save_rejects_times_that_are_not_half_hours(): void
+    {
+        Institution::query()->create([
+            'SKcode' => 'SK-HALF-1',
+            'AccountName' => '30분 기관',
+        ]);
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(SupportCreateForm::class)
+            ->call('selectInstitution', 'SK-HALF-1')
+            ->set('formSupportDate', '2026-10-02')
+            ->set('formSupportTime', '10:10')
+            ->call('save')
+            ->assertHasErrors(['formSupportTime' => '지원 시간은 30분 단위로 선택해 주세요.']);
     }
 }
