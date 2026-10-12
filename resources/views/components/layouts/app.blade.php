@@ -269,7 +269,8 @@
 
             {{-- ── 일정 관리 ── --}}
             @php
-                $scheduleMenuEnabled = $canSeeManagementMenus;
+                $canSeeScheduleCalendar = $canSeeManagementMenus || (bool) ($sidebarUser?->isCsTeam());
+                $scheduleMenuEnabled = $canSeeScheduleCalendar;
             @endphp
             <div class="sidebar-group">
                 <button type="button"
@@ -292,13 +293,19 @@
                 </button>
 
                 <div x-show="openScheduleManagement" class="sidebar-sublist">
-                    @if($scheduleMenuEnabled)
+                    @if($canSeeScheduleCalendar)
                         <a href="{{ route('schedules.index') }}"
                            class="sidebar-subitem sidebar-subitem-row sidebar-focusable
                                   {{ request()->routeIs('schedules.*') ? 'sidebar-subitem-active' : '' }}"
                            @if(request()->routeIs('schedules.*')) aria-current="page" @endif>
                             <span class="sidebar-subitem-label">일정 캘린더</span>
                         </a>
+                    @else
+                        <span class="sidebar-subitem sidebar-subitem-row opacity-50 cursor-not-allowed">
+                            <span class="sidebar-subitem-label">일정 캘린더</span>
+                        </span>
+                    @endif
+                    @if($canSeeManagementMenus)
                         <a href="{{ route('shared-supplies.index') }}"
                            class="sidebar-subitem sidebar-subitem-row sidebar-focusable
                                   {{ request()->routeIs('shared-supplies.*') ? 'sidebar-subitem-active' : '' }}"
@@ -312,9 +319,6 @@
                             <span class="sidebar-subitem-label">차량별 사용 내역</span>
                         </a>
                     @else
-                        <span class="sidebar-subitem sidebar-subitem-row opacity-50 cursor-not-allowed">
-                            <span class="sidebar-subitem-label">일정 캘린더</span>
-                        </span>
                         <span class="sidebar-subitem sidebar-subitem-row opacity-50 cursor-not-allowed">
                             <span class="sidebar-subitem-label">공용품 관리</span>
                         </span>

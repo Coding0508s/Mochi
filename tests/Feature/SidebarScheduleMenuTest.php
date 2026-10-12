@@ -30,6 +30,24 @@ class SidebarScheduleMenuTest extends TestCase
         $this->assertStringNotContainsString('href="'.route('vehicle-usage-history.index').'"', $content);
     }
 
+    public function test_cs_team_sees_only_schedule_calendar_in_sidebar(): void
+    {
+        $user = User::factory()->create([
+            'team' => 'CS',
+            'is_admin' => false,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('schedules.index'));
+        $response->assertOk();
+
+        $content = $response->getContent();
+        $this->assertIsString($content);
+        $this->assertStringContainsString('href="'.route('schedules.index').'"', $content);
+        $this->assertStringNotContainsString('href="'.route('shared-supplies.index').'"', $content);
+        $this->assertStringNotContainsString('href="'.route('vehicle-usage-history.index').'"', $content);
+        $this->assertStringNotContainsString('aria-disabled="true"', $content);
+    }
+
     public function test_schedule_menu_is_enabled_in_sidebar_for_admin(): void
     {
         $admin = User::factory()->admin()->create([
