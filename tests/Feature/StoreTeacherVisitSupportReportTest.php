@@ -379,6 +379,13 @@ class StoreTeacherVisitSupportReportTest extends TestCase
                     'class' => '',
                     'age' => '',
                 ],
+                [
+                    'type' => 'GrapeSEED',
+                    'unit' => 9,
+                    'lesson' => 1,
+                    'class' => 'B반',
+                    'age' => '7',
+                ],
             ],
         ]);
 
@@ -393,6 +400,8 @@ class StoreTeacherVisitSupportReportTest extends TestCase
         $this->assertSame('A반', $report->observe_class);
         $this->assertSame('LittleSEED', $report->observe_curriculum_rows[1]['type']);
         $this->assertSame(4, $report->observe_curriculum_rows[1]['unit']);
+        $this->assertSame('GrapeSEED', $report->observe_curriculum_rows[2]['type']);
+        $this->assertSame(9, $report->observe_curriculum_rows[2]['unit']);
     }
 
     public function test_rejects_duplicate_completed_report_on_same_teacher_and_date(): void

@@ -13,14 +13,25 @@ class VisitObserveCurriculumRowsTest extends TestCase
         $this->assertSame(['GrapeSEED', 'LittleSEED'], VisitObserveCurriculumRows::addableTypes([]));
     }
 
-    public function test_adds_grapeseed_and_littleseed_rows_once_each(): void
+    public function test_adds_the_same_curriculum_more_than_once_until_the_row_cap(): void
     {
         $rows = VisitObserveCurriculumRows::add([], 'LittleSEED');
         $rows = VisitObserveCurriculumRows::add($rows, 'GrapeSEED');
         $rows = VisitObserveCurriculumRows::add($rows, 'LittleSEED');
 
-        $this->assertSame(['LittleSEED', 'GrapeSEED'], array_column($rows, 'type'));
+        $this->assertSame(['LittleSEED', 'GrapeSEED', 'LittleSEED'], array_column($rows, 'type'));
+        $this->assertSame(['GrapeSEED', 'LittleSEED'], VisitObserveCurriculumRows::addableTypes($rows));
+
+        while (count($rows) < VisitObserveCurriculumRows::MAX_ROWS) {
+            $rows = VisitObserveCurriculumRows::add($rows, 'GrapeSEED');
+        }
+
+        $this->assertCount(VisitObserveCurriculumRows::MAX_ROWS, $rows);
         $this->assertSame([], VisitObserveCurriculumRows::addableTypes($rows));
+        $this->assertCount(
+            VisitObserveCurriculumRows::MAX_ROWS,
+            VisitObserveCurriculumRows::add($rows, 'GrapeSEED'),
+        );
     }
 
     public function test_can_remove_grapeseed_row(): void

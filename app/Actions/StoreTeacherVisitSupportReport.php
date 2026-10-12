@@ -159,7 +159,7 @@ class StoreTeacherVisitSupportReport
                 'observe_summary_extra' => ['nullable', 'string', 'max:255'],
                 'observe_class' => ['nullable', 'string', 'max:50'],
                 'observe_age' => ['nullable', 'string', 'max:50'],
-                'observe_rows' => ['nullable', 'array', 'max:4'],
+                'observe_rows' => ['nullable', 'array', 'max:'.VisitObserveCurriculumRows::MAX_ROWS],
                 'observe_rows.*.type' => ['required', 'string', Rule::in(VisitObserveCurriculumRows::types())],
                 'observe_rows.*.unit' => ['nullable', 'integer', 'min:0', 'max:99'],
                 'observe_rows.*.lesson' => ['nullable', 'integer', 'min:0', 'max:99'],

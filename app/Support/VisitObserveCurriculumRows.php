@@ -12,6 +12,8 @@ final class VisitObserveCurriculumRows
 
     public const TYPE_DAY = 'Day';
 
+    public const MAX_ROWS = 8;
+
     /**
      * @return list<string>
      */
@@ -54,19 +56,21 @@ final class VisitObserveCurriculumRows
     public static function normalize(array $rows): array
     {
         $normalized = [];
-        $seen = [];
 
         foreach ($rows as $row) {
+            if (count($normalized) >= self::MAX_ROWS) {
+                break;
+            }
+
             if (! is_array($row)) {
                 continue;
             }
 
             $type = (string) ($row['type'] ?? '');
-            if (! in_array($type, self::types(), true) || in_array($type, $seen, true)) {
+            if (! in_array($type, self::types(), true)) {
                 continue;
             }
 
-            $seen[] = $type;
             $normalized[] = [
                 'type' => $type,
                 'unit' => self::nullableInt($row['unit'] ?? null),
@@ -85,12 +89,11 @@ final class VisitObserveCurriculumRows
      */
     public static function addableTypes(array $rows): array
     {
-        $used = array_column(self::normalize($rows), 'type');
+        if (count(self::normalize($rows)) >= self::MAX_ROWS) {
+            return [];
+        }
 
-        return array_values(array_filter(
-            [self::TYPE_GRAPESEED, self::TYPE_LITTLESEED],
-            fn (string $type): bool => ! in_array($type, $used, true),
-        ));
+        return [self::TYPE_GRAPESEED, self::TYPE_LITTLESEED];
     }
 
     /**

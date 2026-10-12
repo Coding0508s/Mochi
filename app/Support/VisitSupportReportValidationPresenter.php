@@ -41,6 +41,7 @@ final class VisitSupportReportValidationPresenter
             'observe_lesson.integer' => 'Lesson은 0~99 사이 숫자로 입력해 주세요.',
             'observe_lesson.min' => 'Lesson은 0~99 사이 숫자로 입력해 주세요.',
             'observe_lesson.max' => 'Lesson은 0~99 사이 숫자로 입력해 주세요.',
+            'observe_rows.max' => '참관 커리큘럼 행은 최대 8줄까지 추가할 수 있습니다.',
             'observe_rows.*.unit.integer' => 'Unit은 0~99 사이 숫자로 입력해 주세요.',
             'observe_rows.*.unit.min' => 'Unit은 0~99 사이 숫자로 입력해 주세요.',
             'observe_rows.*.unit.max' => 'Unit은 0~99 사이 숫자로 입력해 주세요.',

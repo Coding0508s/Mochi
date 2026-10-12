@@ -10,7 +10,7 @@
 
 <div class="space-y-3">
     @foreach($observeRows as $index => $observeRow)
-        <div wire:key="visit-observe-row-{{ $observeRow['type'] ?? $index }}" class="grid grid-cols-1 gap-3 sm:grid-cols-12">
+        <div wire:key="visit-observe-row-{{ $index }}" class="grid grid-cols-1 gap-3 sm:grid-cols-12">
             <div class="sm:col-span-2">
                 <span class="{{ $observeLabelClass }}">커리큘럼</span>
                 <div class="{{ $observeTypeClass }}">{{ $observeRow['type'] ?? 'GrapeSEED' }}</div>

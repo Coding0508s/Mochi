@@ -578,7 +578,10 @@ class SupportCreateFormTest extends TestCase
             ->assertSee('SET')
             ->assertSee('Day')
             ->call('addVisitObserveRow', 'GrapeSEED')
-            ->assertSeeHtml('visitForm.observe_rows.1.unit');
+            ->assertSeeHtml('visitForm.observe_rows.1.unit')
+            ->call('addVisitObserveRow', 'LittleSEED')
+            ->assertSeeHtml('visitForm.observe_rows.2.unit')
+            ->assertSee('참관한 커리큘럼 행 추가');
     }
 
     public function test_support_method_selects_sync_on_change(): void
